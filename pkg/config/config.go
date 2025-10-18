@@ -1,0 +1,128 @@
+// Package config provides configuration management for the Tor client.
+package config
+
+import (
+	"fmt"
+	"time"
+)
+
+// Config represents the Tor client configuration
+type Config struct {
+	// Network settings
+	SocksPort           int      // SOCKS5 proxy port (default: 9050)
+	ControlPort         int      // Control protocol port (default: 9051)
+	DataDirectory       string   // Directory for persistent state
+	
+	// Circuit settings
+	CircuitBuildTimeout time.Duration // Max time to build a circuit (default: 60s)
+	MaxCircuitDirtiness time.Duration // Max time to use a circuit (default: 10m)
+	NewCircuitPeriod    time.Duration // How often to rotate circuits (default: 30s)
+	NumEntryGuards      int           // Number of entry guards to use (default: 3)
+	
+	// Path selection
+	UseEntryGuards      bool     // Whether to use entry guards (default: true)
+	UseBridges          bool     // Whether to use bridges (default: false)
+	BridgeAddresses     []string // Bridge addresses if UseBridges is true
+	ExcludeNodes        []string // Nodes to exclude from path selection
+	ExcludeExitNodes    []string // Exit nodes to exclude
+	
+	// Network behavior
+	ConnLimit           int      // Max concurrent connections (default: 1000)
+	DormantTimeout      time.Duration // Time before entering dormant mode (default: 24h)
+	
+	// Onion service settings
+	OnionServices       []OnionServiceConfig
+	
+	// Logging
+	LogLevel            string   // Log level: debug, info, warn, error (default: info)
+}
+
+// OnionServiceConfig represents configuration for a single onion service
+type OnionServiceConfig struct {
+	ServiceDir  string            // Directory for service keys and state
+	VirtualPort int               // Virtual port for the onion service
+	TargetAddr  string            // Target address (localhost:port)
+	MaxStreams  int               // Max concurrent streams (default: 0 = unlimited)
+	ClientAuth  map[string]string // Client authorization keys
+}
+
+// DefaultConfig returns a configuration with sensible defaults
+func DefaultConfig() *Config {
+	return &Config{
+		SocksPort:           9050,
+		ControlPort:         9051,
+		DataDirectory:       "/var/lib/tor",
+		CircuitBuildTimeout: 60 * time.Second,
+		MaxCircuitDirtiness: 10 * time.Minute,
+		NewCircuitPeriod:    30 * time.Second,
+		NumEntryGuards:      3,
+		UseEntryGuards:      true,
+		UseBridges:          false,
+		BridgeAddresses:     []string{},
+		ExcludeNodes:        []string{},
+		ExcludeExitNodes:    []string{},
+		ConnLimit:           1000,
+		DormantTimeout:      24 * time.Hour,
+		OnionServices:       []OnionServiceConfig{},
+		LogLevel:            "info",
+	}
+}
+
+// Validate checks if the configuration is valid
+func (c *Config) Validate() error {
+	if c.SocksPort < 0 || c.SocksPort > 65535 {
+		return fmt.Errorf("invalid SocksPort: %d", c.SocksPort)
+	}
+	if c.ControlPort < 0 || c.ControlPort > 65535 {
+		return fmt.Errorf("invalid ControlPort: %d", c.ControlPort)
+	}
+	if c.CircuitBuildTimeout <= 0 {
+		return fmt.Errorf("CircuitBuildTimeout must be positive")
+	}
+	if c.MaxCircuitDirtiness <= 0 {
+		return fmt.Errorf("MaxCircuitDirtiness must be positive")
+	}
+	if c.NumEntryGuards < 1 {
+		return fmt.Errorf("NumEntryGuards must be at least 1")
+	}
+	if c.ConnLimit < 1 {
+		return fmt.Errorf("ConnLimit must be at least 1")
+	}
+	
+	// Validate log level
+	validLogLevels := map[string]bool{
+		"debug": true,
+		"info":  true,
+		"warn":  true,
+		"error": true,
+	}
+	if !validLogLevels[c.LogLevel] {
+		return fmt.Errorf("invalid LogLevel: %s (must be debug, info, warn, or error)", c.LogLevel)
+	}
+	
+	// Validate onion service configs
+	for i, os := range c.OnionServices {
+		if os.VirtualPort < 1 || os.VirtualPort > 65535 {
+			return fmt.Errorf("onion service %d: invalid VirtualPort: %d", i, os.VirtualPort)
+		}
+		if os.TargetAddr == "" {
+			return fmt.Errorf("onion service %d: TargetAddr is required", i)
+		}
+		if os.ServiceDir == "" {
+			return fmt.Errorf("onion service %d: ServiceDir is required", i)
+		}
+	}
+	
+	return nil
+}
+
+// Clone creates a deep copy of the configuration
+func (c *Config) Clone() *Config {
+	clone := *c
+	clone.BridgeAddresses = append([]string{}, c.BridgeAddresses...)
+	clone.ExcludeNodes = append([]string{}, c.ExcludeNodes...)
+	clone.ExcludeExitNodes = append([]string{}, c.ExcludeExitNodes...)
+	clone.OnionServices = make([]OnionServiceConfig, len(c.OnionServices))
+	copy(clone.OnionServices, c.OnionServices)
+	return &clone
+}
