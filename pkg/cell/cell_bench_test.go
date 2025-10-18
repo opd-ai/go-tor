@@ -51,11 +51,11 @@ func BenchmarkFixedCellDecode(b *testing.B) {
 // BenchmarkRelayCellEncode benchmarks encoding of relay cells
 func BenchmarkRelayCellEncode(b *testing.B) {
 	relay := &RelayCell{
-		Command:    RelayBegin,
-		StreamID:   1,
-		Digest:     [4]byte{0x01, 0x02, 0x03, 0x04},
-		Length:     100,
-		Data:       make([]byte, 100),
+		Command:  RelayBegin,
+		StreamID: 1,
+		Digest:   [4]byte{0x01, 0x02, 0x03, 0x04},
+		Length:   100,
+		Data:     make([]byte, 100),
 	}
 
 	b.ResetTimer()
@@ -71,11 +71,11 @@ func BenchmarkRelayCellEncode(b *testing.B) {
 func BenchmarkRelayCellDecode(b *testing.B) {
 	// Create a valid encoded relay cell
 	relay := &RelayCell{
-		Command:    RelayBegin,
-		StreamID:   1,
-		Digest:     [4]byte{0x01, 0x02, 0x03, 0x04},
-		Length:     100,
-		Data:       make([]byte, 100),
+		Command:  RelayBegin,
+		StreamID: 1,
+		Digest:   [4]byte{0x01, 0x02, 0x03, 0x04},
+		Length:   100,
+		Data:     make([]byte, 100),
 	}
 	data, err := relay.Encode()
 	if err != nil {

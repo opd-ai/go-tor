@@ -55,8 +55,8 @@ func NewGuardManager(dataDir string, log *logger.Logger) (*GuardManager, error) 
 	gm := &GuardManager{
 		logger:      log.Component("guards"),
 		stateFile:   stateFile,
-		maxGuards:   3,                      // Tor typically uses 3 guard nodes
-		guardExpiry: 90 * 24 * time.Hour,    // 90 days per Tor spec
+		maxGuards:   3,                   // Tor typically uses 3 guard nodes
+		guardExpiry: 90 * 24 * time.Hour, // 90 days per Tor spec
 	}
 
 	// Load existing state if available

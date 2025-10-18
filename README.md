@@ -9,7 +9,7 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 
 ## Features
 
-### Current (Phase 1, 2, 3, 4 & 5 - Foundation, Core Protocol, Client Functionality, Stream Handling & Integration)
+### Current (Phase 1-6.5 Complete + Phase 7 Control Protocol)
 - ✅ Cell encoding/decoding (fixed and variable-size)
 - ✅ Relay cell handling
 - ✅ Circuit management types and lifecycle
@@ -19,21 +19,25 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 - ✅ Structured logging with log/slog
 - ✅ Graceful shutdown with context propagation
 - ✅ TLS connection handling to Tor relays
+- ✅ TLS certificate validation
 - ✅ Protocol handshake and version negotiation
-- ✅ Connection state management
+- ✅ Connection state management with retry logic
 - ✅ Directory client (consensus fetching)
 - ✅ Path selection (guard, middle, exit)
+- ✅ Guard node persistence
 - ✅ Circuit builder
 - ✅ Circuit extension (CREATE2/CREATED2, EXTEND2/EXTENDED2)
 - ✅ Stream management and multiplexing
 - ✅ SOCKS5 proxy server (RFC 1928)
 - ✅ Component integration and orchestration
 - ✅ Functional Tor client application
+- ✅ Metrics and observability system
+- ✅ Control protocol server (basic commands)
 
 ### Planned
-- [ ] **Phase 6**: Production hardening and optimization
-- [ ] **Phase 7**: Onion services (client and server)
-- [ ] **Phase 8**: Control protocol and advanced features
+- [ ] **Phase 7.1**: Control protocol enhancements (events, circuit mgmt)
+- [ ] **Phase 7.2**: Onion services (client and server)
+- [ ] **Phase 8**: Advanced features and optimization
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture and roadmap.
 

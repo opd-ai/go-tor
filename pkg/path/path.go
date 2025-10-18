@@ -145,7 +145,7 @@ func (s *Selector) selectGuard() (*directory.Relay, error) {
 	// If we have a guard manager, try to use persistent guards first
 	if s.guardManager != nil {
 		persistentGuards := s.guardManager.GetGuards()
-		
+
 		// Try to find a persistent guard that's still in the current consensus
 		for _, pGuard := range persistentGuards {
 			for _, relay := range s.guards {
@@ -155,7 +155,7 @@ func (s *Selector) selectGuard() (*directory.Relay, error) {
 				}
 			}
 		}
-		
+
 		// If no persistent guards are available, select a new one and persist it
 		s.logger.Debug("No persistent guards available, selecting new guard")
 	}
@@ -167,7 +167,7 @@ func (s *Selector) selectGuard() (*directory.Relay, error) {
 	}
 
 	guard := s.guards[idx]
-	
+
 	// Add to persistent guards if we have a guard manager
 	if s.guardManager != nil {
 		if err := s.guardManager.AddGuard(guard); err != nil {
