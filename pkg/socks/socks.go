@@ -8,11 +8,13 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/opd-ai/go-tor/pkg/circuit"
 	"github.com/opd-ai/go-tor/pkg/logger"
+	"github.com/opd-ai/go-tor/pkg/onion"
 )
 
 const (
@@ -147,7 +149,30 @@ func (s *Server) handleConnection(ctx context.Context, conn net.Conn) {
 
 	s.logger.Info("SOCKS5 request", "target", targetAddr, "remote", conn.RemoteAddr())
 
-	// For now, return success without actually routing through Tor
+	// Extract hostname from targetAddr (format: "host:port")
+	host := targetAddr
+	if idx := strings.LastIndex(targetAddr, ":"); idx != -1 {
+		host = targetAddr[:idx]
+	}
+
+	// Check if this is an onion address
+	isOnion := onion.IsOnionAddress(host)
+	if isOnion {
+		// Validate the onion address
+		if _, err := onion.ParseAddress(host); err != nil {
+			s.logger.Warn("Invalid onion address", "address", host, "error", err)
+			s.sendReply(conn, replyHostUnreachable, nil)
+			return
+		}
+		s.logger.Info("Onion service connection requested", "address", host)
+		// TODO: Implement onion service connection via introduction/rendezvous
+		// For now, signal not yet implemented
+		s.sendReply(conn, replyHostUnreachable, nil)
+		s.logger.Debug("Onion service protocol not yet fully implemented")
+		return
+	}
+
+	// For regular addresses, return success without actually routing through Tor
 	// In a full implementation, this would:
 	// 1. Select or create a circuit
 	// 2. Open a stream through the circuit
