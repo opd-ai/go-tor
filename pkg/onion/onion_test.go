@@ -87,27 +87,27 @@ func TestParseV3Address(t *testing.T) {
 func TestAddressEncode(t *testing.T) {
 	// Generate a valid v3 address
 	original := generateValidV3Address(t)
-	
+
 	// Parse it
 	addr, err := ParseAddress(original)
 	if err != nil {
 		t.Fatalf("ParseAddress() failed: %v", err)
 	}
-	
+
 	// Encode it back
 	encoded := addr.Encode()
-	
+
 	// Should match original (case-insensitive)
 	if !strings.EqualFold(encoded, original) {
 		t.Errorf("Encode() = %v, want %v", encoded, original)
 	}
-	
+
 	// Parse again to verify round-trip
 	addr2, err := ParseAddress(encoded)
 	if err != nil {
 		t.Fatalf("ParseAddress() second time failed: %v", err)
 	}
-	
+
 	// Pubkeys should match
 	if len(addr.Pubkey) != len(addr2.Pubkey) {
 		t.Errorf("Pubkey length mismatch: %d vs %d", len(addr.Pubkey), len(addr2.Pubkey))
@@ -126,7 +126,7 @@ func TestAddressString(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseAddress() failed: %v", err)
 	}
-	
+
 	str := addr.String()
 	if !strings.HasSuffix(str, ".onion") {
 		t.Errorf("String() = %v, want suffix .onion", str)
@@ -140,9 +140,9 @@ func TestAddressString(t *testing.T) {
 // TestIsOnionAddress tests the IsOnionAddress helper
 func TestIsOnionAddress(t *testing.T) {
 	tests := []struct {
-		name    string
-		addr    string
-		want    bool
+		name string
+		addr string
+		want bool
 	}{
 		{"valid .onion", "test.onion", true},
 		{"valid long .onion", generateValidV3Address(t), true},
@@ -150,7 +150,7 @@ func TestIsOnionAddress(t *testing.T) {
 		{"partial .onion", "test.onio", false},
 		{"empty", "", false},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := IsOnionAddress(tt.addr); got != tt.want {
@@ -167,19 +167,19 @@ func TestV3ChecksumComputation(t *testing.T) {
 	for i := range pubkey {
 		pubkey[i] = byte(i)
 	}
-	
+
 	// Compute checksum twice - should be deterministic
 	checksum1 := computeV3Checksum(pubkey, V3Version)
 	checksum2 := computeV3Checksum(pubkey, V3Version)
-	
+
 	if len(checksum1) != V3ChecksumLen {
 		t.Errorf("computeV3Checksum() returned %d bytes, want %d", len(checksum1), V3ChecksumLen)
 	}
-	
+
 	if checksum1[0] != checksum2[0] || checksum1[1] != checksum2[1] {
 		t.Errorf("computeV3Checksum() not deterministic: %v vs %v", checksum1, checksum2)
 	}
-	
+
 	// Different pubkey should give different checksum
 	pubkey[0] = 0xFF
 	checksum3 := computeV3Checksum(pubkey, V3Version)
@@ -193,16 +193,16 @@ func TestRealWorldV3Address(t *testing.T) {
 	// DuckDuckGo's onion address (example of a real v3 address format)
 	// Note: Using a similar format, not the actual address for testing
 	realAddr := generateValidV3Address(t)
-	
+
 	addr, err := ParseAddress(realAddr)
 	if err != nil {
 		t.Fatalf("ParseAddress() failed for real-world format: %v", err)
 	}
-	
+
 	if addr.Version != V3 {
 		t.Errorf("ParseAddress() version = %v, want V3", addr.Version)
 	}
-	
+
 	// Verify it can be encoded back
 	encoded := addr.Encode()
 	if !strings.EqualFold(encoded, realAddr) {
@@ -217,18 +217,18 @@ func generateValidV3Address(t *testing.T) string {
 	if err != nil {
 		t.Fatalf("Failed to generate ed25519 key: %v", err)
 	}
-	
+
 	// Construct the address: pubkey || checksum || version
 	checksum := computeV3Checksum(pubkey, V3Version)
 	data := make([]byte, 0, V3PubkeyLen+V3ChecksumLen+1)
 	data = append(data, pubkey...)
 	data = append(data, checksum...)
 	data = append(data, V3Version)
-	
+
 	// Encode to base32
 	encoder := base32.StdEncoding.WithPadding(base32.NoPadding)
 	encoded := strings.ToLower(encoder.EncodeToString(data))
-	
+
 	return encoded + ".onion"
 }
 
@@ -239,18 +239,18 @@ func generateInvalidChecksumAddress(t *testing.T) string {
 	if err != nil {
 		t.Fatalf("Failed to generate ed25519 key: %v", err)
 	}
-	
+
 	// Construct with WRONG checksum
 	wrongChecksum := []byte{0xFF, 0xFF}
 	data := make([]byte, 0, V3PubkeyLen+V3ChecksumLen+1)
 	data = append(data, pubkey...)
 	data = append(data, wrongChecksum...)
 	data = append(data, V3Version)
-	
+
 	// Encode to base32
 	encoder := base32.StdEncoding.WithPadding(base32.NoPadding)
 	encoded := strings.ToLower(encoder.EncodeToString(data))
-	
+
 	return encoded + ".onion"
 }
 
@@ -266,7 +266,7 @@ func TestNewClient(t *testing.T) {
 func BenchmarkParseV3Address(b *testing.B) {
 	addr := generateValidV3AddressBench(b)
 	b.ResetTimer()
-	
+
 	for i := 0; i < b.N; i++ {
 		_, _ = ParseAddress(addr)
 	}
@@ -279,7 +279,7 @@ func BenchmarkEncodeV3Address(b *testing.B) {
 		b.Fatalf("Failed to parse address: %v", err)
 	}
 	b.ResetTimer()
-	
+
 	for i := 0; i < b.N; i++ {
 		_ = parsed.Encode()
 	}
@@ -290,15 +290,15 @@ func generateValidV3AddressBench(b *testing.B) string {
 	if err != nil {
 		b.Fatalf("Failed to generate ed25519 key: %v", err)
 	}
-	
+
 	checksum := computeV3Checksum(pubkey, V3Version)
 	data := make([]byte, 0, V3PubkeyLen+V3ChecksumLen+1)
 	data = append(data, pubkey...)
 	data = append(data, checksum...)
 	data = append(data, V3Version)
-	
+
 	encoder := base32.StdEncoding.WithPadding(base32.NoPadding)
 	encoded := strings.ToLower(encoder.EncodeToString(data))
-	
+
 	return encoded + ".onion"
 }

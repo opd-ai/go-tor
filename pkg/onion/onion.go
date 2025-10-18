@@ -39,12 +39,12 @@ type Address struct {
 func ParseAddress(addr string) (*Address, error) {
 	// Remove trailing .onion if present
 	addr = strings.TrimSuffix(addr, V3Suffix)
-	
+
 	// Check if it's a v3 address (56 characters)
 	if len(addr) == V3AddressLength {
 		return parseV3Address(addr)
 	}
-	
+
 	return nil, fmt.Errorf("unsupported onion address format: must be 56 characters (v3)")
 }
 
@@ -57,29 +57,29 @@ func parseV3Address(addr string) (*Address, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid base32 encoding: %w", err)
 	}
-	
+
 	// Check length: 32 bytes pubkey + 2 bytes checksum + 1 byte version = 35 bytes
 	if len(decoded) != V3PubkeyLen+V3ChecksumLen+1 {
 		return nil, fmt.Errorf("invalid v3 address length: expected 35 bytes, got %d", len(decoded))
 	}
-	
+
 	// Extract components
 	pubkey := decoded[0:V3PubkeyLen]
 	checksum := decoded[V3PubkeyLen : V3PubkeyLen+V3ChecksumLen]
 	version := decoded[V3PubkeyLen+V3ChecksumLen]
-	
+
 	// Verify version
 	if version != V3Version {
 		return nil, fmt.Errorf("invalid version byte: expected 0x03, got 0x%02x", version)
 	}
-	
+
 	// Verify checksum
 	// checksum = H(".onion checksum" || pubkey || version)[:2]
 	expectedChecksum := computeV3Checksum(pubkey, version)
 	if checksum[0] != expectedChecksum[0] || checksum[1] != expectedChecksum[1] {
 		return nil, fmt.Errorf("invalid checksum")
 	}
-	
+
 	return &Address{
 		Version: V3,
 		Pubkey:  pubkey,
@@ -111,18 +111,18 @@ func (a *Address) Encode() string {
 	if a.Version != V3 {
 		return ""
 	}
-	
+
 	// Construct: pubkey || checksum || version
 	checksum := computeV3Checksum(a.Pubkey, V3Version)
 	data := make([]byte, 0, V3PubkeyLen+V3ChecksumLen+1)
 	data = append(data, a.Pubkey...)
 	data = append(data, checksum...)
 	data = append(data, V3Version)
-	
+
 	// Encode to base32
 	encoder := base32.StdEncoding.WithPadding(base32.NoPadding)
 	encoded := strings.ToLower(encoder.EncodeToString(data))
-	
+
 	return encoded + V3Suffix
 }
 

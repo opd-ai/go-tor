@@ -55,23 +55,23 @@ func (e *CircuitEvent) Format() string {
 	parts := []string{
 		fmt.Sprintf("650 CIRC %d %s", e.CircuitID, e.Status),
 	}
-	
+
 	if e.Path != "" {
 		parts = append(parts, e.Path)
 	}
-	
+
 	if e.BuildFlags != "" {
 		parts = append(parts, fmt.Sprintf("BUILD_FLAGS=%s", e.BuildFlags))
 	}
-	
+
 	if e.Purpose != "" {
 		parts = append(parts, fmt.Sprintf("PURPOSE=%s", e.Purpose))
 	}
-	
+
 	if !e.TimeCreated.IsZero() {
 		parts = append(parts, fmt.Sprintf("TIME_CREATED=%s", e.TimeCreated.Format(time.RFC3339)))
 	}
-	
+
 	return strings.Join(parts, " ")
 }
 
@@ -95,11 +95,11 @@ func (e *StreamEvent) Format() string {
 	parts := []string{
 		fmt.Sprintf("650 STREAM %d %s %d %s", e.StreamID, e.Status, e.CircuitID, e.Target),
 	}
-	
+
 	if e.Reason != "" {
 		parts = append(parts, fmt.Sprintf("REASON=%s", e.Reason))
 	}
-	
+
 	return strings.Join(parts, " ")
 }
 
@@ -123,11 +123,11 @@ func (e *BWEvent) Format() string {
 // ORConnEvent represents an OR connection status change event
 // Format: 650 ORCONN <Target> <Status> [REASON=<Reason>] [NCIRCS=<NumCircuits>] [ID=<ID>]
 type ORConnEvent struct {
-	Target    string // address:port
-	Status    string // NEW, LAUNCHED, CONNECTED, FAILED, CLOSED
-	Reason    string // Optional reason
-	NumCircs  int    // Number of circuits on this connection
-	ID        uint64 // Connection ID
+	Target   string // address:port
+	Status   string // NEW, LAUNCHED, CONNECTED, FAILED, CLOSED
+	Reason   string // Optional reason
+	NumCircs int    // Number of circuits on this connection
+	ID       uint64 // Connection ID
 }
 
 // Type returns the event type
@@ -140,19 +140,19 @@ func (e *ORConnEvent) Format() string {
 	parts := []string{
 		fmt.Sprintf("650 ORCONN %s %s", e.Target, e.Status),
 	}
-	
+
 	if e.Reason != "" {
 		parts = append(parts, fmt.Sprintf("REASON=%s", e.Reason))
 	}
-	
+
 	if e.NumCircs > 0 {
 		parts = append(parts, fmt.Sprintf("NCIRCS=%d", e.NumCircs))
 	}
-	
+
 	if e.ID > 0 {
 		parts = append(parts, fmt.Sprintf("ID=%d", e.ID))
 	}
-	
+
 	return strings.Join(parts, " ")
 }
 
@@ -181,9 +181,9 @@ func (e *NewDescEvent) Format() string {
 // Type: ENTRY (for guard nodes)
 // Status: NEW, UP, DOWN, BAD, GOOD, DROPPED
 type GuardEvent struct {
-	GuardType   string // ENTRY
-	Name        string // $fingerprint~nickname or just nickname
-	Status      string // NEW, UP, DOWN, BAD, GOOD, DROPPED
+	GuardType string // ENTRY
+	Name      string // $fingerprint~nickname or just nickname
+	Status    string // NEW, UP, DOWN, BAD, GOOD, DROPPED
 }
 
 // Type returns the event type
@@ -218,11 +218,11 @@ func (e *NSEvent) Type() EventType {
 func (e *NSEvent) Format() string {
 	result := fmt.Sprintf("650 NS %s %s %s %s %d %d",
 		e.LongName, e.Fingerprint, e.Published, e.IP, e.ORPort, e.DirPort)
-	
+
 	if len(e.Flags) > 0 {
 		result += " " + strings.Join(e.Flags, " ")
 	}
-	
+
 	return result
 }
 
@@ -243,14 +243,14 @@ func NewEventDispatcher() *EventDispatcher {
 func (d *EventDispatcher) Subscribe(conn *connection, events []EventType) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	
+
 	if d.subscribers[conn] == nil {
 		d.subscribers[conn] = make(map[EventType]bool)
 	}
-	
+
 	// Clear existing subscriptions for this connection
 	d.subscribers[conn] = make(map[EventType]bool)
-	
+
 	// Add new subscriptions
 	for _, event := range events {
 		d.subscribers[conn][event] = true
@@ -261,7 +261,7 @@ func (d *EventDispatcher) Subscribe(conn *connection, events []EventType) {
 func (d *EventDispatcher) Unsubscribe(conn *connection) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	
+
 	delete(d.subscribers, conn)
 }
 
@@ -269,17 +269,17 @@ func (d *EventDispatcher) Unsubscribe(conn *connection) {
 func (d *EventDispatcher) Dispatch(event Event) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
-	
+
 	eventType := event.Type()
 	formatted := event.Format()
-	
+
 	for conn, subscriptions := range d.subscribers {
 		if subscriptions[eventType] {
 			// Send event asynchronously to avoid blocking
 			go func(c *connection, msg string) {
 				c.mu.Lock()
 				defer c.mu.Unlock()
-				
+
 				// Check if connection is still valid
 				if c.conn != nil {
 					c.writer.WriteString(msg + "\r\n")
@@ -294,7 +294,7 @@ func (d *EventDispatcher) Dispatch(event Event) {
 func (d *EventDispatcher) GetSubscriberCount(eventType EventType) int {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
-	
+
 	count := 0
 	for _, subscriptions := range d.subscribers {
 		if subscriptions[eventType] {

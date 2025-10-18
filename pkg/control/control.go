@@ -167,7 +167,7 @@ func (s *Server) handleConnection(netConn net.Conn) {
 	defer func() {
 		// Unsubscribe from events
 		s.dispatcher.Unsubscribe(conn)
-		
+
 		s.connsMu.Lock()
 		delete(s.conns, netConn)
 		s.connsMu.Unlock()

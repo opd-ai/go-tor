@@ -101,7 +101,7 @@ func (s *Selector) UpdateConsensus(ctx context.Context) error {
 func (s *Selector) GetRelays() []*directory.Relay {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	// Return a copy to avoid race conditions
 	relays := make([]*directory.Relay, len(s.relays))
 	copy(relays, s.relays)
