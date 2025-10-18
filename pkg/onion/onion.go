@@ -10,6 +10,7 @@ import (
 	"crypto/sha3"
 	"encoding/base32"
 	"encoding/base64"
+	"encoding/binary"
 	"fmt"
 	"strings"
 	"sync"
@@ -365,10 +366,7 @@ func ComputeBlindedPubkey(pubkey ed25519.PublicKey, timePeriod uint64) []byte {
 	
 	// Convert time period to bytes (8 bytes, big-endian)
 	timePeriodBytes := make([]byte, 8)
-	for i := 7; i >= 0; i-- {
-		timePeriodBytes[i] = byte(timePeriod & 0xFF)
-		timePeriod >>= 8
-	}
+	binary.BigEndian.PutUint64(timePeriodBytes, timePeriod)
 	h.Write(timePeriodBytes)
 	
 	return h.Sum(nil)
