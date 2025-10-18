@@ -8,7 +8,7 @@ import (
 
 func TestGenerateRandomBytes(t *testing.T) {
 	tests := []int{16, 32, 64}
-	
+
 	for _, n := range tests {
 		t.Run("", func(t *testing.T) {
 			b, err := GenerateRandomBytes(n)
@@ -49,7 +49,7 @@ func TestSHA1Hash(t *testing.T) {
 				0xde, 0x0f, 0x3b, 0x48, 0x2c, 0xd9, 0xae, 0xa9, 0x43, 0x4d},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run("", func(t *testing.T) {
 			got := SHA1Hash(tt.input)
@@ -76,7 +76,7 @@ func TestSHA256Hash(t *testing.T) {
 				0xb8, 0x55},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run("", func(t *testing.T) {
 			got := SHA256Hash(tt.input)
@@ -93,36 +93,36 @@ func TestSHA256Hash(t *testing.T) {
 func TestAESCTRCipher(t *testing.T) {
 	key := []byte("0123456789abcdef") // 16 bytes
 	iv := make([]byte, aes.BlockSize)
-	
+
 	plaintext := []byte("Hello, World! This is a test message.")
-	
+
 	// Create cipher for encryption
 	encCipher, err := NewAESCTRCipher(key, iv)
 	if err != nil {
 		t.Fatalf("NewAESCTRCipher() error = %v", err)
 	}
-	
+
 	// Encrypt
 	ciphertext := make([]byte, len(plaintext))
 	copy(ciphertext, plaintext)
 	encCipher.Encrypt(ciphertext)
-	
+
 	// Ciphertext should be different from plaintext
 	if bytes.Equal(ciphertext, plaintext) {
 		t.Error("ciphertext equals plaintext")
 	}
-	
+
 	// Create cipher for decryption (with same key and IV)
 	decCipher, err := NewAESCTRCipher(key, iv)
 	if err != nil {
 		t.Fatalf("NewAESCTRCipher() error = %v", err)
 	}
-	
+
 	// Decrypt
 	decrypted := make([]byte, len(ciphertext))
 	copy(decrypted, ciphertext)
 	decCipher.Decrypt(decrypted)
-	
+
 	// Decrypted should match original plaintext
 	if !bytes.Equal(decrypted, plaintext) {
 		t.Errorf("decrypted = %v, want %v", decrypted, plaintext)
@@ -135,29 +135,29 @@ func TestRSAEncryptDecrypt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateRSAKey() error = %v", err)
 	}
-	
+
 	publicKey := privateKey.PublicKey()
-	
+
 	// Test data (small enough for RSA)
 	plaintext := []byte("Hello, RSA!")
-	
+
 	// Encrypt
 	ciphertext, err := publicKey.Encrypt(plaintext)
 	if err != nil {
 		t.Fatalf("Encrypt() error = %v", err)
 	}
-	
+
 	// Ciphertext should be different from plaintext
 	if bytes.Equal(ciphertext, plaintext) {
 		t.Error("ciphertext equals plaintext")
 	}
-	
+
 	// Decrypt
 	decrypted, err := privateKey.Decrypt(ciphertext)
 	if err != nil {
 		t.Fatalf("Decrypt() error = %v", err)
 	}
-	
+
 	// Decrypted should match original plaintext
 	if !bytes.Equal(decrypted, plaintext) {
 		t.Errorf("decrypted = %v, want %v", decrypted, plaintext)
@@ -169,7 +169,7 @@ func TestNewSHA1DigestWriter(t *testing.T) {
 	if dw == nil {
 		t.Fatal("NewSHA1DigestWriter() returned nil")
 	}
-	
+
 	// Test writing
 	data := []byte("test data")
 	n, err := dw.Write(data)

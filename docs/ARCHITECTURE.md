@@ -100,19 +100,51 @@ Configuration management with torrc-compatible options.
 - `Config`: Main configuration structure
 - `OnionServiceConfig`: Onion service configuration
 
-### pkg/protocol (TODO)
-Core Tor protocol implementation including:
+### pkg/connection ✅ (NEW in Phase 2)
+TLS connection management for Tor relays.
+
+**Key Types:**
+- `Connection`: TLS connection to a relay with state management
+- `Config`: Connection configuration
+- `State`: Connection state (Connecting, Handshaking, Open, Closed, Failed)
+
+**Key Operations:**
+- Establish TLS connections with timeout
+- Send/receive cells with proper synchronization
+- Connection lifecycle management
+- Error handling and state transitions
+
+### pkg/protocol ✅ (NEW in Phase 2)
+Core Tor protocol implementation including version negotiation and handshake.
+
+**Key Types:**
+- `Handshake`: Performs protocol handshake
+- Protocol version constants (v3-v5 support)
+
+**Key Operations:**
+- Version negotiation (VERSIONS cell exchange)
+- NETINFO cell exchange
+- Protocol version selection
+
+### pkg/directory ✅ (NEW in Phase 2)
+Directory protocol client for fetching network information.
 - Version negotiation
 - TLS connection setup
 - Link protocol handshake
 - Cell multiplexing
 
-### pkg/directory (TODO)
-Directory protocol client for:
-- Consensus document fetching
-- Router descriptor retrieval
-- Microdescriptor support
-- Directory authority interaction
+### pkg/directory ✅ (NEW in Phase 2)
+Directory protocol client for fetching network information.
+
+**Key Types:**
+- `Client`: HTTP-based directory client
+- `Relay`: Relay information from consensus
+
+**Key Operations:**
+- Fetch network consensus from directory authorities
+- Parse consensus documents
+- Extract relay information (address, ports, flags)
+- Filter relays by flags (Guard, Exit, etc.)
 
 ### pkg/path (TODO)
 Path selection algorithms:
@@ -198,11 +230,13 @@ Tor control protocol (client-relevant subset):
 ✅ Structured logging (log/slog)
 ✅ Graceful shutdown with context
 
-### Phase 2: Core Protocol (In Progress)
-- [ ] TLS connection handling
-- [ ] Protocol handshake
-- [ ] Cell I/O and multiplexing
-- [ ] Directory client
+### Phase 2: Core Protocol ✅ (Complete)
+✅ TLS connection handling
+✅ Protocol handshake and version negotiation
+✅ Cell I/O with state management
+✅ Directory client (consensus fetching)
+✅ Connection lifecycle management
+✅ Error handling and timeouts
 
 ### Phase 3: Client Functionality (Planned)
 - [ ] SOCKS5 proxy

@@ -70,11 +70,11 @@ func NewCircuit(id uint32) *Circuit {
 func (c *Circuit) AddHop(hop *Hop) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	if c.State != StateBuilding {
 		return fmt.Errorf("cannot add hop to circuit in state %s", c.State)
 	}
-	
+
 	c.Hops = append(c.Hops, hop)
 	return nil
 }
@@ -130,11 +130,11 @@ func NewManager() *Manager {
 func (m *Manager) CreateCircuit() (*Circuit, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	if m.closed {
 		return nil, fmt.Errorf("manager is closed")
 	}
-	
+
 	// Find an unused circuit ID
 	id := m.nextID
 	for {
@@ -149,12 +149,12 @@ func (m *Manager) CreateCircuit() (*Circuit, error) {
 			return nil, fmt.Errorf("no available circuit IDs")
 		}
 	}
-	
+
 	m.nextID = id + 1
 	if m.nextID == 0 {
 		m.nextID = 1
 	}
-	
+
 	circuit := NewCircuit(id)
 	m.circuits[id] = circuit
 	return circuit, nil
@@ -164,7 +164,7 @@ func (m *Manager) CreateCircuit() (*Circuit, error) {
 func (m *Manager) GetCircuit(id uint32) (*Circuit, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	circuit, exists := m.circuits[id]
 	if !exists {
 		return nil, fmt.Errorf("circuit %d not found", id)
@@ -176,12 +176,12 @@ func (m *Manager) GetCircuit(id uint32) (*Circuit, error) {
 func (m *Manager) CloseCircuit(id uint32) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	circuit, exists := m.circuits[id]
 	if !exists {
 		return fmt.Errorf("circuit %d not found", id)
 	}
-	
+
 	circuit.SetState(StateClosed)
 	delete(m.circuits, id)
 	return nil
@@ -191,7 +191,7 @@ func (m *Manager) CloseCircuit(id uint32) error {
 func (m *Manager) ListCircuits() []uint32 {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	ids := make([]uint32, 0, len(m.circuits))
 	for id := range m.circuits {
 		ids = append(ids, id)
@@ -210,20 +210,20 @@ func (m *Manager) Count() int {
 func (m *Manager) Close(ctx context.Context) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	if m.closed {
 		return fmt.Errorf("manager already closed")
 	}
-	
+
 	// Mark as closed to prevent new circuits
 	m.closed = true
-	
+
 	// Close all circuits
 	for id, circuit := range m.circuits {
 		circuit.SetState(StateClosed)
 		delete(m.circuits, id)
 	}
-	
+
 	return nil
 }
 

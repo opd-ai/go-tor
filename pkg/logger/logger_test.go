@@ -11,14 +11,14 @@ import (
 func TestNew(t *testing.T) {
 	var buf bytes.Buffer
 	logger := New(slog.LevelDebug, &buf)
-	
+
 	if logger == nil {
 		t.Fatal("New() returned nil")
 	}
-	
+
 	logger.Info("test message")
 	output := buf.String()
-	
+
 	if !strings.Contains(output, "test message") {
 		t.Errorf("Expected log output to contain 'test message', got: %s", output)
 	}
@@ -42,7 +42,7 @@ func TestParseLevel(t *testing.T) {
 		{"error", slog.LevelError},
 		{"unknown", slog.LevelInfo}, // defaults to info
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			level, err := ParseLevel(tt.input)
@@ -59,7 +59,7 @@ func TestParseLevel(t *testing.T) {
 func TestWithContext(t *testing.T) {
 	logger := NewDefault()
 	ctx := WithContext(context.Background(), logger)
-	
+
 	retrievedLogger := FromContext(ctx)
 	if retrievedLogger != logger {
 		t.Error("FromContext() did not return the same logger")
@@ -69,7 +69,7 @@ func TestWithContext(t *testing.T) {
 func TestFromContextDefault(t *testing.T) {
 	ctx := context.Background()
 	logger := FromContext(ctx)
-	
+
 	if logger == nil {
 		t.Fatal("FromContext() returned nil for context without logger")
 	}
@@ -78,10 +78,10 @@ func TestFromContextDefault(t *testing.T) {
 func TestWith(t *testing.T) {
 	var buf bytes.Buffer
 	logger := New(slog.LevelInfo, &buf)
-	
+
 	loggerWithAttrs := logger.With("key", "value")
 	loggerWithAttrs.Info("test")
-	
+
 	output := buf.String()
 	if !strings.Contains(output, "key=value") {
 		t.Errorf("Expected output to contain 'key=value', got: %s", output)
@@ -91,10 +91,10 @@ func TestWith(t *testing.T) {
 func TestComponent(t *testing.T) {
 	var buf bytes.Buffer
 	logger := New(slog.LevelInfo, &buf)
-	
+
 	componentLogger := logger.Component("circuit")
 	componentLogger.Info("test message")
-	
+
 	output := buf.String()
 	if !strings.Contains(output, "component=circuit") {
 		t.Errorf("Expected output to contain 'component=circuit', got: %s", output)
@@ -104,10 +104,10 @@ func TestComponent(t *testing.T) {
 func TestCircuit(t *testing.T) {
 	var buf bytes.Buffer
 	logger := New(slog.LevelInfo, &buf)
-	
+
 	circuitLogger := logger.Circuit(12345)
 	circuitLogger.Info("circuit event")
-	
+
 	output := buf.String()
 	if !strings.Contains(output, "circuit_id=12345") {
 		t.Errorf("Expected output to contain 'circuit_id=12345', got: %s", output)
@@ -117,10 +117,10 @@ func TestCircuit(t *testing.T) {
 func TestStream(t *testing.T) {
 	var buf bytes.Buffer
 	logger := New(slog.LevelInfo, &buf)
-	
+
 	streamLogger := logger.Stream(42)
 	streamLogger.Info("stream event")
-	
+
 	output := buf.String()
 	if !strings.Contains(output, "stream_id=42") {
 		t.Errorf("Expected output to contain 'stream_id=42', got: %s", output)
@@ -130,10 +130,10 @@ func TestStream(t *testing.T) {
 func TestWithGroup(t *testing.T) {
 	var buf bytes.Buffer
 	logger := New(slog.LevelInfo, &buf)
-	
+
 	groupLogger := logger.WithGroup("network")
 	groupLogger.Info("test", "bytes", 1024)
-	
+
 	output := buf.String()
 	// WithGroup should nest attributes
 	if !strings.Contains(output, "network.bytes=1024") {
@@ -152,13 +152,13 @@ func TestLogLevels(t *testing.T) {
 		{slog.LevelWarn, func(l *Logger, msg string) { l.Warn(msg) }, "Warn"},
 		{slog.LevelError, func(l *Logger, msg string) { l.Error(msg) }, "Error"},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
 			logger := New(tt.level, &buf)
 			tt.logFunc(logger, "test message")
-			
+
 			output := buf.String()
 			if !strings.Contains(output, "test message") {
 				t.Errorf("Expected output to contain 'test message', got: %s", output)

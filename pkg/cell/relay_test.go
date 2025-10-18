@@ -9,9 +9,9 @@ func TestNewRelayCell(t *testing.T) {
 	streamID := uint16(42)
 	cmd := RelayBegin
 	data := []byte("test data")
-	
+
 	rc := NewRelayCell(streamID, cmd, data)
-	
+
 	if rc.StreamID != streamID {
 		t.Errorf("StreamID = %v, want %v", rc.StreamID, streamID)
 	}
@@ -37,25 +37,25 @@ func TestRelayCellEncodeDecode(t *testing.T) {
 		{"small data", 2, RelayData, []byte("hello")},
 		{"larger data", 3, RelayEnd, bytes.Repeat([]byte("x"), 100)},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			original := NewRelayCell(tt.streamID, tt.cmd, tt.data)
-			
+
 			encoded, err := original.Encode()
 			if err != nil {
 				t.Fatalf("Encode() error = %v", err)
 			}
-			
+
 			if len(encoded) != PayloadLen {
 				t.Errorf("Encoded length = %v, want %v", len(encoded), PayloadLen)
 			}
-			
+
 			decoded, err := DecodeRelayCell(encoded)
 			if err != nil {
 				t.Fatalf("DecodeRelayCell() error = %v", err)
 			}
-			
+
 			if decoded.Command != original.Command {
 				t.Errorf("Command = %v, want %v", decoded.Command, original.Command)
 			}
@@ -75,9 +75,9 @@ func TestRelayCellEncodeDecode(t *testing.T) {
 func TestRelayCellEncodeTooLarge(t *testing.T) {
 	maxDataLen := PayloadLen - RelayCellHeaderLen
 	tooLargeData := make([]byte, maxDataLen+1)
-	
+
 	rc := NewRelayCell(1, RelayData, tooLargeData)
-	
+
 	_, err := rc.Encode()
 	if err == nil {
 		t.Error("Encode() expected error for data too large, got nil")
@@ -86,7 +86,7 @@ func TestRelayCellEncodeTooLarge(t *testing.T) {
 
 func TestDecodeRelayCellTooShort(t *testing.T) {
 	shortPayload := make([]byte, RelayCellHeaderLen-1)
-	
+
 	_, err := DecodeRelayCell(shortPayload)
 	if err == nil {
 		t.Error("DecodeRelayCell() expected error for short payload, got nil")
@@ -96,9 +96,9 @@ func TestDecodeRelayCellTooShort(t *testing.T) {
 func TestDecodeRelayCellInvalidLength(t *testing.T) {
 	payload := make([]byte, PayloadLen)
 	// Set length to exceed available space
-	payload[9] = 0xFF // Length high byte
+	payload[9] = 0xFF  // Length high byte
 	payload[10] = 0xFF // Length low byte
-	
+
 	_, err := DecodeRelayCell(payload)
 	if err == nil {
 		t.Error("DecodeRelayCell() expected error for invalid length, got nil")
@@ -121,7 +121,7 @@ func TestRelayCmdString(t *testing.T) {
 		{RelayExtended2, "RELAY_EXTENDED2"},
 		{255, "RELAY_UNKNOWN(255)"},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.expected, func(t *testing.T) {
 			if got := RelayCmdString(tt.cmd); got != tt.expected {

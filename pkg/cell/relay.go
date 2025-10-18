@@ -8,25 +8,25 @@ import (
 
 // Relay commands from tor-spec.txt section 6.1
 const (
-	RelayBegin          byte = 1
-	RelayData           byte = 2
-	RelayEnd            byte = 3
-	RelayConnected      byte = 4
-	RelayResolve        byte = 11
-	RelayResolved       byte = 12
-	RelayBeginDir       byte = 13
-	RelayExtend2        byte = 14
-	RelayExtended2      byte = 15
+	RelayBegin     byte = 1
+	RelayData      byte = 2
+	RelayEnd       byte = 3
+	RelayConnected byte = 4
+	RelayResolve   byte = 11
+	RelayResolved  byte = 12
+	RelayBeginDir  byte = 13
+	RelayExtend2   byte = 14
+	RelayExtended2 byte = 15
 )
 
 // RelayCell represents the payload of a RELAY or RELAY_EARLY cell
 type RelayCell struct {
-	Command      byte     // Relay command
-	Recognized   uint16   // Must be zero
-	StreamID     uint16   // Stream ID
-	Digest       [4]byte  // Running digest
-	Length       uint16   // Length of data
-	Data         []byte   // Relay data
+	Command    byte    // Relay command
+	Recognized uint16  // Must be zero
+	StreamID   uint16  // Stream ID
+	Digest     [4]byte // Running digest
+	Length     uint16  // Length of data
+	Data       []byte  // Relay data
 }
 
 // RelayCell header size: Command(1) + Recognized(2) + StreamID(2) + Digest(4) + Length(2) = 11 bytes
@@ -51,22 +51,22 @@ func (rc *RelayCell) Encode() ([]byte, error) {
 	if len(rc.Data) > maxDataLen {
 		return nil, fmt.Errorf("relay cell data too large: %d > %d", len(rc.Data), maxDataLen)
 	}
-	
+
 	// Create payload buffer
 	payload := make([]byte, PayloadLen)
-	
+
 	// Write header
 	payload[0] = rc.Command
 	binary.BigEndian.PutUint16(payload[1:3], rc.Recognized)
 	binary.BigEndian.PutUint16(payload[3:5], rc.StreamID)
 	copy(payload[5:9], rc.Digest[:])
 	binary.BigEndian.PutUint16(payload[9:11], rc.Length)
-	
+
 	// Write data
 	copy(payload[11:], rc.Data)
-	
+
 	// Rest is zero padding (already initialized to zero)
-	
+
 	return payload, nil
 }
 
@@ -75,7 +75,7 @@ func DecodeRelayCell(payload []byte) (*RelayCell, error) {
 	if len(payload) < RelayCellHeaderLen {
 		return nil, fmt.Errorf("payload too short for relay cell: %d < %d", len(payload), RelayCellHeaderLen)
 	}
-	
+
 	rc := &RelayCell{
 		Command:    payload[0],
 		Recognized: binary.BigEndian.Uint16(payload[1:3]),
@@ -83,18 +83,18 @@ func DecodeRelayCell(payload []byte) (*RelayCell, error) {
 		Length:     binary.BigEndian.Uint16(payload[9:11]),
 	}
 	copy(rc.Digest[:], payload[5:9])
-	
+
 	// Validate length
 	if int(rc.Length) > len(payload)-RelayCellHeaderLen {
 		return nil, fmt.Errorf("relay cell data length exceeds payload: %d > %d", rc.Length, len(payload)-RelayCellHeaderLen)
 	}
-	
+
 	// Extract data
 	if rc.Length > 0 {
 		rc.Data = make([]byte, rc.Length)
 		copy(rc.Data, payload[11:11+rc.Length])
 	}
-	
+
 	return rc, nil
 }
 
