@@ -9,11 +9,12 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 
 ## Features
 
-### Current (Phase 1, 2 & 3 - Foundation, Core Protocol & Client Functionality)
+### Current (Phase 1, 2, 3 & 4 - Foundation, Core Protocol, Client Functionality & Stream Handling)
 - ✅ Cell encoding/decoding (fixed and variable-size)
 - ✅ Relay cell handling
 - ✅ Circuit management types and lifecycle
 - ✅ Cryptographic primitives (AES-CTR, RSA, SHA-1/256)
+- ✅ Key derivation (KDF-TOR)
 - ✅ Configuration system with validation
 - ✅ Structured logging with log/slog
 - ✅ Graceful shutdown with context propagation
@@ -23,10 +24,11 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 - ✅ Directory client (consensus fetching)
 - ✅ Path selection (guard, middle, exit)
 - ✅ Circuit builder
+- ✅ Circuit extension (CREATE2/CREATED2, EXTEND2/EXTENDED2)
+- ✅ Stream management and multiplexing
 - ✅ SOCKS5 proxy server (RFC 1928)
 
 ### Planned
-- [ ] **Phase 4**: Stream handling, circuit extension, DNS over Tor
 - [ ] **Phase 5**: Onion services (client and server)
 - [ ] **Phase 6**: Control protocol and production hardening
 
@@ -101,15 +103,14 @@ The project is organized into modular packages:
 - **pkg/circuit**: Circuit management and lifecycle ✅
 - **pkg/crypto**: Cryptographic primitives ✅
 - **pkg/config**: Configuration management ✅
-- **pkg/connection**: TLS connection handling ✅ (NEW in Phase 2)
-- **pkg/protocol**: Core Tor protocol handshake ✅ (NEW in Phase 2)
-- **pkg/directory**: Directory protocol client ✅ (NEW in Phase 2)
-- **pkg/path**: Path selection algorithms ✅ (NEW in Phase 3)
-- **pkg/socks**: SOCKS5 proxy server ✅ (NEW in Phase 3)
+- **pkg/connection**: TLS connection handling ✅ (Phase 2)
+- **pkg/protocol**: Core Tor protocol handshake ✅ (Phase 2)
+- **pkg/directory**: Directory protocol client ✅ (Phase 2)
+- **pkg/path**: Path selection algorithms ✅ (Phase 3)
+- **pkg/socks**: SOCKS5 proxy server ✅ (Phase 3)
+- **pkg/stream**: Stream multiplexing ✅ (Phase 4)
 - **pkg/onion**: Onion service support (TODO)
-- **pkg/path**: Path selection algorithms (TODO)
 - **pkg/control**: Control protocol (TODO)
-- **pkg/path**: Path selection algorithms (TODO)
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for details.
 
@@ -185,17 +186,11 @@ Current test coverage: ~90% for implemented packages.
 - SOCKS5 proxy server (RFC 1928)
 - Connection routing foundation
 
-### Phase 4: Stream Handling (Weeks 17-22)
-- SOCKS5 proxy server
-- Path selection and guard persistence
-- Stream handling and isolation
-- DNS over Tor
-
-### Phase 4: Stream Handling (Weeks 17-22)
+### Phase 4: Stream Handling ✅ (Complete)
+- Stream management and multiplexing
 - Circuit extension (CREATE2/CREATED2, EXTEND2/EXTENDED2)
-- Stream multiplexing and relay
-- DNS resolution over Tor
-- Guard persistence
+- Key derivation (KDF-TOR)
+- Stream isolation foundation
 
 ### Phase 5: Onion Services (Weeks 23-28)
 - Hidden service client (.onion resolution)

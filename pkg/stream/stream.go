@@ -47,18 +47,18 @@ func (s State) String() string {
 
 // Stream represents a single connection multiplexed over a circuit
 type Stream struct {
-	ID         uint16
-	CircuitID  uint32
-	Target     string
-	Port       uint16
-	State      State
-	CreatedAt  time.Time
-	sendQueue  chan []byte
-	recvQueue  chan []byte
-	closeChan  chan struct{}
-	closeOnce  sync.Once
-	mu         sync.RWMutex
-	logger     *logger.Logger
+	ID        uint16
+	CircuitID uint32
+	Target    string
+	Port      uint16
+	State     State
+	CreatedAt time.Time
+	sendQueue chan []byte
+	recvQueue chan []byte
+	closeChan chan struct{}
+	closeOnce sync.Once
+	mu        sync.RWMutex
+	logger    *logger.Logger
 }
 
 // NewStream creates a new stream

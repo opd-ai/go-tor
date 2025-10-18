@@ -250,8 +250,8 @@ func TestSelectMiddle(t *testing.T) {
 	selector := NewSelector(directory.NewClient(log), log)
 	selector.relays = mockDir.relays[:6]
 
-	guard := mockDir.relays[0]  // GuardRelay1
-	exit := mockDir.relays[4]   // ExitRelay1
+	guard := mockDir.relays[0] // GuardRelay1
+	exit := mockDir.relays[4]  // ExitRelay1
 
 	middle, err := selector.selectMiddle(guard, exit)
 	if err != nil {

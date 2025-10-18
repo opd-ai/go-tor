@@ -162,10 +162,10 @@ func (e *Extension) buildExtend2Data(target string, handshakeType HandshakeType,
 
 	// Link specifier type 0 (TLS-over-TCP, IPv4) - simplified
 	// Type (1 byte) | Length (1 byte) | IPv4 (4 bytes) | Port (2 bytes)
-	data = append(data, 0)                     // Type
-	data = append(data, 6)                     // Length
-	data = append(data, 127, 0, 0, 1)          // IPv4 (placeholder)
-	data = append(data, 0, 0)                  // Port (placeholder)
+	data = append(data, 0)            // Type
+	data = append(data, 6)            // Length
+	data = append(data, 127, 0, 0, 1) // IPv4 (placeholder)
+	data = append(data, 0, 0)         // Port (placeholder)
 
 	// HTYPE
 	htypeBytes := make([]byte, 2)
@@ -266,8 +266,8 @@ func (e *Extension) DeriveKeys(sharedSecret []byte) (forwardKey, backwardKey []b
 
 	// Split key material
 	// For now, we'll return cipher keys only
-	forwardKey = km[40:56]   // Kf (offset 40, 16 bytes)
-	backwardKey = km[56:72]  // Kb (offset 56, 16 bytes)
+	forwardKey = km[40:56]  // Kf (offset 40, 16 bytes)
+	backwardKey = km[56:72] // Kb (offset 56, 16 bytes)
 
 	e.logger.Debug("Keys derived",
 		"circuit_id", e.circuit.ID,
