@@ -9,7 +9,7 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 
 ## Features
 
-### Current (Phase 1-6.5 Complete + Phase 7 Control Protocol)
+### Current (Phase 1-6.5 Complete + Phase 7 Control Protocol + Phase 7.3 Onion Services Foundation)
 - ✅ Cell encoding/decoding (fixed and variable-size)
 - ✅ Relay cell handling
 - ✅ Circuit management types and lifecycle
@@ -35,9 +35,12 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 - ✅ Control protocol server (basic commands)
 - ✅ Event notification system (CIRC, STREAM, BW, ORCONN events)
 - ✅ Additional event types (NEWDESC, GUARD, NS events)
+- ✅ v3 onion address parsing and validation
+- ✅ SOCKS5 .onion address detection
 
 ### Planned
-- [ ] **Phase 7.3**: Onion services (client and server)
+- [ ] **Phase 7.3**: Onion services client (descriptor fetching, introduction/rendezvous protocols)
+- [ ] **Phase 7.4**: Onion services server (hidden service hosting)
 - [ ] **Phase 8**: Advanced features and optimization
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture and roadmap.
@@ -127,8 +130,9 @@ The project is organized into modular packages:
 - **pkg/socks**: SOCKS5 proxy server ✅ (Phase 3)
 - **pkg/stream**: Stream multiplexing ✅ (Phase 4)
 - **pkg/client**: Client orchestration ✅ (Phase 5)
-- **pkg/onion**: Onion service support (TODO)
-- **pkg/control**: Control protocol (TODO)
+- **pkg/metrics**: Metrics and observability ✅ (Phase 6.5)
+- **pkg/control**: Control protocol ✅ (Phase 7)
+- **pkg/onion**: Onion service support 🚧 (Phase 7.3 - Foundation complete)
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for details.
 
@@ -224,16 +228,20 @@ Current test coverage: ~90% for implemented packages.
 - Security hardening and audit
 - Comprehensive testing and benchmarking
 
-### Phase 7: Onion Services (Weeks 29-36)
-- Hidden service client (.onion resolution)
-- Hidden service server (hosting)
-- Descriptor management
-- Introduction/rendezvous protocol
+### Phase 7: Control Protocol & Onion Services ✅ (Partial - Weeks 29-36)
+- ✅ Control protocol server with basic commands (Phase 7)
+- ✅ Event notification system (Phase 7.1)
+- ✅ Additional event types (Phase 7.2)
+- ✅ v3 onion address parsing and validation (Phase 7.3 - Foundation)
+- 🚧 Descriptor fetching from HSDirs (Phase 7.3.1 - Next)
+- 🚧 Introduction protocol (Phase 7.3.2)
+- 🚧 Rendezvous protocol (Phase 7.3.3)
+- [ ] Hidden service server (hosting) (Phase 7.4)
 
-### Phase 8: Control Protocol (Weeks 37-40)
-- Control protocol implementation
+### Phase 8: Advanced Features (Weeks 37-40)
 - Embedded system optimization
 - Security hardening and audit
+- Performance tuning
 - Comprehensive testing and documentation
 
 See [problem statement](docs/ROADMAP.md) for full 30-week roadmap.
