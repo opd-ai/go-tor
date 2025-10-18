@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/opd-ai/go-tor/pkg/directory"
 	"github.com/opd-ai/go-tor/pkg/logger"
 	"github.com/opd-ai/go-tor/pkg/path"
-	"github.com/opd-ai/go-tor/pkg/directory"
 )
 
 func TestNewBuilder(t *testing.T) {

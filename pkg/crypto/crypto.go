@@ -130,3 +130,34 @@ func NewSHA1DigestWriter() *DigestWriter {
 func (d *DigestWriter) Write(p []byte) (n int, err error) {
 	return d.hash.Write(p)
 }
+
+// DeriveKey derives key material using KDF-TOR
+// KDF-TOR uses iterative SHA-1 hashing to expand a shared secret
+func DeriveKey(secret []byte, keyLen int) ([]byte, error) {
+	if keyLen <= 0 {
+		return nil, fmt.Errorf("invalid key length: %d", keyLen)
+	}
+
+	// KDF-TOR: K = K_0 | K_1 | K_2 | ...
+	// Where K_i = H(K_0 | [i])
+	// And K_0 = H(secret)
+
+	k0 := SHA1Hash(secret)
+	result := make([]byte, 0, keyLen)
+
+	// Append K_0
+	result = append(result, k0...)
+
+	// Generate additional blocks if needed
+	i := byte(1)
+	for len(result) < keyLen {
+		// K_i = H(K_0 | [i])
+		data := append(k0, i)
+		ki := SHA1Hash(data)
+		result = append(result, ki...)
+		i++
+	}
+
+	// Return exactly keyLen bytes
+	return result[:keyLen], nil
+}

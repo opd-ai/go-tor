@@ -180,3 +180,76 @@ func TestNewSHA1DigestWriter(t *testing.T) {
 		t.Errorf("Write() wrote %v bytes, want %v", n, len(data))
 	}
 }
+
+func TestDeriveKey(t *testing.T) {
+	secret := []byte("test secret")
+
+	tests := []struct {
+		name    string
+		keyLen  int
+		wantErr bool
+	}{
+		{"16 bytes", 16, false},
+		{"32 bytes", 32, false},
+		{"72 bytes", 72, false}, // For KDF-TOR with full key material
+		{"100 bytes", 100, false},
+		{"invalid length", 0, true},
+		{"negative length", -1, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			key, err := DeriveKey(secret, tt.keyLen)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DeriveKey() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr {
+				if len(key) != tt.keyLen {
+					t.Errorf("DeriveKey() key length = %v, want %v", len(key), tt.keyLen)
+				}
+			}
+		})
+	}
+}
+
+func TestDeriveKeyDeterministic(t *testing.T) {
+	secret := []byte("test secret")
+	keyLen := 72
+
+	key1, err := DeriveKey(secret, keyLen)
+	if err != nil {
+		t.Fatalf("DeriveKey() error = %v", err)
+	}
+
+	key2, err := DeriveKey(secret, keyLen)
+	if err != nil {
+		t.Fatalf("DeriveKey() error = %v", err)
+	}
+
+	// Same input should produce same output
+	if !bytes.Equal(key1, key2) {
+		t.Error("DeriveKey() not deterministic")
+	}
+}
+
+func TestDeriveKeyDifferentSecrets(t *testing.T) {
+	secret1 := []byte("secret1")
+	secret2 := []byte("secret2")
+	keyLen := 32
+
+	key1, err := DeriveKey(secret1, keyLen)
+	if err != nil {
+		t.Fatalf("DeriveKey() error = %v", err)
+	}
+
+	key2, err := DeriveKey(secret2, keyLen)
+	if err != nil {
+		t.Fatalf("DeriveKey() error = %v", err)
+	}
+
+	// Different secrets should produce different keys
+	if bytes.Equal(key1, key2) {
+		t.Error("DeriveKey() produced same key for different secrets")
+	}
+}
