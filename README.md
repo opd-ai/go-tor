@@ -37,9 +37,19 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 - ✅ Additional event types (NEWDESC, GUARD, NS events)
 - ✅ v3 onion address parsing and validation
 - ✅ SOCKS5 .onion address detection
+- ✅ Descriptor cache with expiration management
+- ✅ Blinded public key computation (SHA3-256)
+- ✅ Time period calculation for descriptor rotation
+- ✅ Descriptor encoding/parsing foundation
+
+### In Progress
+- [ ] **Phase 7.3**: Onion services client
+  - ✅ Phase 7.3.1: Descriptor management (caching, blinded keys, time periods)
+  - [ ] Phase 7.3.2: HSDir protocol and descriptor fetching
+  - [ ] Phase 7.3.3: Introduction point protocol
+  - [ ] Phase 7.3.4: Rendezvous protocol
 
 ### Planned
-- [ ] **Phase 7.3**: Onion services client (descriptor fetching, introduction/rendezvous protocols)
 - [ ] **Phase 7.4**: Onion services server (hidden service hosting)
 - [ ] **Phase 8**: Advanced features and optimization
 
@@ -233,9 +243,10 @@ Current test coverage: ~90% for implemented packages.
 - ✅ Event notification system (Phase 7.1)
 - ✅ Additional event types (Phase 7.2)
 - ✅ v3 onion address parsing and validation (Phase 7.3 - Foundation)
-- 🚧 Descriptor fetching from HSDirs (Phase 7.3.1 - Next)
-- 🚧 Introduction protocol (Phase 7.3.2)
-- 🚧 Rendezvous protocol (Phase 7.3.3)
+- ✅ Descriptor management (caching, crypto) (Phase 7.3.1)
+- 🚧 HSDir protocol and descriptor fetching (Phase 7.3.2 - Next)
+- 🚧 Introduction protocol (Phase 7.3.3)
+- 🚧 Rendezvous protocol (Phase 7.3.4)
 - [ ] Hidden service server (hosting) (Phase 7.4)
 
 ### Phase 8: Advanced Features (Weeks 37-40)
