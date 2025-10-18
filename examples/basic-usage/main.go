@@ -12,7 +12,8 @@ import (
 )
 
 func main() {
-	fmt.Println("=== go-tor Package Examples ===\n")
+	fmt.Println("=== go-tor Package Examples ===")
+	fmt.Println()
 
 	// Example 1: Working with cells
 	fmt.Println("1. Cell Encoding/Decoding")
