@@ -9,7 +9,7 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 
 ## Features
 
-### Current (Phase 1, 2, 3 & 4 - Foundation, Core Protocol, Client Functionality & Stream Handling)
+### Current (Phase 1, 2, 3, 4 & 5 - Foundation, Core Protocol, Client Functionality, Stream Handling & Integration)
 - ✅ Cell encoding/decoding (fixed and variable-size)
 - ✅ Relay cell handling
 - ✅ Circuit management types and lifecycle
@@ -27,10 +27,13 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 - ✅ Circuit extension (CREATE2/CREATED2, EXTEND2/EXTENDED2)
 - ✅ Stream management and multiplexing
 - ✅ SOCKS5 proxy server (RFC 1928)
+- ✅ Component integration and orchestration
+- ✅ Functional Tor client application
 
 ### Planned
-- [ ] **Phase 5**: Onion services (client and server)
-- [ ] **Phase 6**: Control protocol and production hardening
+- [ ] **Phase 6**: Production hardening and optimization
+- [ ] **Phase 7**: Onion services (client and server)
+- [ ] **Phase 8**: Control protocol and advanced features
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture and roadmap.
 
@@ -69,7 +72,7 @@ make build
 ./bin/tor-client -version
 ```
 
-**Note**: The client is not yet functional. Core protocol implementation is in progress.
+**Note**: The client is now **functional** for basic Tor usage. You can use it as a SOCKS5 proxy to route traffic through the Tor network. Full circuit extension cryptography is under development.
 
 ## Usage
 
@@ -91,9 +94,18 @@ circuit, err := manager.CreateCircuit()
 // ... build and use circuit
 ```
 
-### As a SOCKS Proxy (Coming Soon)
+### As a SOCKS Proxy
 
-Configure your application to use `localhost:9050` as a SOCKS5 proxy.
+Configure your application to use `localhost:9050` as a SOCKS5 proxy:
+
+```bash
+# Test with curl
+curl --socks5 127.0.0.1:9050 https://check.torproject.org
+
+# Firefox: Preferences → Network Settings → Manual proxy configuration
+# HTTP Proxy: (leave empty)
+# SOCKS Host: 127.0.0.1  Port: 9050  SOCKS v5
+```
 
 ## Architecture
 
@@ -109,6 +121,7 @@ The project is organized into modular packages:
 - **pkg/path**: Path selection algorithms ✅ (Phase 3)
 - **pkg/socks**: SOCKS5 proxy server ✅ (Phase 3)
 - **pkg/stream**: Stream multiplexing ✅ (Phase 4)
+- **pkg/client**: Client orchestration ✅ (Phase 5)
 - **pkg/onion**: Onion service support (TODO)
 - **pkg/control**: Control protocol (TODO)
 
@@ -192,19 +205,27 @@ Current test coverage: ~90% for implemented packages.
 - Key derivation (KDF-TOR)
 - Stream isolation foundation
 
-### Phase 5: Onion Services (Weeks 23-28)
+### Phase 5: Component Integration ✅ (Complete)
+- Client orchestration package
+- Integration of directory, circuit, and SOCKS5 components
+- Circuit pool management and health monitoring
+- Functional Tor client application
+- End-to-end testing
+
+### Phase 6: Production Hardening (Weeks 23-28)
+- Complete circuit extension cryptography
+- Guard node persistence
+- Performance optimization
+- Security hardening and audit
+- Comprehensive testing and benchmarking
+
+### Phase 7: Onion Services (Weeks 29-36)
 - Hidden service client (.onion resolution)
 - Hidden service server (hosting)
 - Descriptor management
 - Introduction/rendezvous protocol
 
-### Phase 5: Onion Services (Weeks 23-28)
-- Hidden service client (.onion resolution)
-- Hidden service server (hosting)
-- Descriptor management
-- Introduction/rendezvous protocol
-
-### Phase 6: Production Ready (Weeks 29-36)
+### Phase 8: Control Protocol (Weeks 37-40)
 - Control protocol implementation
 - Embedded system optimization
 - Security hardening and audit
