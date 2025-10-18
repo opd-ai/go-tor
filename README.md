@@ -15,6 +15,8 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 - ✅ Circuit management types and lifecycle
 - ✅ Cryptographic primitives (AES-CTR, RSA, SHA-1/256)
 - ✅ Configuration system with validation
+- ✅ Structured logging with log/slog
+- ✅ Graceful shutdown with context propagation
 
 ### Planned
 - [ ] **Phase 2**: Core protocol (TLS, handshake, directory client)
@@ -115,6 +117,13 @@ make vet          # Run go vet
 make lint         # Run golint
 ```
 
+### Documentation
+
+- [Architecture](docs/ARCHITECTURE.md) - System architecture and design
+- [Development Guide](docs/DEVELOPMENT.md) - Development workflow and guidelines
+- [Structured Logging](docs/LOGGING.md) - Using the structured logging system
+- [Graceful Shutdown](docs/SHUTDOWN.md) - Implementing graceful shutdown
+
 ### Cross-Compilation
 
 ```bash
@@ -144,12 +153,14 @@ Current test coverage: ~90% for implemented packages.
 
 ## Roadmap
 
-### Phase 1: Foundation ✅ (Current)
+### Phase 1: Foundation ✅ (Complete)
 - Project structure and build system
 - Cell encoding/decoding
 - Circuit management types
 - Cryptographic wrappers
 - Configuration system
+- Structured logging with log/slog
+- Graceful shutdown with context propagation
 
 ### Phase 2: Core Protocol (Weeks 4-10)
 - TLS connection handling

@@ -189,12 +189,14 @@ Tor control protocol (client-relevant subset):
 
 ## Development Phases
 
-### Phase 1: Foundation (Complete)
+### Phase 1: Foundation ✅ (Complete)
 ✅ Project structure
 ✅ Cell encoding/decoding
 ✅ Circuit management types
 ✅ Crypto wrappers
 ✅ Configuration system
+✅ Structured logging (log/slog)
+✅ Graceful shutdown with context
 
 ### Phase 2: Core Protocol (In Progress)
 - [ ] TLS connection handling
