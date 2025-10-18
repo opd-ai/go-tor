@@ -10,6 +10,7 @@ import (
 
 	"github.com/opd-ai/go-tor/pkg/circuit"
 	"github.com/opd-ai/go-tor/pkg/config"
+	"github.com/opd-ai/go-tor/pkg/control"
 	"github.com/opd-ai/go-tor/pkg/directory"
 	"github.com/opd-ai/go-tor/pkg/logger"
 	"github.com/opd-ai/go-tor/pkg/metrics"
@@ -19,14 +20,15 @@ import (
 
 // Client represents a Tor client instance
 type Client struct {
-	config       *config.Config
-	logger       *logger.Logger
-	directory    *directory.Client
-	circuitMgr   *circuit.Manager
-	socksServer  *socks.Server
-	pathSelector *path.Selector
-	guardManager *path.GuardManager
-	metrics      *metrics.Metrics
+	config        *config.Config
+	logger        *logger.Logger
+	directory     *directory.Client
+	circuitMgr    *circuit.Manager
+	socksServer   *socks.Server
+	controlServer *control.Server
+	pathSelector  *path.Selector
+	guardManager  *path.GuardManager
+	metrics       *metrics.Metrics
 
 	// Circuit management
 	circuits   []*circuit.Circuit
@@ -81,6 +83,10 @@ func New(cfg *config.Config, log *logger.Logger) (*Client, error) {
 		shutdown:     make(chan struct{}),
 	}
 
+	// Initialize control protocol server
+	controlAddr := fmt.Sprintf("127.0.0.1:%d", cfg.ControlPort)
+	client.controlServer = control.NewServer(controlAddr, &clientStatsAdapter{client: client}, log)
+
 	return client, nil
 }
 
@@ -126,7 +132,13 @@ func (c *Client) Start(ctx context.Context) error {
 		}
 	}()
 
-	// Step 5: Start circuit maintenance loop
+	// Step 6: Start control protocol server
+	c.logger.Info("Starting control protocol server", "port", c.config.ControlPort)
+	if err := c.controlServer.Start(); err != nil {
+		return fmt.Errorf("failed to start control server: %w", err)
+	}
+
+	// Step 7: Start circuit maintenance loop
 	c.wg.Add(1)
 	go func() {
 		defer c.wg.Done()
@@ -171,6 +183,11 @@ func (c *Client) Stop() error {
 	// Stop SOCKS server
 	if err := c.socksServer.Shutdown(context.Background()); err != nil {
 		c.logger.Warn("Failed to shutdown SOCKS server", "error", err)
+	}
+
+	// Stop control server
+	if err := c.controlServer.Stop(); err != nil {
+		c.logger.Warn("Failed to stop control server", "error", err)
 	}
 
 	return nil
@@ -344,6 +361,30 @@ type Stats struct {
 
 	// System metrics
 	UptimeSeconds int64
+}
+
+// GetActiveCircuits returns the number of active circuits
+func (s Stats) GetActiveCircuits() int {
+	return s.ActiveCircuits
+}
+
+// GetSocksPort returns the SOCKS proxy port
+func (s Stats) GetSocksPort() int {
+	return s.SocksPort
+}
+
+// GetControlPort returns the control protocol port
+func (s Stats) GetControlPort() int {
+	return s.ControlPort
+}
+
+// clientStatsAdapter adapts Client to control.ClientInfoGetter
+type clientStatsAdapter struct {
+	client *Client
+}
+
+func (a *clientStatsAdapter) GetStats() control.StatsProvider {
+	return a.client.GetStats()
 }
 
 // mergeContexts creates a context that respects both parent and child cancellation
