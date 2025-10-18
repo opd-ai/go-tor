@@ -289,7 +289,7 @@ Building tor-client version 2188960...
 Build complete: bin/tor-client
 
 $ ls -lh bin/tor-client
--rwxrwxr-x 1 runner runner 8.9M Oct 18 20:06 bin/tor-client
+-rwxrwxr-x 1 runner runner 8.9M Oct 18 2025 bin/tor-client
 ```
 
 ✅ Binary: 8.9MB (target: < 15MB)
