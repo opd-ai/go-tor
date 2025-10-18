@@ -446,7 +446,8 @@ func (c *Client) publishConsensusEvents(relays []*directory.Relay) {
 		}
 		
 		// Only publish for guards and exits (most interesting nodes)
-		if !relay.IsGuard() && !relay.IsExit() {
+		// Use short-circuit evaluation to avoid redundant method calls
+		if !(relay.IsGuard() || relay.IsExit()) {
 			continue
 		}
 		

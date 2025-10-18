@@ -439,7 +439,7 @@ func TestNSEventFormat(t *testing.T) {
 				DirPort:     9030,
 				Flags:       []string{},
 			},
-			expected: "650 NS $ABC123~NodeA $ABC123 2024-01-01T12:00:00Z 192.168.1.1 9001 9030 ",
+			expected: "650 NS $ABC123~NodeA $ABC123 2024-01-01T12:00:00Z 192.168.1.1 9001 9030",
 		},
 		{
 			name: "NS event with flags",

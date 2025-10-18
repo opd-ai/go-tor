@@ -216,12 +216,14 @@ func (e *NSEvent) Type() EventType {
 
 // Format formats the event for transmission
 func (e *NSEvent) Format() string {
-	flags := ""
+	result := fmt.Sprintf("650 NS %s %s %s %s %d %d",
+		e.LongName, e.Fingerprint, e.Published, e.IP, e.ORPort, e.DirPort)
+	
 	if len(e.Flags) > 0 {
-		flags = strings.Join(e.Flags, " ")
+		result += " " + strings.Join(e.Flags, " ")
 	}
-	return fmt.Sprintf("650 NS %s %s %s %s %d %d %s",
-		e.LongName, e.Fingerprint, e.Published, e.IP, e.ORPort, e.DirPort, flags)
+	
+	return result
 }
 
 // EventDispatcher manages event subscriptions and dispatching
