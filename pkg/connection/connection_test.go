@@ -207,7 +207,7 @@ func TestConnectionConnect(t *testing.T) {
 	defer cleanup()
 
 	cfg := DefaultConfig(address)
-	cfg.TLSConfig = &tls.Config{InsecureSkipVerify: true}
+	// Use default TLS config which now has proper certificate verification
 	conn := New(cfg, logger.NewDefault())
 
 	ctx := context.Background()
@@ -280,3 +280,23 @@ MHcCAQEEIIrYSSNQFaA2Hwf1duRSxKtLYX5CB04fSeQ6tF1aY/PuoAoGCCqGSM49
 AwEHoUQDQgAEPR3tU2Fta9ktY+6P9G0cWO+0kETA6SFs38GecTyudlHz6xvCdz8q
 EKTcWGekdmdDPsHloRNtsiCa697B2O9IFA==
 -----END EC PRIVATE KEY-----`
+
+func TestVerifyTorRelayCertificate(t *testing.T) {
+	// Test with nil certificates
+	err := verifyTorRelayCertificate(nil, nil)
+	if err == nil {
+		t.Error("Expected error for nil certificates")
+	}
+
+	// Test with empty certificates
+	err = verifyTorRelayCertificate([][]byte{}, nil)
+	if err == nil {
+		t.Error("Expected error for empty certificates")
+	}
+
+	// Test with invalid certificate data
+	err = verifyTorRelayCertificate([][]byte{{0x00, 0x01, 0x02}}, nil)
+	if err == nil {
+		t.Error("Expected error for invalid certificate")
+	}
+}

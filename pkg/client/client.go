@@ -24,6 +24,7 @@ type Client struct {
 	circuitMgr   *circuit.Manager
 	socksServer  *socks.Server
 	pathSelector *path.Selector
+	guardManager *path.GuardManager
 
 	// Circuit management
 	circuits   []*circuit.Circuit
@@ -58,16 +59,23 @@ func New(cfg *config.Config, log *logger.Logger) (*Client, error) {
 	socksAddr := fmt.Sprintf("127.0.0.1:%d", cfg.SocksPort)
 	socksServer := socks.NewServer(socksAddr, circuitMgr, log)
 
+	// Initialize guard manager for persistent guard nodes
+	guardMgr, err := path.NewGuardManager(cfg.DataDirectory, log)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create guard manager: %w", err)
+	}
+
 	client := &Client{
-		config:      cfg,
-		logger:      log.Component("client"),
-		directory:   dirClient,
-		circuitMgr:  circuitMgr,
-		socksServer: socksServer,
-		circuits:    make([]*circuit.Circuit, 0),
-		ctx:         ctx,
-		cancel:      cancel,
-		shutdown:    make(chan struct{}),
+		config:       cfg,
+		logger:       log.Component("client"),
+		directory:    dirClient,
+		circuitMgr:   circuitMgr,
+		socksServer:  socksServer,
+		guardManager: guardMgr,
+		circuits:     make([]*circuit.Circuit, 0),
+		ctx:          ctx,
+		cancel:       cancel,
+		shutdown:     make(chan struct{}),
 	}
 
 	return client, nil
@@ -83,21 +91,24 @@ func (c *Client) Start(ctx context.Context) error {
 	// Step 1: Fetch network consensus (path selector will do this)
 	c.logger.Info("Initializing path selector...")
 
-	// Step 2: Initialize path selector and update consensus
-	c.pathSelector = path.NewSelector(c.directory, c.logger)
+	// Step 2: Initialize path selector with guard persistence and update consensus
+	c.pathSelector = path.NewSelectorWithGuards(c.directory, c.guardManager, c.logger)
 	if err := c.pathSelector.UpdateConsensus(ctx); err != nil {
 		return fmt.Errorf("failed to update consensus: %w", err)
 	}
 	c.logger.Info("Path selector initialized")
 
-	// Step 3: Build initial circuits
+	// Step 3: Clean up expired guards
+	c.guardManager.CleanupExpired()
+
+	// Step 4: Build initial circuits
 	c.logger.Info("Building initial circuits...")
 	if err := c.buildInitialCircuits(ctx); err != nil {
 		return fmt.Errorf("failed to build initial circuits: %w", err)
 	}
 	c.logger.Info("Initial circuits built successfully")
 
-	// Step 4: Start SOCKS5 proxy server
+	// Step 5: Start SOCKS5 proxy server
 	c.logger.Info("Starting SOCKS5 proxy server", "port", c.config.SocksPort)
 	c.wg.Add(1)
 	go func() {
@@ -196,6 +207,9 @@ func (c *Client) buildCircuit(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to build circuit: %w", err)
 	}
+
+	// Confirm the guard node as working (for persistence)
+	c.pathSelector.ConfirmGuard(selectedPath.Guard.Fingerprint)
 
 	// Add to circuit pool
 	c.circuitsMu.Lock()
