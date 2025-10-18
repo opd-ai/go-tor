@@ -2,7 +2,193 @@
 // This package handles fetching and parsing directory consensus documents and router descriptors.
 package directory
 
-// TODO: Implement consensus document fetching and parsing
-// TODO: Implement router descriptor retrieval
-// TODO: Implement microdescriptor support
-// TODO: Implement fallback directory handling
+import (
+	"bufio"
+	"context"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/opd-ai/go-tor/pkg/logger"
+)
+
+// Default directory authority addresses (hardcoded fallback directories)
+var DefaultAuthorities = []string{
+	"https://194.109.206.212/tor/status-vote/current/consensus.z", // gabelmoo
+	"https://131.188.40.189/tor/status-vote/current/consensus.z",  // moria1
+	"https://128.31.0.34:9131/tor/status-vote/current/consensus.z", // tor26
+}
+
+// Relay represents a Tor relay from the consensus
+type Relay struct {
+	Nickname    string
+	Fingerprint string
+	Address     string
+	ORPort      int
+	DirPort     int
+	Flags       []string
+	Published   time.Time
+}
+
+// Client provides directory protocol operations
+type Client struct {
+	httpClient *http.Client
+	logger     *logger.Logger
+	authorities []string
+}
+
+// NewClient creates a new directory client
+func NewClient(log *logger.Logger) *Client {
+	if log == nil {
+		log = logger.NewDefault()
+	}
+	
+	return &Client{
+		httpClient: &http.Client{
+			Timeout: 30 * time.Second,
+		},
+		logger:      log.Component("directory"),
+		authorities: DefaultAuthorities,
+	}
+}
+
+// FetchConsensus fetches the network consensus from directory authorities
+func (c *Client) FetchConsensus(ctx context.Context) ([]*Relay, error) {
+	c.logger.Info("Fetching network consensus")
+
+	// Try each authority until one succeeds
+	var lastErr error
+	for _, authority := range c.authorities {
+		relays, err := c.fetchFromAuthority(ctx, authority)
+		if err != nil {
+			c.logger.Warn("Failed to fetch from authority", "authority", authority, "error", err)
+			lastErr = err
+			continue
+		}
+		
+		c.logger.Info("Successfully fetched consensus", "relays", len(relays), "authority", authority)
+		return relays, nil
+	}
+
+	return nil, fmt.Errorf("failed to fetch consensus from any authority: %w", lastErr)
+}
+
+// fetchFromAuthority fetches consensus from a specific authority
+func (c *Client) fetchFromAuthority(ctx context.Context, authorityURL string) ([]*Relay, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", authorityURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch consensus: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	// Parse the consensus document
+	relays, err := c.parseConsensus(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse consensus: %w", err)
+	}
+
+	return relays, nil
+}
+
+// parseConsensus parses a consensus document and extracts relay information
+func (c *Client) parseConsensus(r io.Reader) ([]*Relay, error) {
+	var relays []*Relay
+	scanner := bufio.NewScanner(r)
+	
+	var currentRelay *Relay
+	
+	for scanner.Scan() {
+		line := scanner.Text()
+		
+		// Parse "r" lines (router status entries)
+		if strings.HasPrefix(line, "r ") {
+			if currentRelay != nil {
+				relays = append(relays, currentRelay)
+			}
+			
+			parts := strings.Fields(line)
+			if len(parts) < 9 {
+				continue // Skip malformed entries
+			}
+			
+			currentRelay = &Relay{
+				Nickname:    parts[1],
+				Fingerprint: parts[2],
+				Address:     parts[6],
+			}
+			
+			// Parse ORPort
+			fmt.Sscanf(parts[7], "%d", &currentRelay.ORPort)
+			// Parse DirPort
+			fmt.Sscanf(parts[8], "%d", &currentRelay.DirPort)
+		}
+		
+		// Parse "s" lines (flags)
+		if strings.HasPrefix(line, "s ") && currentRelay != nil {
+			flags := strings.Fields(line[2:]) // Skip "s "
+			currentRelay.Flags = flags
+		}
+	}
+	
+	// Add the last relay
+	if currentRelay != nil {
+		relays = append(relays, currentRelay)
+	}
+	
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error reading consensus: %w", err)
+	}
+	
+	return relays, nil
+}
+
+// HasFlag checks if a relay has a specific flag
+func (r *Relay) HasFlag(flag string) bool {
+	for _, f := range r.Flags {
+		if f == flag {
+			return true
+		}
+	}
+	return false
+}
+
+// IsGuard returns true if the relay is a guard
+func (r *Relay) IsGuard() bool {
+	return r.HasFlag("Guard")
+}
+
+// IsExit returns true if the relay is an exit
+func (r *Relay) IsExit() bool {
+	return r.HasFlag("Exit")
+}
+
+// IsStable returns true if the relay is stable
+func (r *Relay) IsStable() bool {
+	return r.HasFlag("Stable")
+}
+
+// IsRunning returns true if the relay is running
+func (r *Relay) IsRunning() bool {
+	return r.HasFlag("Running")
+}
+
+// IsValid returns true if the relay is valid
+func (r *Relay) IsValid() bool {
+	return r.HasFlag("Valid")
+}
+
+// String returns a string representation of the relay
+func (r *Relay) String() string {
+	return fmt.Sprintf("%s (%s:%d)", r.Nickname, r.Address, r.ORPort)
+}

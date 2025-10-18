@@ -9,7 +9,7 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 
 ## Features
 
-### Current (Phase 1 - Foundation)
+### Current (Phase 1 & 2 - Foundation & Core Protocol)
 - ✅ Cell encoding/decoding (fixed and variable-size)
 - ✅ Relay cell handling
 - ✅ Circuit management types and lifecycle
@@ -17,10 +17,13 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 - ✅ Configuration system with validation
 - ✅ Structured logging with log/slog
 - ✅ Graceful shutdown with context propagation
+- ✅ TLS connection handling to Tor relays
+- ✅ Protocol handshake and version negotiation
+- ✅ Connection state management
+- ✅ Directory client (consensus fetching)
 
 ### Planned
-- [ ] **Phase 2**: Core protocol (TLS, handshake, directory client)
-- [ ] **Phase 3**: SOCKS5 proxy and path selection
+- [ ] **Phase 3**: SOCKS5 proxy, path selection, and circuit building
 - [ ] **Phase 4**: Onion services (client and server)
 - [ ] **Phase 5**: Control protocol and production hardening
 
@@ -91,12 +94,13 @@ Configure your application to use `localhost:9050` as a SOCKS5 proxy.
 
 The project is organized into modular packages:
 
-- **pkg/cell**: Tor protocol cell encoding/decoding
-- **pkg/circuit**: Circuit management and lifecycle
-- **pkg/crypto**: Cryptographic primitives
-- **pkg/config**: Configuration management
-- **pkg/protocol**: Core Tor protocol (TODO)
-- **pkg/directory**: Directory protocol client (TODO)
+- **pkg/cell**: Tor protocol cell encoding/decoding ✅
+- **pkg/circuit**: Circuit management and lifecycle ✅
+- **pkg/crypto**: Cryptographic primitives ✅
+- **pkg/config**: Configuration management ✅
+- **pkg/connection**: TLS connection handling ✅ (NEW in Phase 2)
+- **pkg/protocol**: Core Tor protocol handshake ✅ (NEW in Phase 2)
+- **pkg/directory**: Directory protocol client ✅ (NEW in Phase 2)
 - **pkg/socks**: SOCKS5 proxy server (TODO)
 - **pkg/onion**: Onion service support (TODO)
 - **pkg/control**: Control protocol (TODO)
@@ -162,11 +166,13 @@ Current test coverage: ~90% for implemented packages.
 - Structured logging with log/slog
 - Graceful shutdown with context propagation
 
-### Phase 2: Core Protocol (Weeks 4-10)
-- TLS connection handling
-- Protocol handshake and versioning
-- Cell I/O and multiplexing
-- Directory protocol client
+### Phase 2: Core Protocol ✅ (Complete)
+- TLS connection handling to Tor relays
+- Protocol handshake and version negotiation (link protocol v3-5)
+- Cell I/O with connection state management
+- Directory protocol client (consensus fetching)
+- Connection lifecycle management
+- Error handling and timeout management
 
 ### Phase 3: Client Functionality (Weeks 11-16)
 - SOCKS5 proxy server
