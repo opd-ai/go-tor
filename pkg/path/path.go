@@ -22,11 +22,12 @@ type Path struct {
 
 // Selector provides path selection for Tor circuits
 type Selector struct {
-	logger    *logger.Logger
-	dirClient *directory.Client
-	mu        sync.RWMutex
-	guards    []*directory.Relay
-	relays    []*directory.Relay
+	logger       *logger.Logger
+	dirClient    *directory.Client
+	guardManager *GuardManager
+	mu           sync.RWMutex
+	guards       []*directory.Relay
+	relays       []*directory.Relay
 }
 
 // NewSelector creates a new path selector
@@ -40,6 +41,21 @@ func NewSelector(dirClient *directory.Client, log *logger.Logger) *Selector {
 		dirClient: dirClient,
 		guards:    make([]*directory.Relay, 0),
 		relays:    make([]*directory.Relay, 0),
+	}
+}
+
+// NewSelectorWithGuards creates a new path selector with guard persistence
+func NewSelectorWithGuards(dirClient *directory.Client, guardMgr *GuardManager, log *logger.Logger) *Selector {
+	if log == nil {
+		log = logger.NewDefault()
+	}
+
+	return &Selector{
+		logger:       log.Component("path"),
+		dirClient:    dirClient,
+		guardManager: guardMgr,
+		guards:       make([]*directory.Relay, 0),
+		relays:       make([]*directory.Relay, 0),
 	}
 }
 
@@ -120,20 +136,61 @@ func (s *Selector) SelectPath(exitPort int) (*Path, error) {
 	}, nil
 }
 
-// selectGuard selects a guard relay
+// selectGuard selects a guard relay, preferring persistent guards
 func (s *Selector) selectGuard() (*directory.Relay, error) {
 	if len(s.guards) == 0 {
 		return nil, fmt.Errorf("no guard relays available")
 	}
 
-	// Simple random selection from guards
-	// In production, this would use guard persistence and bandwidth weighting
+	// If we have a guard manager, try to use persistent guards first
+	if s.guardManager != nil {
+		persistentGuards := s.guardManager.GetGuards()
+		
+		// Try to find a persistent guard that's still in the current consensus
+		for _, pGuard := range persistentGuards {
+			for _, relay := range s.guards {
+				if relay.Fingerprint == pGuard.Fingerprint {
+					s.logger.Debug("Using persistent guard", "nickname", relay.Nickname)
+					return relay, nil
+				}
+			}
+		}
+		
+		// If no persistent guards are available, select a new one and persist it
+		s.logger.Debug("No persistent guards available, selecting new guard")
+	}
+
+	// Select a random guard from available guards
 	idx, err := randomIndex(len(s.guards))
 	if err != nil {
 		return nil, err
 	}
 
-	return s.guards[idx], nil
+	guard := s.guards[idx]
+	
+	// Add to persistent guards if we have a guard manager
+	if s.guardManager != nil {
+		if err := s.guardManager.AddGuard(guard); err != nil {
+			s.logger.Warn("Failed to persist guard", "error", err)
+		} else if err := s.guardManager.Save(); err != nil {
+			s.logger.Warn("Failed to save guard state", "error", err)
+		}
+	}
+
+	return guard, nil
+}
+
+// ConfirmGuard marks a guard as confirmed after successful use
+func (s *Selector) ConfirmGuard(fingerprint string) {
+	if s.guardManager != nil {
+		if err := s.guardManager.ConfirmGuard(fingerprint); err != nil {
+			s.logger.Warn("Failed to confirm guard", "error", err)
+			return
+		}
+		if err := s.guardManager.Save(); err != nil {
+			s.logger.Warn("Failed to save guard state after confirmation", "error", err)
+		}
+	}
 }
 
 // selectExit selects an exit relay that allows the specified port

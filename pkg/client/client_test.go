@@ -11,6 +11,7 @@ import (
 
 func TestNew(t *testing.T) {
 	cfg := config.DefaultConfig()
+	cfg.DataDirectory = t.TempDir() // Use temporary directory for tests
 	log := logger.NewDefault()
 
 	client, err := New(cfg, log)
@@ -41,6 +42,10 @@ func TestNew(t *testing.T) {
 	if client.socksServer == nil {
 		t.Error("SOCKS server not initialized")
 	}
+
+	if client.guardManager == nil {
+		t.Error("Guard manager not initialized")
+	}
 }
 
 func TestNewWithNilConfig(t *testing.T) {
@@ -54,6 +59,7 @@ func TestNewWithNilConfig(t *testing.T) {
 
 func TestNewWithNilLogger(t *testing.T) {
 	cfg := config.DefaultConfig()
+	cfg.DataDirectory = t.TempDir() // Use temporary directory for tests
 
 	client, err := New(cfg, nil)
 	if err != nil {
@@ -67,6 +73,7 @@ func TestNewWithNilLogger(t *testing.T) {
 
 func TestGetStats(t *testing.T) {
 	cfg := config.DefaultConfig()
+	cfg.DataDirectory = t.TempDir() // Use temporary directory for tests
 	cfg.SocksPort = 9999
 	cfg.ControlPort = 9998
 	log := logger.NewDefault()
@@ -92,6 +99,7 @@ func TestGetStats(t *testing.T) {
 
 func TestStopWithoutStart(t *testing.T) {
 	cfg := config.DefaultConfig()
+	cfg.DataDirectory = t.TempDir() // Use temporary directory for tests
 	log := logger.NewDefault()
 
 	client, err := New(cfg, log)
@@ -108,6 +116,7 @@ func TestStopWithoutStart(t *testing.T) {
 
 func TestStopMultipleTimes(t *testing.T) {
 	cfg := config.DefaultConfig()
+	cfg.DataDirectory = t.TempDir() // Use temporary directory for tests
 	log := logger.NewDefault()
 
 	client, err := New(cfg, log)
@@ -130,6 +139,7 @@ func TestStopMultipleTimes(t *testing.T) {
 
 func TestMergeContexts(t *testing.T) {
 	cfg := config.DefaultConfig()
+	cfg.DataDirectory = t.TempDir() // Use temporary directory for tests
 	log := logger.NewDefault()
 
 	client, err := New(cfg, log)
@@ -158,6 +168,7 @@ func TestMergeContexts(t *testing.T) {
 
 func TestMergeContextsChildCancel(t *testing.T) {
 	cfg := config.DefaultConfig()
+	cfg.DataDirectory = t.TempDir() // Use temporary directory for tests
 	log := logger.NewDefault()
 
 	client, err := New(cfg, log)
