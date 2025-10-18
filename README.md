@@ -9,7 +9,7 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 
 ## Features
 
-### Current (Phase 1 & 2 - Foundation & Core Protocol)
+### Current (Phase 1, 2 & 3 - Foundation, Core Protocol & Client Functionality)
 - ✅ Cell encoding/decoding (fixed and variable-size)
 - ✅ Relay cell handling
 - ✅ Circuit management types and lifecycle
@@ -21,11 +21,14 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 - ✅ Protocol handshake and version negotiation
 - ✅ Connection state management
 - ✅ Directory client (consensus fetching)
+- ✅ Path selection (guard, middle, exit)
+- ✅ Circuit builder
+- ✅ SOCKS5 proxy server (RFC 1928)
 
 ### Planned
-- [ ] **Phase 3**: SOCKS5 proxy, path selection, and circuit building
-- [ ] **Phase 4**: Onion services (client and server)
-- [ ] **Phase 5**: Control protocol and production hardening
+- [ ] **Phase 4**: Stream handling, circuit extension, DNS over Tor
+- [ ] **Phase 5**: Onion services (client and server)
+- [ ] **Phase 6**: Control protocol and production hardening
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture and roadmap.
 
@@ -101,8 +104,10 @@ The project is organized into modular packages:
 - **pkg/connection**: TLS connection handling ✅ (NEW in Phase 2)
 - **pkg/protocol**: Core Tor protocol handshake ✅ (NEW in Phase 2)
 - **pkg/directory**: Directory protocol client ✅ (NEW in Phase 2)
-- **pkg/socks**: SOCKS5 proxy server (TODO)
+- **pkg/path**: Path selection algorithms ✅ (NEW in Phase 3)
+- **pkg/socks**: SOCKS5 proxy server ✅ (NEW in Phase 3)
 - **pkg/onion**: Onion service support (TODO)
+- **pkg/path**: Path selection algorithms (TODO)
 - **pkg/control**: Control protocol (TODO)
 - **pkg/path**: Path selection algorithms (TODO)
 
@@ -174,19 +179,37 @@ Current test coverage: ~90% for implemented packages.
 - Connection lifecycle management
 - Error handling and timeout management
 
-### Phase 3: Client Functionality (Weeks 11-16)
+### Phase 3: Client Functionality ✅ (Complete)
+- Path selection (guard, middle, exit)
+- Circuit builder
+- SOCKS5 proxy server (RFC 1928)
+- Connection routing foundation
+
+### Phase 4: Stream Handling (Weeks 17-22)
 - SOCKS5 proxy server
 - Path selection and guard persistence
 - Stream handling and isolation
 - DNS over Tor
 
-### Phase 4: Onion Services (Weeks 17-22)
+### Phase 4: Stream Handling (Weeks 17-22)
+- Circuit extension (CREATE2/CREATED2, EXTEND2/EXTENDED2)
+- Stream multiplexing and relay
+- DNS resolution over Tor
+- Guard persistence
+
+### Phase 5: Onion Services (Weeks 23-28)
 - Hidden service client (.onion resolution)
 - Hidden service server (hosting)
 - Descriptor management
 - Introduction/rendezvous protocol
 
-### Phase 5: Production Ready (Weeks 23-30)
+### Phase 5: Onion Services (Weeks 23-28)
+- Hidden service client (.onion resolution)
+- Hidden service server (hosting)
+- Descriptor management
+- Introduction/rendezvous protocol
+
+### Phase 6: Production Ready (Weeks 29-36)
 - Control protocol implementation
 - Embedded system optimization
 - Security hardening and audit
