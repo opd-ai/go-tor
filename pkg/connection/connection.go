@@ -5,6 +5,7 @@ package connection
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"net"
@@ -76,9 +77,85 @@ func DefaultConfig(address string) *Config {
 	return &Config{
 		Address:        address,
 		Timeout:        30 * time.Second,
-		TLSConfig:      &tls.Config{InsecureSkipVerify: true}, // TODO: Implement proper cert validation
+		TLSConfig:      createTorTLSConfig(),
 		LinkProtocolV4: true,
 	}
+}
+
+// createTorTLSConfig creates a TLS config appropriate for Tor relay connections.
+// Tor relays use self-signed certificates, but we validate them according to tor-spec.txt section 2:
+// - Certificate must be valid X.509
+// - We accept self-signed certificates (Tor relays don't use CA-signed certs)
+// - We verify the certificate signature is valid
+// - Additional validation happens via directory consensus (relay identity keys)
+func createTorTLSConfig() *tls.Config {
+	return &tls.Config{
+		// Tor relays use self-signed certificates, so we can't verify against root CAs
+		// However, we still want to verify the certificate is well-formed and properly signed
+		InsecureSkipVerify: false,
+		// Custom verification function for Tor-specific certificate handling
+		VerifyPeerCertificate: verifyTorRelayCertificate,
+		// Tor supports TLS 1.0+ but we prefer modern versions
+		MinVersion: tls.VersionTLS12,
+		// Cipher suites compatible with Tor relays
+		CipherSuites: []uint16{
+			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+			tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
+			tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_RSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+			tls.TLS_RSA_WITH_AES_128_CBC_SHA,
+		},
+	}
+}
+
+// verifyTorRelayCertificate verifies a Tor relay's TLS certificate.
+// Tor relays use self-signed certificates, so this function performs Tor-specific validation:
+// 1. Verify the certificate is a valid X.509 certificate
+// 2. Verify the certificate signature (self-signed is acceptable)
+// 3. Check that the certificate is not expired
+// 4. Verify the certificate has required key usage
+//
+// Note: Full identity verification happens through the Tor directory consensus,
+// which maps relay fingerprints to their identity keys. This function only validates
+// the certificate's structural integrity.
+func verifyTorRelayCertificate(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+	if len(rawCerts) == 0 {
+		return fmt.Errorf("no certificates provided")
+	}
+
+	// Parse the certificate
+	cert, err := x509.ParseCertificate(rawCerts[0])
+	if err != nil {
+		return fmt.Errorf("failed to parse certificate: %w", err)
+	}
+
+	// Check certificate is not expired
+	now := time.Now()
+	if now.Before(cert.NotBefore) {
+		return fmt.Errorf("certificate not yet valid")
+	}
+	if now.After(cert.NotAfter) {
+		return fmt.Errorf("certificate has expired")
+	}
+
+	// For self-signed certificates, verify the signature against itself
+	if err := cert.CheckSignatureFrom(cert); err != nil {
+		return fmt.Errorf("invalid certificate signature: %w", err)
+	}
+
+	// Verify the certificate has appropriate key usage
+	// Tor relay certificates should support key encipherment and digital signature
+	if cert.KeyUsage&x509.KeyUsageKeyEncipherment == 0 &&
+		cert.KeyUsage&x509.KeyUsageDigitalSignature == 0 {
+		return fmt.Errorf("certificate has invalid key usage")
+	}
+
+	// Certificate is structurally valid
+	// Note: Relay identity verification happens via directory consensus validation
+	return nil
 }
 
 // New creates a new connection to a Tor relay
