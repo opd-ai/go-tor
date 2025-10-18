@@ -498,10 +498,12 @@ func TestEventUnsubscribe(t *testing.T) {
 func BenchmarkEventDispatchMultipleSubscribers(b *testing.B) {
 	dispatcher := NewEventDispatcher()
 
-	// Create 1000 mock connections
+	// Create 1000 mock connections with minimal initialization
+	// The connections have nil conn/writer which is checked by Dispatch
 	for i := 0; i < 1000; i++ {
 		conn := &connection{
 			events: make(map[string]bool),
+			conn:   nil, // nil is fine - Dispatch checks before writing
 		}
 		dispatcher.Subscribe(conn, []EventType{EventCirc, EventStream, EventBW})
 	}
