@@ -3,6 +3,7 @@
 package circuit
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -114,6 +115,7 @@ type Manager struct {
 	circuits map[uint32]*Circuit
 	nextID   uint32
 	mu       sync.RWMutex
+	closed   bool
 }
 
 // NewManager creates a new circuit manager
@@ -128,6 +130,10 @@ func NewManager() *Manager {
 func (m *Manager) CreateCircuit() (*Circuit, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	
+	if m.closed {
+		return nil, fmt.Errorf("manager is closed")
+	}
 	
 	// Find an unused circuit ID
 	id := m.nextID
@@ -198,4 +204,32 @@ func (m *Manager) Count() int {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return len(m.circuits)
+}
+
+// Close closes all circuits and shuts down the manager gracefully
+func (m *Manager) Close(ctx context.Context) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	
+	if m.closed {
+		return fmt.Errorf("manager already closed")
+	}
+	
+	// Mark as closed to prevent new circuits
+	m.closed = true
+	
+	// Close all circuits
+	for id, circuit := range m.circuits {
+		circuit.SetState(StateClosed)
+		delete(m.circuits, id)
+	}
+	
+	return nil
+}
+
+// IsClosed returns true if the manager has been closed
+func (m *Manager) IsClosed() bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.closed
 }
