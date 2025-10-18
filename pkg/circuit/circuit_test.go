@@ -1,6 +1,7 @@
 package circuit
 
 import (
+	"context"
 	"testing"
 	"time"
 )
@@ -220,5 +221,73 @@ func TestManagerListCircuits(t *testing.T) {
 		if !ids[id] {
 			t.Errorf("ListCircuits() contains unexpected ID %v", id)
 		}
+	}
+}
+
+func TestManagerClose(t *testing.T) {
+	m := NewManager()
+	
+	// Create some circuits
+	for i := 0; i < 3; i++ {
+		_, err := m.CreateCircuit()
+		if err != nil {
+			t.Fatalf("CreateCircuit() error = %v", err)
+		}
+	}
+	
+	if m.Count() != 3 {
+		t.Errorf("Count() = %v, want 3", m.Count())
+	}
+	
+	// Close the manager
+	ctx := context.Background()
+	err := m.Close(ctx)
+	if err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	
+	// Verify manager is closed
+	if !m.IsClosed() {
+		t.Error("IsClosed() = false, want true")
+	}
+	
+	// Verify all circuits are closed
+	if m.Count() != 0 {
+		t.Errorf("Count() = %v, want 0 after close", m.Count())
+	}
+	
+	// Try to create circuit on closed manager
+	_, err = m.CreateCircuit()
+	if err == nil {
+		t.Error("CreateCircuit() on closed manager should return error")
+	}
+	
+	// Try to close again
+	err = m.Close(ctx)
+	if err == nil {
+		t.Error("Close() on already closed manager should return error")
+	}
+}
+
+func TestManagerCloseWithTimeout(t *testing.T) {
+	m := NewManager()
+	
+	// Create a circuit
+	_, err := m.CreateCircuit()
+	if err != nil {
+		t.Fatalf("CreateCircuit() error = %v", err)
+	}
+	
+	// Close with a timeout context
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	
+	err = m.Close(ctx)
+	if err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	
+	if !m.IsClosed() {
+		t.Error("IsClosed() = false, want true")
 	}
 }
