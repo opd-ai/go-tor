@@ -12,6 +12,7 @@ import (
 	"github.com/opd-ai/go-tor/pkg/config"
 	"github.com/opd-ai/go-tor/pkg/directory"
 	"github.com/opd-ai/go-tor/pkg/logger"
+	"github.com/opd-ai/go-tor/pkg/metrics"
 	"github.com/opd-ai/go-tor/pkg/path"
 	"github.com/opd-ai/go-tor/pkg/socks"
 )
@@ -25,6 +26,7 @@ type Client struct {
 	socksServer  *socks.Server
 	pathSelector *path.Selector
 	guardManager *path.GuardManager
+	metrics      *metrics.Metrics
 
 	// Circuit management
 	circuits   []*circuit.Circuit
@@ -72,6 +74,7 @@ func New(cfg *config.Config, log *logger.Logger) (*Client, error) {
 		circuitMgr:   circuitMgr,
 		socksServer:  socksServer,
 		guardManager: guardMgr,
+		metrics:      metrics.New(),
 		circuits:     make([]*circuit.Circuit, 0),
 		ctx:          ctx,
 		cancel:       cancel,
@@ -100,6 +103,11 @@ func (c *Client) Start(ctx context.Context) error {
 
 	// Step 3: Clean up expired guards
 	c.guardManager.CleanupExpired()
+
+	// Step 3.5: Update guard metrics
+	guardStats := c.guardManager.GetStats()
+	c.metrics.GuardsActive.Set(int64(guardStats.TotalGuards))
+	c.metrics.GuardsConfirmed.Set(int64(guardStats.ConfirmedGuards))
 
 	// Step 4: Build initial circuits
 	c.logger.Info("Building initial circuits...")
@@ -202,8 +210,16 @@ func (c *Client) buildCircuit(ctx context.Context) error {
 	// Create circuit builder
 	builder := circuit.NewBuilder(c.circuitMgr, c.logger)
 
+	// Track circuit build time
+	startTime := time.Now()
+
 	// Build the circuit with 30 second timeout
 	circ, err := builder.BuildCircuit(ctx, selectedPath, 30*time.Second)
+	buildDuration := time.Since(startTime)
+
+	// Record metrics
+	c.metrics.RecordCircuitBuild(err == nil, buildDuration)
+
 	if err != nil {
 		return fmt.Errorf("failed to build circuit: %w", err)
 	}
@@ -214,9 +230,10 @@ func (c *Client) buildCircuit(ctx context.Context) error {
 	// Add to circuit pool
 	c.circuitsMu.Lock()
 	c.circuits = append(c.circuits, circ)
+	c.metrics.ActiveCircuits.Set(int64(len(c.circuits)))
 	c.circuitsMu.Unlock()
 
-	c.logger.Info("Circuit built successfully", "circuit_id", circ.ID)
+	c.logger.Info("Circuit built successfully", "circuit_id", circ.ID, "duration", buildDuration)
 	return nil
 }
 
@@ -240,7 +257,6 @@ func (c *Client) maintainCircuits(ctx context.Context) {
 // checkAndRebuildCircuits checks circuit health and rebuilds if needed
 func (c *Client) checkAndRebuildCircuits(ctx context.Context) {
 	c.circuitsMu.Lock()
-	defer c.circuitsMu.Unlock()
 
 	// Remove failed/closed circuits
 	activeCircuits := make([]*circuit.Circuit, 0)
@@ -253,6 +269,7 @@ func (c *Client) checkAndRebuildCircuits(ctx context.Context) {
 		}
 	}
 	c.circuits = activeCircuits
+	c.metrics.ActiveCircuits.Set(int64(len(c.circuits)))
 
 	// Rebuild if needed
 	const minCircuitCount = 2
@@ -271,6 +288,8 @@ func (c *Client) checkAndRebuildCircuits(ctx context.Context) {
 		// Re-acquire lock for defer
 		c.circuitsMu.Lock()
 	}
+
+	c.circuitsMu.Unlock()
 }
 
 // GetStats returns client statistics
@@ -278,18 +297,53 @@ func (c *Client) GetStats() Stats {
 	c.circuitsMu.RLock()
 	defer c.circuitsMu.RUnlock()
 
+	// Get guard statistics
+	guardStats := c.guardManager.GetStats()
+
+	// Get metrics snapshot
+	metricsSnap := c.metrics.Snapshot()
+
 	return Stats{
-		ActiveCircuits: len(c.circuits),
-		SocksPort:      c.config.SocksPort,
-		ControlPort:    c.config.ControlPort,
+		ActiveCircuits:      len(c.circuits),
+		SocksPort:           c.config.SocksPort,
+		ControlPort:         c.config.ControlPort,
+		CircuitBuilds:       metricsSnap.CircuitBuilds,
+		CircuitBuildSuccess: metricsSnap.CircuitBuildSuccess,
+		CircuitBuildFailure: metricsSnap.CircuitBuildFailure,
+		CircuitBuildTimeAvg: metricsSnap.CircuitBuildTimeAvg,
+		CircuitBuildTimeP95: metricsSnap.CircuitBuildTimeP95,
+		GuardsActive:        guardStats.TotalGuards,
+		GuardsConfirmed:     guardStats.ConfirmedGuards,
+		ConnectionAttempts:  metricsSnap.ConnectionAttempts,
+		ConnectionRetries:   metricsSnap.ConnectionRetries,
+		UptimeSeconds:       metricsSnap.UptimeSeconds,
 	}
 }
 
 // Stats represents client statistics
 type Stats struct {
+	// Basic stats
 	ActiveCircuits int
 	SocksPort      int
 	ControlPort    int
+
+	// Circuit metrics
+	CircuitBuilds       int64
+	CircuitBuildSuccess int64
+	CircuitBuildFailure int64
+	CircuitBuildTimeAvg time.Duration
+	CircuitBuildTimeP95 time.Duration
+
+	// Guard metrics
+	GuardsActive    int
+	GuardsConfirmed int
+
+	// Connection metrics
+	ConnectionAttempts int64
+	ConnectionRetries  int64
+
+	// System metrics
+	UptimeSeconds int64
 }
 
 // mergeContexts creates a context that respects both parent and child cancellation
