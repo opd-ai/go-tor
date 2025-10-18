@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/opd-ai/go-tor/pkg/client"
 	"github.com/opd-ai/go-tor/pkg/config"
 	"github.com/opd-ai/go-tor/pkg/logger"
 )
@@ -98,19 +99,24 @@ func main() {
 
 // run contains the main application logic
 func run(ctx context.Context, cfg *config.Config, log *logger.Logger) error {
-	// TODO: Initialize Tor client components
-	// - Initialize circuit manager
-	// - Connect to directory authorities
-	// - Start SOCKS5 proxy
-	// - Start control protocol server
+	// Initialize Tor client
+	torClient, err := client.New(cfg, log)
+	if err != nil {
+		return fmt.Errorf("failed to create Tor client: %w", err)
+	}
 
-	log.Info("Note: This is a development version. Core functionality not yet implemented.")
-	log.Info("The following features are planned:")
-	log.Info("  - Circuit building and management")
-	log.Info("  - SOCKS5 proxy server")
-	log.Info("  - Onion service support (client and server)")
-	log.Info("  - Tor control protocol")
-	log.Info("  - Guard node selection and persistence")
+	// Start the client
+	if err := torClient.Start(ctx); err != nil {
+		return fmt.Errorf("failed to start Tor client: %w", err)
+	}
+
+	// Display status
+	stats := torClient.GetStats()
+	log.Info("Tor client running",
+		"active_circuits", stats.ActiveCircuits,
+		"socks_port", stats.SocksPort)
+	log.Info("SOCKS5 proxy available at", "address", fmt.Sprintf("127.0.0.1:%d", stats.SocksPort))
+	log.Info("Configure your application to use SOCKS5 proxy for anonymous connections")
 
 	// Set up signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
@@ -133,17 +139,16 @@ func run(ctx context.Context, cfg *config.Config, log *logger.Logger) error {
 
 	log.Info("Initiating graceful shutdown...")
 
-	// TODO: Graceful shutdown
-	// - Close all circuits
-	// - Save state
-	// - Close connections
+	// Stop the client
+	if err := torClient.Stop(); err != nil {
+		log.Warn("Error during shutdown", "error", err)
+	}
 
-	// Simulate shutdown work
 	select {
 	case <-shutdownCtx.Done():
 		log.Warn("Shutdown timeout exceeded, forcing exit")
 		return shutdownCtx.Err()
-	case <-time.After(100 * time.Millisecond):
+	default:
 		// Shutdown completed successfully
 	}
 
