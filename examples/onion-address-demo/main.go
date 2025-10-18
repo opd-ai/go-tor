@@ -5,7 +5,6 @@ package main
 import (
 	"crypto/ed25519"
 	"crypto/rand"
-	"encoding/base32"
 	"fmt"
 	"strings"
 
@@ -137,30 +136,4 @@ func generateOnionAddress() string {
 	}
 
 	return addr.Encode()
-}
-
-// Alternative implementation showing the low-level encoding
-func generateOnionAddressLowLevel() string {
-	// Generate a random ed25519 public key
-	pubkey, _, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil {
-		panic(fmt.Sprintf("Failed to generate key: %v", err))
-	}
-
-	// Note: This is a simplified version. The actual checksum computation
-	// is done by the onion package using SHA3-256
-	// Here we just demonstrate the structure
-
-	// Construct: pubkey || checksum || version
-	// For demonstration, we use a placeholder checksum
-	data := make([]byte, 0, 35)
-	data = append(data, pubkey...)
-	data = append(data, 0xFF, 0xFF) // Placeholder checksum (would be computed properly)
-	data = append(data, 0x03)        // Version byte
-
-	// Encode to base32
-	encoder := base32.StdEncoding.WithPadding(base32.NoPadding)
-	encoded := strings.ToLower(encoder.EncodeToString(data))
-
-	return encoded + ".onion"
 }
