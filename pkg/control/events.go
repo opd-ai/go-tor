@@ -24,6 +24,8 @@ const (
 	EventNewDesc EventType = "NEWDESC"
 	// EventGuard indicates guard status changes
 	EventGuard EventType = "GUARD"
+	// EventNS indicates network status changes
+	EventNS EventType = "NS"
 )
 
 // Event represents a control protocol event
@@ -152,6 +154,76 @@ func (e *ORConnEvent) Format() string {
 	}
 	
 	return strings.Join(parts, " ")
+}
+
+// NewDescEvent represents a new descriptor availability event
+// Format: 650 NEWDESC <ServerID> [<ServerID>...]
+// ServerID is the long name (nickname or $fingerprint) of the relay
+type NewDescEvent struct {
+	Descriptors []string // List of server IDs (fingerprints or nicknames)
+}
+
+// Type returns the event type
+func (e *NewDescEvent) Type() EventType {
+	return EventNewDesc
+}
+
+// Format formats the event for transmission
+func (e *NewDescEvent) Format() string {
+	if len(e.Descriptors) == 0 {
+		return "650 NEWDESC"
+	}
+	return fmt.Sprintf("650 NEWDESC %s", strings.Join(e.Descriptors, " "))
+}
+
+// GuardEvent represents a guard status change event
+// Format: 650 GUARD <Type> <Name> <Status>
+// Type: ENTRY (for guard nodes)
+// Status: NEW, UP, DOWN, BAD, GOOD, DROPPED
+type GuardEvent struct {
+	GuardType   string // ENTRY
+	Name        string // $fingerprint~nickname or just nickname
+	Status      string // NEW, UP, DOWN, BAD, GOOD, DROPPED
+}
+
+// Type returns the event type
+func (e *GuardEvent) Type() EventType {
+	return EventGuard
+}
+
+// Format formats the event for transmission
+func (e *GuardEvent) Format() string {
+	return fmt.Sprintf("650 GUARD %s %s %s", e.GuardType, e.Name, e.Status)
+}
+
+// NSEvent represents a network status change event
+// Format: 650 NS <LongName> <Fingerprint> <Published> <IP> <ORPort> <DirPort> <Flags>
+// This is a simplified version - the full NS event is quite complex
+type NSEvent struct {
+	LongName    string   // Nickname or $fingerprint~nickname
+	Fingerprint string   // Relay fingerprint
+	Published   string   // Publication time (ISO 8601)
+	IP          string   // IP address
+	ORPort      int      // OR port
+	DirPort     int      // Directory port
+	Flags       []string // Relay flags (Fast, Guard, Exit, etc.)
+}
+
+// Type returns the event type
+func (e *NSEvent) Type() EventType {
+	return EventNS
+}
+
+// Format formats the event for transmission
+func (e *NSEvent) Format() string {
+	result := fmt.Sprintf("650 NS %s %s %s %s %d %d",
+		e.LongName, e.Fingerprint, e.Published, e.IP, e.ORPort, e.DirPort)
+	
+	if len(e.Flags) > 0 {
+		result += " " + strings.Join(e.Flags, " ")
+	}
+	
+	return result
 }
 
 // EventDispatcher manages event subscriptions and dispatching

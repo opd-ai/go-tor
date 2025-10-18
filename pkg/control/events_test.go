@@ -310,12 +310,170 @@ func TestEventTypes(t *testing.T) {
 		{&StreamEvent{}, EventStream},
 		{&BWEvent{}, EventBW},
 		{&ORConnEvent{}, EventORConn},
+		{&NewDescEvent{}, EventNewDesc},
+		{&GuardEvent{}, EventGuard},
+		{&NSEvent{}, EventNS},
 	}
 
 	for _, tt := range tests {
 		t.Run(string(tt.expected), func(t *testing.T) {
 			if result := tt.event.Type(); result != tt.expected {
 				t.Errorf("Type() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestNewDescEventFormat(t *testing.T) {
+	tests := []struct {
+		name     string
+		event    *NewDescEvent
+		expected string
+	}{
+		{
+			name:     "empty descriptors",
+			event:    &NewDescEvent{},
+			expected: "650 NEWDESC",
+		},
+		{
+			name: "single descriptor",
+			event: &NewDescEvent{
+				Descriptors: []string{"$ABC123~NodeA"},
+			},
+			expected: "650 NEWDESC $ABC123~NodeA",
+		},
+		{
+			name: "multiple descriptors",
+			event: &NewDescEvent{
+				Descriptors: []string{"$ABC123~NodeA", "$DEF456~NodeB", "$GHI789~NodeC"},
+			},
+			expected: "650 NEWDESC $ABC123~NodeA $DEF456~NodeB $GHI789~NodeC",
+		},
+		{
+			name: "fingerprints only",
+			event: &NewDescEvent{
+				Descriptors: []string{"$ABC123", "$DEF456"},
+			},
+			expected: "650 NEWDESC $ABC123 $DEF456",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.event.Format()
+			if result != tt.expected {
+				t.Errorf("Format() = %q, want %q", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGuardEventFormat(t *testing.T) {
+	tests := []struct {
+		name     string
+		event    *GuardEvent
+		expected string
+	}{
+		{
+			name: "guard new",
+			event: &GuardEvent{
+				GuardType: "ENTRY",
+				Name:      "$ABC123~GuardNode",
+				Status:    "NEW",
+			},
+			expected: "650 GUARD ENTRY $ABC123~GuardNode NEW",
+		},
+		{
+			name: "guard up",
+			event: &GuardEvent{
+				GuardType: "ENTRY",
+				Name:      "$DEF456~MyGuard",
+				Status:    "UP",
+			},
+			expected: "650 GUARD ENTRY $DEF456~MyGuard UP",
+		},
+		{
+			name: "guard down",
+			event: &GuardEvent{
+				GuardType: "ENTRY",
+				Name:      "$GHI789~DownGuard",
+				Status:    "DOWN",
+			},
+			expected: "650 GUARD ENTRY $GHI789~DownGuard DOWN",
+		},
+		{
+			name: "guard dropped",
+			event: &GuardEvent{
+				GuardType: "ENTRY",
+				Name:      "OldGuard",
+				Status:    "DROPPED",
+			},
+			expected: "650 GUARD ENTRY OldGuard DROPPED",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.event.Format()
+			if result != tt.expected {
+				t.Errorf("Format() = %q, want %q", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestNSEventFormat(t *testing.T) {
+	tests := []struct {
+		name     string
+		event    *NSEvent
+		expected string
+	}{
+		{
+			name: "basic NS event",
+			event: &NSEvent{
+				LongName:    "$ABC123~NodeA",
+				Fingerprint: "$ABC123",
+				Published:   "2024-01-01T12:00:00Z",
+				IP:          "192.168.1.1",
+				ORPort:      9001,
+				DirPort:     9030,
+				Flags:       []string{},
+			},
+			expected: "650 NS $ABC123~NodeA $ABC123 2024-01-01T12:00:00Z 192.168.1.1 9001 9030",
+		},
+		{
+			name: "NS event with flags",
+			event: &NSEvent{
+				LongName:    "$DEF456~GuardNode",
+				Fingerprint: "$DEF456",
+				Published:   "2024-01-02T13:00:00Z",
+				IP:          "10.0.0.1",
+				ORPort:      443,
+				DirPort:     80,
+				Flags:       []string{"Fast", "Guard", "Running", "Stable", "Valid"},
+			},
+			expected: "650 NS $DEF456~GuardNode $DEF456 2024-01-02T13:00:00Z 10.0.0.1 443 80 Fast Guard Running Stable Valid",
+		},
+		{
+			name: "NS event exit node",
+			event: &NSEvent{
+				LongName:    "$GHI789~ExitNode",
+				Fingerprint: "$GHI789",
+				Published:   "2024-01-03T14:00:00Z",
+				IP:          "172.16.0.1",
+				ORPort:      9001,
+				DirPort:     0,
+				Flags:       []string{"Exit", "Fast", "Running", "Valid"},
+			},
+			expected: "650 NS $GHI789~ExitNode $GHI789 2024-01-03T14:00:00Z 172.16.0.1 9001 0 Exit Fast Running Valid",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.event.Format()
+			if result != tt.expected {
+				t.Errorf("Format() = %q, want %q", result, tt.expected)
 			}
 		})
 	}

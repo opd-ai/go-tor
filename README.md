@@ -34,9 +34,9 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 - ✅ Metrics and observability system
 - ✅ Control protocol server (basic commands)
 - ✅ Event notification system (CIRC, STREAM, BW, ORCONN events)
+- ✅ Additional event types (NEWDESC, GUARD, NS events)
 
 ### Planned
-- [ ] **Phase 7.2**: Additional event types (NEWDESC, GUARD, NS)
 - [ ] **Phase 7.3**: Onion services (client and server)
 - [ ] **Phase 8**: Advanced features and optimization
 
