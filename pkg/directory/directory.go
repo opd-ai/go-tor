@@ -128,10 +128,14 @@ func (c *Client) parseConsensus(r io.Reader) ([]*Relay, error) {
 				Address:     parts[6],
 			}
 
-			// Parse ORPort
-			fmt.Sscanf(parts[7], "%d", &currentRelay.ORPort)
-			// Parse DirPort
-			fmt.Sscanf(parts[8], "%d", &currentRelay.DirPort)
+			// Parse ORPort (ignore errors for malformed entries)
+			if _, err := fmt.Sscanf(parts[7], "%d", &currentRelay.ORPort); err != nil {
+				c.logger.Debug("Failed to parse ORPort", "error", err, "value", parts[7])
+			}
+			// Parse DirPort (ignore errors for malformed entries)
+			if _, err := fmt.Sscanf(parts[8], "%d", &currentRelay.DirPort); err != nil {
+				c.logger.Debug("Failed to parse DirPort", "error", err, "value", parts[8])
+			}
 		}
 
 		// Parse "s" lines (flags)
