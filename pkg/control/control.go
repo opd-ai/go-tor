@@ -26,6 +26,9 @@ type Server struct {
 	conns   map[net.Conn]*connection
 	connsMu sync.RWMutex
 
+	// Event management
+	dispatcher *EventDispatcher
+
 	// Lifecycle
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -63,9 +66,15 @@ func NewServer(address string, clientGetter ClientInfoGetter, log *logger.Logger
 		logger:       log.Component("control"),
 		clientGetter: clientGetter,
 		conns:        make(map[net.Conn]*connection),
+		dispatcher:   NewEventDispatcher(),
 		ctx:          ctx,
 		cancel:       cancel,
 	}
+}
+
+// GetEventDispatcher returns the event dispatcher for publishing events
+func (s *Server) GetEventDispatcher() *EventDispatcher {
+	return s.dispatcher
 }
 
 // Start starts the control protocol server
@@ -156,6 +165,9 @@ func (s *Server) handleConnection(netConn net.Conn) {
 
 	// Unregister on exit
 	defer func() {
+		// Unsubscribe from events
+		s.dispatcher.Unsubscribe(conn)
+		
 		s.connsMu.Lock()
 		delete(s.conns, netConn)
 		s.connsMu.Unlock()
@@ -350,11 +362,17 @@ func (s *Server) handleSetEvents(conn *connection, args []string) {
 	// Clear existing events
 	conn.events = make(map[string]bool)
 
-	// Register new events
+	// Register new events with connection and dispatcher
+	var eventTypes []EventType
 	for _, event := range args {
-		conn.events[strings.ToUpper(event)] = true
+		eventUpper := strings.ToUpper(event)
+		conn.events[eventUpper] = true
+		eventTypes = append(eventTypes, EventType(eventUpper))
 	}
 	conn.mu.Unlock()
+
+	// Update dispatcher subscriptions
+	s.dispatcher.Subscribe(conn, eventTypes)
 
 	conn.writeReply(250, "OK")
 	s.logger.Debug("Events subscribed", "events", args, "remote", conn.conn.RemoteAddr())

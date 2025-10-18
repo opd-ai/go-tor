@@ -34,6 +34,11 @@ type Client struct {
 	circuits   []*circuit.Circuit
 	circuitsMu sync.RWMutex
 
+	// Bandwidth tracking (for BW events)
+	bytesRead    uint64
+	bytesWritten uint64
+	bwMu         sync.Mutex
+
 	// Lifecycle management
 	ctx          context.Context
 	cancel       context.CancelFunc
@@ -146,6 +151,13 @@ func (c *Client) Start(ctx context.Context) error {
 		c.maintainCircuits(ctx)
 	}()
 
+	// Step 8: Start bandwidth monitoring (publishes BW events)
+	c.wg.Add(1)
+	go func() {
+		defer c.wg.Done()
+		c.monitorBandwidth(ctx)
+	}()
+
 	c.logger.Info("Tor client started successfully")
 	return nil
 }
@@ -239,8 +251,31 @@ func (c *Client) buildCircuit(ctx context.Context) error {
 	c.metrics.RecordCircuitBuild(err == nil, buildDuration)
 
 	if err != nil {
+		// Publish circuit failure event
+		if circ != nil {
+			c.PublishEvent(&control.CircuitEvent{
+				CircuitID:   circ.ID,
+				Status:      "FAILED",
+				Purpose:     "GENERAL",
+				TimeCreated: startTime,
+			})
+		}
 		return fmt.Errorf("failed to build circuit: %w", err)
 	}
+
+	// Publish circuit built event
+	path := fmt.Sprintf("%s~%s,%s~%s,%s~%s",
+		selectedPath.Guard.Fingerprint, selectedPath.Guard.Nickname,
+		selectedPath.Middle.Fingerprint, selectedPath.Middle.Nickname,
+		selectedPath.Exit.Fingerprint, selectedPath.Exit.Nickname)
+	
+	c.PublishEvent(&control.CircuitEvent{
+		CircuitID:   circ.ID,
+		Status:      "BUILT",
+		Path:        path,
+		Purpose:     "GENERAL",
+		TimeCreated: startTime,
+	})
 
 	// Confirm the guard node as working (for persistence)
 	c.pathSelector.ConfirmGuard(selectedPath.Guard.Fingerprint)
@@ -377,6 +412,57 @@ func (s Stats) GetSocksPort() int {
 // GetControlPort returns the control protocol port
 func (s Stats) GetControlPort() int {
 	return s.ControlPort
+}
+
+// PublishEvent publishes an event to the control protocol
+func (c *Client) PublishEvent(event control.Event) {
+	if c.controlServer != nil {
+		c.controlServer.GetEventDispatcher().Dispatch(event)
+	}
+}
+
+// monitorBandwidth periodically publishes BW events
+func (c *Client) monitorBandwidth(ctx context.Context) {
+	ticker := time.NewTicker(1 * time.Second) // BW events every second
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-c.shutdown:
+			return
+		case <-ticker.C:
+			c.publishBandwidthEvent()
+		}
+	}
+}
+
+// publishBandwidthEvent publishes a bandwidth usage event
+func (c *Client) publishBandwidthEvent() {
+	c.bwMu.Lock()
+	bytesRead := c.bytesRead
+	bytesWritten := c.bytesWritten
+	c.bwMu.Unlock()
+
+	c.PublishEvent(&control.BWEvent{
+		BytesRead:    bytesRead,
+		BytesWritten: bytesWritten,
+	})
+}
+
+// RecordBytesRead records bytes read (called by stream/circuit layers)
+func (c *Client) RecordBytesRead(n uint64) {
+	c.bwMu.Lock()
+	c.bytesRead += n
+	c.bwMu.Unlock()
+}
+
+// RecordBytesWritten records bytes written (called by stream/circuit layers)
+func (c *Client) RecordBytesWritten(n uint64) {
+	c.bwMu.Lock()
+	c.bytesWritten += n
+	c.bwMu.Unlock()
 }
 
 // clientStatsAdapter adapts Client to control.ClientInfoGetter
