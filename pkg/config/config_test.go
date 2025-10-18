@@ -7,11 +7,11 @@ import (
 
 func TestDefaultConfig(t *testing.T) {
 	cfg := DefaultConfig()
-	
+
 	if cfg == nil {
 		t.Fatal("DefaultConfig() returned nil")
 	}
-	
+
 	// Verify some defaults
 	if cfg.SocksPort != 9050 {
 		t.Errorf("SocksPort = %v, want 9050", cfg.SocksPort)
@@ -138,7 +138,7 @@ func TestConfigValidate(t *testing.T) {
 			wantErr: false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := DefaultConfig()
@@ -158,25 +158,25 @@ func TestConfigClone(t *testing.T) {
 	original.OnionServices = []OnionServiceConfig{
 		{VirtualPort: 80, TargetAddr: "localhost:8080", ServiceDir: "/tmp/os1"},
 	}
-	
+
 	clone := original.Clone()
-	
+
 	// Verify values match
 	if clone.SocksPort != original.SocksPort {
 		t.Errorf("SocksPort = %v, want %v", clone.SocksPort, original.SocksPort)
 	}
-	
+
 	// Modify clone's slices - should not affect original
 	clone.BridgeAddresses[0] = "modified"
 	if original.BridgeAddresses[0] == "modified" {
 		t.Error("Modifying clone's BridgeAddresses affected original")
 	}
-	
+
 	clone.ExcludeNodes = append(clone.ExcludeNodes, "node2")
 	if len(original.ExcludeNodes) != 1 {
 		t.Error("Modifying clone's ExcludeNodes affected original")
 	}
-	
+
 	clone.OnionServices[0].VirtualPort = 443
 	if original.OnionServices[0].VirtualPort == 443 {
 		t.Error("Modifying clone's OnionServices affected original")
@@ -191,7 +191,7 @@ func TestOnionServiceConfig(t *testing.T) {
 		MaxStreams:  10,
 		ClientAuth:  map[string]string{"client1": "key1"},
 	}
-	
+
 	if cfg.ServiceDir != "/tmp/service" {
 		t.Errorf("ServiceDir = %v, want /tmp/service", cfg.ServiceDir)
 	}

@@ -17,7 +17,7 @@ import (
 const (
 	// AES128KeySize is the size of AES-128 keys
 	AES128KeySize = 16
-	// AES256KeySize is the size of AES-256 keys  
+	// AES256KeySize is the size of AES-256 keys
 	AES256KeySize = 32
 	// SHA1Size is the size of SHA-1 digests
 	SHA1Size = 20
@@ -58,7 +58,7 @@ func NewAESCTRCipher(key, iv []byte) (*AESCTRCipher, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create AES cipher: %w", err)
 	}
-	
+
 	stream := cipher.NewCTR(block, iv)
 	return &AESCTRCipher{stream: stream}, nil
 }

@@ -17,7 +17,7 @@ func TestStateString(t *testing.T) {
 		{StateFailed, "FAILED"},
 		{State(99), "UNKNOWN(99)"},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.expected, func(t *testing.T) {
 			if got := tt.state.String(); got != tt.expected {
@@ -30,7 +30,7 @@ func TestStateString(t *testing.T) {
 func TestNewCircuit(t *testing.T) {
 	id := uint32(123)
 	c := NewCircuit(id)
-	
+
 	if c.ID != id {
 		t.Errorf("ID = %v, want %v", c.ID, id)
 	}
@@ -47,22 +47,22 @@ func TestNewCircuit(t *testing.T) {
 
 func TestCircuitAddHop(t *testing.T) {
 	c := NewCircuit(1)
-	
+
 	hop := &Hop{
 		Fingerprint: "ABC123",
 		Address:     "1.2.3.4:9001",
 		IsGuard:     true,
 	}
-	
+
 	err := c.AddHop(hop)
 	if err != nil {
 		t.Fatalf("AddHop() error = %v", err)
 	}
-	
+
 	if c.Length() != 1 {
 		t.Errorf("Length() = %v, want 1", c.Length())
 	}
-	
+
 	// Try adding to a closed circuit
 	c.SetState(StateClosed)
 	err = c.AddHop(hop)
@@ -73,9 +73,9 @@ func TestCircuitAddHop(t *testing.T) {
 
 func TestCircuitSetGetState(t *testing.T) {
 	c := NewCircuit(1)
-	
+
 	states := []State{StateBuilding, StateOpen, StateClosed, StateFailed}
-	
+
 	for _, state := range states {
 		c.SetState(state)
 		if got := c.GetState(); got != state {
@@ -86,16 +86,16 @@ func TestCircuitSetGetState(t *testing.T) {
 
 func TestCircuitIsReady(t *testing.T) {
 	c := NewCircuit(1)
-	
+
 	if c.IsReady() {
 		t.Error("IsReady() = true for building circuit, want false")
 	}
-	
+
 	c.SetState(StateOpen)
 	if !c.IsReady() {
 		t.Error("IsReady() = false for open circuit, want true")
 	}
-	
+
 	c.SetState(StateClosed)
 	if c.IsReady() {
 		t.Error("IsReady() = true for closed circuit, want false")
@@ -104,9 +104,9 @@ func TestCircuitIsReady(t *testing.T) {
 
 func TestCircuitAge(t *testing.T) {
 	c := NewCircuit(1)
-	
+
 	time.Sleep(10 * time.Millisecond)
-	
+
 	age := c.Age()
 	if age < 10*time.Millisecond {
 		t.Errorf("Age() = %v, want >= 10ms", age)
@@ -118,7 +118,7 @@ func TestCircuitAge(t *testing.T) {
 
 func TestNewManager(t *testing.T) {
 	m := NewManager()
-	
+
 	if m == nil {
 		t.Fatal("NewManager() returned nil")
 	}
@@ -129,7 +129,7 @@ func TestNewManager(t *testing.T) {
 
 func TestManagerCreateCircuit(t *testing.T) {
 	m := NewManager()
-	
+
 	c1, err := m.CreateCircuit()
 	if err != nil {
 		t.Fatalf("CreateCircuit() error = %v", err)
@@ -137,7 +137,7 @@ func TestManagerCreateCircuit(t *testing.T) {
 	if c1.ID == 0 {
 		t.Error("Circuit ID is 0 (reserved)")
 	}
-	
+
 	c2, err := m.CreateCircuit()
 	if err != nil {
 		t.Fatalf("CreateCircuit() error = %v", err)
@@ -145,7 +145,7 @@ func TestManagerCreateCircuit(t *testing.T) {
 	if c2.ID == c1.ID {
 		t.Error("Two circuits have the same ID")
 	}
-	
+
 	if m.Count() != 2 {
 		t.Errorf("Count() = %v, want 2", m.Count())
 	}
@@ -153,12 +153,12 @@ func TestManagerCreateCircuit(t *testing.T) {
 
 func TestManagerGetCircuit(t *testing.T) {
 	m := NewManager()
-	
+
 	c, err := m.CreateCircuit()
 	if err != nil {
 		t.Fatalf("CreateCircuit() error = %v", err)
 	}
-	
+
 	retrieved, err := m.GetCircuit(c.ID)
 	if err != nil {
 		t.Fatalf("GetCircuit() error = %v", err)
@@ -166,7 +166,7 @@ func TestManagerGetCircuit(t *testing.T) {
 	if retrieved.ID != c.ID {
 		t.Errorf("Retrieved circuit ID = %v, want %v", retrieved.ID, c.ID)
 	}
-	
+
 	// Try getting non-existent circuit
 	_, err = m.GetCircuit(99999)
 	if err == nil {
@@ -176,21 +176,21 @@ func TestManagerGetCircuit(t *testing.T) {
 
 func TestManagerCloseCircuit(t *testing.T) {
 	m := NewManager()
-	
+
 	c, err := m.CreateCircuit()
 	if err != nil {
 		t.Fatalf("CreateCircuit() error = %v", err)
 	}
-	
+
 	err = m.CloseCircuit(c.ID)
 	if err != nil {
 		t.Fatalf("CloseCircuit() error = %v", err)
 	}
-	
+
 	if m.Count() != 0 {
 		t.Errorf("Count() = %v, want 0 after close", m.Count())
 	}
-	
+
 	// Try closing non-existent circuit
 	err = m.CloseCircuit(99999)
 	if err == nil {
@@ -200,7 +200,7 @@ func TestManagerCloseCircuit(t *testing.T) {
 
 func TestManagerListCircuits(t *testing.T) {
 	m := NewManager()
-	
+
 	// Create several circuits
 	ids := make(map[uint32]bool)
 	for i := 0; i < 5; i++ {
@@ -210,12 +210,12 @@ func TestManagerListCircuits(t *testing.T) {
 		}
 		ids[c.ID] = true
 	}
-	
+
 	list := m.ListCircuits()
 	if len(list) != 5 {
 		t.Errorf("ListCircuits() length = %v, want 5", len(list))
 	}
-	
+
 	// Verify all IDs are in the list
 	for _, id := range list {
 		if !ids[id] {
@@ -226,7 +226,7 @@ func TestManagerListCircuits(t *testing.T) {
 
 func TestManagerClose(t *testing.T) {
 	m := NewManager()
-	
+
 	// Create some circuits
 	for i := 0; i < 3; i++ {
 		_, err := m.CreateCircuit()
@@ -234,34 +234,34 @@ func TestManagerClose(t *testing.T) {
 			t.Fatalf("CreateCircuit() error = %v", err)
 		}
 	}
-	
+
 	if m.Count() != 3 {
 		t.Errorf("Count() = %v, want 3", m.Count())
 	}
-	
+
 	// Close the manager
 	ctx := context.Background()
 	err := m.Close(ctx)
 	if err != nil {
 		t.Fatalf("Close() error = %v", err)
 	}
-	
+
 	// Verify manager is closed
 	if !m.IsClosed() {
 		t.Error("IsClosed() = false, want true")
 	}
-	
+
 	// Verify all circuits are closed
 	if m.Count() != 0 {
 		t.Errorf("Count() = %v, want 0 after close", m.Count())
 	}
-	
+
 	// Try to create circuit on closed manager
 	_, err = m.CreateCircuit()
 	if err == nil {
 		t.Error("CreateCircuit() on closed manager should return error")
 	}
-	
+
 	// Try to close again
 	err = m.Close(ctx)
 	if err == nil {
@@ -271,22 +271,22 @@ func TestManagerClose(t *testing.T) {
 
 func TestManagerCloseWithTimeout(t *testing.T) {
 	m := NewManager()
-	
+
 	// Create a circuit
 	_, err := m.CreateCircuit()
 	if err != nil {
 		t.Fatalf("CreateCircuit() error = %v", err)
 	}
-	
+
 	// Close with a timeout context
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
+
 	err = m.Close(ctx)
 	if err != nil {
 		t.Fatalf("Close() error = %v", err)
 	}
-	
+
 	if !m.IsClosed() {
 		t.Error("IsClosed() = false, want true")
 	}

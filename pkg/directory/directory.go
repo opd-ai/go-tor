@@ -16,8 +16,8 @@ import (
 
 // Default directory authority addresses (hardcoded fallback directories)
 var DefaultAuthorities = []string{
-	"https://194.109.206.212/tor/status-vote/current/consensus.z", // gabelmoo
-	"https://131.188.40.189/tor/status-vote/current/consensus.z",  // moria1
+	"https://194.109.206.212/tor/status-vote/current/consensus.z",  // gabelmoo
+	"https://131.188.40.189/tor/status-vote/current/consensus.z",   // moria1
 	"https://128.31.0.34:9131/tor/status-vote/current/consensus.z", // tor26
 }
 
@@ -34,8 +34,8 @@ type Relay struct {
 
 // Client provides directory protocol operations
 type Client struct {
-	httpClient *http.Client
-	logger     *logger.Logger
+	httpClient  *http.Client
+	logger      *logger.Logger
 	authorities []string
 }
 
@@ -44,7 +44,7 @@ func NewClient(log *logger.Logger) *Client {
 	if log == nil {
 		log = logger.NewDefault()
 	}
-	
+
 	return &Client{
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
@@ -67,7 +67,7 @@ func (c *Client) FetchConsensus(ctx context.Context) ([]*Relay, error) {
 			lastErr = err
 			continue
 		}
-		
+
 		c.logger.Info("Successfully fetched consensus", "relays", len(relays), "authority", authority)
 		return relays, nil
 	}
@@ -105,51 +105,51 @@ func (c *Client) fetchFromAuthority(ctx context.Context, authorityURL string) ([
 func (c *Client) parseConsensus(r io.Reader) ([]*Relay, error) {
 	var relays []*Relay
 	scanner := bufio.NewScanner(r)
-	
+
 	var currentRelay *Relay
-	
+
 	for scanner.Scan() {
 		line := scanner.Text()
-		
+
 		// Parse "r" lines (router status entries)
 		if strings.HasPrefix(line, "r ") {
 			if currentRelay != nil {
 				relays = append(relays, currentRelay)
 			}
-			
+
 			parts := strings.Fields(line)
 			if len(parts) < 9 {
 				continue // Skip malformed entries
 			}
-			
+
 			currentRelay = &Relay{
 				Nickname:    parts[1],
 				Fingerprint: parts[2],
 				Address:     parts[6],
 			}
-			
+
 			// Parse ORPort
 			fmt.Sscanf(parts[7], "%d", &currentRelay.ORPort)
 			// Parse DirPort
 			fmt.Sscanf(parts[8], "%d", &currentRelay.DirPort)
 		}
-		
+
 		// Parse "s" lines (flags)
 		if strings.HasPrefix(line, "s ") && currentRelay != nil {
 			flags := strings.Fields(line[2:]) // Skip "s "
 			currentRelay.Flags = flags
 		}
 	}
-	
+
 	// Add the last relay
 	if currentRelay != nil {
 		relays = append(relays, currentRelay)
 	}
-	
+
 	if err := scanner.Err(); err != nil {
 		return nil, fmt.Errorf("error reading consensus: %w", err)
 	}
-	
+
 	return relays, nil
 }
 

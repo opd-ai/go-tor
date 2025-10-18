@@ -9,32 +9,32 @@ import (
 // Config represents the Tor client configuration
 type Config struct {
 	// Network settings
-	SocksPort           int      // SOCKS5 proxy port (default: 9050)
-	ControlPort         int      // Control protocol port (default: 9051)
-	DataDirectory       string   // Directory for persistent state
-	
+	SocksPort     int    // SOCKS5 proxy port (default: 9050)
+	ControlPort   int    // Control protocol port (default: 9051)
+	DataDirectory string // Directory for persistent state
+
 	// Circuit settings
 	CircuitBuildTimeout time.Duration // Max time to build a circuit (default: 60s)
 	MaxCircuitDirtiness time.Duration // Max time to use a circuit (default: 10m)
 	NewCircuitPeriod    time.Duration // How often to rotate circuits (default: 30s)
 	NumEntryGuards      int           // Number of entry guards to use (default: 3)
-	
+
 	// Path selection
-	UseEntryGuards      bool     // Whether to use entry guards (default: true)
-	UseBridges          bool     // Whether to use bridges (default: false)
-	BridgeAddresses     []string // Bridge addresses if UseBridges is true
-	ExcludeNodes        []string // Nodes to exclude from path selection
-	ExcludeExitNodes    []string // Exit nodes to exclude
-	
+	UseEntryGuards   bool     // Whether to use entry guards (default: true)
+	UseBridges       bool     // Whether to use bridges (default: false)
+	BridgeAddresses  []string // Bridge addresses if UseBridges is true
+	ExcludeNodes     []string // Nodes to exclude from path selection
+	ExcludeExitNodes []string // Exit nodes to exclude
+
 	// Network behavior
-	ConnLimit           int      // Max concurrent connections (default: 1000)
-	DormantTimeout      time.Duration // Time before entering dormant mode (default: 24h)
-	
+	ConnLimit      int           // Max concurrent connections (default: 1000)
+	DormantTimeout time.Duration // Time before entering dormant mode (default: 24h)
+
 	// Onion service settings
-	OnionServices       []OnionServiceConfig
-	
+	OnionServices []OnionServiceConfig
+
 	// Logging
-	LogLevel            string   // Log level: debug, info, warn, error (default: info)
+	LogLevel string // Log level: debug, info, warn, error (default: info)
 }
 
 // OnionServiceConfig represents configuration for a single onion service
@@ -88,7 +88,7 @@ func (c *Config) Validate() error {
 	if c.ConnLimit < 1 {
 		return fmt.Errorf("ConnLimit must be at least 1")
 	}
-	
+
 	// Validate log level
 	validLogLevels := map[string]bool{
 		"debug": true,
@@ -99,7 +99,7 @@ func (c *Config) Validate() error {
 	if !validLogLevels[c.LogLevel] {
 		return fmt.Errorf("invalid LogLevel: %s (must be debug, info, warn, or error)", c.LogLevel)
 	}
-	
+
 	// Validate onion service configs
 	for i, os := range c.OnionServices {
 		if os.VirtualPort < 1 || os.VirtualPort > 65535 {
@@ -112,7 +112,7 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("onion service %d: ServiceDir is required", i)
 		}
 	}
-	
+
 	return nil
 }
 

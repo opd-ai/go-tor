@@ -86,7 +86,7 @@ func New(cfg *Config, log *logger.Logger) *Connection {
 	if log == nil {
 		log = logger.NewDefault()
 	}
-	
+
 	return &Connection{
 		address: cfg.Address,
 		state:   StateConnecting,
@@ -98,12 +98,12 @@ func New(cfg *Config, log *logger.Logger) *Connection {
 // Connect establishes a TLS connection to the relay
 func (c *Connection) Connect(ctx context.Context, cfg *Config) error {
 	c.logger.Debug("Connecting to relay")
-	
+
 	// Create dialer with timeout
 	dialer := &net.Dialer{
 		Timeout: cfg.Timeout,
 	}
-	
+
 	// Establish TCP connection
 	conn, err := dialer.DialContext(ctx, "tcp", cfg.Address)
 	if err != nil {
@@ -111,11 +111,11 @@ func (c *Connection) Connect(ctx context.Context, cfg *Config) error {
 		return fmt.Errorf("failed to connect: %w", err)
 	}
 	c.conn = conn
-	
+
 	// Upgrade to TLS
 	c.setState(StateHandshaking)
 	c.logger.Debug("Starting TLS handshake")
-	
+
 	tlsConn := tls.Client(conn, cfg.TLSConfig)
 	if err := tlsConn.HandshakeContext(ctx); err != nil {
 		conn.Close()
@@ -123,10 +123,10 @@ func (c *Connection) Connect(ctx context.Context, cfg *Config) error {
 		return fmt.Errorf("TLS handshake failed: %w", err)
 	}
 	c.tlsConn = tlsConn
-	
+
 	c.setState(StateOpen)
 	c.logger.Info("Connection established")
-	
+
 	return nil
 }
 
@@ -134,22 +134,22 @@ func (c *Connection) Connect(ctx context.Context, cfg *Config) error {
 func (c *Connection) SendCell(cell *cell.Cell) error {
 	c.sendMu.Lock()
 	defer c.sendMu.Unlock()
-	
+
 	if c.getState() != StateOpen {
 		return fmt.Errorf("connection not open: %s", c.getState())
 	}
-	
+
 	select {
 	case <-c.closeCh:
 		return fmt.Errorf("connection closed")
 	default:
 	}
-	
+
 	if err := cell.Encode(c.tlsConn); err != nil {
 		c.logger.Error("Failed to send cell", "error", err, "command", cell.Command)
 		return fmt.Errorf("failed to send cell: %w", err)
 	}
-	
+
 	c.logger.Debug("Sent cell", "command", cell.Command, "circuit_id", cell.CircID)
 	return nil
 }
@@ -158,17 +158,17 @@ func (c *Connection) SendCell(cell *cell.Cell) error {
 func (c *Connection) ReceiveCell() (*cell.Cell, error) {
 	c.recvMu.Lock()
 	defer c.recvMu.Unlock()
-	
+
 	if c.getState() != StateOpen {
 		return nil, fmt.Errorf("connection not open: %s", c.getState())
 	}
-	
+
 	select {
 	case <-c.closeCh:
 		return nil, fmt.Errorf("connection closed")
 	default:
 	}
-	
+
 	receivedCell, err := cell.DecodeCell(c.tlsConn)
 	if err != nil {
 		if err == io.EOF {
@@ -179,7 +179,7 @@ func (c *Connection) ReceiveCell() (*cell.Cell, error) {
 		c.logger.Error("Failed to receive cell", "error", err)
 		return nil, fmt.Errorf("failed to receive cell: %w", err)
 	}
-	
+
 	c.logger.Debug("Received cell", "command", receivedCell.Command, "circuit_id", receivedCell.CircID)
 	return receivedCell, nil
 }
@@ -190,7 +190,7 @@ func (c *Connection) Close() error {
 	c.closeOnce.Do(func() {
 		close(c.closeCh)
 		c.setState(StateClosed)
-		
+
 		if c.tlsConn != nil {
 			if closeErr := c.tlsConn.Close(); closeErr != nil {
 				err = fmt.Errorf("failed to close TLS connection: %w", closeErr)
@@ -200,7 +200,7 @@ func (c *Connection) Close() error {
 				err = fmt.Errorf("failed to close connection: %w", closeErr)
 			}
 		}
-		
+
 		c.logger.Info("Connection closed")
 	})
 	return err

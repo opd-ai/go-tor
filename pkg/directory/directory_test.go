@@ -11,7 +11,7 @@ import (
 
 func TestNewClient(t *testing.T) {
 	client := NewClient(nil)
-	
+
 	if client == nil {
 		t.Fatal("NewClient() returned nil")
 	}
@@ -29,7 +29,7 @@ func TestNewClient(t *testing.T) {
 func TestNewClientWithLogger(t *testing.T) {
 	log := logger.NewDefault()
 	client := NewClient(log)
-	
+
 	if client == nil {
 		t.Fatal("NewClient() returned nil")
 	}
@@ -52,17 +52,17 @@ s Running Valid
 
 	client := NewClient(nil)
 	reader := strings.NewReader(consensusData)
-	
+
 	relays, err := client.parseConsensus(reader)
 	if err != nil {
 		t.Fatalf("parseConsensus() error = %v", err)
 	}
-	
+
 	if len(relays) != 3 {
 		t.Errorf("parseConsensus() returned %d relays, want 3", len(relays))
 		return
 	}
-	
+
 	// Check first relay
 	if relays[0].Nickname != "Test1" {
 		t.Errorf("relay[0].Nickname = %s, want Test1", relays[0].Nickname)
@@ -76,7 +76,7 @@ s Running Valid
 	if !relays[0].HasFlag("Guard") {
 		t.Error("relay[0] should have Guard flag")
 	}
-	
+
 	// Check second relay
 	if relays[1].Nickname != "Test2" {
 		t.Errorf("relay[1].Nickname = %s, want Test2", relays[1].Nickname)
@@ -92,12 +92,12 @@ s Running Valid
 func TestParseConsensusEmpty(t *testing.T) {
 	client := NewClient(nil)
 	reader := strings.NewReader("")
-	
+
 	relays, err := client.parseConsensus(reader)
 	if err != nil {
 		t.Fatalf("parseConsensus() error = %v", err)
 	}
-	
+
 	if len(relays) != 0 {
 		t.Errorf("parseConsensus() returned %d relays, want 0", len(relays))
 	}
@@ -108,7 +108,7 @@ func TestRelayHasFlag(t *testing.T) {
 		Nickname: "Test",
 		Flags:    []string{"Fast", "Guard", "Running", "Stable", "Valid"},
 	}
-	
+
 	tests := []struct {
 		flag     string
 		expected bool
@@ -119,7 +119,7 @@ func TestRelayHasFlag(t *testing.T) {
 		{"Exit", false},
 		{"NotAFlag", false},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.flag, func(t *testing.T) {
 			got := relay.HasFlag(tt.flag)
@@ -140,7 +140,7 @@ func TestRelayIsGuard(t *testing.T) {
 		{"without_guard_flag", []string{"Fast", "Running"}, false},
 		{"empty_flags", []string{}, false},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			relay := &Relay{Flags: tt.flags}
@@ -162,7 +162,7 @@ func TestRelayIsExit(t *testing.T) {
 		{"without_exit_flag", []string{"Fast", "Running"}, false},
 		{"empty_flags", []string{}, false},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			relay := &Relay{Flags: tt.flags}
@@ -179,7 +179,7 @@ func TestRelayIsStable(t *testing.T) {
 	if !relay.IsStable() {
 		t.Error("IsStable() = false, want true")
 	}
-	
+
 	relay2 := &Relay{Flags: []string{"Fast", "Running"}}
 	if relay2.IsStable() {
 		t.Error("IsStable() = true, want false")
@@ -191,7 +191,7 @@ func TestRelayIsRunning(t *testing.T) {
 	if !relay.IsRunning() {
 		t.Error("IsRunning() = false, want true")
 	}
-	
+
 	relay2 := &Relay{Flags: []string{"Fast"}}
 	if relay2.IsRunning() {
 		t.Error("IsRunning() = true, want false")
@@ -203,7 +203,7 @@ func TestRelayIsValid(t *testing.T) {
 	if !relay.IsValid() {
 		t.Error("IsValid() = false, want true")
 	}
-	
+
 	relay2 := &Relay{Flags: []string{"Running"}}
 	if relay2.IsValid() {
 		t.Error("IsValid() = true, want false")
@@ -216,10 +216,10 @@ func TestRelayString(t *testing.T) {
 		Address:  "192.168.1.1",
 		ORPort:   9001,
 	}
-	
+
 	expected := "TestRelay (192.168.1.1:9001)"
 	got := relay.String()
-	
+
 	if got != expected {
 		t.Errorf("String() = %s, want %s", got, expected)
 	}
@@ -230,10 +230,10 @@ func TestFetchConsensusTimeout(t *testing.T) {
 	// Use invalid authorities to test timeout
 	client.authorities = []string{"http://192.0.2.1:9999/consensus"}
 	client.httpClient.Timeout = 100 * time.Millisecond
-	
+
 	ctx := context.Background()
 	_, err := client.FetchConsensus(ctx)
-	
+
 	if err == nil {
 		t.Error("FetchConsensus() should fail with invalid authority")
 	}
@@ -242,12 +242,12 @@ func TestFetchConsensusTimeout(t *testing.T) {
 func TestFetchConsensusContextCanceled(t *testing.T) {
 	client := NewClient(nil)
 	client.authorities = []string{"http://192.0.2.1:9999/consensus"}
-	
+
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
-	
+
 	_, err := client.FetchConsensus(ctx)
-	
+
 	if err == nil {
 		t.Error("FetchConsensus() should fail with canceled context")
 	}
@@ -257,7 +257,7 @@ func TestDefaultAuthorities(t *testing.T) {
 	if len(DefaultAuthorities) == 0 {
 		t.Error("DefaultAuthorities should not be empty")
 	}
-	
+
 	for i, auth := range DefaultAuthorities {
 		if !strings.HasPrefix(auth, "https://") && !strings.HasPrefix(auth, "http://") {
 			t.Errorf("DefaultAuthorities[%d] = %s, should start with http:// or https://", i, auth)
