@@ -537,3 +537,332 @@ func BenchmarkEventFormatting(b *testing.B) {
 		_ = event.Format()
 	}
 }
+
+// TestNewEventTypesIntegration tests the new event types (NEWDESC, GUARD, NS)
+func TestNewEventTypesIntegration(t *testing.T) {
+	// Create mock client
+	mockClient := &mockClientGetter{
+		activeCircuits: 1,
+		socksPort:      9050,
+		controlPort:    9051,
+	}
+
+	// Create server
+	log := logger.NewDefault()
+	server := NewServer("127.0.0.1:0", mockClient, log)
+
+	if err := server.Start(); err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+	defer server.Stop()
+
+	// Get the actual address
+	addr := server.listener.Addr().String()
+
+	// Connect to server
+	conn, err := net.Dial("tcp", addr)
+	if err != nil {
+		t.Fatalf("Failed to connect: %v", err)
+	}
+	defer conn.Close()
+
+	reader := bufio.NewReader(conn)
+	writer := bufio.NewWriter(conn)
+
+	// Read greeting
+	greeting, err := reader.ReadString('\n')
+	if err != nil {
+		t.Fatalf("Failed to read greeting: %v", err)
+	}
+	if !strings.HasPrefix(greeting, "250") {
+		t.Errorf("Unexpected greeting: %s", greeting)
+	}
+
+	// Authenticate
+	writer.WriteString("AUTHENTICATE\r\n")
+	writer.Flush()
+	authResp, _ := reader.ReadString('\n')
+	if !strings.HasPrefix(authResp, "250") {
+		t.Errorf("Authentication failed: %s", authResp)
+	}
+
+	// Subscribe to new event types
+	writer.WriteString("SETEVENTS NEWDESC GUARD NS\r\n")
+	writer.Flush()
+	eventResp, _ := reader.ReadString('\n')
+	if !strings.HasPrefix(eventResp, "250") {
+		t.Errorf("Event subscription failed: %s", eventResp)
+	}
+
+	// Set up event collection
+	var receivedEvents []string
+	var eventsMu sync.Mutex
+	eventChan := make(chan string, 10)
+
+	// Start event reader goroutine
+	go func() {
+		for {
+			line, err := reader.ReadString('\n')
+			if err != nil {
+				return
+			}
+			if strings.HasPrefix(line, "650 ") {
+				eventChan <- strings.TrimSpace(line)
+			}
+		}
+	}()
+
+	// Wait a bit for setup
+	time.Sleep(50 * time.Millisecond)
+
+	// Publish NEWDESC event
+	server.GetEventDispatcher().Dispatch(&NewDescEvent{
+		Descriptors: []string{"$ABC123~NodeA", "$DEF456~NodeB"},
+	})
+
+	// Publish GUARD event
+	server.GetEventDispatcher().Dispatch(&GuardEvent{
+		GuardType: "ENTRY",
+		Name:      "$GHI789~GuardNode",
+		Status:    "NEW",
+	})
+
+	// Publish NS event
+	server.GetEventDispatcher().Dispatch(&NSEvent{
+		LongName:    "$JKL012~ExitNode",
+		Fingerprint: "$JKL012",
+		Published:   "2024-01-01T12:00:00Z",
+		IP:          "192.168.1.1",
+		ORPort:      9001,
+		DirPort:     9030,
+		Flags:       []string{"Fast", "Exit", "Running", "Valid"},
+	})
+
+	// Collect events with timeout
+	timeout := time.After(2 * time.Second)
+	expectedEvents := 3
+	for len(receivedEvents) < expectedEvents {
+		select {
+		case event := <-eventChan:
+			eventsMu.Lock()
+			receivedEvents = append(receivedEvents, event)
+			eventsMu.Unlock()
+		case <-timeout:
+			t.Fatalf("Timeout waiting for events. Received %d/%d events", len(receivedEvents), expectedEvents)
+		}
+	}
+
+	// Verify events
+	eventsMu.Lock()
+	defer eventsMu.Unlock()
+
+	if len(receivedEvents) != expectedEvents {
+		t.Errorf("Expected %d events, got %d", expectedEvents, len(receivedEvents))
+	}
+
+	// Check for NEWDESC event
+	foundNewDesc := false
+	for _, event := range receivedEvents {
+		if strings.HasPrefix(event, "650 NEWDESC") && strings.Contains(event, "$ABC123~NodeA") {
+			foundNewDesc = true
+			break
+		}
+	}
+	if !foundNewDesc {
+		t.Errorf("NEWDESC event not received. Got: %v", receivedEvents)
+	}
+
+	// Check for GUARD event
+	foundGuard := false
+	for _, event := range receivedEvents {
+		if strings.HasPrefix(event, "650 GUARD") && strings.Contains(event, "ENTRY") && strings.Contains(event, "$GHI789~GuardNode") {
+			foundGuard = true
+			break
+		}
+	}
+	if !foundGuard {
+		t.Errorf("GUARD event not received. Got: %v", receivedEvents)
+	}
+
+	// Check for NS event
+	foundNS := false
+	for _, event := range receivedEvents {
+		if strings.HasPrefix(event, "650 NS") && strings.Contains(event, "$JKL012~ExitNode") && strings.Contains(event, "192.168.1.1") {
+			foundNS = true
+			break
+		}
+	}
+	if !foundNS {
+		t.Errorf("NS event not received. Got: %v", receivedEvents)
+	}
+}
+
+// TestMixedEventSubscription tests subscribing to both old and new event types
+func TestMixedEventSubscription(t *testing.T) {
+	// Create mock client
+	mockClient := &mockClientGetter{
+		activeCircuits: 1,
+		socksPort:      9050,
+		controlPort:    9051,
+	}
+
+	// Create server
+	log := logger.NewDefault()
+	server := NewServer("127.0.0.1:0", mockClient, log)
+
+	if err := server.Start(); err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+	defer server.Stop()
+
+	// Get the actual address
+	addr := server.listener.Addr().String()
+
+	// Connect to server
+	conn, err := net.Dial("tcp", addr)
+	if err != nil {
+		t.Fatalf("Failed to connect: %v", err)
+	}
+	defer conn.Close()
+
+	reader := bufio.NewReader(conn)
+	writer := bufio.NewWriter(conn)
+
+	// Read greeting
+	greeting, err := reader.ReadString('\n')
+	if err != nil {
+		t.Fatalf("Failed to read greeting: %v", err)
+	}
+	if !strings.HasPrefix(greeting, "250") {
+		t.Errorf("Unexpected greeting: %s", greeting)
+	}
+
+	// Authenticate
+	writer.WriteString("AUTHENTICATE\r\n")
+	writer.Flush()
+	authResp, _ := reader.ReadString('\n')
+	if !strings.HasPrefix(authResp, "250") {
+		t.Errorf("Authentication failed: %s", authResp)
+	}
+
+	// Subscribe to mix of old and new event types
+	writer.WriteString("SETEVENTS CIRC GUARD BW NEWDESC\r\n")
+	writer.Flush()
+	eventResp, _ := reader.ReadString('\n')
+	if !strings.HasPrefix(eventResp, "250") {
+		t.Errorf("Event subscription failed: %s", eventResp)
+	}
+
+	// Set up event collection
+	eventChan := make(chan string, 10)
+
+	// Start event reader goroutine
+	go func() {
+		for {
+			line, err := reader.ReadString('\n')
+			if err != nil {
+				return
+			}
+			if strings.HasPrefix(line, "650 ") {
+				eventChan <- strings.TrimSpace(line)
+			}
+		}
+	}()
+
+	// Wait a bit for setup
+	time.Sleep(50 * time.Millisecond)
+
+	// Publish old event (CIRC)
+	server.GetEventDispatcher().Dispatch(&CircuitEvent{
+		CircuitID: 100,
+		Status:    "BUILT",
+		Purpose:   "GENERAL",
+	})
+
+	// Publish new event (GUARD)
+	server.GetEventDispatcher().Dispatch(&GuardEvent{
+		GuardType: "ENTRY",
+		Name:      "$ABC~Guard",
+		Status:    "UP",
+	})
+
+	// Publish another old event (BW)
+	server.GetEventDispatcher().Dispatch(&BWEvent{
+		BytesRead:    1024,
+		BytesWritten: 2048,
+	})
+
+	// Publish another new event (NEWDESC)
+	server.GetEventDispatcher().Dispatch(&NewDescEvent{
+		Descriptors: []string{"$XYZ~Relay"},
+	})
+
+	// Publish event that should NOT be received (NS - not subscribed)
+	server.GetEventDispatcher().Dispatch(&NSEvent{
+		LongName:    "$Test~Node",
+		Fingerprint: "$Test",
+		Published:   "2024-01-01T00:00:00Z",
+		IP:          "1.2.3.4",
+		ORPort:      9001,
+		DirPort:     0,
+		Flags:       []string{},
+	})
+
+	// Collect events
+	var receivedEvents []string
+	timeout := time.After(2 * time.Second)
+	expectedEvents := 4 // CIRC, GUARD, BW, NEWDESC (not NS)
+
+	for len(receivedEvents) < expectedEvents {
+		select {
+		case event := <-eventChan:
+			receivedEvents = append(receivedEvents, event)
+		case <-timeout:
+			// Timeout is OK - we might have received all we need
+			break
+		}
+	}
+
+	// Extra wait to ensure NS event doesn't arrive
+	time.Sleep(100 * time.Millisecond)
+
+	// Drain any extra events
+	for {
+		select {
+		case event := <-eventChan:
+			receivedEvents = append(receivedEvents, event)
+		default:
+			goto doneCollecting
+		}
+	}
+doneCollecting:
+
+	// Verify we got exactly the expected events
+	if len(receivedEvents) != expectedEvents {
+		t.Errorf("Expected %d events, got %d: %v", expectedEvents, len(receivedEvents), receivedEvents)
+	}
+
+	// Verify we got the expected event types
+	eventTypes := make(map[string]bool)
+	for _, event := range receivedEvents {
+		if strings.HasPrefix(event, "650 CIRC") {
+			eventTypes["CIRC"] = true
+		} else if strings.HasPrefix(event, "650 GUARD") {
+			eventTypes["GUARD"] = true
+		} else if strings.HasPrefix(event, "650 BW") {
+			eventTypes["BW"] = true
+		} else if strings.HasPrefix(event, "650 NEWDESC") {
+			eventTypes["NEWDESC"] = true
+		} else if strings.HasPrefix(event, "650 NS") {
+			t.Errorf("Received NS event which should not be subscribed: %s", event)
+		}
+	}
+
+	// Verify all expected types present
+	expectedTypes := []string{"CIRC", "GUARD", "BW", "NEWDESC"}
+	for _, et := range expectedTypes {
+		if !eventTypes[et] {
+			t.Errorf("Missing expected event type: %s", et)
+		}
+	}
+}

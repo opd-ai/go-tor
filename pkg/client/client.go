@@ -112,6 +112,12 @@ func (c *Client) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to update consensus: %w", err)
 	}
 	c.logger.Info("Path selector initialized")
+	
+	// Publish NS and NEWDESC events for the new consensus
+	if relays := c.pathSelector.GetRelays(); len(relays) > 0 {
+		c.publishNewDescEvents(relays)
+		c.publishConsensusEvents(relays)
+	}
 
 	// Step 3: Clean up expired guards
 	c.guardManager.CleanupExpired()
@@ -279,6 +285,13 @@ func (c *Client) buildCircuit(ctx context.Context) error {
 
 	// Confirm the guard node as working (for persistence)
 	c.pathSelector.ConfirmGuard(selectedPath.Guard.Fingerprint)
+	
+	// Publish GUARD event for confirmed guard
+	c.PublishEvent(&control.GuardEvent{
+		GuardType: "ENTRY",
+		Name:      fmt.Sprintf("$%s~%s", selectedPath.Guard.Fingerprint, selectedPath.Guard.Nickname),
+		Status:    "GOOD",
+	})
 
 	// Add to circuit pool
 	c.circuitsMu.Lock()
@@ -418,6 +431,59 @@ func (s Stats) GetControlPort() int {
 func (c *Client) PublishEvent(event control.Event) {
 	if c.controlServer != nil {
 		c.controlServer.GetEventDispatcher().Dispatch(event)
+	}
+}
+
+// publishConsensusEvents publishes NS events for relays in the consensus
+func (c *Client) publishConsensusEvents(relays []*directory.Relay) {
+	// Only publish a subset to avoid flooding - publish events for guards and exits
+	count := 0
+	maxEvents := 50 // Limit to avoid overwhelming subscribers
+	
+	for _, relay := range relays {
+		if count >= maxEvents {
+			break
+		}
+		
+		// Only publish for guards and exits (most interesting nodes)
+		if !relay.IsGuard() && !relay.IsExit() {
+			continue
+		}
+		
+		c.PublishEvent(&control.NSEvent{
+			LongName:    fmt.Sprintf("$%s~%s", relay.Fingerprint, relay.Nickname),
+			Fingerprint: fmt.Sprintf("$%s", relay.Fingerprint),
+			Published:   relay.Published.Format(time.RFC3339),
+			IP:          relay.Address,
+			ORPort:      relay.ORPort,
+			DirPort:     relay.DirPort,
+			Flags:       relay.Flags,
+		})
+		count++
+	}
+	
+	c.logger.Debug("Published NS events", "count", count)
+}
+
+// publishNewDescEvents publishes NEWDESC events for new relay descriptors
+func (c *Client) publishNewDescEvents(relays []*directory.Relay) {
+	// Collect fingerprints for NEWDESC event
+	descriptors := make([]string, 0, len(relays))
+	
+	// Limit to avoid huge events
+	maxDescriptors := 100
+	for i, relay := range relays {
+		if i >= maxDescriptors {
+			break
+		}
+		descriptors = append(descriptors, fmt.Sprintf("$%s~%s", relay.Fingerprint, relay.Nickname))
+	}
+	
+	if len(descriptors) > 0 {
+		c.PublishEvent(&control.NewDescEvent{
+			Descriptors: descriptors,
+		})
+		c.logger.Debug("Published NEWDESC event", "count", len(descriptors))
 	}
 }
 

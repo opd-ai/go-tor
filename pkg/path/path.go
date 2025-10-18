@@ -97,6 +97,17 @@ func (s *Selector) UpdateConsensus(ctx context.Context) error {
 	return nil
 }
 
+// GetRelays returns all relays from the current consensus (for event publishing)
+func (s *Selector) GetRelays() []*directory.Relay {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	
+	// Return a copy to avoid race conditions
+	relays := make([]*directory.Relay, len(s.relays))
+	copy(relays, s.relays)
+	return relays
+}
+
 // SelectPath selects a complete path (guard, middle, exit) for a circuit
 func (s *Selector) SelectPath(exitPort int) (*Path, error) {
 	s.mu.RLock()
