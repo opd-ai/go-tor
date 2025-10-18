@@ -66,6 +66,7 @@ func New(cfg *config.Config, log *logger.Logger) (*Client, error) {
 	// Initialize guard manager for persistent guard nodes
 	guardMgr, err := path.NewGuardManager(cfg.DataDirectory, log)
 	if err != nil {
+		cancel() // Clean up context on error
 		return nil, fmt.Errorf("failed to create guard manager: %w", err)
 	}
 

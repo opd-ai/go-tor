@@ -21,11 +21,11 @@ type Server struct {
 	listener     net.Listener
 	logger       *logger.Logger
 	clientGetter ClientInfoGetter
-	
+
 	// Connection management
 	conns   map[net.Conn]*connection
 	connsMu sync.RWMutex
-	
+
 	// Lifecycle
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -57,7 +57,7 @@ type connection struct {
 // NewServer creates a new control protocol server
 func NewServer(address string, clientGetter ClientInfoGetter, log *logger.Logger) *Server {
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	return &Server{
 		address:      address,
 		logger:       log.Component("control"),
@@ -74,39 +74,39 @@ func (s *Server) Start() error {
 	if err != nil {
 		return fmt.Errorf("failed to listen on %s: %w", s.address, err)
 	}
-	
+
 	s.listener = listener
 	s.logger.Info("Control protocol server listening", "address", s.address)
-	
+
 	// Accept connections in background
 	s.wg.Add(1)
 	go s.acceptLoop()
-	
+
 	return nil
 }
 
 // Stop stops the control protocol server
 func (s *Server) Stop() error {
 	s.logger.Info("Stopping control protocol server")
-	
+
 	// Cancel context
 	s.cancel()
-	
+
 	// Close listener
 	if s.listener != nil {
 		s.listener.Close()
 	}
-	
+
 	// Close all connections
 	s.connsMu.Lock()
 	for conn := range s.conns {
 		conn.Close()
 	}
 	s.connsMu.Unlock()
-	
+
 	// Wait for goroutines
 	s.wg.Wait()
-	
+
 	s.logger.Info("Control protocol server stopped")
 	return nil
 }
@@ -114,7 +114,7 @@ func (s *Server) Stop() error {
 // acceptLoop accepts incoming connections
 func (s *Server) acceptLoop() {
 	defer s.wg.Done()
-	
+
 	for {
 		conn, err := s.listener.Accept()
 		if err != nil {
@@ -126,9 +126,9 @@ func (s *Server) acceptLoop() {
 				continue
 			}
 		}
-		
+
 		s.logger.Info("New control connection", "remote", conn.RemoteAddr())
-		
+
 		// Handle connection in background
 		s.wg.Add(1)
 		go s.handleConnection(conn)
@@ -139,7 +139,7 @@ func (s *Server) acceptLoop() {
 func (s *Server) handleConnection(netConn net.Conn) {
 	defer s.wg.Done()
 	defer netConn.Close()
-	
+
 	// Create connection state
 	conn := &connection{
 		conn:          netConn,
@@ -148,22 +148,22 @@ func (s *Server) handleConnection(netConn net.Conn) {
 		authenticated: false,
 		events:        make(map[string]bool),
 	}
-	
+
 	// Register connection
 	s.connsMu.Lock()
 	s.conns[netConn] = conn
 	s.connsMu.Unlock()
-	
+
 	// Unregister on exit
 	defer func() {
 		s.connsMu.Lock()
 		delete(s.conns, netConn)
 		s.connsMu.Unlock()
 	}()
-	
+
 	// Send greeting
 	conn.writeReply(250, "OK")
-	
+
 	// Process commands
 	for {
 		select {
@@ -171,10 +171,10 @@ func (s *Server) handleConnection(netConn net.Conn) {
 			return
 		default:
 		}
-		
+
 		// Set read deadline
 		netConn.SetReadDeadline(time.Now().Add(30 * time.Second))
-		
+
 		// Read command
 		line, err := conn.reader.ReadString('\n')
 		if err != nil {
@@ -183,13 +183,13 @@ func (s *Server) handleConnection(netConn net.Conn) {
 			}
 			return
 		}
-		
+
 		// Parse and handle command
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
-		
+
 		s.logger.Debug("Control command received", "command", line)
 		s.handleCommand(conn, line)
 	}
@@ -202,10 +202,10 @@ func (s *Server) handleCommand(conn *connection, line string) {
 		conn.writeReply(500, "Syntax error: empty command")
 		return
 	}
-	
+
 	cmd := strings.ToUpper(parts[0])
 	args := parts[1:]
-	
+
 	switch cmd {
 	case "AUTHENTICATE":
 		s.handleAuthenticate(conn, args)
@@ -234,7 +234,7 @@ func (s *Server) handleAuthenticate(conn *connection, args []string) {
 	conn.mu.Lock()
 	conn.authenticated = true
 	conn.mu.Unlock()
-	
+
 	conn.writeReply(250, "OK")
 	s.logger.Info("Client authenticated", "remote", conn.conn.RemoteAddr())
 }
@@ -256,15 +256,15 @@ func (s *Server) handleGetInfo(conn *connection, args []string) {
 		conn.writeReply(514, "Authentication required")
 		return
 	}
-	
+
 	if len(args) == 0 {
 		conn.writeReply(552, "Missing argument")
 		return
 	}
-	
+
 	// Get client stats
 	stats := s.clientGetter.GetStats()
-	
+
 	var replies []string
 	for _, key := range args {
 		value, ok := s.getInfoValue(key, stats)
@@ -274,12 +274,12 @@ func (s *Server) handleGetInfo(conn *connection, args []string) {
 		}
 		replies = append(replies, fmt.Sprintf("250-%s=%s", key, value))
 	}
-	
+
 	// Last reply without dash
 	if len(replies) > 0 {
 		replies[len(replies)-1] = strings.Replace(replies[len(replies)-1], "250-", "250 ", 1)
 	}
-	
+
 	conn.writeDataReply(replies)
 }
 
@@ -309,22 +309,22 @@ func (s *Server) handleGetConf(conn *connection, args []string) {
 		conn.writeReply(514, "Authentication required")
 		return
 	}
-	
+
 	if len(args) == 0 {
 		conn.writeReply(552, "Missing argument")
 		return
 	}
-	
+
 	// Return dummy values for now
 	var replies []string
 	for _, key := range args {
 		replies = append(replies, fmt.Sprintf("250-%s=", key))
 	}
-	
+
 	if len(replies) > 0 {
 		replies[len(replies)-1] = strings.Replace(replies[len(replies)-1], "250-", "250 ", 1)
 	}
-	
+
 	conn.writeDataReply(replies)
 }
 
@@ -334,7 +334,7 @@ func (s *Server) handleSetConf(conn *connection, args []string) {
 		conn.writeReply(514, "Authentication required")
 		return
 	}
-	
+
 	// For now, just acknowledge
 	conn.writeReply(250, "OK")
 }
@@ -345,17 +345,17 @@ func (s *Server) handleSetEvents(conn *connection, args []string) {
 		conn.writeReply(514, "Authentication required")
 		return
 	}
-	
+
 	conn.mu.Lock()
 	// Clear existing events
 	conn.events = make(map[string]bool)
-	
+
 	// Register new events
 	for _, event := range args {
 		conn.events[strings.ToUpper(event)] = true
 	}
 	conn.mu.Unlock()
-	
+
 	conn.writeReply(250, "OK")
 	s.logger.Debug("Events subscribed", "events", args, "remote", conn.conn.RemoteAddr())
 }
@@ -364,7 +364,7 @@ func (s *Server) handleSetEvents(conn *connection, args []string) {
 func (c *connection) writeReply(code int, message string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	line := fmt.Sprintf("%d %s\r\n", code, message)
 	c.writer.WriteString(line)
 	c.writer.Flush()
@@ -374,7 +374,7 @@ func (c *connection) writeReply(code int, message string) {
 func (c *connection) writeDataReply(lines []string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	for _, line := range lines {
 		c.writer.WriteString(line + "\r\n")
 	}
