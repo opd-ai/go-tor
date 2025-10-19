@@ -60,6 +60,7 @@ type Server struct {
 	shutdown      chan struct{}
 	shutdownOnce  sync.Once
 	closeListener sync.Once
+	listenerReady chan struct{} // Signals when listener is ready
 }
 
 // NewServer creates a new SOCKS5 proxy server
@@ -69,12 +70,13 @@ func NewServer(address string, circuitMgr *circuit.Manager, log *logger.Logger) 
 	}
 
 	return &Server{
-		address:     address,
-		circuitMgr:  circuitMgr,
-		onionClient: onion.NewClient(log),
-		logger:      log.Component("socks5"),
-		activeConns: make(map[net.Conn]struct{}),
-		shutdown:    make(chan struct{}),
+		address:       address,
+		circuitMgr:    circuitMgr,
+		onionClient:   onion.NewClient(log),
+		logger:        log.Component("socks5"),
+		activeConns:   make(map[net.Conn]struct{}),
+		shutdown:      make(chan struct{}),
+		listenerReady: make(chan struct{}),
 	}
 }
 
@@ -86,7 +88,14 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to listen: %w", err)
 	}
+	
+	// Use mutex to protect listener assignment
+	s.mu.Lock()
 	s.listener = listener
+	s.mu.Unlock()
+	
+	// Signal that listener is ready
+	close(s.listenerReady)
 
 	s.logger.Info("SOCKS5 server listening", "address", s.address)
 
@@ -403,3 +412,19 @@ func (s *Server) Shutdown(ctx context.Context) error {
 func (s *Server) Address() string {
 	return s.address
 }
+
+// ListenerAddr returns the actual listener address once the server is ready.
+// This method blocks until the listener is initialized.
+func (s *Server) ListenerAddr() net.Addr {
+	// Wait for listener to be ready
+	<-s.listenerReady
+	
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	
+	if s.listener != nil {
+		return s.listener.Addr()
+	}
+	return nil
+}
+

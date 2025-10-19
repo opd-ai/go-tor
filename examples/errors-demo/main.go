@@ -110,7 +110,14 @@ func simulateRetryLogic() {
 
 		fmt.Printf("Attempt %d: %v\n", i+1, err)
 		if errors.IsRetryable(err) {
-			backoff := time.Duration(1<<uint(i)) * time.Second
+			// Cap maximum backoff to prevent integer overflow
+			// Max power of 10 gives us 1024 seconds (~17 minutes)
+			const maxBackoffPower = 10
+			backoffPower := uint(i)
+			if backoffPower > maxBackoffPower {
+				backoffPower = maxBackoffPower
+			}
+			backoff := time.Duration(1<<backoffPower) * time.Second
 			fmt.Printf("  -> Retrying after %v backoff\n", backoff)
 		} else {
 			fmt.Printf("  -> Error not retryable, aborting\n")

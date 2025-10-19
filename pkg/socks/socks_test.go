@@ -80,16 +80,16 @@ func TestSOCKS5Handshake(t *testing.T) {
 	defer cancel()
 
 	go server.ListenAndServe(ctx)
-	time.Sleep(100 * time.Millisecond)
 
-	// Get actual listening address
-	if server.listener == nil {
-		t.Fatal("Server listener is nil")
+	// Get actual listening address (blocks until server is ready)
+	addr := server.ListenerAddr()
+	if addr == nil {
+		t.Fatal("Server listener address is nil")
 	}
-	addr := server.listener.Addr().String()
+	addrStr := addr.String()
 
 	// Connect to server
-	conn, err := net.Dial("tcp", addr)
+	conn, err := net.Dial("tcp", addrStr)
 	if err != nil {
 		t.Fatalf("Failed to connect to server: %v", err)
 	}
@@ -128,9 +128,8 @@ func TestSOCKS5ConnectRequest(t *testing.T) {
 	defer cancel()
 
 	go server.ListenAndServe(ctx)
-	time.Sleep(100 * time.Millisecond)
 
-	addr := server.listener.Addr().String()
+	addr := server.ListenerAddr().String()
 
 	// Connect to server
 	conn, err := net.Dial("tcp", addr)
@@ -190,9 +189,8 @@ func TestSOCKS5DomainRequest(t *testing.T) {
 	defer cancel()
 
 	go server.ListenAndServe(ctx)
-	time.Sleep(100 * time.Millisecond)
 
-	addr := server.listener.Addr().String()
+	addr := server.ListenerAddr().String()
 
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
@@ -246,9 +244,8 @@ func TestSOCKS5OnionAddress(t *testing.T) {
 	defer cancel()
 
 	go server.ListenAndServe(ctx)
-	time.Sleep(100 * time.Millisecond)
 
-	addr := server.listener.Addr().String()
+	addr := server.ListenerAddr().String()
 
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
@@ -324,9 +321,8 @@ func TestSOCKS5UnsupportedVersion(t *testing.T) {
 	defer cancel()
 
 	go server.ListenAndServe(ctx)
-	time.Sleep(100 * time.Millisecond)
 
-	addr := server.listener.Addr().String()
+	addr := server.ListenerAddr().String()
 
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
@@ -359,9 +355,8 @@ func TestSOCKS5ConcurrentConnections(t *testing.T) {
 	defer cancel()
 
 	go server.ListenAndServe(ctx)
-	time.Sleep(100 * time.Millisecond)
 
-	addr := server.listener.Addr().String()
+	addr := server.ListenerAddr().String()
 
 	// Make multiple concurrent connections
 	done := make(chan bool)
@@ -414,9 +409,8 @@ func TestServerShutdownWithActiveConnections(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	go server.ListenAndServe(ctx)
-	time.Sleep(100 * time.Millisecond)
 
-	addr := server.listener.Addr().String()
+	addr := server.ListenerAddr().String()
 
 	// Create a connection
 	conn, err := net.Dial("tcp", addr)

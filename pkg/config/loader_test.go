@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -281,6 +282,80 @@ func TestSaveToFile_NilConfig(t *testing.T) {
 	err := SaveToFile(testFile, nil)
 	if err == nil {
 		t.Error("SaveToFile() should return error for nil config")
+	}
+}
+
+func TestPathValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		path    string
+		wantErr bool
+	}{
+		{
+			name:    "valid absolute path",
+			path:    "/tmp/config.conf",
+			wantErr: false,
+		},
+		{
+			name:    "valid relative path",
+			path:    "config.conf",
+			wantErr: false,
+		},
+		{
+			name:    "valid nested relative path",
+			path:    "configs/tor/config.conf",
+			wantErr: false,
+		},
+		{
+			name:    "directory traversal attack with ..",
+			path:    "../../../etc/passwd",
+			wantErr: true,
+		},
+		{
+			name:    "directory traversal in middle",
+			path:    "configs/../../../etc/passwd",
+			wantErr: true,
+		},
+		{
+			name:    "double dot escape",
+			path:    "configs/../../etc/passwd",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validatePath(tt.path)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validatePath() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestSaveToFile_PathValidation(t *testing.T) {
+	cfg := DefaultConfig()
+
+	// Try to save to a path with directory traversal
+	err := SaveToFile("../../../etc/passwd", cfg)
+	if err == nil {
+		t.Error("SaveToFile() should reject path with directory traversal")
+	}
+	if !strings.Contains(err.Error(), "path validation failed") {
+		t.Errorf("Expected path validation error, got: %v", err)
+	}
+}
+
+func TestLoadFromFile_PathValidation(t *testing.T) {
+	cfg := DefaultConfig()
+
+	// Try to load from a path with directory traversal
+	err := LoadFromFile("../../../etc/passwd", cfg)
+	if err == nil {
+		t.Error("LoadFromFile() should reject path with directory traversal")
+	}
+	if !strings.Contains(err.Error(), "path validation failed") {
+		t.Errorf("Expected path validation error, got: %v", err)
 	}
 }
 

@@ -43,3 +43,4 @@ go.work
 
 # Profiling results
 /profiles/
+errors-demo
