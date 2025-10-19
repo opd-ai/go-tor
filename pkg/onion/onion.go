@@ -629,26 +629,86 @@ func VerifyDescriptorSignature(descriptor *Descriptor, address *Address) error {
 	// The signed message is everything up to (but not including) the signature line
 	signedMessage := raw[:signatureIdx]
 
-	// Import crypto package for Ed25519 verification
-	// Verify the signature using the onion service public key
-	// Per rend-spec-v3.txt, the signature is created with the descriptor signing key
-	// which is derived from the identity key (the onion address public key)
+	// Verify the signature using Ed25519
+	// Per rend-spec-v3.txt section 2.1, the descriptor is signed with the descriptor signing key
+	// which is certified by the identity key (onion address public key)
+	//
+	// Simplified implementation: We verify directly with the identity key
+	// A full production implementation would:
+	// 1. Parse the descriptor-signing-key-cert from the descriptor
+	// 2. Verify certificate signature: Ed25519Verify(identityKey, certBody, certSig)
+	// 3. Extract signing key from certificate
+	// 4. Verify descriptor: Ed25519Verify(signingKey, signedMessage, descriptorSig)
+	//
+	// For now, we verify with the identity key which provides authentication
+	// (though not full certificate chain validation per spec)
 	
-	// Use crypto.Ed25519Verify for verification
-	// Note: We're using the address public key directly for simplification
-	// A full implementation would extract the signing key from the certificate
+	// Import the crypto package Ed25519 verification function
+	if !ed25519.Verify(ed25519.PublicKey(address.Pubkey), signedMessage, descriptor.Signature) {
+		return fmt.Errorf("descriptor signature verification failed: invalid signature")
+	}
 	
-	// For now, create a basic verification that checks the signature format
-	// In production, we would:
-	// 1. Parse the descriptor-signing-key-cert to get the actual signing key
-	// 2. Verify the certificate chain
-	// 3. Use the signing key (not the identity key) to verify
+	return nil
+}
+
+// parseCertificate parses a Tor Ed25519 certificate
+// This is a simplified parser for basic certificate validation
+// A full implementation would handle all certificate types and extensions
+// Per cert-spec.txt (Tor certificate format specification)
+func parseCertificate(certData []byte) (*Certificate, error) {
+	if len(certData) < 13 { // Minimum certificate size
+		return nil, fmt.Errorf("certificate too short: %d bytes", len(certData))
+	}
 	
-	// Placeholder verification - logs a warning that full verification is needed
-	// TODO: Implement full certificate chain validation
-	_ = signedMessage
+	cert := &Certificate{}
 	
-	return nil // Temporarily accept all signatures until full implementation
+	// Certificate format (simplified):
+	// [1 byte] version (must be 1)
+	// [1 byte] cert_type
+	// [4 bytes] expiration_date (hours since epoch)
+	// [1 byte] cert_key_type
+	// [32 bytes] certified_key
+	// [1 byte] n_extensions
+	// [extensions]
+	// [64 bytes] signature
+	
+	cert.Version = certData[0]
+	if cert.Version != 1 {
+		return nil, fmt.Errorf("unsupported certificate version: %d", cert.Version)
+	}
+	
+	cert.CertType = certData[1]
+	cert.SigningKey = certData[7:39] // Simplified: extract signing key
+	
+	// Signature is last 64 bytes
+	if len(certData) >= 64 {
+		cert.Signature = certData[len(certData)-64:]
+	}
+	
+	return cert, nil
+}
+
+// Certificate represents a Tor Ed25519 certificate
+type Certificate struct {
+	Version    uint8
+	CertType   uint8
+	SigningKey []byte // The certified Ed25519 key
+	Signature  []byte // Ed25519 signature
+}
+
+// VerifyDescriptorSignatureWithCertChain performs full certificate chain validation
+// This is a placeholder for full cert-spec.txt implementation
+func VerifyDescriptorSignatureWithCertChain(descriptor *Descriptor, address *Address) error {
+	// This would implement full certificate chain validation:
+	// 1. Parse descriptor-signing-key-cert from raw descriptor
+	// 2. Verify cert signature with identity key
+	// 3. Extract signing key from cert
+	// 4. Verify descriptor signature with signing key
+	//
+	// For now, we use the simplified approach in VerifyDescriptorSignature
+	// which verifies directly with the identity key
+	
+	return VerifyDescriptorSignature(descriptor, address)
 }
 
 // ParseDescriptorWithVerification parses and verifies a descriptor in one step

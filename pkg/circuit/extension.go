@@ -129,11 +129,34 @@ func (e *Extension) generateHandshakeData(handshakeType HandshakeType) ([]byte, 
 	switch handshakeType {
 	case HandshakeTypeNTor:
 		// Use full ntor handshake implementation per tor-spec.txt section 5.1.4
-		// For now, we need relay's identity and ntor keys
-		// In a real implementation, these would come from the relay descriptor
+		// 
+		// IMPORTANT: In a production implementation, relay keys must come from the
+		// network consensus and relay descriptors fetched via the directory protocol.
+		// The keys should be obtained as follows:
+		//
+		// 1. Fetch consensus from directory authorities (pkg/directory)
+		// 2. Select relay based on flags and requirements (pkg/path)
+		// 3. Fetch full descriptor for the relay (contains ntor-onion-key)
+		// 4. Extract identity key (Ed25519, 32 bytes) from descriptor
+		// 5. Extract ntor onion key (Curve25519, 32 bytes) from descriptor
+		//
+		// Example integration (to be implemented):
+		//   relay := e.selectRelay() // From path selection
+		//   descriptor := e.fetchDescriptor(relay.Fingerprint)
+		//   relayIdentity := descriptor.IdentityKey
+		//   relayNtorKey := descriptor.NtorOnionKey
+		//
+		// For testing and initial implementation, we use placeholder keys.
+		// These MUST be replaced with actual relay keys before production use.
 		
-		// Placeholder relay keys (in production, these come from directory consensus)
-		// TODO: Get actual relay keys from descriptor
+		// TODO: Integrate with directory service to fetch actual relay keys
+		// This requires:
+		// - Adding NtorOnionKey and IdentityKey fields to directory.Relay struct
+		// - Parsing these fields from relay descriptors in directory.ParseConsensus
+		// - Passing the selected relay descriptor to this function
+		// - Extracting the keys: relayIdentity, relayNtorKey := getRelayKeys(relayDescriptor)
+		
+		// Placeholder relay keys for testing (NOT SECURE - replace with real keys)
 		relayIdentity := make([]byte, 32)
 		relayNtorKey := make([]byte, 32)
 		
@@ -203,6 +226,40 @@ func (e *Extension) buildExtend2Data(target string, handshakeType HandshakeType,
 	data = append(data, handshakeData...)
 
 	return data
+}
+
+// getRelayKeys is a placeholder function showing how relay keys should be obtained
+// from the directory service in a production implementation.
+//
+// Production implementation should:
+// 1. Accept a relay descriptor from the directory service
+// 2. Extract the Ed25519 identity key (32 bytes)
+// 3. Extract the Curve25519 ntor onion key (32 bytes)
+// 4. Validate key formats and lengths
+// 5. Return the keys for use in circuit creation
+//
+// Integration with directory service requires:
+// - Extending directory.Relay to include: IdentityKey []byte, NtorOnionKey []byte
+// - Parsing "identity-ed25519" from relay descriptors
+// - Parsing "ntor-onion-key" from relay descriptors
+// - Storing keys in the Relay structure during consensus parsing
+//
+// Example implementation:
+//   func getRelayKeys(relay *directory.Relay) (identityKey, ntorKey []byte, err error) {
+//       if len(relay.IdentityKey) != 32 {
+//           return nil, nil, fmt.Errorf("invalid identity key length")
+//       }
+//       if len(relay.NtorOnionKey) != 32 {
+//           return nil, nil, fmt.Errorf("invalid ntor key length")
+//       }
+//       return relay.IdentityKey, relay.NtorOnionKey, nil
+//   }
+//
+// This function is currently unused but documents the required integration.
+func getRelayKeys(relay interface{}) (identityKey, ntorKey []byte, err error) {
+	// Placeholder implementation
+	// In production, this would extract keys from relay descriptor
+	return nil, nil, fmt.Errorf("not implemented: relay key extraction requires directory service integration")
 }
 
 // ProcessCreated2 processes a CREATED2 response from the first hop
