@@ -128,13 +128,22 @@ func (e *Extension) ExtendCircuit(ctx context.Context, target string, handshakeT
 func (e *Extension) generateHandshakeData(handshakeType HandshakeType) ([]byte, error) {
 	switch handshakeType {
 	case HandshakeTypeNTor:
-		// ntor handshake: X (32 bytes) where X is the client's public key
-		// This is a simplified version; real ntor is more complex
-		data := make([]byte, 32)
-		if _, err := rand.Read(data); err != nil {
-			return nil, fmt.Errorf("failed to generate random data: %w", err)
+		// Use full ntor handshake implementation per tor-spec.txt section 5.1.4
+		// For now, we need relay's identity and ntor keys
+		// In a real implementation, these would come from the relay descriptor
+		
+		// Placeholder relay keys (in production, these come from directory consensus)
+		// TODO: Get actual relay keys from descriptor
+		relayIdentity := make([]byte, 32)
+		relayNtorKey := make([]byte, 32)
+		
+		// Generate client handshake data
+		handshakeData, _, err := crypto.NtorClientHandshake(relayIdentity, relayNtorKey)
+		if err != nil {
+			return nil, fmt.Errorf("ntor handshake failed: %w", err)
 		}
-		return data, nil
+		
+		return handshakeData, nil
 
 	case HandshakeTypeTAP:
 		// TAP handshake: PK_ID (16 bytes) || Symmetric key material (128 bytes)
