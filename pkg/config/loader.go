@@ -26,7 +26,7 @@ func LoadFromFile(path string, cfg *Config) error {
 		return fmt.Errorf("path validation failed: %w", err)
 	}
 
-	file, err := os.Open(path)
+	file, err := os.Open(path) // #nosec G304 - path is validated by validatePath
 	if err != nil {
 		return fmt.Errorf("failed to open config file: %w", err)
 	}
@@ -254,7 +254,7 @@ func SaveToFile(path string, cfg *Config) error {
 		return fmt.Errorf("path validation failed: %w", err)
 	}
 
-	file, err := os.Create(path)
+	file, err := os.Create(path) // #nosec G304 - path is validated by validatePath
 	if err != nil {
 		return fmt.Errorf("failed to create config file: %w", err)
 	}
