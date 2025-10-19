@@ -29,13 +29,15 @@ var DefaultAuthorities = []string{
 
 // Relay represents a Tor relay from the consensus
 type Relay struct {
-	Nickname    string
-	Fingerprint string
-	Address     string
-	ORPort      int
-	DirPort     int
-	Flags       []string
-	Published   time.Time
+	Nickname     string
+	Fingerprint  string
+	Address      string
+	ORPort       int
+	DirPort      int
+	Flags        []string
+	Published    time.Time
+	IdentityKey  []byte // Ed25519 identity key (32 bytes) - SPEC-001
+	NtorOnionKey []byte // Curve25519 ntor onion key (32 bytes) - SPEC-001
 }
 
 // Client provides directory protocol operations
@@ -233,4 +235,19 @@ func (r *Relay) IsValid() bool {
 // String returns a string representation of the relay
 func (r *Relay) String() string {
 	return fmt.Sprintf("%s (%s:%d)", r.Nickname, r.Address, r.ORPort)
+}
+
+// GetIdentityKey returns the relay's Ed25519 identity key (SPEC-001)
+func (r *Relay) GetIdentityKey() []byte {
+	return r.IdentityKey
+}
+
+// GetNtorOnionKey returns the relay's Curve25519 ntor onion key (SPEC-001)
+func (r *Relay) GetNtorOnionKey() []byte {
+	return r.NtorOnionKey
+}
+
+// HasValidKeys returns true if the relay has both required cryptographic keys (SPEC-001)
+func (r *Relay) HasValidKeys() bool {
+	return len(r.IdentityKey) == 32 && len(r.NtorOnionKey) == 32
 }
