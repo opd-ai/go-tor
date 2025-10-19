@@ -14,7 +14,7 @@ func TestFindingH001_RaceConditionSOCKS5(t *testing.T) {
 	// The actual fix should be implemented in pkg/socks/socks_test.go
 	// by synchronizing access to the listener address
 	t.Skip("Race condition documented in FINDING H-001 - needs fix in pkg/socks")
-	
+
 	// The race occurs when:
 	// 1. Server starts and creates listener (writes to TCPAddr)
 	// 2. Test reads listener.Addr().String() concurrently
@@ -69,15 +69,15 @@ func TestFindingH002_IntegerOverflowTimestamp(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Test the safe conversion function
 			result, err := safeInt64ToUint64(tt.timestamp)
-			
+
 			if tt.wantError && err == nil {
 				t.Errorf("expected error for %s, got none", tt.reason)
 			}
-			
+
 			if !tt.wantError && err != nil {
 				t.Errorf("unexpected error for %s: %v", tt.reason, err)
 			}
-			
+
 			if !tt.wantError && err == nil {
 				if result != uint64(tt.timestamp) {
 					t.Errorf("conversion mismatch: got %d, want %d", result, tt.timestamp)
@@ -133,11 +133,11 @@ func TestFindingM002_PathTraversal(t *testing.T) {
 			// Validate path doesn't contain directory traversal
 			cleanPath := filepath.Clean(tt.path)
 			hasTraversal := strings.Contains(cleanPath, "..")
-			
+
 			if tt.wantError && !hasTraversal {
 				t.Errorf("expected path traversal detection for %s", tt.reason)
 			}
-			
+
 			if !tt.wantError && hasTraversal {
 				t.Errorf("false positive for %s: %s", tt.reason, cleanPath)
 			}
@@ -199,20 +199,20 @@ func TestFindingM003_IntegerOverflowBackoff(t *testing.T) {
 			if power > tt.maxPower {
 				power = tt.maxPower
 			}
-			
+
 			// Calculate backoff safely
 			backoff := time.Duration(1<<power) * time.Second
 			seconds := int64(backoff / time.Second)
-			
+
 			if seconds != tt.wantSeconds {
 				t.Errorf("backoff mismatch: got %d seconds, want %d seconds", seconds, tt.wantSeconds)
 			}
-			
+
 			// Verify we didn't overflow
 			if backoff < 0 {
 				t.Error("negative backoff indicates overflow")
 			}
-			
+
 			// Verify it's reasonable (< 1 hour for safety)
 			if seconds > 3600 {
 				t.Errorf("backoff too large: %d seconds (>1 hour)", seconds)
@@ -226,14 +226,14 @@ func TestFindingM003_IntegerOverflowBackoff(t *testing.T) {
 func TestFindingM004_TestCoverageBaseline(t *testing.T) {
 	// This test documents the test coverage findings
 	// Target: All packages should have >70% coverage
-	
+
 	type coverageTarget struct {
 		pkg      string
 		current  float64
 		target   float64
 		priority string
 	}
-	
+
 	targets := []coverageTarget{
 		{"pkg/errors", 100.0, 100.0, "PASS"},
 		{"pkg/logger", 100.0, 100.0, "PASS"},
@@ -254,7 +254,7 @@ func TestFindingM004_TestCoverageBaseline(t *testing.T) {
 		{"pkg/client", 21.0, 70.0, "CRITICAL"},
 		{"pkg/protocol", 9.8, 70.0, "CRITICAL"},
 	}
-	
+
 	for _, target := range targets {
 		t.Run(target.pkg, func(t *testing.T) {
 			if target.current < target.target {
@@ -273,31 +273,31 @@ func TestSecurityBestPractices(t *testing.T) {
 		for i := range sensitive {
 			sensitive[i] = byte(i)
 		}
-		
+
 		zeroSensitiveData(sensitive)
-		
+
 		for i, b := range sensitive {
 			if b != 0 {
 				t.Errorf("byte %d not zeroed", i)
 			}
 		}
 	})
-	
+
 	t.Run("constant_time_compare", func(t *testing.T) {
 		// Verify constant-time comparison
 		a := []byte{1, 2, 3, 4}
 		b := []byte{1, 2, 3, 4}
 		c := []byte{1, 2, 3, 5}
-		
+
 		if !constantTimeCompare(a, b) {
 			t.Error("equal slices should compare equal")
 		}
-		
+
 		if constantTimeCompare(a, c) {
 			t.Error("different slices should not compare equal")
 		}
 	})
-	
+
 	t.Run("safe_conversions", func(t *testing.T) {
 		// Verify safe type conversions work
 		tests := []struct {
@@ -309,7 +309,7 @@ func TestSecurityBestPractices(t *testing.T) {
 			{-1, false},
 			{9223372036854775807, true},
 		}
-		
+
 		for _, tt := range tests {
 			_, err := safeInt64ToUint64(tt.input)
 			if tt.valid && err != nil {
@@ -351,7 +351,7 @@ func BenchmarkSecurityOperations(b *testing.B) {
 			zeroSensitiveData(data)
 		}
 	})
-	
+
 	b.Run("ConstantTimeCompare", func(b *testing.B) {
 		a := make([]byte, 32)
 		b2 := make([]byte, 32)
@@ -360,7 +360,7 @@ func BenchmarkSecurityOperations(b *testing.B) {
 			constantTimeCompare(a, b2)
 		}
 	})
-	
+
 	b.Run("SafeConversion", func(b *testing.B) {
 		timestamp := time.Now().Unix()
 		b.ResetTimer()
@@ -368,7 +368,7 @@ func BenchmarkSecurityOperations(b *testing.B) {
 			_, _ = safeInt64ToUint64(timestamp)
 		}
 	})
-	
+
 	b.Run("RateLimiter", func(b *testing.B) {
 		limiter := newRateLimiter(1000000, time.Second)
 		b.ResetTimer()

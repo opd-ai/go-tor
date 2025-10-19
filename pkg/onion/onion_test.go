@@ -639,9 +639,9 @@ func TestEncodeDescriptor(t *testing.T) {
 
 	t.Run("descriptor with introduction points", func(t *testing.T) {
 		intro := IntroductionPoint{
-			OnionKey:  []byte("test-onion-key-32-bytes-long!!"),
-			AuthKey:   []byte("test-auth-key-32-bytes-long!!!"),
-			EncKey:    []byte("test-enc-key-32-bytes-long!!!!"),
+			OnionKey:    []byte("test-onion-key-32-bytes-long!!"),
+			AuthKey:     []byte("test-auth-key-32-bytes-long!!!"),
+			EncKey:      []byte("test-enc-key-32-bytes-long!!!!"),
 			LegacyKeyID: []byte("legacy-key-20-bytes!"),
 			LinkSpecifiers: []LinkSpecifier{
 				{Type: 0, Data: []byte{127, 0, 0, 1}},
