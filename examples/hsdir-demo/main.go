@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	fmt.Println("=== Hidden Service Directory (HSDir) Protocol Demo ===\n")
+	fmt.Println("=== Hidden Service Directory (HSDir) Protocol Demo ===")
 
 	// Create logger
 	log := logger.NewDefault()

@@ -40,3 +40,4 @@ go.work
 
 # Temporary files
 /tmp/
+tor-client
