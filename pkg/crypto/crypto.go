@@ -42,8 +42,11 @@ func GenerateRandomBytes(n int) ([]byte, error) {
 }
 
 // SHA1Hash computes the SHA-1 hash of the input
+// #nosec G401 - SHA1 required by Tor specification (tor-spec.txt section 0.3)
+// SHA1 is mandated by the Tor protocol for specific operations and cannot be replaced
+// without breaking protocol compatibility. It is not used for collision-resistant purposes.
 func SHA1Hash(data []byte) []byte {
-	h := sha1.Sum(data)
+	h := sha1.Sum(data) // #nosec G401
 	return h[:]
 }
 
@@ -105,8 +108,10 @@ func (k *RSAPrivateKey) PublicKey() *RSAPublicKey {
 }
 
 // Encrypt encrypts data using RSA OAEP with SHA-1
+// #nosec G401 - SHA1 with RSA-OAEP required by Tor specification (tor-spec.txt section 0.3)
+// The Tor protocol mandates RSA-1024-OAEP-SHA1 for hybrid encryption.
 func (k *RSAPublicKey) Encrypt(plaintext []byte) ([]byte, error) {
-	ciphertext, err := rsa.EncryptOAEP(sha1.New(), rand.Reader, k.key, plaintext, nil)
+	ciphertext, err := rsa.EncryptOAEP(sha1.New(), rand.Reader, k.key, plaintext, nil) // #nosec G401
 	if err != nil {
 		return nil, fmt.Errorf("RSA encryption failed: %w", err)
 	}
@@ -114,8 +119,10 @@ func (k *RSAPublicKey) Encrypt(plaintext []byte) ([]byte, error) {
 }
 
 // Decrypt decrypts data using RSA OAEP with SHA-1
+// #nosec G401 - SHA1 with RSA-OAEP required by Tor specification (tor-spec.txt section 0.3)
+// The Tor protocol mandates RSA-1024-OAEP-SHA1 for hybrid encryption.
 func (k *RSAPrivateKey) Decrypt(ciphertext []byte) ([]byte, error) {
-	plaintext, err := rsa.DecryptOAEP(sha1.New(), rand.Reader, k.key, ciphertext, nil)
+	plaintext, err := rsa.DecryptOAEP(sha1.New(), rand.Reader, k.key, ciphertext, nil) // #nosec G401
 	if err != nil {
 		return nil, fmt.Errorf("RSA decryption failed: %w", err)
 	}
@@ -128,8 +135,10 @@ type DigestWriter struct {
 }
 
 // NewSHA1DigestWriter creates a new SHA-1 digest writer
+// #nosec G401 - SHA1 required by Tor specification (tor-spec.txt)
+// SHA1 is mandated by the Tor protocol for computing digests in various protocol operations.
 func NewSHA1DigestWriter() *DigestWriter {
-	return &DigestWriter{hash: sha1.New()}
+	return &DigestWriter{hash: sha1.New()} // #nosec G401
 }
 
 // Write writes data to the digest
