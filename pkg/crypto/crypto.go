@@ -310,22 +310,48 @@ func NtorProcessResponse(response []byte, clientPrivate, serverNtorKey, serverId
 	secretInput = append(secretInput, serverY[:]...)
 	secretInput = append(secretInput, protoid...)
 	
-	// Derive keys using HKDF-SHA256
-	// This produces: key_material = HKDF-SHA256(secret_input, t_key || t_verify)
-	verify := []byte("ntor-curve25519-sha256-1:verify")
+	// Derive keys using HKDF-SHA256 per tor-spec.txt section 5.1.4
+	// The handshake uses two derivation steps:
+	// 1. verify = HKDF(secret_input, t_verify, M_EXPAND) for auth verification
+	// 2. key_material = HKDF(secret_input, t_key, M_EXPAND) for circuit keys
 	
-	// Use HKDF to derive key material
-	hkdfReader := hkdf.New(sha256.New, secretInput, nil, verify)
-	keyMaterial := make([]byte, 32) // We need 32 bytes for verification
-	if _, err := io.ReadFull(hkdfReader, keyMaterial); err != nil {
-		return nil, fmt.Errorf("HKDF derivation failed: %w", err)
+	// First derive the verification key to check the AUTH value
+	verify := []byte("ntor-curve25519-sha256-1:verify")
+	hkdfVerify := hkdf.New(sha256.New, secretInput, nil, verify)
+	expectedAuth := make([]byte, 32)
+	if _, err := io.ReadFull(hkdfVerify, expectedAuth); err != nil {
+		return nil, fmt.Errorf("HKDF verify derivation failed: %w", err)
 	}
 	
-	// TODO: Verify the auth MAC matches our computation
-	// For now, we accept the response (this should be fixed in production)
-	_ = auth
+	// Verify the AUTH value matches our computation (constant-time comparison)
+	// This ensures the server has the correct private keys
+	if !constantTimeCompare(auth[:], expectedAuth) {
+		return nil, fmt.Errorf("auth MAC verification failed: server authentication invalid")
+	}
+	
+	// Now derive the actual key material for circuit use
+	keyInfo := []byte("ntor-curve25519-sha256-1:key_extract")
+	hkdfKey := hkdf.New(sha256.New, secretInput, nil, keyInfo)
+	keyMaterial := make([]byte, 72) // Tor uses 72 bytes of key material
+	if _, err := io.ReadFull(hkdfKey, keyMaterial); err != nil {
+		return nil, fmt.Errorf("HKDF key derivation failed: %w", err)
+	}
 	
 	return keyMaterial, nil
+}
+
+// constantTimeCompare performs constant-time comparison of two byte slices
+// This prevents timing attacks when comparing cryptographic values
+func constantTimeCompare(a, b []byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	
+	var result byte = 0
+	for i := 0; i < len(a); i++ {
+		result |= a[i] ^ b[i]
+	}
+	return result == 0
 }
 
 // Ed25519Verify verifies an Ed25519 signature
