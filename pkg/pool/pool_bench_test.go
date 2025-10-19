@@ -2,6 +2,7 @@ package pool
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -191,7 +192,7 @@ func BenchmarkBufferPoolSizes(b *testing.B) {
 	sizes := []int{64, 128, 256, 512, 1024, 2048, 4096, 8192}
 
 	for _, size := range sizes {
-		b.Run(string(rune(size)), func(b *testing.B) {
+		b.Run(fmt.Sprintf("size-%d", size), func(b *testing.B) {
 			pool := NewBufferPool(size)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
