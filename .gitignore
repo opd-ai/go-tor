@@ -40,3 +40,6 @@ go.work
 
 # Temporary files
 /tmp/
+
+# Profiling results
+/profiles/
