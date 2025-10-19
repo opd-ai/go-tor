@@ -95,17 +95,21 @@ Moved from root directory to `docs/archive/`:
 
 ---
 
-### Phase 3: New Files Created (2 files, ~14KB)
+### Phase 3: New Files Created (4 files, ~30KB)
 
 #### Consolidated Documentation
 | File | Size | Purpose |
 |------|------|---------|
 | `AUDIT_SUMMARY.md` | 7.0KB | Concise audit summary for quick reference |
+| `CLEANUP_REPORT.md` | 13KB | This comprehensive cleanup report |
 | `docs/archive/PHASE_HISTORY.md` | 7.2KB | Consolidated development phase history |
+| `docs/archive/README.md` | 3KB | Archive directory documentation |
 
 **Rationale**: 
 - **AUDIT_SUMMARY.md**: Provides quick access to audit status without reading 150KB of detailed reports
 - **PHASE_HISTORY.md**: Single consolidated reference for all completed development phases
+- **CLEANUP_REPORT.md**: Comprehensive documentation of this cleanup operation
+- **archive/README.md**: Documents the archive structure and contents
 
 ---
 
@@ -372,7 +376,7 @@ docs/: 19 files (mixed active/historical)
 Repository Root:
 ├── README.md                       (12KB) ✅
 ├── AUDIT_SUMMARY.md                (7KB) ✅ NEW
-├── CLEANUP_REPORT.md               (12KB) ✅ NEW
+├── CLEANUP_REPORT.md               (13KB) ✅ NEW (this file)
 ├── LICENSE
 └── Makefile
 
@@ -398,9 +402,9 @@ docs/
     ├── PHASE_HISTORY.md            (7.2KB) ✅ NEW
     └── SECURITY_AUDIT_COMPREHENSIVE.md (28KB)
 
-Total: 20 documentation files (-29% reduction)
-Root: 2 markdown files (-78% cleaner)
-docs/: 12 active files (-37% cleaner)
+Total: 20 documentation files (29% reduction from 28)
+Root: 2 markdown files (78% fewer than 9 before)
+docs/: 12 active files (37% fewer than 19 before)
 archive/: 7 historical files (properly organized)
 ```
 
