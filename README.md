@@ -9,7 +9,7 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 
 ## Features
 
-### Current (Phase 1-6.5 Complete + Phase 7 Control Protocol + Phase 7.3 Onion Services Foundation + Phase 8.1-8.2)
+### Current (Phase 1-6.5 Complete + Phase 7 Control Protocol + Phase 7.3 Onion Services Foundation + Phase 8.1-8.4)
 - ✅ Cell encoding/decoding (fixed and variable-size)
 - ✅ Relay cell handling
 - ✅ Circuit management types and lifecycle
@@ -61,14 +61,15 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 - ✅ **Resource pooling (buffers, connections, circuits)**
 - ✅ **Circuit prebuilding for instant availability**
 - ✅ **Performance tuning configuration options**
+- ✅ **Security hardening (zero HIGH/MEDIUM severity issues)**
 
 ### In Progress
-- [ ] **Phase 8.4**: Security hardening and audit
+- [ ] **Phase 8.5**: Comprehensive testing and documentation
 
 ### Recently Completed
+- ✅ **Phase 8.4**: Security hardening and audit
 - ✅ **Phase 8.3**: Performance optimization and tuning (resource pooling, circuit prebuilding)
 - ✅ **Phase 8.2**: Enhanced error handling and resilience
-- ✅ **Phase 8.1**: Configuration file loading (torrc-compatible)
 
 ### Planned
 - [ ] **Phase 7.4**: Onion services server (hidden service hosting)
@@ -285,7 +286,7 @@ Current test coverage: ~90% for implemented packages.
 - ✅ Configuration file loading (torrc-compatible) (Phase 8.1)
 - ✅ Enhanced error handling and resilience (Phase 8.2)
 - ✅ Performance optimization and tuning (Phase 8.3)
-- [ ] Security hardening and audit (Phase 8.4)
+- ✅ Security hardening and audit (Phase 8.4)
 - [ ] Comprehensive testing and documentation (Phase 8.5)
 
 See [problem statement](docs/ROADMAP.md) for full 30-week roadmap.
