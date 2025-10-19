@@ -291,3 +291,120 @@ func TestManagerCloseWithTimeout(t *testing.T) {
 		t.Error("IsClosed() = false, want true")
 	}
 }
+
+// SPEC-002: Tests for circuit padding functionality
+
+func TestCircuitPaddingEnabled(t *testing.T) {
+	c := NewCircuit(1)
+	
+	// Padding should be enabled by default
+	if !c.IsPaddingEnabled() {
+		t.Error("Padding should be enabled by default")
+	}
+	
+	// Disable padding
+	c.SetPaddingEnabled(false)
+	if c.IsPaddingEnabled() {
+		t.Error("Padding should be disabled after SetPaddingEnabled(false)")
+	}
+	
+	// Re-enable padding
+	c.SetPaddingEnabled(true)
+	if !c.IsPaddingEnabled() {
+		t.Error("Padding should be enabled after SetPaddingEnabled(true)")
+	}
+}
+
+func TestCircuitPaddingInterval(t *testing.T) {
+	c := NewCircuit(1)
+	
+	// Initial interval should be 0 (adaptive)
+	if c.GetPaddingInterval() != 0 {
+		t.Errorf("Initial padding interval should be 0, got %v", c.GetPaddingInterval())
+	}
+	
+	// Set custom interval
+	interval := 5 * time.Second
+	c.SetPaddingInterval(interval)
+	if c.GetPaddingInterval() != interval {
+		t.Errorf("Padding interval should be %v, got %v", interval, c.GetPaddingInterval())
+	}
+}
+
+func TestShouldSendPadding(t *testing.T) {
+	tests := []struct {
+		name           string
+		paddingEnabled bool
+		state          State
+		expected       bool
+	}{
+		{
+			name:           "enabled_open",
+			paddingEnabled: true,
+			state:          StateOpen,
+			expected:       true,
+		},
+		{
+			name:           "disabled_open",
+			paddingEnabled: false,
+			state:          StateOpen,
+			expected:       false,
+		},
+		{
+			name:           "enabled_building",
+			paddingEnabled: true,
+			state:          StateBuilding,
+			expected:       false,
+		},
+		{
+			name:           "enabled_closed",
+			paddingEnabled: true,
+			state:          StateClosed,
+			expected:       false,
+		},
+		{
+			name:           "disabled_closed",
+			paddingEnabled: false,
+			state:          StateClosed,
+			expected:       false,
+		},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := NewCircuit(1)
+			c.SetPaddingEnabled(tt.paddingEnabled)
+			c.SetState(tt.state)
+			
+			if got := c.ShouldSendPadding(); got != tt.expected {
+				t.Errorf("ShouldSendPadding() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestPaddingConcurrency(t *testing.T) {
+	c := NewCircuit(1)
+	c.SetState(StateOpen)
+	
+	// Test concurrent access to padding settings
+	done := make(chan bool, 10)
+	
+	for i := 0; i < 5; i++ {
+		go func(id int) {
+			for j := 0; j < 100; j++ {
+				c.SetPaddingEnabled(id%2 == 0)
+				_ = c.IsPaddingEnabled()
+				c.SetPaddingInterval(time.Duration(id) * time.Second)
+				_ = c.GetPaddingInterval()
+				_ = c.ShouldSendPadding()
+			}
+			done <- true
+		}(i)
+	}
+	
+	// Wait for all goroutines
+	for i := 0; i < 5; i++ {
+		<-done
+	}
+}

@@ -18,6 +18,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
+	"sync"
 
 	"golang.org/x/crypto/curve25519"
 	"golang.org/x/crypto/hkdf"
@@ -65,6 +66,30 @@ type AESCTRCipher struct {
 	stream cipher.Stream
 }
 
+// bufferPool provides pooling for temporary buffers used in cipher operations (SEC-L003)
+// This reduces allocation pressure in high-throughput scenarios
+var bufferPool = sync.Pool{
+	New: func() interface{} {
+		// Create 512-byte buffers (standard cell size)
+		buf := make([]byte, 512)
+		return &buf
+	},
+}
+
+// GetBuffer retrieves a buffer from the pool (SEC-L003)
+func GetBuffer() []byte {
+	bufPtr := bufferPool.Get().(*[]byte)
+	return (*bufPtr)[:512]
+}
+
+// PutBuffer returns a buffer to the pool (SEC-L003)
+func PutBuffer(buf []byte) {
+	if cap(buf) >= 512 {
+		buf = buf[:512]
+		bufferPool.Put(&buf)
+	}
+}
+
 // NewAESCTRCipher creates a new AES-CTR cipher with the given key and IV
 func NewAESCTRCipher(key, iv []byte) (*AESCTRCipher, error) {
 	block, err := aes.NewCipher(key)
@@ -73,7 +98,9 @@ func NewAESCTRCipher(key, iv []byte) (*AESCTRCipher, error) {
 	}
 
 	stream := cipher.NewCTR(block, iv)
-	return &AESCTRCipher{stream: stream}, nil
+	return &AESCTRCipher{
+		stream: stream,
+	}, nil
 }
 
 // Encrypt encrypts the plaintext in-place using AES-CTR
