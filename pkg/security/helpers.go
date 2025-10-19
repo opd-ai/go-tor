@@ -46,10 +46,9 @@ func constantTimeCompare(a, b []byte) bool {
 }
 
 // zeroSensitiveData securely zeros sensitive data in memory
+// Note: Use SecureZeroMemory (from conversion.go) for public API
 func zeroSensitiveData(data []byte) {
-	for i := range data {
-		data[i] = 0
-	}
+	SecureZeroMemory(data)
 }
 
 // validateCellInput validates cell input data

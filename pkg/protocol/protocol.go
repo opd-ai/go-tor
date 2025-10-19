@@ -18,6 +18,9 @@ const (
 	MinLinkProtocolVersion = 3
 	MaxLinkProtocolVersion = 5
 	PreferredVersion       = 4 // Link protocol v4 uses 4-byte circuit IDs
+	
+	// DefaultHandshakeTimeout is the default timeout for protocol handshake (SEC-009)
+	DefaultHandshakeTimeout = 10 * time.Second
 )
 
 // Handshake performs the Tor protocol handshake on a connection
@@ -25,6 +28,7 @@ type Handshake struct {
 	conn              *connection.Connection
 	negotiatedVersion int
 	logger            *logger.Logger
+	timeout           time.Duration // Configurable handshake timeout (SEC-009)
 }
 
 // NewHandshake creates a new handshake instance
@@ -33,9 +37,16 @@ func NewHandshake(conn *connection.Connection, log *logger.Logger) *Handshake {
 		log = logger.NewDefault()
 	}
 	return &Handshake{
-		conn:   conn,
-		logger: log,
+		conn:    conn,
+		logger:  log,
+		timeout: DefaultHandshakeTimeout, // Use default, can be overridden with SetTimeout
 	}
+}
+
+// SetTimeout sets the handshake timeout (SEC-009)
+// This allows configuring shorter timeouts for embedded systems
+func (h *Handshake) SetTimeout(timeout time.Duration) {
+	h.timeout = timeout
 }
 
 // PerformHandshake performs the version negotiation handshake
@@ -90,8 +101,8 @@ func (h *Handshake) sendVersions() error {
 
 // receiveVersions receives and processes the VERSIONS response
 func (h *Handshake) receiveVersions(ctx context.Context) error {
-	// Set a timeout for receiving
-	timer := time.NewTimer(30 * time.Second)
+	// Set a timeout for receiving (SEC-009: configurable timeout)
+	timer := time.NewTimer(h.timeout)
 	defer timer.Stop()
 
 	cellCh := make(chan *cell.Cell, 1)
@@ -192,7 +203,7 @@ func (h *Handshake) sendNetinfo() error {
 
 // receiveNetinfo receives and validates the NETINFO response
 func (h *Handshake) receiveNetinfo(ctx context.Context) error {
-	timer := time.NewTimer(30 * time.Second)
+	timer := time.NewTimer(h.timeout)
 	defer timer.Stop()
 
 	cellCh := make(chan *cell.Cell, 1)

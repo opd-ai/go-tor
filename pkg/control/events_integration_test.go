@@ -426,24 +426,33 @@ func TestEventUnsubscribe(t *testing.T) {
 	reader := bufio.NewReader(conn)
 	writer := bufio.NewWriter(conn)
 	eventChan := make(chan string, 10)
+	readerMu := &sync.Mutex{} // Protect concurrent reader access
 
 	// Read greeting
+	readerMu.Lock()
 	reader.ReadString('\n')
+	readerMu.Unlock()
 
 	// Authenticate
 	writer.WriteString("AUTHENTICATE\r\n")
 	writer.Flush()
+	readerMu.Lock()
 	reader.ReadString('\n')
+	readerMu.Unlock()
 
 	// Subscribe to CIRC events
 	writer.WriteString("SETEVENTS CIRC\r\n")
 	writer.Flush()
+	readerMu.Lock()
 	reader.ReadString('\n')
+	readerMu.Unlock()
 
 	// Start event reader
 	go func() {
 		for {
+			readerMu.Lock()
 			line, err := reader.ReadString('\n')
+			readerMu.Unlock()
 			if err != nil {
 				return
 			}
@@ -474,7 +483,9 @@ func TestEventUnsubscribe(t *testing.T) {
 	// Unsubscribe by sending empty SETEVENTS
 	writer.WriteString("SETEVENTS\r\n")
 	writer.Flush()
+	readerMu.Lock()
 	reader.ReadString('\n')
+	readerMu.Unlock()
 
 	time.Sleep(50 * time.Millisecond)
 
