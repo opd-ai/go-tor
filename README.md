@@ -184,6 +184,8 @@ make lint         # Run golint
 - [Development Guide](docs/DEVELOPMENT.md) - Development workflow and guidelines
 - [Structured Logging](docs/LOGGING.md) - Using the structured logging system
 - [Graceful Shutdown](docs/SHUTDOWN.md) - Implementing graceful shutdown
+- [Progress Log](PROGRESS_LOG.md) - Development activity tracking
+- [Historical Archive](archive/2025/README.md) - Consolidated phase reports and audit documentation
 
 ### Cross-Compilation
 
