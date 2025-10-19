@@ -892,7 +892,7 @@ func (ip *IntroductionProtocol) SendIntroduce1(ctx context.Context, circuitID ui
 }
 
 // ConnectToOnionService orchestrates the full connection process to an onion service
-// This combines descriptor fetching, introduction point selection, and connection establishment
+// This combines descriptor fetching, introduction, and rendezvous protocols
 func (c *Client) ConnectToOnionService(ctx context.Context, addr *Address) (uint32, error) {
 	c.logger.Info("Connecting to onion service", "address", addr.String())
 
@@ -904,7 +904,22 @@ func (c *Client) ConnectToOnionService(ctx context.Context, addr *Address) (uint
 
 	c.logger.Debug("Descriptor retrieved", "intro_points", len(desc.IntroPoints))
 
-	// Step 2: Select an introduction point
+	// Step 2: Generate rendezvous cookie
+	rendezvousCookie := make([]byte, 20)
+	// NOTE: In Phase 7.3.4, using zeros for testing
+	// Phase 8 will use crypto/rand.Read(rendezvousCookie) for production security
+
+	// Step 3: Establish rendezvous point
+	rendezvousCircuitID, rendezvousPoint, err := c.EstablishRendezvousPoint(ctx, rendezvousCookie, c.consensus)
+	if err != nil {
+		return 0, fmt.Errorf("failed to establish rendezvous point: %w", err)
+	}
+
+	c.logger.Debug("Rendezvous point established",
+		"circuit_id", rendezvousCircuitID,
+		"fingerprint", rendezvousPoint.Fingerprint)
+
+	// Step 4: Select an introduction point
 	intro := NewIntroductionProtocol(c.logger)
 	introPoint, err := intro.SelectIntroductionPoint(desc)
 	if err != nil {
@@ -913,22 +928,19 @@ func (c *Client) ConnectToOnionService(ctx context.Context, addr *Address) (uint
 
 	c.logger.Debug("Introduction point selected")
 
-	// Step 3: Create circuit to introduction point
-	circuitID, err := intro.CreateIntroductionCircuit(ctx, introPoint)
+	// Step 5: Create circuit to introduction point
+	introCircuitID, err := intro.CreateIntroductionCircuit(ctx, introPoint)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create introduction circuit: %w", err)
 	}
 
-	c.logger.Debug("Introduction circuit created", "circuit_id", circuitID)
+	c.logger.Debug("Introduction circuit created", "circuit_id", introCircuitID)
 
-	// Step 4: Generate rendezvous cookie and create INTRODUCE1 cell
-	rendezvousCookie := make([]byte, 20)
-	// NOTE: In Phase 7.3.3, using zeros for testing
-	// Phase 8 will use crypto/rand.Read(rendezvousCookie) for production security
+	// Step 6: Build and send INTRODUCE1 cell
 	req := &IntroduceRequest{
 		IntroPoint:       introPoint,
 		RendezvousCookie: rendezvousCookie,
-		RendezvousPoint:  "mock-rendezvous-point",
+		RendezvousPoint:  rendezvousPoint.Fingerprint,
 		OnionKey:         make([]byte, 32), // Phase 8 will generate real ephemeral key
 	}
 
@@ -939,22 +951,287 @@ func (c *Client) ConnectToOnionService(ctx context.Context, addr *Address) (uint
 
 	c.logger.Debug("INTRODUCE1 cell built", "size", len(introduce1Data))
 
-	// Step 5: Send INTRODUCE1 cell
-	if err := intro.SendIntroduce1(ctx, circuitID, introduce1Data); err != nil {
+	if err := intro.SendIntroduce1(ctx, introCircuitID, introduce1Data); err != nil {
 		return 0, fmt.Errorf("failed to send INTRODUCE1: %w", err)
 	}
 
-	c.logger.Info("Successfully initiated connection to onion service",
-		"address", addr.String(),
-		"circuit_id", circuitID)
+	c.logger.Debug("INTRODUCE1 cell sent")
 
-	// In a full implementation, we would now:
-	// - Wait for INTRODUCE_ACK
-	// - Create rendezvous circuit
-	// - Wait for RENDEZVOUS2
-	// - Complete the connection
+	// Step 7: Wait for RENDEZVOUS2 and complete the connection
+	if err := c.CompleteRendezvous(ctx, rendezvousCircuitID); err != nil {
+		return 0, fmt.Errorf("failed to complete rendezvous: %w", err)
+	}
+
+	c.logger.Info("Successfully connected to onion service",
+		"address", addr.String(),
+		"rendezvous_circuit_id", rendezvousCircuitID)
+
+	// Return the rendezvous circuit ID as it's the final connection circuit
+	return rendezvousCircuitID, nil
+}
+
+// RendezvousProtocol handles rendezvous point operations for onion services
+type RendezvousProtocol struct {
+	logger *logger.Logger
+}
+
+// NewRendezvousProtocol creates a new rendezvous protocol handler
+func NewRendezvousProtocol(log *logger.Logger) *RendezvousProtocol {
+	if log == nil {
+		log = logger.NewDefault()
+	}
+
+	return &RendezvousProtocol{
+		logger: log.Component("rendezvous-protocol"),
+	}
+}
+
+// SelectRendezvousPoint selects a suitable rendezvous point from available relays
+// Per Tor spec (rend-spec-v3.txt section 3.3):
+// The client selects a rendezvous point randomly from available relays
+func (rp *RendezvousProtocol) SelectRendezvousPoint(relays []*HSDirectory) (*HSDirectory, error) {
+	if len(relays) == 0 {
+		return nil, fmt.Errorf("no relays available for rendezvous point selection")
+	}
+
+	// For Phase 7.3.4, select the first available relay
+	// In a full implementation, this would:
+	// 1. Filter relays that support being rendezvous points
+	// 2. Exclude relays that are already in our circuit
+	// 3. Randomly select from remaining relays
+	// 4. Consider relay stability and performance metrics
+	selected := relays[0]
+
+	rp.logger.Debug("Selected rendezvous point",
+		"relays_available", len(relays),
+		"selected_fingerprint", selected.Fingerprint)
+
+	return selected, nil
+}
+
+// EstablishRendezvousRequest represents a request to establish a rendezvous point
+type EstablishRendezvousRequest struct {
+	RendezvousCookie []byte // Rendezvous cookie (20 bytes)
+}
+
+// BuildEstablishRendezvousCell constructs an ESTABLISH_RENDEZVOUS cell
+// Per Tor spec (rend-spec-v3.txt section 3.3):
+// ESTABLISH_RENDEZVOUS {
+//   RENDEZVOUS_COOKIE [20 bytes]
+// }
+func (rp *RendezvousProtocol) BuildEstablishRendezvousCell(req *EstablishRendezvousRequest) ([]byte, error) {
+	if req == nil {
+		return nil, fmt.Errorf("establish rendezvous request is nil")
+	}
+	if len(req.RendezvousCookie) != 20 {
+		return nil, fmt.Errorf("invalid rendezvous cookie length: %d, expected 20", len(req.RendezvousCookie))
+	}
+
+	rp.logger.Debug("Building ESTABLISH_RENDEZVOUS cell",
+		"cookie_len", len(req.RendezvousCookie))
+
+	// The cell contains only the rendezvous cookie
+	data := make([]byte, 20)
+	copy(data, req.RendezvousCookie)
+
+	rp.logger.Debug("Built ESTABLISH_RENDEZVOUS cell", "size", len(data))
+
+	return data, nil
+}
+
+// CreateRendezvousCircuit creates a circuit to a rendezvous point
+// This is a placeholder for the full circuit creation logic
+func (rp *RendezvousProtocol) CreateRendezvousCircuit(ctx context.Context, rendezvousPoint *HSDirectory) (uint32, error) {
+	if rendezvousPoint == nil {
+		return 0, fmt.Errorf("rendezvous point is nil")
+	}
+
+	rp.logger.Info("Creating rendezvous circuit",
+		"rendezvous_point", rendezvousPoint.Fingerprint)
+
+	// In Phase 7.3.4, we return a mock circuit ID
+	// In a full implementation (Phase 8), this would:
+	// 1. Use the circuit builder to create a 3-hop circuit
+	// 2. Extend the circuit to the rendezvous point
+	// 3. Wait for circuit to be established
+	// 4. Return the circuit ID
+
+	// Mock circuit ID for testing
+	circuitID := uint32(2000)
+
+	rp.logger.Debug("Rendezvous circuit created (mock)",
+		"circuit_id", circuitID)
 
 	return circuitID, nil
 }
 
-// TODO: Implement rendezvous protocol (Phase 7.3.4)
+// SendEstablishRendezvous sends an ESTABLISH_RENDEZVOUS cell over a circuit
+// This is a placeholder for the full send logic
+func (rp *RendezvousProtocol) SendEstablishRendezvous(ctx context.Context, circuitID uint32, establishData []byte) error {
+	if len(establishData) == 0 {
+		return fmt.Errorf("establish rendezvous data is empty")
+	}
+
+	rp.logger.Info("Sending ESTABLISH_RENDEZVOUS cell",
+		"circuit_id", circuitID,
+		"data_size", len(establishData))
+
+	// In a full implementation (Phase 8), this would:
+	// 1. Wrap establishData in a RELAY cell with command ESTABLISH_RENDEZVOUS
+	// 2. Send the cell over the circuit
+	// 3. Wait for RENDEZVOUS_ESTABLISHED acknowledgment
+	// 4. Handle retries and errors
+
+	rp.logger.Debug("ESTABLISH_RENDEZVOUS cell sent (mock)")
+
+	return nil
+}
+
+// Rendezvous1Request represents a RENDEZVOUS1 request
+type Rendezvous1Request struct {
+	RendezvousCookie []byte // Rendezvous cookie (20 bytes)
+	HandshakeData    []byte // Handshake data from INTRODUCE2
+}
+
+// BuildRendezvous1Cell constructs a RENDEZVOUS1 cell
+// Per Tor spec (rend-spec-v3.txt section 3.4):
+// RENDEZVOUS1 {
+//   RENDEZVOUS_COOKIE [20 bytes]
+//   HANDSHAKE_DATA    [remaining bytes]
+// }
+// Note: RENDEZVOUS1 is sent by the hidden service, not the client.
+// This function is included for completeness but won't be used in client-only implementation.
+func (rp *RendezvousProtocol) BuildRendezvous1Cell(req *Rendezvous1Request) ([]byte, error) {
+	if req == nil {
+		return nil, fmt.Errorf("rendezvous1 request is nil")
+	}
+	if len(req.RendezvousCookie) != 20 {
+		return nil, fmt.Errorf("invalid rendezvous cookie length: %d, expected 20", len(req.RendezvousCookie))
+	}
+
+	rp.logger.Debug("Building RENDEZVOUS1 cell",
+		"cookie_len", len(req.RendezvousCookie),
+		"handshake_data_len", len(req.HandshakeData))
+
+	var buf bytes.Buffer
+
+	// RENDEZVOUS_COOKIE (20 bytes)
+	buf.Write(req.RendezvousCookie)
+
+	// HANDSHAKE_DATA
+	if len(req.HandshakeData) > 0 {
+		buf.Write(req.HandshakeData)
+	}
+
+	rp.logger.Debug("Built RENDEZVOUS1 cell", "size", buf.Len())
+
+	return buf.Bytes(), nil
+}
+
+// ParseRendezvous2Cell parses a RENDEZVOUS2 cell
+// Per Tor spec (rend-spec-v3.txt section 3.4):
+// RENDEZVOUS2 {
+//   HANDSHAKE_DATA [remaining bytes]
+// }
+func (rp *RendezvousProtocol) ParseRendezvous2Cell(data []byte) ([]byte, error) {
+	if len(data) == 0 {
+		return nil, fmt.Errorf("rendezvous2 data is empty")
+	}
+
+	rp.logger.Debug("Parsing RENDEZVOUS2 cell", "size", len(data))
+
+	// The entire cell is handshake data
+	handshakeData := make([]byte, len(data))
+	copy(handshakeData, data)
+
+	rp.logger.Debug("Parsed RENDEZVOUS2 cell", "handshake_data_len", len(handshakeData))
+
+	return handshakeData, nil
+}
+
+// WaitForRendezvous2 waits for a RENDEZVOUS2 cell on a circuit
+// This is a placeholder for the full receive logic
+func (rp *RendezvousProtocol) WaitForRendezvous2(ctx context.Context, circuitID uint32) ([]byte, error) {
+	rp.logger.Info("Waiting for RENDEZVOUS2 cell", "circuit_id", circuitID)
+
+	// In a full implementation (Phase 8), this would:
+	// 1. Wait for a RELAY cell with command RENDEZVOUS2
+	// 2. Parse the handshake data
+	// 3. Verify the handshake
+	// 4. Return the handshake data
+
+	// Mock handshake data for testing
+	handshakeData := make([]byte, 32)
+
+	rp.logger.Debug("Received RENDEZVOUS2 cell (mock)", "handshake_data_len", len(handshakeData))
+
+	return handshakeData, nil
+}
+
+// EstablishRendezvousPoint orchestrates establishing a rendezvous point
+// This combines rendezvous point selection, circuit creation, and ESTABLISH_RENDEZVOUS
+func (c *Client) EstablishRendezvousPoint(ctx context.Context, rendezvousCookie []byte, relays []*HSDirectory) (uint32, *HSDirectory, error) {
+	c.logger.Info("Establishing rendezvous point")
+
+	// Step 1: Select rendezvous point
+	rendezvous := NewRendezvousProtocol(c.logger)
+	rendezvousPoint, err := rendezvous.SelectRendezvousPoint(relays)
+	if err != nil {
+		return 0, nil, fmt.Errorf("failed to select rendezvous point: %w", err)
+	}
+
+	c.logger.Debug("Rendezvous point selected", "fingerprint", rendezvousPoint.Fingerprint)
+
+	// Step 2: Create circuit to rendezvous point
+	circuitID, err := rendezvous.CreateRendezvousCircuit(ctx, rendezvousPoint)
+	if err != nil {
+		return 0, nil, fmt.Errorf("failed to create rendezvous circuit: %w", err)
+	}
+
+	c.logger.Debug("Rendezvous circuit created", "circuit_id", circuitID)
+
+	// Step 3: Build and send ESTABLISH_RENDEZVOUS cell
+	req := &EstablishRendezvousRequest{
+		RendezvousCookie: rendezvousCookie,
+	}
+
+	establishData, err := rendezvous.BuildEstablishRendezvousCell(req)
+	if err != nil {
+		return 0, nil, fmt.Errorf("failed to build ESTABLISH_RENDEZVOUS cell: %w", err)
+	}
+
+	if err := rendezvous.SendEstablishRendezvous(ctx, circuitID, establishData); err != nil {
+		return 0, nil, fmt.Errorf("failed to send ESTABLISH_RENDEZVOUS: %w", err)
+	}
+
+	c.logger.Info("Successfully established rendezvous point",
+		"circuit_id", circuitID,
+		"fingerprint", rendezvousPoint.Fingerprint)
+
+	return circuitID, rendezvousPoint, nil
+}
+
+// CompleteRendezvous completes the rendezvous protocol
+// This waits for RENDEZVOUS2 and establishes the final connection
+func (c *Client) CompleteRendezvous(ctx context.Context, rendezvousCircuitID uint32) error {
+	c.logger.Info("Completing rendezvous protocol", "circuit_id", rendezvousCircuitID)
+
+	// Wait for RENDEZVOUS2 cell from the hidden service
+	rendezvous := NewRendezvousProtocol(c.logger)
+	handshakeData, err := rendezvous.WaitForRendezvous2(ctx, rendezvousCircuitID)
+	if err != nil {
+		return fmt.Errorf("failed to receive RENDEZVOUS2: %w", err)
+	}
+
+	c.logger.Debug("Received RENDEZVOUS2", "handshake_data_len", len(handshakeData))
+
+	// In a full implementation, we would:
+	// 1. Verify the handshake data
+	// 2. Complete the key exchange
+	// 3. Derive shared secrets
+	// 4. Establish the final encrypted connection
+
+	c.logger.Info("Rendezvous protocol completed successfully")
+
+	return nil
+}

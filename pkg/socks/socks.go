@@ -53,6 +53,7 @@ type Server struct {
 	address       string
 	listener      net.Listener
 	circuitMgr    *circuit.Manager
+	onionClient   *onion.Client
 	logger        *logger.Logger
 	mu            sync.Mutex
 	activeConns   map[net.Conn]struct{}
@@ -70,6 +71,7 @@ func NewServer(address string, circuitMgr *circuit.Manager, log *logger.Logger) 
 	return &Server{
 		address:     address,
 		circuitMgr:  circuitMgr,
+		onionClient: onion.NewClient(log),
 		logger:      log.Component("socks5"),
 		activeConns: make(map[net.Conn]struct{}),
 		shutdown:    make(chan struct{}),
@@ -158,17 +160,35 @@ func (s *Server) handleConnection(ctx context.Context, conn net.Conn) {
 	// Check if this is an onion address
 	isOnion := onion.IsOnionAddress(host)
 	if isOnion {
-		// Validate the onion address
-		if _, err := onion.ParseAddress(host); err != nil {
+		// Parse and validate the onion address
+		addr, err := onion.ParseAddress(host)
+		if err != nil {
 			s.logger.Warn("Invalid onion address", "address", host, "error", err)
 			s.sendReply(conn, replyHostUnreachable, nil)
 			return
 		}
+		
 		s.logger.Info("Onion service connection requested", "address", host)
-		// TODO: Implement onion service connection via introduction/rendezvous
-		// For now, signal not yet implemented
-		s.sendReply(conn, replyHostUnreachable, nil)
-		s.logger.Debug("Onion service protocol not yet fully implemented")
+		
+		// Connect to the onion service using rendezvous protocol
+		circuitID, err := s.onionClient.ConnectToOnionService(ctx, addr)
+		if err != nil {
+			s.logger.Error("Failed to connect to onion service", "address", host, "error", err)
+			s.sendReply(conn, replyHostUnreachable, nil)
+			return
+		}
+		
+		s.logger.Info("Successfully connected to onion service", 
+			"address", host, 
+			"circuit_id", circuitID)
+		
+		// Send success reply
+		s.sendReply(conn, replySuccess, conn.LocalAddr())
+		
+		// In Phase 8, this would relay data through the rendezvous circuit
+		// For Phase 7.3.4, we just log success and close
+		s.logger.Debug("Onion service connection established (mock relay)")
+		time.Sleep(100 * time.Millisecond)
 		return
 	}
 
