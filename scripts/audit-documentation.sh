@@ -74,8 +74,7 @@ classify_document() {
         rationale="Security remediation tracking"
     
     # Older phase completion reports - ARCHIVE
-    elif [[ "$filename" =~ PHASE[2-7]_COMPLETION_REPORT ]] || \
-         [[ "$filename" =~ PHASE6[^5] ]]; then
+    elif [[ "$filename" =~ PHASE[2-7]_COMPLETION_REPORT ]]; then
         classification="ARCHIVE"
         category="Historical Phase Reports"
         rationale="Completed phase - historical value"
@@ -166,7 +165,7 @@ consolidate_count=$(tail -n +2 "${AUDIT_REPORT}" | grep -c "\"CONSOLIDATE\"" || 
 review_count=$(tail -n +2 "${AUDIT_REPORT}" | grep -c "\"REVIEW\"" || echo "0")
 
 total_size=$(awk -F',' 'NR>1 {sum+=$3} END {print sum}' "${AUDIT_REPORT}")
-total_size_mb=$(echo "scale=2; $total_size / 1024 / 1024" | bc)
+total_size_mb=$(awk "BEGIN {printf \"%.2f\", $total_size / 1024 / 1024}")
 
 echo -e "${GREEN}Total Files Scanned:${NC} $total_files"
 echo -e "${GREEN}Total Size:${NC} ${total_size_mb} MB"
