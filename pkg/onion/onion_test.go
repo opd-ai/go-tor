@@ -6,6 +6,8 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/base32"
+	"encoding/base64"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -508,47 +510,222 @@ func TestGetTimePeriod(t *testing.T) {
 
 // TestParseDescriptor tests descriptor parsing
 func TestParseDescriptor(t *testing.T) {
-	rawDesc := []byte(`hs-descriptor 3
+	t.Run("basic descriptor", func(t *testing.T) {
+		rawDesc := []byte(`hs-descriptor 3
 descriptor-lifetime 180
 revision-counter 42
 `)
 
-	desc, err := ParseDescriptor(rawDesc)
-	if err != nil {
-		t.Fatalf("Failed to parse descriptor: %v", err)
-	}
+		desc, err := ParseDescriptor(rawDesc)
+		if err != nil {
+			t.Fatalf("Failed to parse descriptor: %v", err)
+		}
 
-	if desc.Version != 3 {
-		t.Errorf("Expected version 3, got %d", desc.Version)
-	}
+		if desc.Version != 3 {
+			t.Errorf("Expected version 3, got %d", desc.Version)
+		}
 
-	if len(desc.RawDescriptor) == 0 {
-		t.Error("Expected raw descriptor to be stored")
-	}
+		if desc.RevisionCounter != 42 {
+			t.Errorf("Expected revision counter 42, got %d", desc.RevisionCounter)
+		}
+
+		if desc.Lifetime != 180*time.Minute {
+			t.Errorf("Expected lifetime 180 minutes, got %v", desc.Lifetime)
+		}
+
+		if len(desc.RawDescriptor) == 0 {
+			t.Error("Expected raw descriptor to be stored")
+		}
+	})
+
+	t.Run("descriptor with introduction points", func(t *testing.T) {
+		// Create a descriptor with introduction point data
+		onionKey := []byte("test-onion-key-32-bytes-long!!")
+		authKey := []byte("test-auth-key-32-bytes-long!!!")
+		encKey := []byte("test-enc-key-32-bytes-long!!!!")
+		legacyKey := []byte("legacy-key-20-bytes!")
+
+		rawDesc := fmt.Sprintf(`hs-descriptor 3
+descriptor-lifetime 180
+revision-counter 42
+superencrypted
+-----BEGIN MESSAGE-----
+introduction-point 0
+onion-key ntor %s
+auth-key
+%s
+enc-key ntor %s
+legacy-key %s
+-----END MESSAGE-----
+signature %s
+`,
+			base64.StdEncoding.EncodeToString(onionKey),
+			base64.StdEncoding.EncodeToString(authKey),
+			base64.StdEncoding.EncodeToString(encKey),
+			base64.StdEncoding.EncodeToString(legacyKey),
+			base64.StdEncoding.EncodeToString([]byte("test-signature")))
+
+		desc, err := ParseDescriptor([]byte(rawDesc))
+		if err != nil {
+			t.Fatalf("Failed to parse descriptor: %v", err)
+		}
+
+		if desc.Version != 3 {
+			t.Errorf("Expected version 3, got %d", desc.Version)
+		}
+
+		if len(desc.IntroPoints) != 1 {
+			t.Errorf("Expected 1 introduction point, got %d", len(desc.IntroPoints))
+		}
+
+		if len(desc.Signature) == 0 {
+			t.Error("Expected signature to be parsed")
+		}
+	})
+
+	t.Run("empty descriptor", func(t *testing.T) {
+		_, err := ParseDescriptor([]byte{})
+		if err == nil {
+			t.Error("Expected error for empty descriptor")
+		}
+	})
+
+	t.Run("invalid version", func(t *testing.T) {
+		rawDesc := []byte(`hs-descriptor 2
+descriptor-lifetime 180
+`)
+		_, err := ParseDescriptor(rawDesc)
+		if err == nil {
+			t.Error("Expected error for unsupported version")
+		}
+	})
 }
 
 // TestEncodeDescriptor tests descriptor encoding
 func TestEncodeDescriptor(t *testing.T) {
-	desc := &Descriptor{
-		Version:         3,
-		RevisionCounter: 123,
-		Lifetime:        3 * time.Hour,
-		DescriptorID:    make([]byte, 32),
-	}
+	t.Run("basic descriptor", func(t *testing.T) {
+		desc := &Descriptor{
+			Version:         3,
+			RevisionCounter: 123,
+			Lifetime:        3 * time.Hour,
+			DescriptorID:    make([]byte, 32),
+			IntroPoints:     make([]IntroductionPoint, 0),
+		}
 
-	encoded, err := EncodeDescriptor(desc)
-	if err != nil {
-		t.Fatalf("Failed to encode descriptor: %v", err)
-	}
+		encoded, err := EncodeDescriptor(desc)
+		if err != nil {
+			t.Fatalf("Failed to encode descriptor: %v", err)
+		}
 
-	if len(encoded) == 0 {
-		t.Error("Expected non-empty encoded descriptor")
-	}
+		if len(encoded) == 0 {
+			t.Error("Expected non-empty encoded descriptor")
+		}
 
-	// Should contain version line
-	if !bytes.Contains(encoded, []byte("hs-descriptor 3")) {
-		t.Error("Expected encoded descriptor to contain version line")
-	}
+		// Should contain version line
+		if !bytes.Contains(encoded, []byte("hs-descriptor 3")) {
+			t.Error("Expected encoded descriptor to contain version line")
+		}
+
+		// Should contain revision counter
+		if !bytes.Contains(encoded, []byte("revision-counter 123")) {
+			t.Error("Expected encoded descriptor to contain revision counter")
+		}
+
+		// Should contain lifetime
+		if !bytes.Contains(encoded, []byte("descriptor-lifetime 180")) {
+			t.Error("Expected encoded descriptor to contain lifetime")
+		}
+	})
+
+	t.Run("descriptor with introduction points", func(t *testing.T) {
+		intro := IntroductionPoint{
+			OnionKey:  []byte("test-onion-key-32-bytes-long!!"),
+			AuthKey:   []byte("test-auth-key-32-bytes-long!!!"),
+			EncKey:    []byte("test-enc-key-32-bytes-long!!!!"),
+			LegacyKeyID: []byte("legacy-key-20-bytes!"),
+			LinkSpecifiers: []LinkSpecifier{
+				{Type: 0, Data: []byte{127, 0, 0, 1}},
+			},
+		}
+
+		desc := &Descriptor{
+			Version:         3,
+			RevisionCounter: 123,
+			Lifetime:        3 * time.Hour,
+			DescriptorID:    make([]byte, 32),
+			IntroPoints:     []IntroductionPoint{intro},
+			Signature:       []byte("test-signature"),
+		}
+
+		encoded, err := EncodeDescriptor(desc)
+		if err != nil {
+			t.Fatalf("Failed to encode descriptor: %v", err)
+		}
+
+		// Should contain introduction point marker
+		if !bytes.Contains(encoded, []byte("introduction-point")) {
+			t.Error("Expected encoded descriptor to contain introduction point")
+		}
+
+		// Should contain keys
+		if !bytes.Contains(encoded, []byte("onion-key")) {
+			t.Error("Expected encoded descriptor to contain onion-key")
+		}
+
+		if !bytes.Contains(encoded, []byte("auth-key")) {
+			t.Error("Expected encoded descriptor to contain auth-key")
+		}
+
+		if !bytes.Contains(encoded, []byte("enc-key")) {
+			t.Error("Expected encoded descriptor to contain enc-key")
+		}
+
+		// Should contain signature
+		if !bytes.Contains(encoded, []byte("signature")) {
+			t.Error("Expected encoded descriptor to contain signature")
+		}
+	})
+
+	t.Run("nil descriptor", func(t *testing.T) {
+		_, err := EncodeDescriptor(nil)
+		if err == nil {
+			t.Error("Expected error for nil descriptor")
+		}
+	})
+
+	t.Run("round-trip encode/decode", func(t *testing.T) {
+		original := &Descriptor{
+			Version:         3,
+			RevisionCounter: 999,
+			Lifetime:        2 * time.Hour,
+			IntroPoints:     make([]IntroductionPoint, 0),
+		}
+
+		// Encode
+		encoded, err := EncodeDescriptor(original)
+		if err != nil {
+			t.Fatalf("Failed to encode: %v", err)
+		}
+
+		// Decode
+		decoded, err := ParseDescriptor(encoded)
+		if err != nil {
+			t.Fatalf("Failed to decode: %v", err)
+		}
+
+		// Verify round-trip
+		if decoded.Version != original.Version {
+			t.Errorf("Version mismatch: expected %d, got %d", original.Version, decoded.Version)
+		}
+
+		if decoded.RevisionCounter != original.RevisionCounter {
+			t.Errorf("Revision counter mismatch: expected %d, got %d", original.RevisionCounter, decoded.RevisionCounter)
+		}
+
+		if decoded.Lifetime != original.Lifetime {
+			t.Errorf("Lifetime mismatch: expected %v, got %v", original.Lifetime, decoded.Lifetime)
+		}
+	})
 }
 
 // TestComputeDescriptorID tests descriptor ID computation
