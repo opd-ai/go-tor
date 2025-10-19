@@ -403,7 +403,7 @@ func TestDescriptorCacheExpiration(t *testing.T) {
 	// Test CleanExpired
 	cache.Put(addr, desc)
 	time.Sleep(150 * time.Millisecond)
-	
+
 	cleaned := cache.CleanExpired()
 	if cleaned != 1 {
 		t.Errorf("Expected 1 descriptor cleaned, got %d", cleaned)
@@ -484,9 +484,9 @@ func TestGetTimePeriod(t *testing.T) {
 	// Test with known time
 	// Unix timestamp: 1609459200 = 2021-01-01 00:00:00 UTC
 	testTime := time.Unix(1609459200, 0)
-	
+
 	period := GetTimePeriod(testTime)
-	
+
 	// Verify period is non-zero
 	if period == 0 {
 		t.Error("Expected non-zero time period")
@@ -575,7 +575,7 @@ func TestComputeDescriptorID(t *testing.T) {
 // BenchmarkDescriptorCache benchmarks descriptor cache operations
 func BenchmarkDescriptorCache(b *testing.B) {
 	cache := NewDescriptorCache(nil)
-	
+
 	addr, _ := ParseAddress("vww6ybal4bd7szmgncyruucpgfkqahzddi37ktceo3ah7ngmcopnpyyd.onion")
 	desc := &Descriptor{
 		Version:         3,
