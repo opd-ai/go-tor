@@ -494,3 +494,69 @@ func TestGenerateEd25519KeyPair(t *testing.T) {
 		t.Error("Generated identical private keys")
 	}
 }
+
+// SEC-L003: Tests for buffer pooling functionality
+func TestBufferPooling(t *testing.T) {
+	// Get a buffer from the pool
+	buf1 := GetBuffer()
+	if len(buf1) != 512 {
+		t.Errorf("GetBuffer() returned buffer of length %d, want 512", len(buf1))
+	}
+	
+	// Write some data to it
+	for i := 0; i < len(buf1); i++ {
+		buf1[i] = byte(i % 256)
+	}
+	
+	// Return it to the pool
+	PutBuffer(buf1)
+	
+	// Get another buffer (may or may not be the same one)
+	buf2 := GetBuffer()
+	if len(buf2) != 512 {
+		t.Errorf("GetBuffer() returned buffer of length %d, want 512", len(buf2))
+	}
+	
+	// Return it
+	PutBuffer(buf2)
+}
+
+func TestBufferPoolConcurrency(t *testing.T) {
+	// Test concurrent access to buffer pool
+	const numGoroutines = 10
+	const opsPerGoroutine = 100
+	
+	done := make(chan bool, numGoroutines)
+	
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
+			for j := 0; j < opsPerGoroutine; j++ {
+				buf := GetBuffer()
+				// Use the buffer
+				for k := 0; k < len(buf); k++ {
+					buf[k] = byte(k)
+				}
+				PutBuffer(buf)
+			}
+			done <- true
+		}()
+	}
+	
+	// Wait for all goroutines
+	for i := 0; i < numGoroutines; i++ {
+		<-done
+	}
+}
+
+func TestBufferPoolSmallBuffer(t *testing.T) {
+	// Test that small buffers are not returned to pool
+	smallBuf := make([]byte, 100)
+	PutBuffer(smallBuf) // Should not panic, just ignore
+	
+	// Get a buffer - should be 512 bytes
+	buf := GetBuffer()
+	if len(buf) != 512 {
+		t.Errorf("GetBuffer() returned buffer of length %d after putting small buffer", len(buf))
+	}
+	PutBuffer(buf)
+}
