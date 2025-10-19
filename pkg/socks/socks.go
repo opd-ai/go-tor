@@ -167,9 +167,9 @@ func (s *Server) handleConnection(ctx context.Context, conn net.Conn) {
 			s.sendReply(conn, replyHostUnreachable, nil)
 			return
 		}
-		
+
 		s.logger.Info("Onion service connection requested", "address", host)
-		
+
 		// Connect to the onion service using rendezvous protocol
 		circuitID, err := s.onionClient.ConnectToOnionService(ctx, addr)
 		if err != nil {
@@ -177,14 +177,14 @@ func (s *Server) handleConnection(ctx context.Context, conn net.Conn) {
 			s.sendReply(conn, replyHostUnreachable, nil)
 			return
 		}
-		
-		s.logger.Info("Successfully connected to onion service", 
-			"address", host, 
+
+		s.logger.Info("Successfully connected to onion service",
+			"address", host,
 			"circuit_id", circuitID)
-		
+
 		// Send success reply
 		s.sendReply(conn, replySuccess, conn.LocalAddr())
-		
+
 		// In Phase 8, this would relay data through the rendezvous circuit
 		// For Phase 7.3.4, we just log success and close
 		s.logger.Debug("Onion service connection established (mock relay)")

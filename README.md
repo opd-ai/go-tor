@@ -9,7 +9,7 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 
 ## Features
 
-### Current (Phase 1-6.5 Complete + Phase 7 Control Protocol + Phase 7.3 Onion Services Foundation + Phase 8.1 Config Loading)
+### Current (Phase 1-6.5 Complete + Phase 7 Control Protocol + Phase 7.3 Onion Services Foundation + Phase 8.1-8.2)
 - ✅ Cell encoding/decoding (fixed and variable-size)
 - ✅ Relay cell handling
 - ✅ Circuit management types and lifecycle
@@ -55,11 +55,15 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 - ✅ RENDEZVOUS1/RENDEZVOUS2 protocol handling
 - ✅ Complete onion service connection workflow
 - ✅ SOCKS5 .onion address integration
+- ✅ **Health monitoring API with component-level checks**
+- ✅ **Structured error types with categories and severity**
+- ✅ **Circuit age enforcement (MaxCircuitDirtiness)**
 
 ### In Progress
-- [ ] **Phase 8**: Advanced features and optimization
+- [ ] **Phase 8.3**: Performance optimization and tuning
 
 ### Recently Completed
+- ✅ **Phase 8.2**: Enhanced error handling and resilience
 - ✅ **Phase 8.1**: Configuration file loading (torrc-compatible)
 
 ### Planned
@@ -162,6 +166,8 @@ The project is organized into modular packages:
 - **pkg/metrics**: Metrics and observability ✅ (Phase 6.5)
 - **pkg/control**: Control protocol ✅ (Phase 7)
 - **pkg/onion**: Onion service support 🚧 (Phase 7.3 - Foundation complete)
+- **pkg/health**: Health monitoring and checks ✅ (Phase 8.2)
+- **pkg/errors**: Structured error types ✅ (Phase 8.2)
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for details.
 
@@ -272,7 +278,7 @@ Current test coverage: ~90% for implemented packages.
 
 ### Phase 8: Advanced Features (Weeks 37-40)
 - ✅ Configuration file loading (torrc-compatible) (Phase 8.1)
-- [ ] Enhanced error handling and resilience (Phase 8.2)
+- ✅ Enhanced error handling and resilience (Phase 8.2)
 - [ ] Performance optimization and tuning (Phase 8.3)
 - [ ] Security hardening and audit (Phase 8.4)
 - [ ] Comprehensive testing and documentation (Phase 8.5)

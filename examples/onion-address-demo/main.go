@@ -93,8 +93,8 @@ func main() {
 	fmt.Println("Example 5: Error handling examples")
 	fmt.Println("-----------------------------------")
 	invalidAddresses := []string{
-		"short.onion",                     // Too short
-		"!!!invalid!!!base32!!!.onion",   // Invalid base32
+		"short.onion",                  // Too short
+		"!!!invalid!!!base32!!!.onion", // Invalid base32
 		"thisisatoolongaddressthatexceedsthemaximumlengthforanyonionaddress.onion", // Too long
 	}
 

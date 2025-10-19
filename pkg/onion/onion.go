@@ -143,16 +143,16 @@ func IsOnionAddress(addr string) bool {
 
 // Descriptor represents an onion service descriptor (v3)
 type Descriptor struct {
-	Version         int                  // Descriptor version (3)
-	Address         *Address             // Onion service address
-	IntroPoints     []IntroductionPoint  // Introduction points
-	DescriptorID    []byte               // Descriptor identifier (32 bytes)
-	BlindedPubkey   []byte               // Blinded ed25519 public key (32 bytes)
-	RevisionCounter uint64               // Revision counter for freshness
-	Signature       []byte               // Descriptor signature
-	RawDescriptor   []byte               // Raw descriptor content
-	CreatedAt       time.Time            // When descriptor was created
-	Lifetime        time.Duration        // Descriptor validity lifetime
+	Version         int                 // Descriptor version (3)
+	Address         *Address            // Onion service address
+	IntroPoints     []IntroductionPoint // Introduction points
+	DescriptorID    []byte              // Descriptor identifier (32 bytes)
+	BlindedPubkey   []byte              // Blinded ed25519 public key (32 bytes)
+	RevisionCounter uint64              // Revision counter for freshness
+	Signature       []byte              // Descriptor signature
+	RawDescriptor   []byte              // Raw descriptor content
+	CreatedAt       time.Time           // When descriptor was created
+	Lifetime        time.Duration       // Descriptor validity lifetime
 }
 
 // IntroductionPoint represents an introduction point
@@ -403,12 +403,12 @@ func ComputeBlindedPubkey(pubkey ed25519.PublicKey, timePeriod uint64) []byte {
 	h := sha3.New256()
 	h.Write([]byte("Derive temporary signing key"))
 	h.Write(pubkey)
-	
+
 	// Convert time period to bytes (8 bytes, big-endian)
 	timePeriodBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(timePeriodBytes, timePeriod)
 	h.Write(timePeriodBytes)
-	
+
 	return h.Sum(nil)
 }
 
@@ -416,9 +416,9 @@ func ComputeBlindedPubkey(pubkey ed25519.PublicKey, timePeriod uint64) []byte {
 // Per Tor spec: time_period = (unix_time + offset) / period_length
 // For v3: period_length = 1440 minutes (24 hours), offset = 12 hours
 func GetTimePeriod(now time.Time) uint64 {
-	const periodLength = 24 * 60 * 60        // 24 hours in seconds
-	const offset = 12 * 60 * 60              // 12 hours in seconds
-	
+	const periodLength = 24 * 60 * 60 // 24 hours in seconds
+	const offset = 12 * 60 * 60       // 12 hours in seconds
+
 	unixTime := now.Unix()
 	// Safe conversion: validate unixTime is non-negative before arithmetic
 	if unixTime < 0 {
@@ -437,7 +437,7 @@ func GetTimePeriod(now time.Time) uint64 {
 func ParseDescriptor(raw []byte) (*Descriptor, error) {
 	// This is a placeholder for descriptor parsing
 	// TODO: Implement full descriptor parsing per rend-spec-v3.txt
-	
+
 	desc := &Descriptor{
 		Version:       3,
 		RawDescriptor: raw,
@@ -445,20 +445,20 @@ func ParseDescriptor(raw []byte) (*Descriptor, error) {
 		Lifetime:      3 * time.Hour,
 		IntroPoints:   make([]IntroductionPoint, 0),
 	}
-	
+
 	// Parse descriptor fields
 	lines := bytes.Split(raw, []byte("\n"))
 	for _, line := range lines {
 		if len(line) == 0 {
 			continue
 		}
-		
+
 		// Simple line parsing - full implementation would handle all fields
 		parts := bytes.SplitN(line, []byte(" "), 2)
 		if len(parts) < 1 {
 			continue
 		}
-		
+
 		keyword := string(parts[0])
 		switch keyword {
 		case "hs-descriptor":
@@ -471,7 +471,7 @@ func ParseDescriptor(raw []byte) (*Descriptor, error) {
 			// TODO: Implement parsing
 		}
 	}
-	
+
 	return desc, nil
 }
 
@@ -479,22 +479,22 @@ func ParseDescriptor(raw []byte) (*Descriptor, error) {
 func EncodeDescriptor(desc *Descriptor) ([]byte, error) {
 	// This is a placeholder for descriptor encoding
 	// TODO: Implement full descriptor encoding per rend-spec-v3.txt
-	
+
 	var buf bytes.Buffer
-	
+
 	// Write basic descriptor structure
 	fmt.Fprintf(&buf, "hs-descriptor %d\n", desc.Version)
 	fmt.Fprintf(&buf, "descriptor-lifetime %d\n", int(desc.Lifetime.Minutes()))
-	
+
 	if len(desc.DescriptorID) > 0 {
 		fmt.Fprintf(&buf, "descriptor-id %s\n", base64.StdEncoding.EncodeToString(desc.DescriptorID))
 	}
-	
+
 	fmt.Fprintf(&buf, "revision-counter %d\n", desc.RevisionCounter)
-	
+
 	// Introduction points would be encoded here
 	// TODO: Implement full encoding
-	
+
 	return buf.Bytes(), nil
 }
 
@@ -766,22 +766,23 @@ func (ip *IntroductionProtocol) SelectIntroductionPoint(desc *Descriptor) (*Intr
 
 // IntroduceRequest represents an INTRODUCE1 request
 type IntroduceRequest struct {
-	IntroPoint     *IntroductionPoint // Target introduction point
-	RendezvousCookie []byte           // Rendezvous cookie (20 bytes)
-	RendezvousPoint string            // Rendezvous point fingerprint
-	OnionKey       []byte             // Client's ephemeral onion key
+	IntroPoint       *IntroductionPoint // Target introduction point
+	RendezvousCookie []byte             // Rendezvous cookie (20 bytes)
+	RendezvousPoint  string             // Rendezvous point fingerprint
+	OnionKey         []byte             // Client's ephemeral onion key
 }
 
 // BuildIntroduce1Cell constructs an INTRODUCE1 cell for the introduction protocol
 // Per Tor spec (rend-spec-v3.txt section 3.2):
-// INTRODUCE1 {
-//   LEGACY_KEY_ID     [20 bytes]
-//   AUTH_KEY_TYPE     [1 byte]
-//   AUTH_KEY_LEN      [2 bytes]
-//   AUTH_KEY          [AUTH_KEY_LEN bytes]
-//   EXTENSIONS        [N bytes]
-//   ENCRYPTED_DATA    [remaining bytes]
-// }
+//
+//	INTRODUCE1 {
+//	  LEGACY_KEY_ID     [20 bytes]
+//	  AUTH_KEY_TYPE     [1 byte]
+//	  AUTH_KEY_LEN      [2 bytes]
+//	  AUTH_KEY          [AUTH_KEY_LEN bytes]
+//	  EXTENSIONS        [N bytes]
+//	  ENCRYPTED_DATA    [remaining bytes]
+//	}
 func (ip *IntroductionProtocol) BuildIntroduce1Cell(req *IntroduceRequest) ([]byte, error) {
 	if req == nil {
 		return nil, fmt.Errorf("introduce request is nil")
@@ -1048,9 +1049,10 @@ type EstablishRendezvousRequest struct {
 
 // BuildEstablishRendezvousCell constructs an ESTABLISH_RENDEZVOUS cell
 // Per Tor spec (rend-spec-v3.txt section 3.3):
-// ESTABLISH_RENDEZVOUS {
-//   RENDEZVOUS_COOKIE [20 bytes]
-// }
+//
+//	ESTABLISH_RENDEZVOUS {
+//	  RENDEZVOUS_COOKIE [20 bytes]
+//	}
 func (rp *RendezvousProtocol) BuildEstablishRendezvousCell(req *EstablishRendezvousRequest) ([]byte, error) {
 	if req == nil {
 		return nil, fmt.Errorf("establish rendezvous request is nil")
@@ -1127,10 +1129,12 @@ type Rendezvous1Request struct {
 
 // BuildRendezvous1Cell constructs a RENDEZVOUS1 cell
 // Per Tor spec (rend-spec-v3.txt section 3.4):
-// RENDEZVOUS1 {
-//   RENDEZVOUS_COOKIE [20 bytes]
-//   HANDSHAKE_DATA    [remaining bytes]
-// }
+//
+//	RENDEZVOUS1 {
+//	  RENDEZVOUS_COOKIE [20 bytes]
+//	  HANDSHAKE_DATA    [remaining bytes]
+//	}
+//
 // Note: RENDEZVOUS1 is sent by the hidden service, not the client.
 // This function is included for completeness but won't be used in client-only implementation.
 func (rp *RendezvousProtocol) BuildRendezvous1Cell(req *Rendezvous1Request) ([]byte, error) {
@@ -1162,9 +1166,10 @@ func (rp *RendezvousProtocol) BuildRendezvous1Cell(req *Rendezvous1Request) ([]b
 
 // ParseRendezvous2Cell parses a RENDEZVOUS2 cell
 // Per Tor spec (rend-spec-v3.txt section 3.4):
-// RENDEZVOUS2 {
-//   HANDSHAKE_DATA [remaining bytes]
-// }
+//
+//	RENDEZVOUS2 {
+//	  HANDSHAKE_DATA [remaining bytes]
+//	}
 func (rp *RendezvousProtocol) ParseRendezvous2Cell(data []byte) ([]byte, error) {
 	if len(data) == 0 {
 		return nil, fmt.Errorf("rendezvous2 data is empty")
