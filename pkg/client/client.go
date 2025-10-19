@@ -324,15 +324,37 @@ func (c *Client) maintainCircuits(ctx context.Context) {
 func (c *Client) checkAndRebuildCircuits(ctx context.Context) {
 	c.circuitsMu.Lock()
 
-	// Remove failed/closed circuits
+	// Remove failed/closed circuits and enforce max circuit age
 	activeCircuits := make([]*circuit.Circuit, 0)
+	maxAge := c.config.MaxCircuitDirtiness
 	for _, circ := range c.circuits {
 		state := circ.GetState()
-		if state == circuit.StateOpen {
-			activeCircuits = append(activeCircuits, circ)
-		} else {
+		age := circ.Age()
+
+		// Remove circuits that are not open or too old
+		if state != circuit.StateOpen {
 			c.logger.Info("Removing inactive circuit", "circuit_id", circ.ID, "state", state.String())
+			continue
 		}
+
+		if age > maxAge {
+			c.logger.Info("Removing old circuit", "circuit_id", circ.ID, "age", age, "max_age", maxAge)
+			// Close the old circuit
+			circ.SetState(circuit.StateClosed)
+			if err := c.circuitMgr.CloseCircuit(circ.ID); err != nil {
+				c.logger.Warn("Failed to close old circuit", "circuit_id", circ.ID, "error", err)
+			}
+			// Publish circuit closed event
+			c.PublishEvent(&control.CircuitEvent{
+				CircuitID:   circ.ID,
+				Status:      "CLOSED",
+				Purpose:     "GENERAL",
+				TimeCreated: circ.CreatedAt,
+			})
+			continue
+		}
+
+		activeCircuits = append(activeCircuits, circ)
 	}
 	c.circuits = activeCircuits
 	c.metrics.ActiveCircuits.Set(int64(len(c.circuits)))
