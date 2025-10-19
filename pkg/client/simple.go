@@ -4,6 +4,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/opd-ai/go-tor/pkg/config"
@@ -44,11 +45,11 @@ func ConnectWithContext(ctx context.Context) (*SimpleClient, error) {
 	cfg := config.DefaultConfig()
 	
 	// Create logger with info level by default
-	log, err := logger.ParseLevel("info")
+	logLevel, err := logger.ParseLevel("info")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create logger: %w", err)
+		return nil, fmt.Errorf("failed to parse log level: %w", err)
 	}
-	logr := logger.New(log, nil) // Use default stdout
+	logr := logger.New(logLevel, os.Stdout)
 
 	// Create client
 	client, err := New(cfg, logr)
@@ -107,7 +108,7 @@ func ConnectWithOptionsContext(ctx context.Context, opts *Options) (*SimpleClien
 	if err != nil {
 		return nil, fmt.Errorf("invalid log level: %w", err)
 	}
-	logr := logger.New(logLevel, nil)
+	logr := logger.New(logLevel, os.Stdout)
 
 	// Create client
 	client, err := New(cfg, logr)
