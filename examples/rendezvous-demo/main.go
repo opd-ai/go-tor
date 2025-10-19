@@ -200,8 +200,8 @@ func main() {
 
 	// Create a mock descriptor with introduction points
 	desc := &onion.Descriptor{
-		Version:     3,
-		Address:     addr,
+		Version: 3,
+		Address: addr,
 		IntroPoints: []onion.IntroductionPoint{
 			{
 				OnionKey: make([]byte, 32),

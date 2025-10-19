@@ -240,10 +240,10 @@ func TestIsCategory(t *testing.T) {
 
 func TestAllErrorConstructors(t *testing.T) {
 	tests := []struct {
-		name         string
-		constructor  func() *TorError
-		category     ErrorCategory
-		shouldRetry  bool
+		name        string
+		constructor func() *TorError
+		category    ErrorCategory
+		shouldRetry bool
 	}{
 		{
 			name:        "ConnectionError",

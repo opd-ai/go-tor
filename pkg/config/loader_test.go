@@ -12,10 +12,10 @@ func TestLoadFromFile(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	tests := []struct {
-		name       string
-		content    string
-		wantErr    bool
-		checkFunc  func(*testing.T, *Config)
+		name      string
+		content   string
+		wantErr   bool
+		checkFunc func(*testing.T, *Config)
 	}{
 		{
 			name: "basic configuration",
@@ -137,21 +137,21 @@ DormantTimeout 1d`,
 			},
 		},
 		{
-			name: "invalid port",
-			content: `SocksPort invalid`,
-			wantErr: true,
+			name:      "invalid port",
+			content:   `SocksPort invalid`,
+			wantErr:   true,
 			checkFunc: nil,
 		},
 		{
-			name: "invalid duration",
-			content: `CircuitBuildTimeout invalid`,
-			wantErr: true,
+			name:      "invalid duration",
+			content:   `CircuitBuildTimeout invalid`,
+			wantErr:   true,
 			checkFunc: nil,
 		},
 		{
-			name: "invalid validation - port too high",
-			content: `SocksPort 70000`,
-			wantErr: true,
+			name:      "invalid validation - port too high",
+			content:   `SocksPort 70000`,
+			wantErr:   true,
 			checkFunc: nil,
 		},
 		{
