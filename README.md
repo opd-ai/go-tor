@@ -9,13 +9,14 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 
 ## Features
 
-### Current (Phase 1-6.5 Complete + Phase 7 Control Protocol + Phase 7.3 Onion Services Foundation)
+### Current (Phase 1-6.5 Complete + Phase 7 Control Protocol + Phase 7.3 Onion Services Foundation + Phase 8.1 Config Loading)
 - ✅ Cell encoding/decoding (fixed and variable-size)
 - ✅ Relay cell handling
 - ✅ Circuit management types and lifecycle
 - ✅ Cryptographic primitives (AES-CTR, RSA, SHA-1/256)
 - ✅ Key derivation (KDF-TOR)
 - ✅ Configuration system with validation
+- ✅ **Configuration file loading (torrc-compatible)**
 - ✅ Structured logging with log/slog
 - ✅ Graceful shutdown with context propagation
 - ✅ TLS connection handling to Tor relays
@@ -58,6 +59,9 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 ### In Progress
 - [ ] **Phase 8**: Advanced features and optimization
 
+### Recently Completed
+- ✅ **Phase 8.1**: Configuration file loading (torrc-compatible)
+
 ### Planned
 - [ ] **Phase 7.4**: Onion services server (hidden service hosting)
 - [ ] **Phase 8**: Advanced features and optimization
@@ -94,6 +98,12 @@ make build
 
 # Run with custom ports
 ./bin/tor-client -socks-port 9150 -control-port 9151
+
+# Run with configuration file
+./bin/tor-client -config /etc/tor/torrc
+
+# Configuration file with command-line overrides
+./bin/tor-client -config /etc/tor/torrc -log-level debug
 
 # Show version
 ./bin/tor-client -version
@@ -259,10 +269,11 @@ Current test coverage: ~90% for implemented packages.
 - [ ] Hidden service server (hosting) (Phase 7.4)
 
 ### Phase 8: Advanced Features (Weeks 37-40)
-- Embedded system optimization
-- Security hardening and audit
-- Performance tuning
-- Comprehensive testing and documentation
+- ✅ Configuration file loading (torrc-compatible) (Phase 8.1)
+- [ ] Enhanced error handling and resilience (Phase 8.2)
+- [ ] Performance optimization and tuning (Phase 8.3)
+- [ ] Security hardening and audit (Phase 8.4)
+- [ ] Comprehensive testing and documentation (Phase 8.5)
 
 See [problem statement](docs/ROADMAP.md) for full 30-week roadmap.
 

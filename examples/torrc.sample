@@ -1,0 +1,32 @@
+# go-tor Configuration File
+# This is a torrc-compatible configuration file for go-tor
+
+# Network Settings
+SocksPort 9050
+ControlPort 9051
+DataDirectory /var/lib/tor
+
+# Circuit Settings
+CircuitBuildTimeout 60s
+MaxCircuitDirtiness 10m
+NewCircuitPeriod 30s
+NumEntryGuards 3
+
+# Path Selection
+UseEntryGuards 1
+UseBridges 0
+
+# Example bridge configuration (commented out)
+# Bridge 192.168.1.1:9001
+# Bridge obfs4 192.168.1.2:9001 fingerprint
+
+# Node exclusion (optional)
+# ExcludeNodes node1,node2
+# ExcludeExitNodes badexitnode
+
+# Network Behavior
+ConnLimit 1000
+DormantTimeout 24h
+
+# Logging
+LogLevel info

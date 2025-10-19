@@ -39,7 +39,15 @@ func main() {
 	// Load or create configuration
 	cfg := config.DefaultConfig()
 
-	// Apply command-line overrides
+	// Load from config file if specified
+	if *configFile != "" {
+		if err := config.LoadFromFile(*configFile, cfg); err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to load config file: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	// Apply command-line overrides (command-line flags take precedence)
 	if *socksPort != 0 {
 		cfg.SocksPort = *socksPort
 	}
@@ -66,11 +74,6 @@ func main() {
 		os.Exit(1)
 	}
 	log := logger.New(level, os.Stdout)
-
-	// TODO: Load from config file if specified
-	if *configFile != "" {
-		log.Warn("Configuration file support not yet implemented", "path", *configFile)
-	}
 
 	log.Info("Starting go-tor",
 		"version", version,
