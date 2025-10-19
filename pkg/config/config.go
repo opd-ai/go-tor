@@ -35,6 +35,15 @@ type Config struct {
 
 	// Logging
 	LogLevel string // Log level: debug, info, warn, error (default: info)
+
+	// Performance tuning (Phase 8.3)
+	EnableConnectionPooling bool          // Enable connection pooling for relay connections
+	ConnectionPoolMaxIdle   int           // Max idle connections per relay (default: 5)
+	ConnectionPoolMaxLife   time.Duration // Max lifetime for pooled connections (default: 10m)
+	EnableCircuitPrebuilding bool          // Enable circuit prebuilding
+	CircuitPoolMinSize      int           // Minimum circuits to prebuild (default: 2)
+	CircuitPoolMaxSize      int           // Maximum circuits in pool (default: 10)
+	EnableBufferPooling     bool          // Enable buffer pooling for cell operations (default: true)
 }
 
 // OnionServiceConfig represents configuration for a single onion service
@@ -65,6 +74,14 @@ func DefaultConfig() *Config {
 		DormantTimeout:      24 * time.Hour,
 		OnionServices:       []OnionServiceConfig{},
 		LogLevel:            "info",
+		// Performance tuning defaults (Phase 8.3)
+		EnableConnectionPooling:  true,
+		ConnectionPoolMaxIdle:    5,
+		ConnectionPoolMaxLife:    10 * time.Minute,
+		EnableCircuitPrebuilding: true,
+		CircuitPoolMinSize:       2,
+		CircuitPoolMaxSize:       10,
+		EnableBufferPooling:      true,
 	}
 }
 
@@ -111,6 +128,20 @@ func (c *Config) Validate() error {
 		if os.ServiceDir == "" {
 			return fmt.Errorf("onion service %d: ServiceDir is required", i)
 		}
+	}
+
+	// Validate performance tuning settings
+	if c.ConnectionPoolMaxIdle < 0 {
+		return fmt.Errorf("ConnectionPoolMaxIdle must be non-negative")
+	}
+	if c.ConnectionPoolMaxLife < 0 {
+		return fmt.Errorf("ConnectionPoolMaxLife must be non-negative")
+	}
+	if c.CircuitPoolMinSize < 0 {
+		return fmt.Errorf("CircuitPoolMinSize must be non-negative")
+	}
+	if c.CircuitPoolMaxSize < c.CircuitPoolMinSize {
+		return fmt.Errorf("CircuitPoolMaxSize must be >= CircuitPoolMinSize")
 	}
 
 	return nil
