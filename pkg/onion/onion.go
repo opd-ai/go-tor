@@ -312,6 +312,12 @@ func (c *Client) UpdateHSDirs(relays []*HSDirectory) {
 	c.logger.Info("Updated HSDir list", "count", len(relays))
 }
 
+// CacheDescriptor caches a descriptor for testing or manual management
+func (c *Client) CacheDescriptor(addr *Address, desc *Descriptor) {
+	c.cache.Put(addr, desc)
+	c.logger.Debug("Descriptor manually cached", "address", addr.String())
+}
+
 // GetDescriptor retrieves a descriptor for an onion address
 // First checks cache, then fetches from HSDirs if needed
 func (c *Client) GetDescriptor(ctx context.Context, addr *Address) (*Descriptor, error) {

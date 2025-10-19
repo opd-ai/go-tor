@@ -1250,7 +1250,7 @@ func TestConnectToOnionService(t *testing.T) {
 	}
 
 	// Cache the descriptor so we don't need HSDirs
-	client.cache.Put(addr, desc)
+	client.CacheDescriptor(addr, desc)
 
 	ctx := context.Background()
 
