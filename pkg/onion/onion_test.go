@@ -1252,6 +1252,17 @@ func TestConnectToOnionService(t *testing.T) {
 	// Cache the descriptor so we don't need HSDirs
 	client.CacheDescriptor(addr, desc)
 
+	// Provide mock relays for rendezvous point selection
+	mockRelays := []*HSDirectory{
+		{
+			Fingerprint: "0000000000000000000000000000000000000001",
+			Address:     "127.0.0.1",
+			ORPort:      9001,
+			HSDir:       true,
+		},
+	}
+	client.UpdateHSDirs(mockRelays)
+
 	ctx := context.Background()
 
 	// Test connection
@@ -1352,3 +1363,489 @@ func BenchmarkBuildIntroduce1Cell(b *testing.B) {
 		intro.BuildIntroduce1Cell(req)
 	}
 }
+
+// TestRendezvousProtocol tests creation of rendezvous protocol handler
+func TestRendezvousProtocol(t *testing.T) {
+	log := logger.NewDefault()
+	rendezvous := NewRendezvousProtocol(log)
+
+	if rendezvous == nil {
+		t.Fatal("Expected non-nil rendezvous protocol")
+	}
+
+	if rendezvous.logger == nil {
+		t.Error("Expected non-nil logger")
+	}
+}
+
+// TestSelectRendezvousPoint tests rendezvous point selection
+func TestSelectRendezvousPoint(t *testing.T) {
+	log := logger.NewDefault()
+	rendezvous := NewRendezvousProtocol(log)
+
+	tests := []struct {
+		name        string
+		relays      []*HSDirectory
+		expectError bool
+	}{
+		{
+			name:        "no relays available",
+			relays:      []*HSDirectory{},
+			expectError: true,
+		},
+		{
+			name: "single relay",
+			relays: []*HSDirectory{
+				{Fingerprint: "relay1", Address: "1.1.1.1", ORPort: 9001, HSDir: true},
+			},
+			expectError: false,
+		},
+		{
+			name: "multiple relays",
+			relays: []*HSDirectory{
+				{Fingerprint: "relay1", Address: "1.1.1.1", ORPort: 9001, HSDir: true},
+				{Fingerprint: "relay2", Address: "2.2.2.2", ORPort: 9002, HSDir: true},
+				{Fingerprint: "relay3", Address: "3.3.3.3", ORPort: 9003, HSDir: true},
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			relay, err := rendezvous.SelectRendezvousPoint(tt.relays)
+
+			if tt.expectError {
+				if err == nil {
+					t.Error("Expected error but got none")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+				if relay == nil {
+					t.Error("Expected non-nil relay")
+				}
+			}
+		})
+	}
+}
+
+// TestBuildEstablishRendezvousCell tests ESTABLISH_RENDEZVOUS cell construction
+func TestBuildEstablishRendezvousCell(t *testing.T) {
+	log := logger.NewDefault()
+	rendezvous := NewRendezvousProtocol(log)
+
+	tests := []struct {
+		name        string
+		request     *EstablishRendezvousRequest
+		expectError bool
+		expectedLen int
+	}{
+		{
+			name:        "nil request",
+			request:     nil,
+			expectError: true,
+		},
+		{
+			name: "invalid cookie length - too short",
+			request: &EstablishRendezvousRequest{
+				RendezvousCookie: make([]byte, 10),
+			},
+			expectError: true,
+		},
+		{
+			name: "invalid cookie length - too long",
+			request: &EstablishRendezvousRequest{
+				RendezvousCookie: make([]byte, 25),
+			},
+			expectError: true,
+		},
+		{
+			name: "valid request",
+			request: &EstablishRendezvousRequest{
+				RendezvousCookie: make([]byte, 20),
+			},
+			expectError: false,
+			expectedLen: 20,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data, err := rendezvous.BuildEstablishRendezvousCell(tt.request)
+
+			if tt.expectError {
+				if err == nil {
+					t.Error("Expected error but got none")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+				if len(data) != tt.expectedLen {
+					t.Errorf("Expected data length %d, got %d", tt.expectedLen, len(data))
+				}
+			}
+		})
+	}
+}
+
+// TestCreateRendezvousCircuit tests rendezvous circuit creation
+func TestCreateRendezvousCircuit(t *testing.T) {
+	log := logger.NewDefault()
+	rendezvous := NewRendezvousProtocol(log)
+	ctx := context.Background()
+
+	tests := []struct {
+		name             string
+		rendezvousPoint  *HSDirectory
+		expectError      bool
+		expectedCircuitID uint32
+	}{
+		{
+			name:            "nil rendezvous point",
+			rendezvousPoint: nil,
+			expectError:     true,
+		},
+		{
+			name: "valid rendezvous point",
+			rendezvousPoint: &HSDirectory{
+				Fingerprint: "test-rp",
+				Address:     "1.1.1.1",
+				ORPort:      9001,
+			},
+			expectError:       false,
+			expectedCircuitID: 2000,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			circuitID, err := rendezvous.CreateRendezvousCircuit(ctx, tt.rendezvousPoint)
+
+			if tt.expectError {
+				if err == nil {
+					t.Error("Expected error but got none")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+				if circuitID != tt.expectedCircuitID {
+					t.Errorf("Expected circuit ID %d, got %d", tt.expectedCircuitID, circuitID)
+				}
+			}
+		})
+	}
+}
+
+// TestSendEstablishRendezvous tests sending ESTABLISH_RENDEZVOUS cell
+func TestSendEstablishRendezvous(t *testing.T) {
+	log := logger.NewDefault()
+	rendezvous := NewRendezvousProtocol(log)
+	ctx := context.Background()
+
+	tests := []struct {
+		name        string
+		circuitID   uint32
+		data        []byte
+		expectError bool
+	}{
+		{
+			name:        "empty data",
+			circuitID:   2000,
+			data:        []byte{},
+			expectError: true,
+		},
+		{
+			name:        "valid data",
+			circuitID:   2000,
+			data:        make([]byte, 20),
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := rendezvous.SendEstablishRendezvous(ctx, tt.circuitID, tt.data)
+
+			if tt.expectError {
+				if err == nil {
+					t.Error("Expected error but got none")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+			}
+		})
+	}
+}
+
+// TestBuildRendezvous1Cell tests RENDEZVOUS1 cell construction
+func TestBuildRendezvous1Cell(t *testing.T) {
+	log := logger.NewDefault()
+	rendezvous := NewRendezvousProtocol(log)
+
+	tests := []struct {
+		name        string
+		request     *Rendezvous1Request
+		expectError bool
+		expectedLen int
+	}{
+		{
+			name:        "nil request",
+			request:     nil,
+			expectError: true,
+		},
+		{
+			name: "invalid cookie length",
+			request: &Rendezvous1Request{
+				RendezvousCookie: make([]byte, 10),
+			},
+			expectError: true,
+		},
+		{
+			name: "valid request without handshake data",
+			request: &Rendezvous1Request{
+				RendezvousCookie: make([]byte, 20),
+				HandshakeData:    []byte{},
+			},
+			expectError: false,
+			expectedLen: 20,
+		},
+		{
+			name: "valid request with handshake data",
+			request: &Rendezvous1Request{
+				RendezvousCookie: make([]byte, 20),
+				HandshakeData:    make([]byte, 32),
+			},
+			expectError: false,
+			expectedLen: 52, // 20 + 32
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data, err := rendezvous.BuildRendezvous1Cell(tt.request)
+
+			if tt.expectError {
+				if err == nil {
+					t.Error("Expected error but got none")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+				if len(data) != tt.expectedLen {
+					t.Errorf("Expected data length %d, got %d", tt.expectedLen, len(data))
+				}
+			}
+		})
+	}
+}
+
+// TestParseRendezvous2Cell tests RENDEZVOUS2 cell parsing
+func TestParseRendezvous2Cell(t *testing.T) {
+	log := logger.NewDefault()
+	rendezvous := NewRendezvousProtocol(log)
+
+	tests := []struct {
+		name        string
+		data        []byte
+		expectError bool
+		expectedLen int
+	}{
+		{
+			name:        "empty data",
+			data:        []byte{},
+			expectError: true,
+		},
+		{
+			name:        "valid data",
+			data:        make([]byte, 32),
+			expectError: false,
+			expectedLen: 32,
+		},
+		{
+			name:        "large handshake data",
+			data:        make([]byte, 100),
+			expectError: false,
+			expectedLen: 100,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handshakeData, err := rendezvous.ParseRendezvous2Cell(tt.data)
+
+			if tt.expectError {
+				if err == nil {
+					t.Error("Expected error but got none")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+				if len(handshakeData) != tt.expectedLen {
+					t.Errorf("Expected handshake data length %d, got %d", tt.expectedLen, len(handshakeData))
+				}
+			}
+		})
+	}
+}
+
+// TestWaitForRendezvous2 tests waiting for RENDEZVOUS2 cell
+func TestWaitForRendezvous2(t *testing.T) {
+	log := logger.NewDefault()
+	rendezvous := NewRendezvousProtocol(log)
+	ctx := context.Background()
+
+	circuitID := uint32(2000)
+
+	handshakeData, err := rendezvous.WaitForRendezvous2(ctx, circuitID)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if len(handshakeData) == 0 {
+		t.Error("Expected non-empty handshake data")
+	}
+}
+
+// TestEstablishRendezvousPoint tests the full rendezvous point establishment
+func TestEstablishRendezvousPoint(t *testing.T) {
+	log := logger.NewDefault()
+	client := NewClient(log)
+	ctx := context.Background()
+
+	rendezvousCookie := make([]byte, 20)
+	for i := range rendezvousCookie {
+		rendezvousCookie[i] = byte(i)
+	}
+
+	mockRelays := []*HSDirectory{
+		{
+			Fingerprint: "relay1",
+			Address:     "1.1.1.1",
+			ORPort:      9001,
+			HSDir:       true,
+		},
+		{
+			Fingerprint: "relay2",
+			Address:     "2.2.2.2",
+			ORPort:      9002,
+			HSDir:       true,
+		},
+	}
+
+	circuitID, rendezvousPoint, err := client.EstablishRendezvousPoint(ctx, rendezvousCookie, mockRelays)
+	if err != nil {
+		t.Fatalf("Failed to establish rendezvous point: %v", err)
+	}
+
+	if circuitID == 0 {
+		t.Error("Expected non-zero circuit ID")
+	}
+
+	if rendezvousPoint == nil {
+		t.Fatal("Expected non-nil rendezvous point")
+	}
+
+	if rendezvousPoint.Fingerprint == "" {
+		t.Error("Expected non-empty rendezvous point fingerprint")
+	}
+}
+
+// TestCompleteRendezvous tests completing the rendezvous protocol
+func TestCompleteRendezvous(t *testing.T) {
+	log := logger.NewDefault()
+	client := NewClient(log)
+	ctx := context.Background()
+
+	rendezvousCircuitID := uint32(2000)
+
+	err := client.CompleteRendezvous(ctx, rendezvousCircuitID)
+	if err != nil {
+		t.Errorf("Failed to complete rendezvous: %v", err)
+	}
+}
+
+// TestEstablishRendezvousCellFormat tests the format of ESTABLISH_RENDEZVOUS cells
+func TestEstablishRendezvousCellFormat(t *testing.T) {
+	log := logger.NewDefault()
+	rendezvous := NewRendezvousProtocol(log)
+
+	rendezvousCookie := make([]byte, 20)
+	for i := range rendezvousCookie {
+		rendezvousCookie[i] = byte(i)
+	}
+
+	req := &EstablishRendezvousRequest{
+		RendezvousCookie: rendezvousCookie,
+	}
+
+	data, err := rendezvous.BuildEstablishRendezvousCell(req)
+	if err != nil {
+		t.Fatalf("Failed to build ESTABLISH_RENDEZVOUS cell: %v", err)
+	}
+
+	// Verify structure
+	if len(data) != 20 {
+		t.Errorf("Expected cell size 20, got %d", len(data))
+	}
+
+	// Verify cookie
+	for i := 0; i < 20; i++ {
+		if data[i] != byte(i) {
+			t.Errorf("Cookie byte %d mismatch: expected %d, got %d", i, byte(i), data[i])
+		}
+	}
+}
+
+// BenchmarkSelectRendezvousPoint benchmarks rendezvous point selection
+func BenchmarkSelectRendezvousPoint(b *testing.B) {
+	log := logger.NewDefault()
+	rendezvous := NewRendezvousProtocol(log)
+
+	relays := []*HSDirectory{
+		{Fingerprint: "relay1", Address: "1.1.1.1", ORPort: 9001, HSDir: true},
+		{Fingerprint: "relay2", Address: "2.2.2.2", ORPort: 9002, HSDir: true},
+		{Fingerprint: "relay3", Address: "3.3.3.3", ORPort: 9003, HSDir: true},
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		rendezvous.SelectRendezvousPoint(relays)
+	}
+}
+
+// BenchmarkBuildEstablishRendezvousCell benchmarks ESTABLISH_RENDEZVOUS cell construction
+func BenchmarkBuildEstablishRendezvousCell(b *testing.B) {
+	log := logger.NewDefault()
+	rendezvous := NewRendezvousProtocol(log)
+
+	req := &EstablishRendezvousRequest{
+		RendezvousCookie: make([]byte, 20),
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		rendezvous.BuildEstablishRendezvousCell(req)
+	}
+}
+
+// BenchmarkParseRendezvous2Cell benchmarks RENDEZVOUS2 cell parsing
+func BenchmarkParseRendezvous2Cell(b *testing.B) {
+	log := logger.NewDefault()
+	rendezvous := NewRendezvousProtocol(log)
+
+	data := make([]byte, 32)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		rendezvous.ParseRendezvous2Cell(data)
+	}
+}
+
