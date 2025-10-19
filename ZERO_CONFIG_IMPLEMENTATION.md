@@ -293,33 +293,6 @@ go-tor/
 - FAQ section
 - Troubleshooting tips
 
-## Future Enhancements (Not Implemented)
-
-The following were considered but not implemented to keep changes minimal:
-
-1. **Embedded Resources:**
-   - Tor binary embedding
-   - Default torrc embedding
-   - GeoIP files embedding
-   - *Reason:* Requires significant binary size increase
-
-2. **Automatic Bridge Selection:**
-   - Fallback to bridges if direct connection fails
-   - *Reason:* Requires bridge configuration management
-
-3. **Port Auto-Selection:**
-   - Try next available port if default is busy
-   - *Reason:* Adds complexity, users can specify port manually
-
-4. **Health Checks:**
-   - DNS leak prevention tests
-   - Circuit verification tests
-   - *Reason:* These features already exist in the codebase
-
-5. **Binary Verification:**
-   - Checksum verification for embedded resources
-   - *Reason:* No embedded resources yet
-
 ## Migration Guide
 
 **For Existing Users:**
@@ -351,3 +324,38 @@ The go-tor client now provides a true zero-configuration experience while mainta
 - Improved developer experience
 - Maintained security and reliability
 - Set foundation for future enhancements
+
+---
+
+## Appendix: Considerations for Future Enhancements
+
+The following features were considered during design but not implemented to maintain minimal changes. These are documented here for future reference:
+
+### Potential Future Features
+
+1. **Embedded Resources**
+   - Tor binary embedding for fully standalone operation
+   - Default torrc configuration embedding
+   - GeoIP files for relay selection
+   - *Note:* Would increase binary size significantly
+
+2. **Automatic Bridge Selection**
+   - Fallback to bridges if direct connection fails
+   - Built-in bridge configuration
+   - *Note:* Requires bridge database management
+
+3. **Smart Port Selection**
+   - Automatically try next available port if default is busy
+   - *Note:* Users can currently specify port manually
+
+4. **Enhanced Health Checks**
+   - Automated DNS leak testing
+   - Circuit verification tests
+   - Connection anonymity validation
+   - *Note:* Basic health checks already exist in codebase
+
+5. **Resource Integrity Verification**
+   - Checksum verification for any embedded resources
+   - *Note:* Relevant when/if resources are embedded
+
+These features may be implemented in future phases based on user feedback and requirements.

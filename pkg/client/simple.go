@@ -11,6 +11,11 @@ import (
 	"github.com/opd-ai/go-tor/pkg/logger"
 )
 
+const (
+	// ReadinessCheckInterval is the polling interval for WaitUntilReady
+	ReadinessCheckInterval = 100 * time.Millisecond
+)
+
 // SimpleClient provides a zero-configuration Tor client interface.
 type SimpleClient struct {
 	client *Client
@@ -170,7 +175,7 @@ func (c *SimpleClient) IsReady() bool {
 // WaitUntilReady blocks until the client has active circuits or the timeout expires.
 func (c *SimpleClient) WaitUntilReady(timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
-	ticker := time.NewTicker(100 * time.Millisecond)
+	ticker := time.NewTicker(ReadinessCheckInterval)
 	defer ticker.Stop()
 
 	for {
