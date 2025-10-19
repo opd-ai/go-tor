@@ -37,13 +37,13 @@ type Config struct {
 	LogLevel string // Log level: debug, info, warn, error (default: info)
 
 	// Performance tuning (Phase 8.3)
-	EnableConnectionPooling bool          // Enable connection pooling for relay connections
-	ConnectionPoolMaxIdle   int           // Max idle connections per relay (default: 5)
-	ConnectionPoolMaxLife   time.Duration // Max lifetime for pooled connections (default: 10m)
+	EnableConnectionPooling  bool          // Enable connection pooling for relay connections
+	ConnectionPoolMaxIdle    int           // Max idle connections per relay (default: 5)
+	ConnectionPoolMaxLife    time.Duration // Max lifetime for pooled connections (default: 10m)
 	EnableCircuitPrebuilding bool          // Enable circuit prebuilding
-	CircuitPoolMinSize      int           // Minimum circuits to prebuild (default: 2)
-	CircuitPoolMaxSize      int           // Maximum circuits in pool (default: 10)
-	EnableBufferPooling     bool          // Enable buffer pooling for cell operations (default: true)
+	CircuitPoolMinSize       int           // Minimum circuits to prebuild (default: 2)
+	CircuitPoolMaxSize       int           // Maximum circuits in pool (default: 10)
+	EnableBufferPooling      bool          // Enable buffer pooling for cell operations (default: true)
 }
 
 // OnionServiceConfig represents configuration for a single onion service

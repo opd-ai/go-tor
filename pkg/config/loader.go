@@ -20,7 +20,7 @@ func LoadFromFile(path string, cfg *Config) error {
 	if cfg == nil {
 		return fmt.Errorf("config cannot be nil")
 	}
-	
+
 	// Validate path to prevent directory traversal attacks
 	if err := validatePath(path); err != nil {
 		return fmt.Errorf("path validation failed: %w", err)
@@ -227,18 +227,18 @@ func parseBool(s string) bool {
 func validatePath(path string) error {
 	// Clean the path to normalize it
 	cleanPath := filepath.Clean(path)
-	
+
 	// Check for directory traversal attempts
 	if strings.Contains(cleanPath, "..") {
 		return fmt.Errorf("invalid path: directory traversal detected")
 	}
-	
+
 	// Additional check: ensure the clean path doesn't escape the intended directory
 	// by checking if it becomes absolute when it shouldn't be
 	if !filepath.IsAbs(path) && filepath.IsAbs(cleanPath) {
 		return fmt.Errorf("invalid path: attempts to escape working directory")
 	}
-	
+
 	return nil
 }
 
@@ -248,7 +248,7 @@ func SaveToFile(path string, cfg *Config) error {
 	if cfg == nil {
 		return fmt.Errorf("config cannot be nil")
 	}
-	
+
 	// Validate path to prevent directory traversal attacks
 	if err := validatePath(path); err != nil {
 		return fmt.Errorf("path validation failed: %w", err)

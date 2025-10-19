@@ -23,7 +23,7 @@ func newMockRelay(t *testing.T) (*mockRelay, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	
+
 	return &mockRelay{
 		listener: listener,
 		t:        t,
@@ -65,7 +65,7 @@ func (m *mockRelay) serve() {
 			m.t.Logf("Failed to encode VERSIONS response: %v", err)
 			return
 		}
-		
+
 		if _, err := conn.Write(encBuf.Bytes()); err != nil {
 			m.t.Logf("Failed to write VERSIONS response: %v", err)
 			return
@@ -104,13 +104,13 @@ func (m *mockRelay) serve() {
 		// Number of this addresses
 		payload[10] = 0
 		netinfoResponse.Payload = payload
-		
+
 		var netBuf bytes.Buffer
 		if err := netinfoResponse.Encode(&netBuf); err != nil {
 			m.t.Logf("Failed to encode NETINFO response: %v", err)
 			return
 		}
-		
+
 		if _, err := conn.Write(netBuf.Bytes()); err != nil {
 			m.t.Logf("Failed to write NETINFO response: %v", err)
 			return
@@ -175,7 +175,7 @@ func TestSendVersionsEncoding(t *testing.T) {
 	log := logger.NewDefault()
 	cfg := connection.DefaultConfig("test:9001")
 	cfg.Timeout = 5 * time.Second
-	
+
 	torConn := connection.New(cfg, log)
 	h := NewHandshake(torConn, log)
 
@@ -272,19 +272,19 @@ func TestNewHandshakeWithNilLogger(t *testing.T) {
 
 	torConn := connection.New(cfg, nil)
 	h := NewHandshake(torConn, nil)
-	
+
 	if h == nil {
 		t.Fatal("NewHandshake with nil logger returned nil")
 	}
-	
+
 	if h.logger == nil {
 		t.Error("NewHandshake should initialize default logger when nil is passed")
 	}
-	
+
 	if h.conn != torConn {
 		t.Error("NewHandshake did not set connection correctly")
 	}
-	
+
 	if h.negotiatedVersion != 0 {
 		t.Errorf("New handshake should have negotiatedVersion = 0, got %d", h.negotiatedVersion)
 	}

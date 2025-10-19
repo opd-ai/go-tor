@@ -64,9 +64,11 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 - ✅ **Security hardening (zero HIGH/MEDIUM severity issues)**
 
 ### In Progress
-- [ ] **Phase 8.5**: Comprehensive testing and documentation
+- [ ] **Phase 7.4**: Onion services server (hidden service hosting)
 
 ### Recently Completed
+- ✅ **Phase 8.6**: Onion Service Infrastructure Completion
+- ✅ **Phase 8.5**: Comprehensive testing and documentation
 - ✅ **Phase 8.4**: Security hardening and audit
 - ✅ **Phase 8.3**: Performance optimization and tuning (resource pooling, circuit prebuilding)
 - ✅ **Phase 8.2**: Enhanced error handling and resilience
@@ -287,7 +289,8 @@ Current test coverage: ~90% for implemented packages.
 - ✅ Enhanced error handling and resilience (Phase 8.2)
 - ✅ Performance optimization and tuning (Phase 8.3)
 - ✅ Security hardening and audit (Phase 8.4)
-- [ ] Comprehensive testing and documentation (Phase 8.5)
+- ✅ Comprehensive testing and documentation (Phase 8.5)
+- ✅ Onion Service Infrastructure Completion (Phase 8.6)
 
 See [problem statement](docs/ROADMAP.md) for full 30-week roadmap.
 

@@ -88,12 +88,12 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to listen: %w", err)
 	}
-	
+
 	// Use mutex to protect listener assignment
 	s.mu.Lock()
 	s.listener = listener
 	s.mu.Unlock()
-	
+
 	// Signal that listener is ready
 	close(s.listenerReady)
 
@@ -418,13 +418,12 @@ func (s *Server) Address() string {
 func (s *Server) ListenerAddr() net.Addr {
 	// Wait for listener to be ready
 	<-s.listenerReady
-	
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	if s.listener != nil {
 		return s.listener.Addr()
 	}
 	return nil
 }
-
