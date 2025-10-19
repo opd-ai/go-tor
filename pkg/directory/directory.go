@@ -109,6 +109,7 @@ func (c *Client) parseConsensus(r io.Reader) ([]*Relay, error) {
 	var currentRelay *Relay
 	var totalEntries int
 	var malformedEntries int
+	var portParseErrors int
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -134,12 +135,14 @@ func (c *Client) parseConsensus(r io.Reader) ([]*Relay, error) {
 				Address:     parts[6],
 			}
 
-			// Parse ORPort (ignore errors for malformed entries)
+			// Parse ORPort (track errors for SEC-014)
 			if _, err := fmt.Sscanf(parts[7], "%d", &currentRelay.ORPort); err != nil {
+				portParseErrors++
 				c.logger.Debug("Failed to parse ORPort", "error", err, "value", parts[7])
 			}
-			// Parse DirPort (ignore errors for malformed entries)
+			// Parse DirPort (track errors for SEC-014)
 			if _, err := fmt.Sscanf(parts[8], "%d", &currentRelay.DirPort); err != nil {
+				portParseErrors++
 				c.logger.Debug("Failed to parse DirPort", "error", err, "value", parts[8])
 			}
 		}
@@ -169,9 +172,16 @@ func (c *Client) parseConsensus(r io.Reader) ([]*Relay, error) {
 			malformedEntries, totalEntries)
 	}
 
-	if malformedEntries > 0 {
-		c.logger.Debug("Consensus parsing completed with some malformed entries",
-			"malformed", malformedEntries, "total", totalEntries, "valid", len(relays))
+	// Warn if excessive port parse errors (SEC-014)
+	if totalEntries > 0 && portParseErrors > totalEntries/5 {
+		c.logger.Warn("Excessive port parse errors in consensus",
+			"port_errors", portParseErrors, "total", totalEntries)
+	}
+
+	if malformedEntries > 0 || portParseErrors > 0 {
+		c.logger.Debug("Consensus parsing completed with some errors",
+			"malformed", malformedEntries, "port_errors", portParseErrors, 
+			"total", totalEntries, "valid", len(relays))
 	}
 
 	return relays, nil
