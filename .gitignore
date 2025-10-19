@@ -44,3 +44,17 @@ go.work
 # Profiling results
 /profiles/
 errors-demo
+
+# Example binaries
+examples/*/onion-service-demo
+examples/*/phase*-demo
+examples/*/config-demo
+examples/*/health-demo
+examples/*/performance-demo
+examples/*/hsdir-demo
+examples/*/intro-demo
+examples/*/descriptor-demo
+examples/*/rendezvous-demo
+examples/*/basic-usage
+examples/*/phase*-integration
+examples/*/onion-address-demo
