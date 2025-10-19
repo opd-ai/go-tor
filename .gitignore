@@ -43,3 +43,6 @@ go.work
 
 # Profiling results
 /profiles/
+
+# Audit reports (generated artifacts)
+audit-reports/*.csv
