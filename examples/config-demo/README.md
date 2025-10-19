@@ -392,7 +392,7 @@ LogLevel info
 - [Main Documentation](../../README.md)
 - [Configuration Package](../../pkg/config/)
 - [Sample Configuration](../torrc.sample)
-- [Phase 8.1 Implementation Report](../../PHASE81_CONFIG_LOADER_REPORT.md)
+- [Historical Phase Reports](../../archive/2025/PHASE_REPORTS.md)
 
 ## License
 

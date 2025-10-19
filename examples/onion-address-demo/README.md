@@ -117,6 +117,6 @@ encoded := addr.Encode()
 
 ## See Also
 
-- [PHASE73_ONION_SERVICES_REPORT.md](../../PHASE73_ONION_SERVICES_REPORT.md) - Complete implementation details
+- [Historical Phase Reports](../../archive/2025/PHASE_REPORTS.md) - Consolidated implementation details
 - [pkg/onion/onion.go](../../pkg/onion/onion.go) - Package source code
 - [pkg/onion/onion_test.go](../../pkg/onion/onion_test.go) - Test suite
