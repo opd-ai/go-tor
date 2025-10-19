@@ -264,3 +264,98 @@ func TestDefaultAuthorities(t *testing.T) {
 		}
 	}
 }
+
+// SPEC-003: Tests for enhanced consensus validation
+
+func TestValidateConsensusMetadata(t *testing.T) {
+	now := time.Now()
+	
+	tests := []struct {
+		name    string
+		meta    *ConsensusMetadata
+		wantErr bool
+	}{
+		{
+			name: "valid_consensus",
+			meta: &ConsensusMetadata{
+				ValidAfter:  now.Add(-1 * time.Hour),
+				FreshUntil:  now.Add(1 * time.Hour),
+				ValidUntil:  now.Add(3 * time.Hour),
+				Signatures:  5,
+				Authorities: 9,
+			},
+			wantErr: false,
+		},
+		{
+			name: "insufficient_signatures",
+			meta: &ConsensusMetadata{
+				ValidAfter:  now.Add(-1 * time.Hour),
+				FreshUntil:  now.Add(1 * time.Hour),
+				ValidUntil:  now.Add(3 * time.Hour),
+				Signatures:  1,
+				Authorities: 9,
+			},
+			wantErr: true,
+		},
+		{
+			name: "insufficient_authorities",
+			meta: &ConsensusMetadata{
+				ValidAfter:  now.Add(-1 * time.Hour),
+				FreshUntil:  now.Add(1 * time.Hour),
+				ValidUntil:  now.Add(3 * time.Hour),
+				Signatures:  5,
+				Authorities: 2,
+			},
+			wantErr: true,
+		},
+		{
+			name: "expired_consensus",
+			meta: &ConsensusMetadata{
+				ValidAfter:  now.Add(-5 * time.Hour),
+				FreshUntil:  now.Add(-3 * time.Hour),
+				ValidUntil:  now.Add(-1 * time.Hour),
+				Signatures:  5,
+				Authorities: 9,
+			},
+			wantErr: true,
+		},
+		{
+			name: "future_consensus",
+			meta: &ConsensusMetadata{
+				ValidAfter:  now.Add(2 * time.Hour),
+				FreshUntil:  now.Add(3 * time.Hour),
+				ValidUntil:  now.Add(5 * time.Hour),
+				Signatures:  5,
+				Authorities: 9,
+			},
+			wantErr: true,
+		},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateConsensusMetadata(tt.meta)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateConsensusMetadata() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestConsensusMetadataStructure(t *testing.T) {
+	// Test that ConsensusMetadata can be created and used
+	meta := &ConsensusMetadata{
+		ValidAfter:  time.Now(),
+		FreshUntil:  time.Now().Add(1 * time.Hour),
+		ValidUntil:  time.Now().Add(3 * time.Hour),
+		Signatures:  5,
+		Authorities: 9,
+	}
+	
+	if meta.Signatures != 5 {
+		t.Errorf("Expected 5 signatures, got %d", meta.Signatures)
+	}
+	if meta.Authorities != 9 {
+		t.Errorf("Expected 9 authorities, got %d", meta.Authorities)
+	}
+}

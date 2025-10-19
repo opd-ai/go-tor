@@ -18,6 +18,13 @@ const (
 	// Consensus validation thresholds (SEC-004, SEC-014)
 	maxMalformedEntryRate = 10 // Reject if >10% of entries are malformed
 	maxPortParseErrorRate = 20 // Warn if >20% of entries have port parse errors
+	
+	// SPEC-003: Enhanced consensus signature validation thresholds
+	// These constants support future implementation of multi-signature threshold validation
+	// per dir-spec.txt section 3.4 (Voting and consensus signature requirements)
+	minDirectoryAuthorities  = 3 // Minimum authorities for valid consensus
+	minSignatureThreshold    = 2 // Minimum signatures required (future: implement proper quorum)
+	maxClockSkew             = 30 * time.Minute // Maximum allowed clock skew for consensus timestamps
 )
 
 // Default directory authority addresses (hardcoded fallback directories)
@@ -250,4 +257,52 @@ func (r *Relay) GetNtorOnionKey() []byte {
 // HasValidKeys returns true if the relay has both required cryptographic keys (SPEC-001)
 func (r *Relay) HasValidKeys() bool {
 	return len(r.IdentityKey) == 32 && len(r.NtorOnionKey) == 32
+}
+
+// SPEC-003: Enhanced consensus validation infrastructure
+// These types and methods provide hooks for implementing full multi-signature
+// threshold validation per dir-spec.txt section 3.4
+
+// ConsensusMetadata contains metadata about a consensus document (SPEC-003)
+// Future enhancement: parse and validate directory authority signatures
+type ConsensusMetadata struct {
+	ValidAfter  time.Time
+	FreshUntil  time.Time
+	ValidUntil  time.Time
+	Signatures  int // Number of authority signatures (future: validate each)
+	Authorities int // Number of authorities in consensus
+}
+
+// ValidateConsensusMetadata performs enhanced validation on consensus metadata (SPEC-003)
+// This provides infrastructure for implementing multi-signature threshold validation
+// Current implementation provides basic timing validation; future versions should:
+// - Parse and verify all directory authority signatures
+// - Validate signature threshold meets quorum requirements  
+// - Check authority keys against hardcoded trusted set
+// - Implement proper Byzantine fault tolerance
+func ValidateConsensusMetadata(meta *ConsensusMetadata) error {
+	now := time.Now()
+	
+	// Check clock skew
+	if meta.ValidAfter.After(now.Add(maxClockSkew)) {
+		return fmt.Errorf("consensus valid-after time is too far in the future")
+	}
+	
+	// Check expiration
+	if meta.ValidUntil.Before(now.Add(-maxClockSkew)) {
+		return fmt.Errorf("consensus has expired")
+	}
+	
+	// Basic signature count validation
+	// Future enhancement: implement proper quorum calculation per dir-spec.txt
+	if meta.Signatures < minSignatureThreshold {
+		return fmt.Errorf("insufficient signatures: %d < %d", meta.Signatures, minSignatureThreshold)
+	}
+	
+	// Authority count validation
+	if meta.Authorities < minDirectoryAuthorities {
+		return fmt.Errorf("insufficient authorities: %d < %d", meta.Authorities, minDirectoryAuthorities)
+	}
+	
+	return nil
 }

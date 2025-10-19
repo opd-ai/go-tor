@@ -41,11 +41,13 @@ func (s State) String() string {
 
 // Circuit represents a Tor circuit
 type Circuit struct {
-	ID        uint32
-	State     State
-	CreatedAt time.Time
-	Hops      []*Hop
-	mu        sync.RWMutex
+	ID              uint32
+	State           State
+	CreatedAt       time.Time
+	Hops            []*Hop
+	mu              sync.RWMutex
+	paddingEnabled  bool          // SPEC-002: Enable/disable circuit padding
+	paddingInterval time.Duration // SPEC-002: Interval for padding cells
 }
 
 // Hop represents a single hop in a circuit (one relay)
@@ -59,10 +61,12 @@ type Hop struct {
 // NewCircuit creates a new circuit with the given ID
 func NewCircuit(id uint32) *Circuit {
 	return &Circuit{
-		ID:        id,
-		State:     StateBuilding,
-		CreatedAt: time.Now(),
-		Hops:      make([]*Hop, 0, 3), // Typical circuit has 3 hops
+		ID:              id,
+		State:           StateBuilding,
+		CreatedAt:       time.Now(),
+		Hops:            make([]*Hop, 0, 3), // Typical circuit has 3 hops
+		paddingEnabled:  true,                // SPEC-002: Enable padding by default
+		paddingInterval: 0,                   // SPEC-002: 0 = adaptive (future enhancement)
 	}
 }
 
@@ -232,4 +236,63 @@ func (m *Manager) IsClosed() bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.closed
+}
+
+// SPEC-002: Circuit padding configuration and control
+// These methods provide infrastructure for enhanced circuit padding per padding-spec.txt
+// Current implementation provides basic padding support with hooks for future adaptive padding
+
+// SetPaddingEnabled enables or disables circuit padding (SPEC-002)
+// When enabled, circuits will send PADDING cells according to padding policy
+func (c *Circuit) SetPaddingEnabled(enabled bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.paddingEnabled = enabled
+}
+
+// IsPaddingEnabled returns whether padding is enabled for this circuit (SPEC-002)
+func (c *Circuit) IsPaddingEnabled() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.paddingEnabled
+}
+
+// SetPaddingInterval sets the interval for padding cells (SPEC-002)
+// interval: time between padding cells (0 = adaptive/traffic-based)
+// This provides infrastructure for implementing adaptive padding per padding-spec.txt
+func (c *Circuit) SetPaddingInterval(interval time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.paddingInterval = interval
+}
+
+// GetPaddingInterval returns the current padding interval (SPEC-002)
+func (c *Circuit) GetPaddingInterval() time.Duration {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.paddingInterval
+}
+
+// ShouldSendPadding determines if a padding cell should be sent (SPEC-002)
+// This is a hook for implementing adaptive padding logic per padding-spec.txt
+// Current implementation returns basic policy; future versions can implement:
+// - Traffic pattern analysis
+// - Time-based adaptive padding  
+// - Connection state-dependent padding
+// - Burst-detection and response
+func (c *Circuit) ShouldSendPadding() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	
+	// Basic policy: padding enabled and circuit is open
+	if !c.paddingEnabled || c.State != StateOpen {
+		return false
+	}
+	
+	// Future enhancement: implement adaptive logic here per padding-spec.txt
+	// - Analyze traffic patterns
+	// - Adjust padding based on activity
+	// - Implement timing-based policies
+	
+	return true
 }
