@@ -13,7 +13,7 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha1"
+	"crypto/sha1" // #nosec G505 - SHA1 required by Tor protocol specification (tor-spec.txt)
 	"crypto/sha256"
 	"fmt"
 	"io"

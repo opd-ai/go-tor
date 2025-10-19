@@ -273,7 +273,8 @@ func (m *Manager) Close() error {
 		defer m.mu.Unlock()
 
 		for id, stream := range m.streams {
-			stream.Close()
+			// Best-effort close during shutdown - errors are logged by the stream itself
+			stream.Close() // nolint:errcheck
 			delete(m.streams, id)
 		}
 

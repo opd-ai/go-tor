@@ -112,11 +112,12 @@ func simulateRetryLogic() {
 		if errors.IsRetryable(err) {
 			// Cap maximum backoff to prevent integer overflow
 			// Max power of 10 gives us 1024 seconds (~17 minutes)
-			const maxBackoffPower = 10
-			backoffPower := uint(i)
+			const maxBackoffPower uint = 10
+			backoffPower := uint(i) // #nosec G115 - immediately capped to maxBackoffPower
 			if backoffPower > maxBackoffPower {
 				backoffPower = maxBackoffPower
 			}
+			// Safe conversion: backoffPower is capped at maxBackoffPower (10)
 			backoff := time.Duration(1<<backoffPower) * time.Second
 			fmt.Printf("  -> Retrying after %v backoff\n", backoff)
 		} else {

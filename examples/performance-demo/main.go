@@ -73,13 +73,13 @@ func demonstrateCircuitPooling() {
 	log := logger.NewDefault()
 
 	// Mock circuit builder
-	buildCount := 0
+	buildCount := uint32(0)
 	builder := func(ctx context.Context) (*circuit.Circuit, error) {
 		buildCount++
 		// Simulate circuit build time
 		time.Sleep(10 * time.Millisecond)
 		circ := &circuit.Circuit{
-			ID: uint32(buildCount),
+			ID: buildCount,
 		}
 		circ.SetState(circuit.StateOpen)
 		return circ, nil
