@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/opd-ai/go-tor/pkg/logger"
 )
 
 // TestParseV3Address tests parsing of v3 onion addresses
@@ -600,5 +602,322 @@ func BenchmarkComputeBlindedPubkey(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		ComputeBlindedPubkey(pubkey, timePeriod)
+	}
+}
+
+// TestHSDirSelection tests HSDir selection algorithm
+func TestHSDirSelection(t *testing.T) {
+	log := logger.NewDefault()
+	hsdir := NewHSDir(log)
+
+	// Create mock HSDirs
+	hsdirs := []*HSDirectory{
+		{Fingerprint: "0000000000000000000000000000000000000001", Address: "10.0.0.1", ORPort: 9001, HSDir: true},
+		{Fingerprint: "0000000000000000000000000000000000000002", Address: "10.0.0.2", ORPort: 9001, HSDir: true},
+		{Fingerprint: "0000000000000000000000000000000000000003", Address: "10.0.0.3", ORPort: 9001, HSDir: true},
+		{Fingerprint: "0000000000000000000000000000000000000004", Address: "10.0.0.4", ORPort: 9001, HSDir: true},
+		{Fingerprint: "0000000000000000000000000000000000000005", Address: "10.0.0.5", ORPort: 9001, HSDir: true},
+	}
+
+	// Generate a random descriptor ID
+	descriptorID := make([]byte, 32)
+	rand.Read(descriptorID)
+
+	// Test replica 0
+	selected := hsdir.SelectHSDirs(descriptorID, hsdirs, 0)
+	if len(selected) != 3 {
+		t.Errorf("Expected 3 selected HSDirs, got %d", len(selected))
+	}
+
+	// Test replica 1 - should select different HSDirs
+	selected1 := hsdir.SelectHSDirs(descriptorID, hsdirs, 1)
+	if len(selected1) != 3 {
+		t.Errorf("Expected 3 selected HSDirs for replica 1, got %d", len(selected1))
+	}
+
+	// Test with fewer HSDirs than needed
+	smallHSDirs := hsdirs[:2]
+	selected2 := hsdir.SelectHSDirs(descriptorID, smallHSDirs, 0)
+	if len(selected2) != 2 {
+		t.Errorf("Expected 2 selected HSDirs (all available), got %d", len(selected2))
+	}
+
+	// Test with empty HSDir list
+	selected3 := hsdir.SelectHSDirs(descriptorID, []*HSDirectory{}, 0)
+	if selected3 != nil {
+		t.Error("Expected nil for empty HSDir list")
+	}
+}
+
+// TestComputeReplicaDescriptorID tests replica descriptor ID computation
+func TestComputeReplicaDescriptorID(t *testing.T) {
+	baseID := make([]byte, 32)
+	rand.Read(baseID)
+
+	// Replica 0 and replica 1 should produce different IDs
+	replica0 := ComputeReplicaDescriptorID(baseID, 0)
+	replica1 := ComputeReplicaDescriptorID(baseID, 1)
+
+	if bytes.Equal(replica0, replica1) {
+		t.Error("Expected different descriptor IDs for different replicas")
+	}
+
+	// Same replica should produce same ID
+	replica0_again := ComputeReplicaDescriptorID(baseID, 0)
+	if !bytes.Equal(replica0, replica0_again) {
+		t.Error("Expected deterministic descriptor ID computation")
+	}
+
+	// Check length
+	if len(replica0) != 32 {
+		t.Errorf("Expected descriptor ID length 32, got %d", len(replica0))
+	}
+}
+
+// TestComputeXORDistance tests XOR distance computation
+func TestComputeXORDistance(t *testing.T) {
+	tests := []struct {
+		name     string
+		a        []byte
+		b        []byte
+		expected []byte
+	}{
+		{
+			name:     "same values",
+			a:        []byte{0xFF, 0x00, 0xAA},
+			b:        []byte{0xFF, 0x00, 0xAA},
+			expected: []byte{0x00, 0x00, 0x00},
+		},
+		{
+			name:     "different values",
+			a:        []byte{0xFF, 0x00},
+			b:        []byte{0x00, 0xFF},
+			expected: []byte{0xFF, 0xFF},
+		},
+		{
+			name:     "partial match",
+			a:        []byte{0xF0, 0x0F},
+			b:        []byte{0x0F, 0xF0},
+			expected: []byte{0xFF, 0xFF},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := computeXORDistance(tt.a, tt.b)
+			if !bytes.Equal(result, tt.expected) {
+				t.Errorf("Expected %v, got %v", tt.expected, result)
+			}
+		})
+	}
+}
+
+// TestCompareBytes tests byte comparison
+func TestCompareBytes(t *testing.T) {
+	tests := []struct {
+		name     string
+		a        []byte
+		b        []byte
+		expected int
+	}{
+		{
+			name:     "equal",
+			a:        []byte{0x01, 0x02, 0x03},
+			b:        []byte{0x01, 0x02, 0x03},
+			expected: 0,
+		},
+		{
+			name:     "a less than b",
+			a:        []byte{0x01, 0x02},
+			b:        []byte{0x01, 0x03},
+			expected: -1,
+		},
+		{
+			name:     "a greater than b",
+			a:        []byte{0x02, 0x01},
+			b:        []byte{0x01, 0x01},
+			expected: 1,
+		},
+		{
+			name:     "a shorter than b",
+			a:        []byte{0x01},
+			b:        []byte{0x01, 0x02},
+			expected: -1,
+		},
+		{
+			name:     "a longer than b",
+			a:        []byte{0x01, 0x02},
+			b:        []byte{0x01},
+			expected: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := compareBytes(tt.a, tt.b)
+			if result != tt.expected {
+				t.Errorf("Expected %d, got %d", tt.expected, result)
+			}
+		})
+	}
+}
+
+// TestHSDirFetchDescriptor tests descriptor fetching from HSDirs
+func TestHSDirFetchDescriptor(t *testing.T) {
+	log := logger.NewDefault()
+	hsdir := NewHSDir(log)
+
+	// Parse a valid onion address
+	addr, err := ParseAddress("vww6ybal4bd7szmgncyruucpgfkqahzddi37ktceo3ah7ngmcopnpyyd.onion")
+	if err != nil {
+		t.Fatalf("Failed to parse address: %v", err)
+	}
+
+	// Create mock HSDirs
+	hsdirs := []*HSDirectory{
+		{Fingerprint: "0000000000000000000000000000000000000001", Address: "10.0.0.1", ORPort: 9001, HSDir: true},
+		{Fingerprint: "0000000000000000000000000000000000000002", Address: "10.0.0.2", ORPort: 9001, HSDir: true},
+		{Fingerprint: "0000000000000000000000000000000000000003", Address: "10.0.0.3", ORPort: 9001, HSDir: true},
+	}
+
+	ctx := context.Background()
+
+	// Fetch descriptor
+	desc, err := hsdir.FetchDescriptor(ctx, addr, hsdirs)
+	if err != nil {
+		t.Fatalf("Failed to fetch descriptor: %v", err)
+	}
+
+	// Verify descriptor properties
+	if desc.Version != 3 {
+		t.Errorf("Expected version 3, got %d", desc.Version)
+	}
+
+	if desc.Address == nil {
+		t.Error("Expected address to be set")
+	}
+
+	if len(desc.BlindedPubkey) == 0 {
+		t.Error("Expected blinded pubkey to be set")
+	}
+
+	if len(desc.DescriptorID) != 32 {
+		t.Errorf("Expected descriptor ID length 32, got %d", len(desc.DescriptorID))
+	}
+
+	if desc.Lifetime != 3*time.Hour {
+		t.Errorf("Expected lifetime 3h, got %v", desc.Lifetime)
+	}
+}
+
+// TestClientUpdateHSDirs tests updating HSDir list in client
+func TestClientUpdateHSDirs(t *testing.T) {
+	log := logger.NewDefault()
+	client := NewClient(log)
+
+	// Initially should have no HSDirs
+	if len(client.consensus) != 0 {
+		t.Error("Expected empty consensus initially")
+	}
+
+	// Update with HSDirs
+	hsdirs := []*HSDirectory{
+		{Fingerprint: "0000000000000000000000000000000000000001", Address: "10.0.0.1", ORPort: 9001, HSDir: true},
+		{Fingerprint: "0000000000000000000000000000000000000002", Address: "10.0.0.2", ORPort: 9001, HSDir: true},
+	}
+
+	client.UpdateHSDirs(hsdirs)
+
+	if len(client.consensus) != 2 {
+		t.Errorf("Expected 2 HSDirs in consensus, got %d", len(client.consensus))
+	}
+}
+
+// TestClientGetDescriptorWithHSDirs tests descriptor fetching with HSDirs available
+func TestClientGetDescriptorWithHSDirs(t *testing.T) {
+	log := logger.NewDefault()
+	client := NewClient(log)
+
+	// Parse a valid onion address
+	addr, err := ParseAddress("vww6ybal4bd7szmgncyruucpgfkqahzddi37ktceo3ah7ngmcopnpyyd.onion")
+	if err != nil {
+		t.Fatalf("Failed to parse address: %v", err)
+	}
+
+	// Update with HSDirs
+	hsdirs := []*HSDirectory{
+		{Fingerprint: "0000000000000000000000000000000000000001", Address: "10.0.0.1", ORPort: 9001, HSDir: true},
+		{Fingerprint: "0000000000000000000000000000000000000002", Address: "10.0.0.2", ORPort: 9001, HSDir: true},
+		{Fingerprint: "0000000000000000000000000000000000000003", Address: "10.0.0.3", ORPort: 9001, HSDir: true},
+	}
+	client.UpdateHSDirs(hsdirs)
+
+	ctx := context.Background()
+
+	// First fetch - should use HSDir protocol and cache result
+	desc1, err := client.GetDescriptor(ctx, addr)
+	if err != nil {
+		t.Fatalf("Failed to get descriptor: %v", err)
+	}
+
+	if desc1 == nil {
+		t.Fatal("Expected descriptor to be returned")
+	}
+
+	// Second fetch - should hit cache
+	desc2, err := client.GetDescriptor(ctx, addr)
+	if err != nil {
+		t.Fatalf("Failed to get descriptor from cache: %v", err)
+	}
+
+	// Should be the same descriptor from cache
+	if desc1 != desc2 {
+		t.Error("Expected same descriptor instance from cache")
+	}
+}
+
+// BenchmarkHSDirSelection benchmarks HSDir selection
+func BenchmarkHSDirSelection(b *testing.B) {
+	log := logger.NewDefault()
+	hsdir := NewHSDir(log)
+
+	// Create many mock HSDirs
+	hsdirs := make([]*HSDirectory, 100)
+	for i := 0; i < 100; i++ {
+		hsdirs[i] = &HSDirectory{
+			Fingerprint: string(make([]byte, 40)),
+			Address:     "10.0.0.1",
+			ORPort:      9001,
+			HSDir:       true,
+		}
+	}
+
+	descriptorID := make([]byte, 32)
+	rand.Read(descriptorID)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		hsdir.SelectHSDirs(descriptorID, hsdirs, 0)
+	}
+}
+
+// BenchmarkFetchDescriptor benchmarks descriptor fetching
+func BenchmarkFetchDescriptor(b *testing.B) {
+	log := logger.NewDefault()
+	hsdir := NewHSDir(log)
+
+	addr, _ := ParseAddress("vww6ybal4bd7szmgncyruucpgfkqahzddi37ktceo3ah7ngmcopnpyyd.onion")
+
+	hsdirs := []*HSDirectory{
+		{Fingerprint: "0000000000000000000000000000000000000001", Address: "10.0.0.1", ORPort: 9001, HSDir: true},
+		{Fingerprint: "0000000000000000000000000000000000000002", Address: "10.0.0.2", ORPort: 9001, HSDir: true},
+		{Fingerprint: "0000000000000000000000000000000000000003", Address: "10.0.0.3", ORPort: 9001, HSDir: true},
+	}
+
+	ctx := context.Background()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		hsdir.FetchDescriptor(ctx, addr, hsdirs)
 	}
 }

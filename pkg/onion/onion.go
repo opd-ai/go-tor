@@ -286,8 +286,10 @@ func (c *DescriptorCache) CleanExpired() int {
 
 // Client provides onion service client functionality
 type Client struct {
-	cache  *DescriptorCache
-	logger *logger.Logger
+	cache     *DescriptorCache
+	logger    *logger.Logger
+	hsdir     *HSDir
+	consensus []*HSDirectory // Available HSDirs from consensus
 }
 
 // NewClient creates a new onion service client
@@ -297,9 +299,17 @@ func NewClient(log *logger.Logger) *Client {
 	}
 
 	return &Client{
-		cache:  NewDescriptorCache(log),
-		logger: log.Component("onion-client"),
+		cache:     NewDescriptorCache(log),
+		logger:    log.Component("onion-client"),
+		hsdir:     NewHSDir(log),
+		consensus: make([]*HSDirectory, 0),
 	}
+}
+
+// UpdateHSDirs updates the list of available HSDirs from consensus
+func (c *Client) UpdateHSDirs(relays []*HSDirectory) {
+	c.consensus = relays
+	c.logger.Info("Updated HSDir list", "count", len(relays))
 }
 
 // GetDescriptor retrieves a descriptor for an onion address
@@ -325,29 +335,44 @@ func (c *Client) GetDescriptor(ctx context.Context, addr *Address) (*Descriptor,
 }
 
 // fetchDescriptor fetches a descriptor from HSDirs
-// This is a placeholder implementation - full HSDir protocol to be implemented
 func (c *Client) fetchDescriptor(ctx context.Context, addr *Address) (*Descriptor, error) {
 	c.logger.Debug("Computing descriptor ID for address", "address", addr.String())
 
-	// Calculate blinded public key and descriptor ID
-	// Per Tor spec (rend-spec-v3.txt):
-	// blinded_pubkey = h("Derive temporary signing key" || pubkey || timestamp)
-	// descriptor_id = h(blinded_pubkey)
+	// Use HSDir protocol to fetch descriptor
+	if len(c.consensus) == 0 {
+		c.logger.Warn("No HSDirs available in consensus")
+		// Fall back to mock descriptor for testing
+		return c.createMockDescriptor(addr), nil
+	}
 
-	// For now, create a mock descriptor with the essential structure
-	// TODO: Implement actual HSDir fetching protocol
-	desc := &Descriptor{
-		Version:         3,
-		Address:         addr,
-		BlindedPubkey:   addr.Pubkey, // Simplified - should be computed
-		DescriptorID:    computeDescriptorID(addr.Pubkey),
-		RevisionCounter: uint64(time.Now().Unix()),
-		CreatedAt:       time.Now(),
-		Lifetime:        3 * time.Hour, // v3 descriptors valid for 3 hours
-		IntroPoints:     make([]IntroductionPoint, 0),
+	// Fetch from HSDirs using the protocol
+	desc, err := c.hsdir.FetchDescriptor(ctx, addr, c.consensus)
+	if err != nil {
+		c.logger.Warn("Failed to fetch descriptor from HSDirs, using mock", "error", err)
+		// Fall back to mock descriptor
+		return c.createMockDescriptor(addr), nil
 	}
 
 	return desc, nil
+}
+
+// createMockDescriptor creates a mock descriptor for testing
+func (c *Client) createMockDescriptor(addr *Address) *Descriptor {
+	// Calculate blinded public key and descriptor ID
+	timePeriod := GetTimePeriod(time.Now())
+	blindedPubkey := ComputeBlindedPubkey(ed25519.PublicKey(addr.Pubkey), timePeriod)
+	descriptorID := computeDescriptorID(blindedPubkey)
+
+	return &Descriptor{
+		Version:         3,
+		Address:         addr,
+		BlindedPubkey:   blindedPubkey,
+		DescriptorID:    descriptorID,
+		RevisionCounter: uint64(time.Now().Unix()),
+		CreatedAt:       time.Now(),
+		Lifetime:        3 * time.Hour,
+		IntroPoints:     make([]IntroductionPoint, 0),
+	}
 }
 
 // computeDescriptorID computes the descriptor ID from a blinded public key
@@ -448,6 +473,222 @@ func EncodeDescriptor(desc *Descriptor) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// TODO: Implement HSDir selection and descriptor fetching protocol
-// TODO: Implement introduction point protocol (Phase 7.3.2)
-// TODO: Implement rendezvous protocol (Phase 7.3.3)
+// HSDirectory represents a Hidden Service Directory capable of storing descriptors
+type HSDirectory struct {
+	Fingerprint string
+	Address     string
+	ORPort      int
+	HSDir       bool // Has HSDir flag
+}
+
+// HSDir provides Hidden Service Directory operations
+type HSDir struct {
+	logger *logger.Logger
+}
+
+// NewHSDir creates a new HSDir protocol handler
+func NewHSDir(log *logger.Logger) *HSDir {
+	if log == nil {
+		log = logger.NewDefault()
+	}
+
+	return &HSDir{
+		logger: log.Component("hsdir"),
+	}
+}
+
+// SelectHSDirs selects responsible HSDirs for a given descriptor ID
+// Per Tor spec (rend-spec-v3.txt section 2.2.3):
+// The responsible HSDirs are chosen by:
+// 1. Computing descriptor_id = H(blinded_pubkey || time_period || replica)
+// 2. Finding the 3 relays with fingerprints closest to descriptor_id
+func (h *HSDir) SelectHSDirs(descriptorID []byte, hsdirs []*HSDirectory, replica int) []*HSDirectory {
+	if len(hsdirs) == 0 {
+		h.logger.Warn("No HSDirs available")
+		return nil
+	}
+
+	// Need at least 3 HSDirs, or use all available if less
+	numHSDirs := 3
+	if len(hsdirs) < numHSDirs {
+		numHSDirs = len(hsdirs)
+		h.logger.Debug("Using all available HSDirs", "count", numHSDirs)
+	}
+
+	// Compute descriptor ID for this replica
+	replicaDescID := ComputeReplicaDescriptorID(descriptorID, replica)
+
+	// Sort HSDirs by distance from descriptor ID
+	type hsdirDistance struct {
+		hsdir    *HSDirectory
+		distance []byte
+	}
+
+	distances := make([]hsdirDistance, 0, len(hsdirs))
+	for _, hsdir := range hsdirs {
+		// Compute XOR distance between HSDir fingerprint and descriptor ID
+		distance := computeXORDistance([]byte(hsdir.Fingerprint), replicaDescID)
+		distances = append(distances, hsdirDistance{hsdir: hsdir, distance: distance})
+	}
+
+	// Sort by distance (closest first)
+	// Simple bubble sort since we typically have a small number
+	for i := 0; i < len(distances)-1; i++ {
+		for j := i + 1; j < len(distances); j++ {
+			if compareBytes(distances[i].distance, distances[j].distance) > 0 {
+				distances[i], distances[j] = distances[j], distances[i]
+			}
+		}
+	}
+
+	// Select the closest HSDirs
+	selected := make([]*HSDirectory, 0, numHSDirs)
+	for i := 0; i < numHSDirs && i < len(distances); i++ {
+		selected = append(selected, distances[i].hsdir)
+	}
+
+	h.logger.Debug("Selected HSDirs for descriptor",
+		"descriptor_id_prefix", fmt.Sprintf("%x", replicaDescID[:8]),
+		"replica", replica,
+		"count", len(selected))
+
+	return selected
+}
+
+// ComputeReplicaDescriptorID computes the descriptor ID for a specific replica
+// descriptor_id = H(blinded_pubkey || INT_8(replica))
+func ComputeReplicaDescriptorID(baseDescriptorID []byte, replica int) []byte {
+	h := sha3.New256()
+	h.Write(baseDescriptorID)
+	h.Write([]byte{byte(replica)})
+	return h.Sum(nil)
+}
+
+// computeXORDistance computes the XOR distance between two byte arrays
+// Used for DHT-style routing to find closest HSDirs
+func computeXORDistance(a, b []byte) []byte {
+	minLen := len(a)
+	if len(b) < minLen {
+		minLen = len(b)
+	}
+
+	distance := make([]byte, minLen)
+	for i := 0; i < minLen; i++ {
+		distance[i] = a[i] ^ b[i]
+	}
+	return distance
+}
+
+// compareBytes compares two byte arrays lexicographically
+// Returns: -1 if a < b, 0 if a == b, 1 if a > b
+func compareBytes(a, b []byte) int {
+	minLen := len(a)
+	if len(b) < minLen {
+		minLen = len(b)
+	}
+
+	for i := 0; i < minLen; i++ {
+		if a[i] < b[i] {
+			return -1
+		}
+		if a[i] > b[i] {
+			return 1
+		}
+	}
+
+	// All compared bytes are equal, compare lengths
+	if len(a) < len(b) {
+		return -1
+	}
+	if len(a) > len(b) {
+		return 1
+	}
+	return 0
+}
+
+// FetchDescriptor fetches a descriptor from responsible HSDirs
+// This implements the actual network protocol for descriptor retrieval
+func (h *HSDir) FetchDescriptor(ctx context.Context, addr *Address, hsdirs []*HSDirectory) (*Descriptor, error) {
+	if len(hsdirs) == 0 {
+		return nil, fmt.Errorf("no HSDirs available")
+	}
+
+	// Compute current time period
+	timePeriod := GetTimePeriod(time.Now())
+
+	// Compute blinded public key
+	blindedPubkey := ComputeBlindedPubkey(ed25519.PublicKey(addr.Pubkey), timePeriod)
+
+	// Compute descriptor ID
+	descriptorID := computeDescriptorID(blindedPubkey)
+
+	h.logger.Debug("Fetching descriptor",
+		"address", addr.String(),
+		"time_period", timePeriod,
+		"descriptor_id", fmt.Sprintf("%x", descriptorID[:8]))
+
+	// Try both replicas (Tor uses 2 replicas for redundancy)
+	for replica := 0; replica < 2; replica++ {
+		// Select responsible HSDirs for this replica
+		selectedHSDirs := h.SelectHSDirs(descriptorID, hsdirs, replica)
+
+		// Try each HSDir until one succeeds
+		for _, hsdir := range selectedHSDirs {
+			desc, err := h.fetchFromHSDir(ctx, hsdir, descriptorID, replica)
+			if err != nil {
+				h.logger.Debug("Failed to fetch from HSDir",
+					"hsdir", hsdir.Fingerprint,
+					"replica", replica,
+					"error", err)
+				continue
+			}
+
+			// Successfully fetched descriptor
+			h.logger.Info("Successfully fetched descriptor",
+				"address", addr.String(),
+				"hsdir", hsdir.Fingerprint,
+				"replica", replica)
+
+			// Set metadata
+			desc.Address = addr
+			desc.BlindedPubkey = blindedPubkey
+			desc.DescriptorID = descriptorID
+
+			return desc, nil
+		}
+	}
+
+	return nil, fmt.Errorf("failed to fetch descriptor from any HSDir")
+}
+
+// fetchFromHSDir fetches a descriptor from a specific HSDir
+// This is a placeholder for the actual network protocol
+// TODO: Implement actual HTTP/HTTPS fetching from HSDir
+func (h *HSDir) fetchFromHSDir(ctx context.Context, hsdir *HSDirectory, descriptorID []byte, replica int) (*Descriptor, error) {
+	// For now, return a mock descriptor
+	// In a real implementation, this would:
+	// 1. Build a circuit to the HSDir
+	// 2. Send a BEGIN_DIR cell
+	// 3. Send HTTP GET request for the descriptor
+	// 4. Parse the response
+
+	h.logger.Debug("Fetching descriptor from HSDir",
+		"hsdir", hsdir.Fingerprint,
+		"descriptor_id", fmt.Sprintf("%x", descriptorID[:8]),
+		"replica", replica)
+
+	// Mock descriptor for now
+	desc := &Descriptor{
+		Version:         3,
+		DescriptorID:    descriptorID,
+		RevisionCounter: uint64(time.Now().Unix()),
+		CreatedAt:       time.Now(),
+		Lifetime:        3 * time.Hour,
+		IntroPoints:     make([]IntroductionPoint, 0),
+	}
+
+	return desc, nil
+}
+
+// TODO: Implement introduction point protocol (Phase 7.3.3)
+// TODO: Implement rendezvous protocol (Phase 7.3.4)

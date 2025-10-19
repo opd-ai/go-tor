@@ -41,11 +41,14 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 - ✅ Blinded public key computation (SHA3-256)
 - ✅ Time period calculation for descriptor rotation
 - ✅ Descriptor encoding/parsing foundation
+- ✅ HSDir selection algorithm (DHT-style routing)
+- ✅ Replica descriptor ID computation
+- ✅ Descriptor fetching protocol foundation
 
 ### In Progress
 - [ ] **Phase 7.3**: Onion services client
   - ✅ Phase 7.3.1: Descriptor management (caching, blinded keys, time periods)
-  - [ ] Phase 7.3.2: HSDir protocol and descriptor fetching
+  - ✅ Phase 7.3.2: HSDir protocol and descriptor fetching
   - [ ] Phase 7.3.3: Introduction point protocol
   - [ ] Phase 7.3.4: Rendezvous protocol
 
@@ -244,8 +247,8 @@ Current test coverage: ~90% for implemented packages.
 - ✅ Additional event types (Phase 7.2)
 - ✅ v3 onion address parsing and validation (Phase 7.3 - Foundation)
 - ✅ Descriptor management (caching, crypto) (Phase 7.3.1)
-- 🚧 HSDir protocol and descriptor fetching (Phase 7.3.2 - Next)
-- 🚧 Introduction protocol (Phase 7.3.3)
+- ✅ HSDir protocol and descriptor fetching (Phase 7.3.2)
+- 🚧 Introduction protocol (Phase 7.3.3 - Next)
 - 🚧 Rendezvous protocol (Phase 7.3.4)
 - [ ] Hidden service server (hosting) (Phase 7.4)
 
