@@ -30,14 +30,14 @@ func TestNewService(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "with existing private key",
+			name: "with invalid private key size",
 			config: &ServiceConfig{
-				PrivateKey: make([]byte, ed25519.PrivateKeySize),
+				PrivateKey: make([]byte, 32), // Wrong size, should be 64
 				Ports: map[int]string{
 					80: "localhost:8080",
 				},
 			},
-			expectError: true, // Invalid key
+			expectError: true,
 		},
 		{
 			name: "custom intro points",

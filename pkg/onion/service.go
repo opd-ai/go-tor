@@ -399,24 +399,31 @@ func (s *Service) createDescriptor() error {
 
 // signDescriptor signs the descriptor with the service's identity key
 func (s *Service) signDescriptor(desc *Descriptor) error {
-	// Encode the descriptor to get the content to sign
-	encoded, err := EncodeDescriptor(desc)
-	if err != nil {
-		return fmt.Errorf("failed to encode descriptor: %w", err)
-	}
-
-	// Store the raw descriptor
-	desc.RawDescriptor = encoded
-
 	// In production, the signing process would be:
 	// 1. Create a descriptor signing key (short-term key)
 	// 2. Create a certificate signing the signing key with the identity key
 	// 3. Sign the descriptor with the signing key
 	// For Phase 7.4, we'll do simplified signing with identity key directly
 
-	// Sign the descriptor content (everything before the signature)
+	// First encode without signature to get the content to sign
+	encoded, err := EncodeDescriptor(desc)
+	if err != nil {
+		return fmt.Errorf("failed to encode descriptor: %w", err)
+	}
+
+	// Sign the descriptor content (everything before the signature line)
+	// We need to sign everything up to where "signature " would appear
 	signature := ed25519.Sign(s.identityKey, encoded)
 	desc.Signature = signature
+
+	// Now encode again with the signature to get the complete descriptor
+	encoded, err = EncodeDescriptor(desc)
+	if err != nil {
+		return fmt.Errorf("failed to encode descriptor with signature: %w", err)
+	}
+
+	// Store the complete raw descriptor
+	desc.RawDescriptor = encoded
 
 	s.logger.Debug("Descriptor signed", "signature_len", len(signature))
 

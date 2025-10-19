@@ -9,7 +9,7 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 
 ## Features
 
-### Current (Phase 1-6.5 Complete + Phase 7 Control Protocol + Phase 7.3 Onion Services Foundation + Phase 8.1-8.4)
+### Current (Phase 1-6.5 Complete + Phase 7 Control Protocol + Phase 7.3-7.4 Onion Services + Phase 8.1-8.6)
 - ✅ Cell encoding/decoding (fixed and variable-size)
 - ✅ Relay cell handling
 - ✅ Circuit management types and lifecycle
@@ -55,6 +55,12 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 - ✅ RENDEZVOUS1/RENDEZVOUS2 protocol handling
 - ✅ Complete onion service connection workflow
 - ✅ SOCKS5 .onion address integration
+- ✅ **Onion service hosting (hidden service server)**
+- ✅ **Service identity management (Ed25519 keypair generation/storage)**
+- ✅ **Descriptor creation and signing**
+- ✅ **Descriptor publishing to HSDirs**
+- ✅ **Introduction point circuit establishment**
+- ✅ **INTRODUCE2 cell handling**
 - ✅ **Health monitoring API with component-level checks**
 - ✅ **Structured error types with categories and severity**
 - ✅ **Circuit age enforcement (MaxCircuitDirtiness)**
@@ -63,10 +69,8 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 - ✅ **Performance tuning configuration options**
 - ✅ **Security hardening (zero HIGH/MEDIUM severity issues)**
 
-### In Progress
-- [ ] **Phase 7.4**: Onion services server (hidden service hosting)
-
 ### Recently Completed
+- ✅ **Phase 7.4**: Onion services server (hidden service hosting)
 - ✅ **Phase 8.6**: Onion Service Infrastructure Completion
 - ✅ **Phase 8.5**: Comprehensive testing and documentation
 - ✅ **Phase 8.4**: Security hardening and audit
@@ -74,7 +78,6 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 - ✅ **Phase 8.2**: Enhanced error handling and resilience
 
 ### Planned
-- [ ] **Phase 7.4**: Onion services server (hidden service hosting)
 - [ ] **Phase 8**: Advanced features and optimization
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture and roadmap.
@@ -282,7 +285,7 @@ Current test coverage: ~90% for implemented packages.
 - ✅ HSDir protocol and descriptor fetching (Phase 7.3.2)
 - ✅ Introduction protocol (Phase 7.3.3)
 - ✅ Rendezvous protocol (Phase 7.3.4)
-- [ ] Hidden service server (hosting) (Phase 7.4)
+- ✅ Hidden service server (hosting) (Phase 7.4)
 
 ### Phase 8: Advanced Features (Weeks 37-40)
 - ✅ Configuration file loading (torrc-compatible) (Phase 8.1)
