@@ -354,8 +354,8 @@ Configuration file loading is fast and efficient:
 
 Benchmarks:
 ```
-BenchmarkLoadFromFile-4    50000    ~20000 ns/op
-BenchmarkSaveToFile-4      30000    ~30000 ns/op
+BenchmarkLoadFromFile-4    129856    9237 ns/op    4800 B/op    25 allocs/op
+BenchmarkSaveToFile-4      (varies by filesystem I/O)
 ```
 
 ## Best Practices
