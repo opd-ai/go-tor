@@ -46,6 +46,9 @@ const (
 	replyTTLExpired           = 0x06
 	replyCommandNotSupported  = 0x07
 	replyAddressNotSupported  = 0x08
+
+	// Connection limits (SEC-006: prevent unbounded memory growth)
+	maxConnections = 1000
 )
 
 // Server is a SOCKS5 proxy server
@@ -123,8 +126,17 @@ func (s *Server) acceptLoop(ctx context.Context) {
 			}
 		}
 
-		// Track connection
+		// Check connection limit (SEC-006: prevent unbounded memory growth)
 		s.mu.Lock()
+		if len(s.activeConns) >= maxConnections {
+			s.mu.Unlock()
+			s.logger.Warn("Connection limit reached, rejecting connection", 
+				"limit", maxConnections, "remote", conn.RemoteAddr())
+			conn.Close()
+			continue
+		}
+		
+		// Track connection
 		s.activeConns[conn] = struct{}{}
 		s.mu.Unlock()
 

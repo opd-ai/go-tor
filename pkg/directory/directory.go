@@ -107,18 +107,24 @@ func (c *Client) parseConsensus(r io.Reader) ([]*Relay, error) {
 	scanner := bufio.NewScanner(r)
 
 	var currentRelay *Relay
+	var totalEntries int
+	var malformedEntries int
 
 	for scanner.Scan() {
 		line := scanner.Text()
 
 		// Parse "r" lines (router status entries)
 		if strings.HasPrefix(line, "r ") {
+			totalEntries++
+			
 			if currentRelay != nil {
 				relays = append(relays, currentRelay)
 			}
 
 			parts := strings.Fields(line)
 			if len(parts) < 9 {
+				malformedEntries++
+				c.logger.Debug("Skipping malformed relay entry", "line", line)
 				continue // Skip malformed entries
 			}
 
@@ -152,6 +158,20 @@ func (c *Client) parseConsensus(r io.Reader) ([]*Relay, error) {
 
 	if err := scanner.Err(); err != nil {
 		return nil, fmt.Errorf("error reading consensus: %w", err)
+	}
+
+	// Validate that consensus is not excessively malformed (SEC-004)
+	// Reject if >10% of entries are malformed, indicating possible attack or corruption
+	if totalEntries > 0 && malformedEntries > totalEntries/10 {
+		c.logger.Warn("Excessive malformed entries in consensus", 
+			"malformed", malformedEntries, "total", totalEntries)
+		return nil, fmt.Errorf("excessive malformed entries in consensus: %d/%d (>10%%)", 
+			malformedEntries, totalEntries)
+	}
+
+	if malformedEntries > 0 {
+		c.logger.Debug("Consensus parsing completed with some malformed entries",
+			"malformed", malformedEntries, "total", totalEntries, "valid", len(relays))
 	}
 
 	return relays, nil
