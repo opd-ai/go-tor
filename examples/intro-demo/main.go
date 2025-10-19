@@ -10,6 +10,7 @@ import (
 
 	"github.com/opd-ai/go-tor/pkg/logger"
 	"github.com/opd-ai/go-tor/pkg/onion"
+	"github.com/opd-ai/go-tor/pkg/security"
 )
 
 func main() {
@@ -212,14 +213,21 @@ func createMockDescriptor(addr *onion.Address) *onion.Descriptor {
 	timePeriod := onion.GetTimePeriod(time.Now())
 	blindedPubkey := onion.ComputeBlindedPubkey(ed25519.PublicKey(addr.Pubkey), timePeriod)
 
+	// Safely convert timestamp to uint64
+	now := time.Now()
+	revisionCounter, err := security.SafeUnixToUint64(now)
+	if err != nil {
+		revisionCounter = 0
+	}
+
 	return &onion.Descriptor{
 		Version:         3,
 		Address:         addr,
 		IntroPoints:     introPoints,
 		BlindedPubkey:   blindedPubkey,
 		DescriptorID:    computeDescriptorID(blindedPubkey),
-		RevisionCounter: uint64(time.Now().Unix()),
-		CreatedAt:       time.Now(),
+		RevisionCounter: revisionCounter,
+		CreatedAt:       now,
 		Lifetime:        3 * time.Hour,
 	}
 }

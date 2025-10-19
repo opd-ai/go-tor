@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/opd-ai/go-tor/pkg/logger"
+	"github.com/opd-ai/go-tor/pkg/security"
 )
 
 const (
@@ -369,13 +370,21 @@ func (c *Client) createMockDescriptor(addr *Address) *Descriptor {
 	blindedPubkey := ComputeBlindedPubkey(ed25519.PublicKey(addr.Pubkey), timePeriod)
 	descriptorID := computeDescriptorID(blindedPubkey)
 
+	// Safe conversion of timestamp to uint64
+	now := time.Now()
+	revisionCounter, err := security.SafeUnixToUint64(now)
+	if err != nil {
+		// In case of error, use 0 as revision counter (should never happen with valid timestamps)
+		revisionCounter = 0
+	}
+
 	return &Descriptor{
 		Version:         3,
 		Address:         addr,
 		BlindedPubkey:   blindedPubkey,
 		DescriptorID:    descriptorID,
-		RevisionCounter: uint64(time.Now().Unix()),
-		CreatedAt:       time.Now(),
+		RevisionCounter: revisionCounter,
+		CreatedAt:       now,
 		Lifetime:        3 * time.Hour,
 		IntroPoints:     make([]IntroductionPoint, 0),
 	}
@@ -411,7 +420,17 @@ func GetTimePeriod(now time.Time) uint64 {
 	const offset = 12 * 60 * 60              // 12 hours in seconds
 	
 	unixTime := now.Unix()
-	return uint64((unixTime + offset) / periodLength)
+	// Safe conversion: validate unixTime is non-negative before arithmetic
+	if unixTime < 0 {
+		// Invalid timestamp, return 0
+		return 0
+	}
+	// Perform calculation in int64 space, then safely convert
+	timePeriod := (unixTime + offset) / periodLength
+	if timePeriod < 0 {
+		return 0
+	}
+	return uint64(timePeriod)
 }
 
 // ParseDescriptor parses a raw v3 onion service descriptor
@@ -683,12 +702,20 @@ func (h *HSDir) fetchFromHSDir(ctx context.Context, hsdir *HSDirectory, descript
 		"descriptor_id", fmt.Sprintf("%x", descriptorID[:8]),
 		"replica", replica)
 
+	// Safe conversion of timestamp to uint64
+	now := time.Now()
+	revisionCounter, err := security.SafeUnixToUint64(now)
+	if err != nil {
+		// In case of error, use 0 as revision counter
+		revisionCounter = 0
+	}
+
 	// Mock descriptor for now
 	desc := &Descriptor{
 		Version:         3,
 		DescriptorID:    descriptorID,
-		RevisionCounter: uint64(time.Now().Unix()),
-		CreatedAt:       time.Now(),
+		RevisionCounter: revisionCounter,
+		CreatedAt:       now,
 		Lifetime:        3 * time.Hour,
 		IntroPoints:     make([]IntroductionPoint, 0),
 	}
@@ -781,7 +808,12 @@ func (ip *IntroductionProtocol) BuildIntroduce1Cell(req *IntroduceRequest) ([]by
 	// AUTH_KEY_LEN (2 bytes) - 32 bytes for ed25519
 	authKeyLen := uint16(32)
 	if len(req.IntroPoint.AuthKey) > 0 {
-		authKeyLen = uint16(len(req.IntroPoint.AuthKey))
+		// Safely convert length to uint16
+		keyLen, err := security.SafeLenToUint16(req.IntroPoint.AuthKey)
+		if err != nil {
+			return nil, fmt.Errorf("auth key too large: %v", err)
+		}
+		authKeyLen = keyLen
 	}
 	binary.BigEndian.PutUint16(buf.Bytes()[len(buf.Bytes()):len(buf.Bytes())+2], authKeyLen)
 	buf.Write(make([]byte, 2)) // placeholder, then overwrite

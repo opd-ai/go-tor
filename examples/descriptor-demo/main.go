@@ -2,13 +2,14 @@
 package main
 
 import (
-"context"
-"fmt"
-"log"
-"time"
+	"context"
+	"fmt"
+	"log"
+	"time"
 
-"github.com/opd-ai/go-tor/pkg/logger"
-"github.com/opd-ai/go-tor/pkg/onion"
+	"github.com/opd-ai/go-tor/pkg/logger"
+	"github.com/opd-ai/go-tor/pkg/onion"
+	"github.com/opd-ai/go-tor/pkg/security"
 )
 
 func main() {
@@ -85,10 +86,16 @@ if err != nil {
 continue
 }
 
+// Safely convert index to uint64
+revCounter, err := security.SafeIntToUint64(i + 1)
+if err != nil {
+revCounter = 1 // fallback to 1
+}
+
 d := &onion.Descriptor{
 Version:         3,
 Address:         a,
-RevisionCounter: uint64(i + 1),
+RevisionCounter: revCounter,
 CreatedAt:       time.Now(),
 Lifetime:        3 * time.Hour,
 }

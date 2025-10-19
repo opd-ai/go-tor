@@ -10,6 +10,7 @@ import (
 	"github.com/opd-ai/go-tor/pkg/cell"
 	"github.com/opd-ai/go-tor/pkg/connection"
 	"github.com/opd-ai/go-tor/pkg/logger"
+	"github.com/opd-ai/go-tor/pkg/security"
 )
 
 // Protocol versions supported by this implementation
@@ -160,7 +161,14 @@ func (h *Handshake) sendNetinfo() error {
 	payload := make([]byte, 512) // Use fixed size, will be padded
 
 	// Timestamp (current time in seconds since epoch)
-	timestamp := uint32(time.Now().Unix())
+	// Safely convert to uint32 (will fail if timestamp exceeds uint32 max in year 2106)
+	now := time.Now()
+	timestamp, err := security.SafeUnixToUint32(now)
+	if err != nil {
+		// Log warning but continue with 0 timestamp if conversion fails
+		h.logger.Warn("Failed to convert timestamp to uint32, using 0", "error", err)
+		timestamp = 0
+	}
 	payload[0] = byte(timestamp >> 24)
 	payload[1] = byte(timestamp >> 16)
 	payload[2] = byte(timestamp >> 8)

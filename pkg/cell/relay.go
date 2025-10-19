@@ -4,6 +4,8 @@ package cell
 import (
 	"encoding/binary"
 	"fmt"
+
+	"github.com/opd-ai/go-tor/pkg/security"
 )
 
 // Relay commands from tor-spec.txt section 6.1
@@ -40,12 +42,19 @@ const RelayCellHeaderLen = 11
 
 // NewRelayCell creates a new relay cell
 func NewRelayCell(streamID uint16, cmd byte, data []byte) *RelayCell {
+	// Safely convert data length to uint16
+	length, err := security.SafeLenToUint16(data)
+	if err != nil {
+		// Data is too large, truncate to max uint16
+		length = 65535
+	}
+
 	return &RelayCell{
 		Command:    cmd,
 		Recognized: 0,
 		StreamID:   streamID,
 		Digest:     [4]byte{0, 0, 0, 0},
-		Length:     uint16(len(data)),
+		Length:     length,
 		Data:       data,
 	}
 }

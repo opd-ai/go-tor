@@ -6,6 +6,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+
+	"github.com/opd-ai/go-tor/pkg/security"
 )
 
 // Cell size constants from tor-spec.txt
@@ -125,7 +127,11 @@ func (c *Cell) Encode(w io.Writer) error {
 	// Handle variable-length cells
 	if c.Command.IsVariableLength() {
 		// Write payload length (2 bytes, big-endian)
-		payloadLen := uint16(len(c.Payload))
+		// Safely convert payload length to uint16
+		payloadLen, err := security.SafeLenToUint16(c.Payload)
+		if err != nil {
+			return fmt.Errorf("payload too large for variable-length cell: %w", err)
+		}
 		if err := binary.Write(w, binary.BigEndian, payloadLen); err != nil {
 			return fmt.Errorf("failed to write payload length: %w", err)
 		}

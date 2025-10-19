@@ -10,7 +10,8 @@ import (
 )
 
 func main() {
-	fmt.Println("=== Configuration File Loading Demo ===\n")
+	fmt.Println("=== Configuration File Loading Demo ===")
+	fmt.Println()
 
 	// Create a temporary directory for demonstration
 	tmpDir, err := os.MkdirTemp("", "go-tor-config-demo-*")
@@ -67,7 +68,8 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Configuration mismatch: SocksPort\n")
 		os.Exit(1)
 	}
-	fmt.Println("✓ Configuration loaded successfully and values match\n")
+	fmt.Println("✓ Configuration loaded successfully and values match")
+	fmt.Println()
 
 	// Demo 3: Display the actual file content
 	fmt.Println("--- Demo 3: Configuration File Content ---")
@@ -132,7 +134,8 @@ ConnLimit 2000
 		fmt.Fprintf(os.Stderr, "Custom config mismatch: BridgeAddresses count\n")
 		os.Exit(1)
 	}
-	fmt.Println("✓ Custom configuration loaded successfully\n")
+	fmt.Println("✓ Custom configuration loaded successfully")
+	fmt.Println()
 
 	// Demo 5: Validation
 	fmt.Println("--- Demo 5: Configuration Validation ---")
