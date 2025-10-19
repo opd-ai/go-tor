@@ -2,7 +2,6 @@ package control
 
 import (
 	"bufio"
-	"fmt"
 	"net"
 	"strings"
 	"testing"
@@ -594,7 +593,7 @@ func BenchmarkCommandProcessing(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		writer.WriteString(fmt.Sprintf("GETINFO version\r\n"))
+		writer.WriteString("GETINFO version\r\n")
 		writer.Flush()
 		reader.ReadString('\n')
 	}

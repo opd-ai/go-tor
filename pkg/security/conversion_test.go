@@ -293,3 +293,88 @@ func TestSafeLenToUint16(t *testing.T) {
 		})
 	}
 }
+
+func TestConstantTimeCompare(t *testing.T) {
+	tests := []struct {
+		name string
+		a    []byte
+		b    []byte
+		want bool
+	}{
+		{
+			name: "equal slices",
+			a:    []byte{1, 2, 3, 4, 5},
+			b:    []byte{1, 2, 3, 4, 5},
+			want: true,
+		},
+		{
+			name: "different slices",
+			a:    []byte{1, 2, 3, 4, 5},
+			b:    []byte{1, 2, 3, 4, 6},
+			want: false,
+		},
+		{
+			name: "different lengths",
+			a:    []byte{1, 2, 3},
+			b:    []byte{1, 2, 3, 4},
+			want: false,
+		},
+		{
+			name: "empty slices",
+			a:    []byte{},
+			b:    []byte{},
+			want: true,
+		},
+		{
+			name: "nil slices",
+			a:    nil,
+			b:    nil,
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ConstantTimeCompare(tt.a, tt.b)
+			if got != tt.want {
+				t.Errorf("ConstantTimeCompare() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSecureZeroMemory(t *testing.T) {
+	tests := []struct {
+		name string
+		data []byte
+	}{
+		{
+			name: "normal slice",
+			data: []byte{1, 2, 3, 4, 5, 6, 7, 8},
+		},
+		{
+			name: "single byte",
+			data: []byte{42},
+		},
+		{
+			name: "empty slice",
+			data: []byte{},
+		},
+		{
+			name: "nil slice",
+			data: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			SecureZeroMemory(tt.data)
+			// Verify all bytes are zeroed
+			for i, b := range tt.data {
+				if b != 0 {
+					t.Errorf("Byte at position %d not zeroed: got %d, want 0", i, b)
+				}
+			}
+		})
+	}
+}

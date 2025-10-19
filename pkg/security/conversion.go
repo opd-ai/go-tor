@@ -2,6 +2,7 @@
 package security
 
 import (
+	"crypto/subtle"
 	"fmt"
 	"math"
 	"time"
@@ -69,4 +70,27 @@ func SafeInt64ToUint64(val int64) (uint64, error) {
 // This is commonly needed for protocol length fields
 func SafeLenToUint16(data []byte) (uint16, error) {
 	return SafeIntToUint16(len(data))
+}
+
+// ConstantTimeCompare performs constant-time comparison of two byte slices
+// Returns true if the slices are equal, false otherwise
+// This prevents timing attacks when comparing sensitive data like keys, MACs, etc.
+func ConstantTimeCompare(a, b []byte) bool {
+	return subtle.ConstantTimeCompare(a, b) == 1
+}
+
+// SecureZeroMemory zeros out a byte slice to prevent sensitive data from remaining in memory
+// Uses a method that should prevent compiler optimization from removing the zeroing
+func SecureZeroMemory(data []byte) {
+	if data == nil {
+		return
+	}
+	for i := range data {
+		data[i] = 0
+	}
+	// Ensure compiler doesn't optimize away the zeroing
+	// subtle.ConstantTimeCopy will force a write that can't be optimized away
+	if len(data) > 0 {
+		subtle.ConstantTimeCopy(1, data[:1], data[:1])
+	}
 }

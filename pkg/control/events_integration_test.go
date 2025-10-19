@@ -813,13 +813,15 @@ func TestMixedEventSubscription(t *testing.T) {
 	timeout := time.After(2 * time.Second)
 	expectedEvents := 4 // CIRC, GUARD, BW, NEWDESC (not NS)
 
-	for len(receivedEvents) < expectedEvents {
+	// Collect events with timeout
+	done := false
+	for len(receivedEvents) < expectedEvents && !done {
 		select {
 		case event := <-eventChan:
 			receivedEvents = append(receivedEvents, event)
 		case <-timeout:
 			// Timeout is OK - we might have received all we need
-			break
+			done = true
 		}
 	}
 
