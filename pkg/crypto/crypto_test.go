@@ -253,3 +253,161 @@ func TestDeriveKeyDifferentSecrets(t *testing.T) {
 		t.Error("DeriveKey() produced same key for different secrets")
 	}
 }
+
+func TestGenerateNtorKeyPair(t *testing.T) {
+	kp1, err := GenerateNtorKeyPair()
+	if err != nil {
+		t.Fatalf("Failed to generate key pair: %v", err)
+	}
+
+	// Check that public and private keys are non-zero
+	zeroPriv := [32]byte{}
+	zeroPub := [32]byte{}
+	
+	if bytes.Equal(kp1.Private[:], zeroPriv[:]) {
+		t.Error("Generated all-zero private key")
+	}
+	
+	if bytes.Equal(kp1.Public[:], zeroPub[:]) {
+		t.Error("Generated all-zero public key")
+	}
+
+	// Generate another key pair and verify they're different
+	kp2, err := GenerateNtorKeyPair()
+	if err != nil {
+		t.Fatalf("Failed to generate second key pair: %v", err)
+	}
+
+	if bytes.Equal(kp1.Private[:], kp2.Private[:]) {
+		t.Error("Generated identical private keys")
+	}
+	
+	if bytes.Equal(kp1.Public[:], kp2.Public[:]) {
+		t.Error("Generated identical public keys")
+	}
+}
+
+func TestNtorClientHandshake(t *testing.T) {
+	// Generate mock relay keys
+	identityKey := make([]byte, 32)
+	ntorOnionKey := make([]byte, 32)
+	
+	for i := range identityKey {
+		identityKey[i] = byte(i)
+	}
+	for i := range ntorOnionKey {
+		ntorOnionKey[i] = byte(i + 32)
+	}
+
+	handshakeData, sharedSecret, err := NtorClientHandshake(identityKey, ntorOnionKey)
+	if err != nil {
+		t.Fatalf("NtorClientHandshake failed: %v", err)
+	}
+
+	// Verify handshake data format: NODEID (20) + KEYID (32) + CLIENT_PK (32) = 84 bytes
+	expectedLen := 20 + 32 + 32
+	if len(handshakeData) != expectedLen {
+		t.Errorf("Handshake data length = %d, want %d", len(handshakeData), expectedLen)
+	}
+
+	// Verify NODEID matches first 20 bytes of identity key
+	if !bytes.Equal(handshakeData[0:20], identityKey[0:20]) {
+		t.Error("NODEID doesn't match identity key")
+	}
+
+	// Verify KEYID matches ntor onion key
+	if !bytes.Equal(handshakeData[20:52], ntorOnionKey) {
+		t.Error("KEYID doesn't match ntor onion key")
+	}
+
+	// Shared secret should be non-zero
+	zeroSecret := make([]byte, 32)
+	if bytes.Equal(sharedSecret, zeroSecret) {
+		t.Error("Generated all-zero shared secret")
+	}
+
+	// Test with invalid keys
+	_, _, err = NtorClientHandshake([]byte("short"), ntorOnionKey)
+	if err == nil {
+		t.Error("Expected error with invalid identity key length")
+	}
+
+	_, _, err = NtorClientHandshake(identityKey, []byte("short"))
+	if err == nil {
+		t.Error("Expected error with invalid ntor onion key length")
+	}
+}
+
+func TestEd25519Verify(t *testing.T) {
+	// Generate a key pair
+	pub, priv, err := GenerateEd25519KeyPair()
+	if err != nil {
+		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
+	}
+
+	message := []byte("test message for signature verification")
+	
+	// Sign the message
+	signature, err := Ed25519Sign(priv, message)
+	if err != nil {
+		t.Fatalf("Failed to sign message: %v", err)
+	}
+
+	// Verify the signature
+	if !Ed25519Verify(pub, message, signature) {
+		t.Error("Valid signature failed verification")
+	}
+
+	// Test with wrong message
+	wrongMessage := []byte("wrong message")
+	if Ed25519Verify(pub, wrongMessage, signature) {
+		t.Error("Signature verified with wrong message")
+	}
+
+	// Test with wrong public key
+	wrongPub := make([]byte, 32)
+	copy(wrongPub, pub)
+	wrongPub[0] ^= 0xFF // Flip bits
+	if Ed25519Verify(wrongPub, message, signature) {
+		t.Error("Signature verified with wrong public key")
+	}
+
+	// Test with invalid key length
+	if Ed25519Verify([]byte("short"), message, signature) {
+		t.Error("Verification succeeded with invalid public key length")
+	}
+
+	// Test with invalid signature length
+	if Ed25519Verify(pub, message, []byte("short")) {
+		t.Error("Verification succeeded with invalid signature length")
+	}
+}
+
+func TestGenerateEd25519KeyPair(t *testing.T) {
+	pub1, priv1, err := GenerateEd25519KeyPair()
+	if err != nil {
+		t.Fatalf("Failed to generate first key pair: %v", err)
+	}
+
+	// Check key lengths
+	if len(pub1) != 32 {
+		t.Errorf("Public key length = %d, want 32", len(pub1))
+	}
+	if len(priv1) != 64 {
+		t.Errorf("Private key length = %d, want 64", len(priv1))
+	}
+
+	// Generate another key pair and verify they're different
+	pub2, priv2, err := GenerateEd25519KeyPair()
+	if err != nil {
+		t.Fatalf("Failed to generate second key pair: %v", err)
+	}
+
+	if bytes.Equal(pub1, pub2) {
+		t.Error("Generated identical public keys")
+	}
+	
+	if bytes.Equal(priv1, priv2) {
+		t.Error("Generated identical private keys")
+	}
+}
