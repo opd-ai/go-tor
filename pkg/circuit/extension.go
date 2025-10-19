@@ -10,6 +10,7 @@ import (
 	"github.com/opd-ai/go-tor/pkg/cell"
 	"github.com/opd-ai/go-tor/pkg/crypto"
 	"github.com/opd-ai/go-tor/pkg/logger"
+	"github.com/opd-ai/go-tor/pkg/security"
 )
 
 // HandshakeType defines the type of circuit handshake to use
@@ -54,9 +55,15 @@ func (e *Extension) CreateFirstHop(ctx context.Context, handshakeType HandshakeT
 	}
 
 	// Build CREATE2 cell payload
+	// Safely convert handshake data length to uint16
+	hlen, err := security.SafeLenToUint16(handshakeData)
+	if err != nil {
+		return fmt.Errorf("handshake data too large: %v", err)
+	}
+
 	payload := make([]byte, 2+2+len(handshakeData))
 	binary.BigEndian.PutUint16(payload[0:2], uint16(handshakeType))
-	binary.BigEndian.PutUint16(payload[2:4], uint16(len(handshakeData)))
+	binary.BigEndian.PutUint16(payload[2:4], hlen)
 	copy(payload[4:], handshakeData)
 
 	// Create CREATE2 cell
@@ -172,9 +179,15 @@ func (e *Extension) buildExtend2Data(target string, handshakeType HandshakeType,
 	binary.BigEndian.PutUint16(htypeBytes, uint16(handshakeType))
 	data = append(data, htypeBytes...)
 
-	// HLEN
+	// HLEN - safely convert handshake data length
+	hlen, err := security.SafeLenToUint16(handshakeData)
+	if err != nil {
+		// This should never happen as handshake data is typically small
+		// But handle it gracefully
+		return nil
+	}
 	hlenBytes := make([]byte, 2)
-	binary.BigEndian.PutUint16(hlenBytes, uint16(len(handshakeData)))
+	binary.BigEndian.PutUint16(hlenBytes, hlen)
 	data = append(data, hlenBytes...)
 
 	// HDATA

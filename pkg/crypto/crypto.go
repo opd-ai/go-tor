@@ -1,5 +1,11 @@
 // Package crypto provides cryptographic primitives for the Tor protocol.
 // This package wraps Go's standard crypto libraries for Tor-specific operations.
+//
+// Security considerations:
+// - All random number generation uses crypto/rand (CSPRNG)
+// - Sensitive data should be zeroed after use (see security.SecureZeroMemory)
+// - Key comparisons should use constant-time operations (see security.ConstantTimeCompare)
+// - Memory containing keys should be zeroed before being freed
 package crypto
 
 import (
@@ -133,6 +139,9 @@ func (d *DigestWriter) Write(p []byte) (n int, err error) {
 
 // DeriveKey derives key material using KDF-TOR
 // KDF-TOR uses iterative SHA-1 hashing to expand a shared secret
+//
+// Security note: The caller is responsible for zeroing the returned key material
+// when it's no longer needed using security.SecureZeroMemory()
 func DeriveKey(secret []byte, keyLen int) ([]byte, error) {
 	if keyLen <= 0 {
 		return nil, fmt.Errorf("invalid key length: %d", keyLen)

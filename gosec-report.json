@@ -1,0 +1,1167 @@
+{
+	"Golang errors": {},
+	"Issues": [
+		{
+			"severity": "HIGH",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "190",
+				"url": "https://cwe.mitre.org/data/definitions/190.html"
+			},
+			"rule_id": "G115",
+			"details": "integer overflow conversion int64 -\u003e uint64",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/onion/onion.go",
+			"code": "689: \t\tDescriptorID:    descriptorID,\n690: \t\tRevisionCounter: uint64(time.Now().Unix()),\n691: \t\tCreatedAt:       time.Now(),\n",
+			"line": "690",
+			"column": "26",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "HIGH",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "190",
+				"url": "https://cwe.mitre.org/data/definitions/190.html"
+			},
+			"rule_id": "G115",
+			"details": "integer overflow conversion int64 -\u003e uint64",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/onion/onion.go",
+			"code": "413: \tunixTime := now.Unix()\n414: \treturn uint64((unixTime + offset) / periodLength)\n415: }\n",
+			"line": "414",
+			"column": "15",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "HIGH",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "190",
+				"url": "https://cwe.mitre.org/data/definitions/190.html"
+			},
+			"rule_id": "G115",
+			"details": "integer overflow conversion int64 -\u003e uint64",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/onion/onion.go",
+			"code": "376: \t\tDescriptorID:    descriptorID,\n377: \t\tRevisionCounter: uint64(time.Now().Unix()),\n378: \t\tCreatedAt:       time.Now(),\n",
+			"line": "377",
+			"column": "26",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "HIGH",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "190",
+				"url": "https://cwe.mitre.org/data/definitions/190.html"
+			},
+			"rule_id": "G115",
+			"details": "integer overflow conversion int64 -\u003e uint64",
+			"file": "/home/runner/work/go-tor/go-tor/examples/intro-demo/main.go",
+			"code": "220: \t\tDescriptorID:    computeDescriptorID(blindedPubkey),\n221: \t\tRevisionCounter: uint64(time.Now().Unix()),\n222: \t\tCreatedAt:       time.Now(),\n",
+			"line": "221",
+			"column": "26",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "HIGH",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "190",
+				"url": "https://cwe.mitre.org/data/definitions/190.html"
+			},
+			"rule_id": "G115",
+			"details": "integer overflow conversion int64 -\u003e uint32",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/protocol/protocol.go",
+			"code": "162: \t// Timestamp (current time in seconds since epoch)\n163: \ttimestamp := uint32(time.Now().Unix())\n164: \tpayload[0] = byte(timestamp \u003e\u003e 24)\n",
+			"line": "163",
+			"column": "21",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "HIGH",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "190",
+				"url": "https://cwe.mitre.org/data/definitions/190.html"
+			},
+			"rule_id": "G115",
+			"details": "integer overflow conversion int -\u003e uint64",
+			"file": "/home/runner/work/go-tor/go-tor/examples/descriptor-demo/main.go",
+			"code": "90: Address:         a,\n91: RevisionCounter: uint64(i + 1),\n92: CreatedAt:       time.Now(),\n",
+			"line": "91",
+			"column": "24",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "HIGH",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "190",
+				"url": "https://cwe.mitre.org/data/definitions/190.html"
+			},
+			"rule_id": "G115",
+			"details": "integer overflow conversion int -\u003e uint16",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/onion/onion.go",
+			"code": "783: \tif len(req.IntroPoint.AuthKey) \u003e 0 {\n784: \t\tauthKeyLen = uint16(len(req.IntroPoint.AuthKey))\n785: \t}\n",
+			"line": "784",
+			"column": "22",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "HIGH",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "190",
+				"url": "https://cwe.mitre.org/data/definitions/190.html"
+			},
+			"rule_id": "G115",
+			"details": "integer overflow conversion int -\u003e uint16",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/circuit/extension.go",
+			"code": "176: \thlenBytes := make([]byte, 2)\n177: \tbinary.BigEndian.PutUint16(hlenBytes, uint16(len(handshakeData)))\n178: \tdata = append(data, hlenBytes...)\n",
+			"line": "177",
+			"column": "46",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "HIGH",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "190",
+				"url": "https://cwe.mitre.org/data/definitions/190.html"
+			},
+			"rule_id": "G115",
+			"details": "integer overflow conversion int -\u003e uint16",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/circuit/extension.go",
+			"code": "58: \tbinary.BigEndian.PutUint16(payload[0:2], uint16(handshakeType))\n59: \tbinary.BigEndian.PutUint16(payload[2:4], uint16(len(handshakeData)))\n60: \tcopy(payload[4:], handshakeData)\n",
+			"line": "59",
+			"column": "49",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "HIGH",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "190",
+				"url": "https://cwe.mitre.org/data/definitions/190.html"
+			},
+			"rule_id": "G115",
+			"details": "integer overflow conversion int -\u003e uint16",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/cell/relay.go",
+			"code": "47: \t\tDigest:     [4]byte{0, 0, 0, 0},\n48: \t\tLength:     uint16(len(data)),\n49: \t\tData:       data,\n",
+			"line": "48",
+			"column": "21",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "HIGH",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "190",
+				"url": "https://cwe.mitre.org/data/definitions/190.html"
+			},
+			"rule_id": "G115",
+			"details": "integer overflow conversion int -\u003e uint16",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/cell/cell.go",
+			"code": "127: \t\t// Write payload length (2 bytes, big-endian)\n128: \t\tpayloadLen := uint16(len(c.Payload))\n129: \t\tif err := binary.Write(w, binary.BigEndian, payloadLen); err != nil {\n",
+			"line": "128",
+			"column": "23",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "HIGH",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "295",
+				"url": "https://cwe.mitre.org/data/definitions/295.html"
+			},
+			"rule_id": "G402",
+			"details": "TLS Bad Cipher Suite: TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/connection/connection.go",
+			"code": "103: \t\t\ttls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,\n104: \t\t\ttls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,\n105: \t\t\ttls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,\n",
+			"line": "104",
+			"column": "4",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "328",
+				"url": "https://cwe.mitre.org/data/definitions/328.html"
+			},
+			"rule_id": "G401",
+			"details": "Use of weak cryptographic primitive",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/crypto/crypto.go",
+			"code": "125: func NewSHA1DigestWriter() *DigestWriter {\n126: \treturn \u0026DigestWriter{hash: sha1.New()}\n127: }\n",
+			"line": "126",
+			"column": "29",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "328",
+				"url": "https://cwe.mitre.org/data/definitions/328.html"
+			},
+			"rule_id": "G401",
+			"details": "Use of weak cryptographic primitive",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/crypto/crypto.go",
+			"code": "111: func (k *RSAPrivateKey) Decrypt(ciphertext []byte) ([]byte, error) {\n112: \tplaintext, err := rsa.DecryptOAEP(sha1.New(), rand.Reader, k.key, ciphertext, nil)\n113: \tif err != nil {\n",
+			"line": "112",
+			"column": "36",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "328",
+				"url": "https://cwe.mitre.org/data/definitions/328.html"
+			},
+			"rule_id": "G401",
+			"details": "Use of weak cryptographic primitive",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/crypto/crypto.go",
+			"code": "102: func (k *RSAPublicKey) Encrypt(plaintext []byte) ([]byte, error) {\n103: \tciphertext, err := rsa.EncryptOAEP(sha1.New(), rand.Reader, k.key, plaintext, nil)\n104: \tif err != nil {\n",
+			"line": "103",
+			"column": "37",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "328",
+				"url": "https://cwe.mitre.org/data/definitions/328.html"
+			},
+			"rule_id": "G401",
+			"details": "Use of weak cryptographic primitive",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/crypto/crypto.go",
+			"code": "39: func SHA1Hash(data []byte) []byte {\n40: \th := sha1.Sum(data)\n41: \treturn h[:]\n",
+			"line": "40",
+			"column": "7",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "22",
+				"url": "https://cwe.mitre.org/data/definitions/22.html"
+			},
+			"rule_id": "G304",
+			"details": "Potential file inclusion via variable",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/config/loader.go",
+			"code": "225: \n226: \tfile, err := os.Create(path)\n227: \tif err != nil {\n",
+			"line": "226",
+			"column": "15",
+			"nosec": false,
+			"suppressions": null,
+			"autofix": "Consider using os.Root to scope file access under a fixed root (Go \u003e=1.24). Prefer root.Open/root.Stat over os.Open/os.Stat to prevent directory traversal."
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "22",
+				"url": "https://cwe.mitre.org/data/definitions/22.html"
+			},
+			"rule_id": "G304",
+			"details": "Potential file inclusion via variable",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/config/loader.go",
+			"code": "22: \n23: \tfile, err := os.Open(path)\n24: \tif err != nil {\n",
+			"line": "23",
+			"column": "15",
+			"nosec": false,
+			"suppressions": null,
+			"autofix": "Consider using os.Root to scope file access under a fixed root (Go \u003e=1.24). Prefer root.Open/root.Stat over os.Open/os.Stat to prevent directory traversal."
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "22",
+				"url": "https://cwe.mitre.org/data/definitions/22.html"
+			},
+			"rule_id": "G304",
+			"details": "Potential file inclusion via variable",
+			"file": "/home/runner/work/go-tor/go-tor/examples/config-demo/main.go",
+			"code": "73: \tfmt.Println(\"--- Demo 3: Configuration File Content ---\")\n74: \tcontent, err := os.ReadFile(configFile)\n75: \tif err != nil {\n",
+			"line": "74",
+			"column": "18",
+			"nosec": false,
+			"suppressions": null,
+			"autofix": "Consider using os.Root to scope file access under a fixed root (Go \u003e=1.24). Prefer root.Open/root.Stat over os.Open/os.Stat to prevent directory traversal."
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "276",
+				"url": "https://cwe.mitre.org/data/definitions/276.html"
+			},
+			"rule_id": "G306",
+			"details": "Expect WriteFile permissions to be 0600 or less",
+			"file": "/home/runner/work/go-tor/go-tor/examples/config-demo/main.go",
+			"code": "142: `\n143: \tif err := os.WriteFile(invalidConfigFile, []byte(invalidContent), 0644); err != nil {\n144: \t\tfmt.Fprintf(os.Stderr, \"Failed to create invalid config: %v\\n\", err)\n",
+			"line": "143",
+			"column": "12",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "276",
+				"url": "https://cwe.mitre.org/data/definitions/276.html"
+			},
+			"rule_id": "G306",
+			"details": "Expect WriteFile permissions to be 0600 or less",
+			"file": "/home/runner/work/go-tor/go-tor/examples/config-demo/main.go",
+			"code": "99: `\n100: \tif err := os.WriteFile(customConfigFile, []byte(customContent), 0644); err != nil {\n101: \t\tfmt.Fprintf(os.Stderr, \"Failed to create custom config: %v\\n\", err)\n",
+			"line": "100",
+			"column": "12",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "327",
+				"url": "https://cwe.mitre.org/data/definitions/327.html"
+			},
+			"rule_id": "G505",
+			"details": "Blocklisted import crypto/sha1: weak cryptographic primitive",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/crypto/crypto.go",
+			"code": "9: \t\"crypto/rsa\"\n10: \t\"crypto/sha1\"\n11: \t\"crypto/sha256\"\n",
+			"line": "10",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/stream/stream.go",
+			"code": "275: \t\tfor id, stream := range m.streams {\n276: \t\t\tstream.Close()\n277: \t\t\tdelete(m.streams, id)\n",
+			"line": "276",
+			"column": "4",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/stream/stream.go",
+			"code": "243: \n244: \tstream.Close()\n245: \tdelete(m.streams, streamID)\n",
+			"line": "244",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/socks/socks.go",
+			"code": "392: \t\tfor conn := range s.activeConns {\n393: \t\t\tconn.Close()\n394: \t\t}\n",
+			"line": "393",
+			"column": "4",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/socks/socks.go",
+			"code": "385: \t\t\tif s.listener != nil {\n386: \t\t\t\ts.listener.Close()\n387: \t\t\t}\n",
+			"line": "386",
+			"column": "5",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/socks/socks.go",
+			"code": "357: \t\t\tvar port uint16\n358: \t\t\tfmt.Sscanf(portStr, \"%d\", \u0026port)\n359: \t\t\tportBytes := make([]byte, 2)\n",
+			"line": "358",
+			"column": "4",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/socks/socks.go",
+			"code": "319: \tif _, err := io.ReadFull(conn, portBytes); err != nil {\n320: \t\ts.sendReply(conn, replyGeneralFailure, nil)\n321: \t\treturn \"\", fmt.Errorf(\"failed to read port: %w\", err)\n",
+			"line": "320",
+			"column": "3",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/socks/socks.go",
+			"code": "312: \tdefault:\n313: \t\ts.sendReply(conn, replyAddressNotSupported, nil)\n314: \t\treturn \"\", fmt.Errorf(\"unsupported address type: %d\", addrType)\n",
+			"line": "313",
+			"column": "3",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/socks/socks.go",
+			"code": "306: \t\tif _, err := io.ReadFull(conn, ip); err != nil {\n307: \t\t\ts.sendReply(conn, replyGeneralFailure, nil)\n308: \t\t\treturn \"\", fmt.Errorf(\"failed to read IPv6 address: %w\", err)\n",
+			"line": "307",
+			"column": "4",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/socks/socks.go",
+			"code": "298: \t\tif _, err := io.ReadFull(conn, domain); err != nil {\n299: \t\t\ts.sendReply(conn, replyGeneralFailure, nil)\n300: \t\t\treturn \"\", fmt.Errorf(\"failed to read domain: %w\", err)\n",
+			"line": "299",
+			"column": "4",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/socks/socks.go",
+			"code": "292: \t\tif _, err := io.ReadFull(conn, domainLen); err != nil {\n293: \t\t\ts.sendReply(conn, replyGeneralFailure, nil)\n294: \t\t\treturn \"\", fmt.Errorf(\"failed to read domain length: %w\", err)\n",
+			"line": "293",
+			"column": "4",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/socks/socks.go",
+			"code": "284: \t\tif _, err := io.ReadFull(conn, ip); err != nil {\n285: \t\t\ts.sendReply(conn, replyGeneralFailure, nil)\n286: \t\t\treturn \"\", fmt.Errorf(\"failed to read IPv4 address: %w\", err)\n",
+			"line": "285",
+			"column": "4",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/socks/socks.go",
+			"code": "274: \tif cmd != cmdConnect {\n275: \t\ts.sendReply(conn, replyCommandNotSupported, nil)\n276: \t\treturn \"\", fmt.Errorf(\"unsupported command: %d\", cmd)\n",
+			"line": "275",
+			"column": "3",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/socks/socks.go",
+			"code": "269: \tif version != socks5Version {\n270: \t\ts.sendReply(conn, replyGeneralFailure, nil)\n271: \t\treturn \"\", fmt.Errorf(\"unsupported SOCKS version: %d\", version)\n",
+			"line": "270",
+			"column": "3",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/socks/socks.go",
+			"code": "199: \t// 3. Relay data between client and stream\n200: \ts.sendReply(conn, replySuccess, conn.LocalAddr())\n201: \n",
+			"line": "200",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/socks/socks.go",
+			"code": "185: \t\t// Send success reply\n186: \t\ts.sendReply(conn, replySuccess, conn.LocalAddr())\n187: \t\t\n",
+			"line": "186",
+			"column": "3",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/socks/socks.go",
+			"code": "176: \t\t\ts.logger.Error(\"Failed to connect to onion service\", \"address\", host, \"error\", err)\n177: \t\t\ts.sendReply(conn, replyHostUnreachable, nil)\n178: \t\t\treturn\n",
+			"line": "177",
+			"column": "4",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/socks/socks.go",
+			"code": "166: \t\t\ts.logger.Warn(\"Invalid onion address\", \"address\", host, \"error\", err)\n167: \t\t\ts.sendReply(conn, replyHostUnreachable, nil)\n168: \t\t\treturn\n",
+			"line": "167",
+			"column": "4",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/socks/socks.go",
+			"code": "136: \t// Set read deadline\n137: \tconn.SetReadDeadline(time.Now().Add(30 * time.Second))\n138: \n",
+			"line": "137",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/socks/socks.go",
+			"code": "129: \tdefer func() {\n130: \t\tconn.Close()\n131: \t\ts.mu.Lock()\n",
+			"line": "130",
+			"column": "3",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/onion/onion.go",
+			"code": "568: \th.Write(baseDescriptorID)\n569: \th.Write([]byte{byte(replica)})\n570: \treturn h.Sum(nil)\n",
+			"line": "569",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/onion/onion.go",
+			"code": "567: \th := sha3.New256()\n568: \th.Write(baseDescriptorID)\n569: \th.Write([]byte{byte(replica)})\n",
+			"line": "568",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/onion/onion.go",
+			"code": "400: \tbinary.BigEndian.PutUint64(timePeriodBytes, timePeriod)\n401: \th.Write(timePeriodBytes)\n402: \t\n",
+			"line": "401",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/onion/onion.go",
+			"code": "395: \th.Write([]byte(\"Derive temporary signing key\"))\n396: \th.Write(pubkey)\n397: \t\n",
+			"line": "396",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/onion/onion.go",
+			"code": "394: \th := sha3.New256()\n395: \th.Write([]byte(\"Derive temporary signing key\"))\n396: \th.Write(pubkey)\n",
+			"line": "395",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/onion/onion.go",
+			"code": "386: \th := sha3.New256()\n387: \th.Write(blindedPubkey)\n388: \treturn h.Sum(nil)\n",
+			"line": "387",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/onion/onion.go",
+			"code": "104: \th.Write(pubkey)\n105: \th.Write([]byte{version})\n106: \thash := h.Sum(nil)\n",
+			"line": "105",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/onion/onion.go",
+			"code": "103: \th.Write([]byte(\".onion checksum\"))\n104: \th.Write(pubkey)\n105: \th.Write([]byte{version})\n",
+			"line": "104",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/onion/onion.go",
+			"code": "102: \th := sha3.New256()\n103: \th.Write([]byte(\".onion checksum\"))\n104: \th.Write(pubkey)\n",
+			"line": "103",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/control/events.go",
+			"code": "285: \t\t\t\t\tc.writer.WriteString(msg + \"\\r\\n\")\n286: \t\t\t\t\tc.writer.Flush()\n287: \t\t\t\t}\n",
+			"line": "286",
+			"column": "6",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/control/events.go",
+			"code": "284: \t\t\t\tif c.conn != nil {\n285: \t\t\t\t\tc.writer.WriteString(msg + \"\\r\\n\")\n286: \t\t\t\t\tc.writer.Flush()\n",
+			"line": "285",
+			"column": "6",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/control/control.go",
+			"code": "398: \t}\n399: \tc.writer.Flush()\n400: }\n",
+			"line": "399",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/control/control.go",
+			"code": "396: \tfor _, line := range lines {\n397: \t\tc.writer.WriteString(line + \"\\r\\n\")\n398: \t}\n",
+			"line": "397",
+			"column": "3",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/control/control.go",
+			"code": "387: \tc.writer.WriteString(line)\n388: \tc.writer.Flush()\n389: }\n",
+			"line": "388",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/control/control.go",
+			"code": "386: \tline := fmt.Sprintf(\"%d %s\\r\\n\", code, message)\n387: \tc.writer.WriteString(line)\n388: \tc.writer.Flush()\n",
+			"line": "387",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/control/control.go",
+			"code": "233: \t\tconn.writeReply(250, \"closing connection\")\n234: \t\tconn.conn.Close()\n235: \tcase \"PROTOCOLINFO\":\n",
+			"line": "234",
+			"column": "3",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/control/control.go",
+			"code": "187: \t\t// Set read deadline\n188: \t\tnetConn.SetReadDeadline(time.Now().Add(30 * time.Second))\n189: \n",
+			"line": "188",
+			"column": "3",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/control/control.go",
+			"code": "111: \tfor conn := range s.conns {\n112: \t\tconn.Close()\n113: \t}\n",
+			"line": "112",
+			"column": "3",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/control/control.go",
+			"code": "105: \tif s.listener != nil {\n106: \t\ts.listener.Close()\n107: \t}\n",
+			"line": "106",
+			"column": "3",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/connection/retry.go",
+			"code": "202: \tfor conn := range p.available {\n203: \t\tconn.Close()\n204: \t}\n",
+			"line": "203",
+			"column": "3",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/connection/retry.go",
+			"code": "191: \t\tp.logger.Debug(\"Pool full, closing connection\", \"address\", conn.Address())\n192: \t\tconn.Close()\n193: \t}\n",
+			"line": "192",
+			"column": "3",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/connection/connection.go",
+			"code": "252: \t\t\tc.logger.Info(\"Connection closed by remote\")\n253: \t\t\tc.Close()\n254: \t\t\treturn nil, err\n",
+			"line": "253",
+			"column": "4",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/connection/connection.go",
+			"code": "197: \tif err := tlsConn.HandshakeContext(ctx); err != nil {\n198: \t\tconn.Close()\n199: \t\tc.setState(StateFailed)\n",
+			"line": "198",
+			"column": "3",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/pkg/circuit/builder.go",
+			"code": "121: \tcase \u003c-ctx.Done():\n122: \t\tconn.Close()\n123: \t\treturn nil, ctx.Err()\n",
+			"line": "122",
+			"column": "3",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/examples/intro-demo/main.go",
+			"code": "192: \t\trand.Read(onionKey)\n193: \t\trand.Read(authKey)\n194: \n",
+			"line": "193",
+			"column": "3",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/examples/intro-demo/main.go",
+			"code": "191: \t\tauthKey := make([]byte, 32)\n192: \t\trand.Read(onionKey)\n193: \t\trand.Read(authKey)\n",
+			"line": "192",
+			"column": "3",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/examples/intro-demo/main.go",
+			"code": "73: \tonionKey := make([]byte, 32)\n74: \trand.Read(onionKey)\n75: \n",
+			"line": "74",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/examples/intro-demo/main.go",
+			"code": "69: \trendezvousCookie := make([]byte, 20)\n70: \trand.Read(rendezvousCookie)\n71: \n",
+			"line": "70",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/examples/basic-usage/main.go",
+			"code": "84: \t\t})\n85: \t\tcirc.AddHop(\u0026circuit.Hop{\n86: \t\t\tFingerprint: fmt.Sprintf(\"EXIT%d\", i),\n87: \t\t\tAddress:     fmt.Sprintf(\"10.0.2.%d:9001\", i+1),\n88: \t\t\tIsExit:      true,\n89: \t\t})\n90: \n",
+			"line": "85-89",
+			"column": "3",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/examples/basic-usage/main.go",
+			"code": "80: \t\t})\n81: \t\tcirc.AddHop(\u0026circuit.Hop{\n82: \t\t\tFingerprint: fmt.Sprintf(\"MIDDLE%d\", i),\n83: \t\t\tAddress:     fmt.Sprintf(\"10.0.1.%d:9001\", i+1),\n84: \t\t})\n85: \t\tcirc.AddHop(\u0026circuit.Hop{\n",
+			"line": "81-84",
+			"column": "3",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/go-tor/go-tor/examples/basic-usage/main.go",
+			"code": "75: \t\t// Add hops to the circuit\n76: \t\tcirc.AddHop(\u0026circuit.Hop{\n77: \t\t\tFingerprint: fmt.Sprintf(\"GUARD%d\", i),\n78: \t\t\tAddress:     fmt.Sprintf(\"10.0.0.%d:9001\", i+1),\n79: \t\t\tIsGuard:     true,\n80: \t\t})\n81: \t\tcirc.AddHop(\u0026circuit.Hop{\n",
+			"line": "76-80",
+			"column": "3",
+			"nosec": false,
+			"suppressions": null
+		}
+	],
+	"Stats": {
+		"files": 35,
+		"lines": 8867,
+		"nosec": 0,
+		"found": 72
+	},
+	"GosecVersion": "dev"
+}

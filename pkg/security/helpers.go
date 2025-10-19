@@ -100,9 +100,9 @@ func (rl *RateLimiter) Allow() bool {
 
 // ResourceManager manages resource allocation limits
 type ResourceManager struct {
-	limit    int
-	current  int
-	resource string
+	limit   int
+	current int
+	// resource field removed as it was unused
 }
 
 // newResourceManager creates a new resource manager
