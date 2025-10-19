@@ -201,8 +201,12 @@ make lint         # Run golint
 - [Development Guide](docs/DEVELOPMENT.md) - Development workflow and guidelines
 - [Structured Logging](docs/LOGGING.md) - Using the structured logging system
 - [Graceful Shutdown](docs/SHUTDOWN.md) - Implementing graceful shutdown
-- [Progress Log](PROGRESS_LOG.md) - Development activity tracking
-- [Historical Archive](archive/2025/README.md) - Consolidated phase reports and audit documentation
+- [API Reference](docs/API.md) - Package APIs and usage examples
+- [Tutorial](docs/TUTORIAL.md) - Getting started guide
+- [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and solutions
+- [Production Guide](docs/PRODUCTION.md) - Production deployment guide
+- [Security Audit](AUDIT_SUMMARY.md) - Security audit results and status
+- [Historical Archive](docs/archive/) - Audit reports and development phase history
 
 ### Cross-Compilation
 
