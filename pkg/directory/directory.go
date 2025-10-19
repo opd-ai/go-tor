@@ -14,6 +14,12 @@ import (
 	"github.com/opd-ai/go-tor/pkg/logger"
 )
 
+const (
+	// Consensus validation thresholds (SEC-004, SEC-014)
+	maxMalformedEntryRate = 10 // Reject if >10% of entries are malformed
+	maxPortParseErrorRate = 20 // Warn if >20% of entries have port parse errors
+)
+
 // Default directory authority addresses (hardcoded fallback directories)
 var DefaultAuthorities = []string{
 	"https://194.109.206.212/tor/status-vote/current/consensus.z",  // gabelmoo
@@ -164,23 +170,25 @@ func (c *Client) parseConsensus(r io.Reader) ([]*Relay, error) {
 	}
 
 	// Validate that consensus is not excessively malformed (SEC-004)
-	// Reject if >10% of entries are malformed, indicating possible attack or corruption
-	if totalEntries > 0 && malformedEntries > totalEntries/10 {
-		c.logger.Warn("Excessive malformed entries in consensus", 
+	// Reject if malformed entries exceed threshold, indicating possible attack or corruption
+	malformedThreshold := totalEntries * maxMalformedEntryRate / 100
+	if totalEntries > 0 && malformedEntries > malformedThreshold {
+		c.logger.Warn("Excessive malformed entries in consensus",
 			"malformed", malformedEntries, "total", totalEntries)
-		return nil, fmt.Errorf("excessive malformed entries in consensus: %d/%d (>10%%)", 
-			malformedEntries, totalEntries)
+		return nil, fmt.Errorf("excessive malformed entries in consensus: %d/%d (>%d%%)",
+			malformedEntries, totalEntries, maxMalformedEntryRate)
 	}
 
 	// Warn if excessive port parse errors (SEC-014)
-	if totalEntries > 0 && portParseErrors > totalEntries/5 {
+	portErrorThreshold := totalEntries * maxPortParseErrorRate / 100
+	if totalEntries > 0 && portParseErrors > portErrorThreshold {
 		c.logger.Warn("Excessive port parse errors in consensus",
 			"port_errors", portParseErrors, "total", totalEntries)
 	}
 
 	if malformedEntries > 0 || portParseErrors > 0 {
 		c.logger.Debug("Consensus parsing completed with some errors",
-			"malformed", malformedEntries, "port_errors", portParseErrors, 
+			"malformed", malformedEntries, "port_errors", portParseErrors,
 			"total", totalEntries, "valid", len(relays))
 	}
 
