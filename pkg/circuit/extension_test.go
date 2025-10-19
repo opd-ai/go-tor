@@ -71,7 +71,7 @@ func TestGenerateHandshakeData(t *testing.T) {
 		handshakeType HandshakeType
 		expectedLen   int
 	}{
-		{"NTor", HandshakeTypeNTor, 32},
+		{"NTor", HandshakeTypeNTor, 84}, // NODEID (20) + KEYID (32) + CLIENT_PK (32)
 		{"TAP", HandshakeTypeTAP, 144},
 	}
 
