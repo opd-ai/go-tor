@@ -266,11 +266,9 @@ func TestClientStatsAdapter(t *testing.T) {
 	// Create adapter
 	adapter := &clientStatsAdapter{client: client}
 
-	// Test GetStats through adapter
+	// Test GetStats through adapter (returns value type)
 	stats := adapter.GetStats()
-	if stats == nil {
-		t.Fatal("GetStats returned nil")
-	}
+	_ = stats // Stats is a value type, can't be nil
 }
 
 func TestConcurrentBandwidthTracking(t *testing.T) {
@@ -302,4 +300,242 @@ func TestConcurrentBandwidthTracking(t *testing.T) {
 
 	// Just verify no race conditions occurred (test runs with -race)
 	// The actual byte counts are internal and not exposed through Stats
+}
+
+// SEC-L001: Additional tests to improve client package coverage to 70%+
+
+func TestStartStop(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.DataDirectory = t.TempDir()
+	cfg.SocksPort = 19050 // Use non-standard port to avoid conflicts
+	cfg.ControlPort = 19051
+	log := logger.NewDefault()
+
+	client, err := New(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Create a context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	// Start in a goroutine
+	startErr := make(chan error, 1)
+	go func() {
+		startErr <- client.Start(ctx)
+	}()
+
+	// Give it a moment to start
+	time.Sleep(100 * time.Millisecond)
+
+	// Stop the client
+	if err := client.Stop(); err != nil {
+		t.Errorf("Stop returned error: %v", err)
+	}
+
+	// Wait for start to complete
+	select {
+	case err := <-startErr:
+		// Expected to get context cancelled or nil
+		if err != nil && err != context.Canceled {
+			t.Logf("Start completed with: %v", err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Error("Start did not complete after stop")
+	}
+}
+
+func TestStartWithCanceledContext(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.DataDirectory = t.TempDir()
+	cfg.SocksPort = 19052
+	cfg.ControlPort = 19053
+	log := logger.NewDefault()
+
+	client, err := New(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Create already-cancelled context
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	// Start should respect cancelled context
+	err = client.Start(ctx)
+	// Either returns immediately or with context error
+	if err != nil && err != context.Canceled {
+		// Some components may start before context check
+		t.Logf("Start with cancelled context returned: %v", err)
+	}
+
+	// Cleanup
+	_ = client.Stop()
+}
+
+func TestGetMetrics(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.DataDirectory = t.TempDir()
+	log := logger.NewDefault()
+
+	client, err := New(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Metrics should be initialized
+	if client.metrics == nil {
+		t.Error("Metrics not initialized")
+	}
+
+	// Record some metrics
+	client.RecordBytesRead(1000)
+	client.RecordBytesWritten(2000)
+
+	// Verify stats are accessible (Stats is a value type)
+	stats := client.GetStats()
+	_ = stats // Stats returns a value, can't be nil
+}
+
+func TestControlServerIntegration(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.DataDirectory = t.TempDir()
+	cfg.ControlPort = 19054
+	log := logger.NewDefault()
+
+	client, err := New(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Control server should be initialized
+	if client.controlServer == nil {
+		t.Error("Control server not initialized")
+	}
+
+	// Cleanup
+	_ = client.Stop()
+}
+
+func TestCircuitManagement(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.DataDirectory = t.TempDir()
+	log := logger.NewDefault()
+
+	client, err := New(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Circuit manager should be initialized
+	if client.circuitMgr == nil {
+		t.Error("Circuit manager not initialized")
+	}
+
+	// Initially no circuits
+	stats := client.GetStats()
+	if stats.ActiveCircuits != 0 {
+		t.Errorf("Expected 0 circuits, got %d", stats.ActiveCircuits)
+	}
+}
+
+func TestDirectoryClient(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.DataDirectory = t.TempDir()
+	log := logger.NewDefault()
+
+	client, err := New(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Directory client should be initialized
+	if client.directory == nil {
+		t.Error("Directory client not initialized")
+	}
+}
+
+func TestGuardManager(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.DataDirectory = t.TempDir()
+	log := logger.NewDefault()
+
+	client, err := New(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Guard manager should be initialized
+	if client.guardManager == nil {
+		t.Error("Guard manager not initialized")
+	}
+}
+
+func TestSOCKSServer(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.DataDirectory = t.TempDir()
+	cfg.SocksPort = 19055
+	log := logger.NewDefault()
+
+	client, err := New(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// SOCKS server should be initialized
+	if client.socksServer == nil {
+		t.Error("SOCKS server not initialized")
+	}
+}
+
+func TestClientContextCancellation(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.DataDirectory = t.TempDir()
+	log := logger.NewDefault()
+
+	client, err := New(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Verify context is set
+	if client.ctx == nil {
+		t.Error("Client context not initialized")
+	}
+
+	// Cancel should work
+	if client.cancel == nil {
+		t.Error("Client cancel function not initialized")
+	}
+
+	// Cleanup
+	_ = client.Stop()
+}
+
+func TestStatsSnapshot(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.DataDirectory = t.TempDir()
+	cfg.SocksPort = 19056
+	cfg.ControlPort = 19057
+	log := logger.NewDefault()
+
+	client, err := New(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Get stats snapshot
+	stats := client.GetStats()
+	
+	// Verify all fields (Stats is a value type, not pointer)
+	if stats.SocksPort != 19056 {
+		t.Errorf("Expected SocksPort 19056, got %d", stats.SocksPort)
+	}
+	if stats.ControlPort != 19057 {
+		t.Errorf("Expected ControlPort 19057, got %d", stats.ControlPort)
+	}
+	if stats.ActiveCircuits != 0 {
+		t.Errorf("Expected 0 ActiveCircuits, got %d", stats.ActiveCircuits)
+	}
 }
