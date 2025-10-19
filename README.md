@@ -104,46 +104,99 @@ cd go-tor
 make build
 ```
 
-### Running
+### Running (Zero Configuration)
+
+The easiest way to get started - just run the binary with no arguments:
 
 ```bash
-# Run with default settings (SOCKS on 9050, Control on 9051)
+# Zero-configuration mode (auto-detects data directory and settings)
 ./bin/tor-client
 
-# Run with custom ports
-./bin/tor-client -socks-port 9150 -control-port 9151
+# Custom SOCKS port
+./bin/tor-client -socks-port 9150
 
-# Run with configuration file
+# Custom data directory
+./bin/tor-client -data-dir ~/.tor
+
+# With configuration file
 ./bin/tor-client -config /etc/tor/torrc
-
-# Configuration file with command-line overrides
-./bin/tor-client -config /etc/tor/torrc -log-level debug
 
 # Show version
 ./bin/tor-client -version
 ```
 
-**Note**: The client is now **functional** for basic Tor usage. You can use it as a SOCKS5 proxy to route traffic through the Tor network. Full circuit extension cryptography is under development.
+**Note**: The client now works in **zero-configuration mode** by default. It automatically:
+- Detects and creates appropriate data directories for your OS
+- Selects available ports
+- Connects to Tor network and builds circuits
+- Starts SOCKS5 proxy without any setup
+
+First connection takes 30-60 seconds. Subsequent starts are faster.
 
 ## Usage
 
-### As a Library
+### As a Library (Zero Configuration)
+
+The simplest way to use go-tor in your application:
 
 ```go
 import (
-    "github.com/opd-ai/go-tor/pkg/circuit"
+    "github.com/opd-ai/go-tor/pkg/client"
+)
+
+func main() {
+    // Zero-configuration - just one function call!
+    torClient, err := client.Connect()
+    if err != nil {
+        panic(err)
+    }
+    defer torClient.Close()
+    
+    // Get SOCKS5 proxy URL
+    proxyURL := torClient.ProxyURL()  // "socks5://127.0.0.1:9050"
+    
+    // Wait until ready (optional)
+    torClient.WaitUntilReady(60 * time.Second)
+    
+    // Use with your HTTP client
+    // ... configure HTTP client to use proxyURL
+}
+```
+
+### As a Library (With Custom Options)
+
+For more control over configuration:
+
+```go
+import (
+    "github.com/opd-ai/go-tor/pkg/client"
     "github.com/opd-ai/go-tor/pkg/config"
 )
 
-// Create configuration
-cfg := config.DefaultConfig()
-cfg.SocksPort = 9050
+// Option 1: Use simplified API with options
+torClient, err := client.ConnectWithOptions(&client.Options{
+    SocksPort:     9150,
+    ControlPort:   9151,
+    DataDirectory: "/custom/path",
+    LogLevel:      "debug",
+})
 
-// Create circuit manager
-manager := circuit.NewManager()
-circuit, err := manager.CreateCircuit()
-// ... build and use circuit
+// Option 2: Use full configuration for advanced usage
+cfg := config.DefaultConfig()
+cfg.SocksPort = 9150
+cfg.CircuitBuildTimeout = 90 * time.Second
+log := logger.NewDefault()
+
+torClient, err := client.New(cfg, log)
+if err != nil {
+    panic(err)
+}
+
+err = torClient.Start(context.Background())
+// ... use client
 ```
+
+See [examples/zero-config](examples/zero-config) for a complete working example.
 
 ### As a SOCKS Proxy
 

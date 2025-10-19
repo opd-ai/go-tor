@@ -4,6 +4,8 @@ package config
 import (
 	"fmt"
 	"time"
+
+	"github.com/opd-ai/go-tor/pkg/autoconfig"
 )
 
 // Config represents the Tor client configuration
@@ -55,12 +57,21 @@ type OnionServiceConfig struct {
 	ClientAuth  map[string]string // Client authorization keys
 }
 
-// DefaultConfig returns a configuration with sensible defaults
+// DefaultConfig returns a configuration with sensible defaults.
+// It automatically detects the appropriate data directory for the current platform
+// and uses ports that work without special privileges.
 func DefaultConfig() *Config {
+	// Auto-detect data directory for current platform
+	dataDir, err := autoconfig.GetDefaultDataDir()
+	if err != nil {
+		// Fallback to current directory if auto-detection fails
+		dataDir = "./go-tor-data"
+	}
+
 	return &Config{
 		SocksPort:           9050,
 		ControlPort:         9051,
-		DataDirectory:       "/var/lib/tor",
+		DataDirectory:       dataDir,
 		CircuitBuildTimeout: 60 * time.Second,
 		MaxCircuitDirtiness: 10 * time.Minute,
 		NewCircuitPeriod:    30 * time.Second,
