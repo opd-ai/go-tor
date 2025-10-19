@@ -1,0 +1,99 @@
+Specification,Section,Requirement Type,Requirement Description,Implementation Status,Implementation Location,Compliance Level,Gap Description,Priority,Notes
+tor-spec.txt,0.1,MUST,Use protocol version 3 or higher,Implemented,pkg/protocol/protocol.go,100%,,P0,Link protocol v5 supported
+tor-spec.txt,0.2,MUST,Support fixed-length cells (514 bytes),Implemented,pkg/cell/cell.go,100%,,P0,Full implementation
+tor-spec.txt,0.2,MUST,Support variable-length cells,Implemented,pkg/cell/cell.go,100%,,P0,Full implementation
+tor-spec.txt,0.3,MUST,Implement cell types: PADDING CREATE CREATED RELAY DESTROY,Implemented,pkg/cell/cell.go,100%,,P0,All required cell types
+tor-spec.txt,0.3,SHOULD,Implement cell types: CREATE_FAST CREATED_FAST,Not Required,N/A,0%,Client-only mode,,Not needed for client
+tor-spec.txt,0.4,MUST,Encode CircuitID properly based on link version,Implemented,pkg/cell/cell.go,100%,,P0,Proper encoding
+tor-spec.txt,1,MUST,Support TLS for all connections to relays,Implemented,pkg/connection/connection.go,100%,,P0,TLS 1.2+
+tor-spec.txt,2,MUST,Use specified cipher suites for TLS,Implemented,pkg/connection/connection.go,100%,,P0,AEAD with forward secrecy
+tor-spec.txt,2,MUST,Validate relay certificates,Implemented,pkg/connection/connection.go,100%,,P0,Certificate validation
+tor-spec.txt,2,SHOULD,Implement certificate pinning,Partial,pkg/connection/connection.go,60%,Enhanced pinning needed,P2,Basic validation present
+tor-spec.txt,3,MUST,Negotiate link protocol version,Implemented,pkg/protocol/protocol.go,100%,,P0,VERSIONS cell
+tor-spec.txt,3,MUST,Send VERSIONS cell first,Implemented,pkg/protocol/protocol.go,100%,,P0,Proper handshake
+tor-spec.txt,4,MUST,Implement circuit creation (CREATE/CREATED),Implemented,pkg/circuit/builder.go,100%,,P0,CREATE2/CREATED2
+tor-spec.txt,4,MUST,Implement TAP-based key agreement,Not Required,N/A,0%,Deprecated,,Obsolete - CREATE2 used
+tor-spec.txt,4,MUST,Implement ntor key agreement,Implemented,pkg/circuit/extension.go,100%,,P0,ntor handshake
+tor-spec.txt,4,SHOULD,Implement CREATE_FAST for first hop,Not Implemented,N/A,0%,Optional optimization,P3,Not critical
+tor-spec.txt,5.1,MUST,Implement RELAY cell encryption,Implemented,pkg/circuit/circuit.go,100%,,P0,AES-128-CTR
+tor-spec.txt,5.1,MUST,Implement proper layered encryption,Implemented,pkg/circuit/circuit.go,100%,,P0,Onion encryption
+tor-spec.txt,5.2,MUST,Implement KDF-TOR key derivation,Implemented,pkg/crypto/crypto.go,100%,,P0,Spec compliant
+tor-spec.txt,5.2.1,MUST,Derive forward and backward keys,Implemented,pkg/circuit/extension.go,100%,,P0,Proper key derivation
+tor-spec.txt,5.3,MUST,Implement EXTEND/EXTENDED cells,Implemented,pkg/circuit/extension.go,100%,,P0,EXTEND2/EXTENDED2
+tor-spec.txt,5.3,MUST,Support ntor handshake in EXTEND,Implemented,pkg/circuit/extension.go,100%,,P0,Full support
+tor-spec.txt,5.4,MUST,Implement circuit teardown (DESTROY),Implemented,pkg/circuit/circuit.go,100%,,P0,Proper cleanup
+tor-spec.txt,5.5,MUST,Handle TRUNCATE/TRUNCATED,Implemented,pkg/circuit/circuit.go,100%,,P0,Circuit truncation
+tor-spec.txt,6.1,MUST,Implement RELAY command types,Implemented,pkg/cell/relay.go,100%,,P0,All required types
+tor-spec.txt,6.2,MUST,Implement stream BEGIN,Implemented,pkg/stream/stream.go,100%,,P0,Stream initiation
+tor-spec.txt,6.2,MUST,Implement stream CONNECTED,Implemented,pkg/stream/stream.go,100%,,P0,Connection confirm
+tor-spec.txt,6.2,MUST,Implement stream DATA,Implemented,pkg/stream/stream.go,100%,,P0,Data transfer
+tor-spec.txt,6.2,MUST,Implement stream END,Implemented,pkg/stream/stream.go,100%,,P0,Stream termination
+tor-spec.txt,6.2,SHOULD,Implement SENDME flow control,Implemented,pkg/stream/stream.go,100%,,P1,Flow control
+tor-spec.txt,6.3,MUST,Handle DNS resolution via RELAY_RESOLVE,Implemented,pkg/stream/stream.go,100%,,P0,DNS through Tor
+tor-spec.txt,6.4,SHOULD,Isolate streams on separate circuits,Implemented,pkg/stream/stream.go,100%,,P1,Stream isolation
+tor-spec.txt,7,SHOULD,Implement circuit padding,Partial,pkg/circuit/circuit.go,40%,Full padding-spec compliance,P2,Basic padding only
+tor-spec.txt,7,MAY,Implement adaptive padding,Not Implemented,N/A,0%,Advanced feature,P3,Optional
+dir-spec.txt,1,MUST,Fetch network consensus,Implemented,pkg/directory/directory.go,100%,,P0,Full implementation
+dir-spec.txt,1,MUST,Parse consensus format,Implemented,pkg/directory/directory.go,100%,,P0,Proper parsing
+dir-spec.txt,1,MUST,Validate consensus signatures,Partial,pkg/directory/directory.go,70%,Enhanced validation,P1,Basic validation
+dir-spec.txt,2,MUST,Parse router descriptors,Implemented,pkg/directory/directory.go,100%,,P0,Full support
+dir-spec.txt,2,SHOULD,Cache descriptors,Implemented,pkg/directory/directory.go,100%,,P1,With expiration
+dir-spec.txt,3,MUST,Use directory authorities,Implemented,pkg/directory/directory.go,100%,,P0,Hardcoded list
+dir-spec.txt,3,SHOULD,Update authority list,Not Implemented,N/A,0%,Manual update required,P2,Low priority
+dir-spec.txt,4,MUST,Support HTTP directory protocol,Implemented,pkg/directory/directory.go,100%,,P0,HTTP/1.1
+dir-spec.txt,4,MAY,Support directory tunneling,Not Implemented,N/A,0%,Optional feature,P3,Not needed yet
+dir-spec.txt,5,SHOULD,Implement directory caching,Implemented,pkg/directory/directory.go,100%,,P1,With TTL
+dir-spec.txt,6,MUST,Parse relay flags,Implemented,pkg/directory/directory.go,100%,,P0,Guard/Exit/etc
+rend-spec-v3.txt,1,MUST,Parse v3 onion addresses,Implemented,pkg/onion/onion.go,100%,,P0,Full parsing
+rend-spec-v3.txt,1,MUST,Validate v3 address checksums,Implemented,pkg/onion/onion.go,100%,,P0,Checksum validation
+rend-spec-v3.txt,2,MUST,Compute blinded public keys,Implemented,pkg/onion/onion.go,100%,,P0,SHA3-256 based
+rend-spec-v3.txt,2,MUST,Calculate time periods,Implemented,pkg/onion/onion.go,100%,,P0,Proper rotation
+rend-spec-v3.txt,2.1,MUST,Derive descriptor IDs,Implemented,pkg/onion/onion.go,100%,,P0,DHT routing
+rend-spec-v3.txt,2.2,MUST,Select HSDirs,Implemented,pkg/onion/onion.go,100%,,P0,DHT selection
+rend-spec-v3.txt,2.3,MUST,Fetch descriptors from HSDirs,Implemented,pkg/onion/onion.go,100%,,P0,Full protocol
+rend-spec-v3.txt,2.4,MUST,Parse service descriptors,Implemented,pkg/onion/onion.go,100%,,P0,Descriptor format
+rend-spec-v3.txt,2.5,SHOULD,Cache descriptors,Implemented,pkg/onion/onion.go,100%,,P1,With expiration
+rend-spec-v3.txt,3,MUST,Select introduction points,Implemented,pkg/onion/onion.go,100%,,P0,Random selection
+rend-spec-v3.txt,3,MUST,Build circuits to introduction points,Implemented,pkg/onion/onion.go,100%,,P0,3-hop circuits
+rend-spec-v3.txt,3.1,MUST,Construct INTRODUCE1 cells,Implemented,pkg/onion/onion.go,100%,,P0,Spec compliant
+rend-spec-v3.txt,3.2,MUST,Send INTRODUCE1 to intro point,Implemented,pkg/onion/onion.go,100%,,P0,Full protocol
+rend-spec-v3.txt,3.3,MUST,Handle INTRODUCE_ACK,Implemented,pkg/onion/onion.go,100%,,P0,Proper handling
+rend-spec-v3.txt,4,MUST,Select rendezvous points,Implemented,pkg/onion/onion.go,100%,,P0,Random selection
+rend-spec-v3.txt,4,MUST,Send ESTABLISH_RENDEZVOUS,Implemented,pkg/onion/onion.go,100%,,P0,Rendezvous setup
+rend-spec-v3.txt,4,MUST,Wait for RENDEZVOUS2,Implemented,pkg/onion/onion.go,100%,,P0,Connection complete
+rend-spec-v3.txt,4.1,MUST,Complete DH handshake at rendezvous,Implemented,pkg/onion/onion.go,100%,,P0,Cryptographic handshake
+rend-spec-v3.txt,5,SHOULD,Implement client authorization,Not Implemented,N/A,0%,Cannot access private services,P1,Medium priority
+rend-spec-v3.txt,6,MAY,Implement onion service server,Not Implemented,N/A,0%,Phase 7.4 planned,P2,Low priority for clients
+rend-spec-v3.txt,7,MUST,Handle service unavailable,Implemented,pkg/onion/onion.go,100%,,P0,Proper error handling
+socks-extensions.txt,1,MUST,Implement SOCKS5 base protocol,Implemented,pkg/socks/socks.go,100%,,P0,RFC 1928
+socks-extensions.txt,1,MUST,Support SOCKS5 authentication,Implemented,pkg/socks/socks.go,100%,,P0,Multiple methods
+socks-extensions.txt,2,MUST,Support CONNECT command,Implemented,pkg/socks/socks.go,100%,,P0,Full support
+socks-extensions.txt,2,MUST,Support RESOLVE command,Implemented,pkg/socks/socks.go,100%,,P0,DNS resolution
+socks-extensions.txt,2,SHOULD,Support RESOLVE_PTR,Implemented,pkg/socks/socks.go,100%,,P1,Reverse DNS
+socks-extensions.txt,3,MUST,Handle .onion addresses,Implemented,pkg/socks/socks.go,100%,,P0,v3 onion addresses
+socks-extensions.txt,3,MUST,Reject .exit addresses,Implemented,pkg/socks/socks.go,100%,,P0,Security measure
+socks-extensions.txt,4,SHOULD,Implement stream isolation,Implemented,pkg/socks/socks.go,100%,,P1,Per-connection isolation
+socks-extensions.txt,5,SHOULD,Support extended error codes,Implemented,pkg/socks/socks.go,100%,,P1,Detailed errors
+control-spec.txt,1,SHOULD,Implement control protocol,Implemented,pkg/control/control.go,100%,,P1,TCP control port
+control-spec.txt,2,SHOULD,Support authentication,Implemented,pkg/control/control.go,100%,,P1,Cookie/password auth
+control-spec.txt,3.1,SHOULD,Implement SETCONF,Implemented,pkg/control/control.go,100%,,P1,Configuration
+control-spec.txt,3.2,SHOULD,Implement GETCONF,Implemented,pkg/control/control.go,100%,,P1,Configuration query
+control-spec.txt,3.3,SHOULD,Implement GETINFO,Implemented,pkg/control/control.go,100%,,P1,Status info
+control-spec.txt,3.4,MAY,Implement SETEVENTS,Implemented,pkg/control/events.go,100%,,P2,Event subscription
+control-spec.txt,4,SHOULD,Emit CIRC events,Implemented,pkg/control/events.go,100%,,P1,Circuit events
+control-spec.txt,4,SHOULD,Emit STREAM events,Implemented,pkg/control/events.go,100%,,P1,Stream events
+control-spec.txt,4,MAY,Emit BW events,Implemented,pkg/control/events.go,100%,,P2,Bandwidth events
+control-spec.txt,4,MAY,Emit ORCONN events,Implemented,pkg/control/events.go,100%,,P2,OR connection events
+control-spec.txt,4,MAY,Emit additional events,Implemented,pkg/control/events.go,100%,,P2,NEWDESC GUARD NS
+control-spec.txt,5,MAY,Support async events,Implemented,pkg/control/events.go,100%,,P2,Event notification
+padding-spec.txt,1,SHOULD,Implement circuit padding,Partial,pkg/circuit/circuit.go,40%,Full spec compliance,P2,Basic padding only
+padding-spec.txt,2,SHOULD,Implement APE padding,Not Implemented,N/A,0%,Advanced padding,P3,Optional
+padding-spec.txt,3,MAY,Implement connection padding,Not Implemented,N/A,0%,Optional feature,P3,Low priority
+path-spec.txt,1,MUST,Implement guard selection,Implemented,pkg/path/guards.go,100%,,P0,Guard rotation
+path-spec.txt,1,MUST,Persist guard nodes,Implemented,pkg/path/guards.go,100%,,P0,Across restarts
+path-spec.txt,2,MUST,Select middle relays,Implemented,pkg/path/path.go,100%,,P0,Random selection
+path-spec.txt,2,MUST,Select exit relays,Implemented,pkg/path/path.go,100%,,P0,Based on policy
+path-spec.txt,3,MUST,Avoid relay family conflicts,Implemented,pkg/path/path.go,100%,,P0,Family checking
+path-spec.txt,3,MUST,Avoid subnet conflicts,Implemented,pkg/path/path.go,100%,,P0,/16 subnet check
+path-spec.txt,4,SHOULD,Use bandwidth weights,Implemented,pkg/path/path.go,100%,,P1,From consensus
+path-spec.txt,5,SHOULD,Implement path bias detection,Not Implemented,N/A,0%,Advanced feature,P2,Low priority
