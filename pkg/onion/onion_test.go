@@ -921,3 +921,434 @@ func BenchmarkFetchDescriptor(b *testing.B) {
 		hsdir.FetchDescriptor(ctx, addr, hsdirs)
 	}
 }
+
+// TestIntroductionProtocol tests the introduction protocol handler
+func TestIntroductionProtocol(t *testing.T) {
+	log := logger.NewDefault()
+	intro := NewIntroductionProtocol(log)
+
+	if intro == nil {
+		t.Fatal("NewIntroductionProtocol returned nil")
+	}
+
+	if intro.logger == nil {
+		t.Error("IntroductionProtocol logger is nil")
+	}
+}
+
+// TestSelectIntroductionPoint tests introduction point selection
+func TestSelectIntroductionPoint(t *testing.T) {
+	log := logger.NewDefault()
+	intro := NewIntroductionProtocol(log)
+
+	tests := []struct {
+		name        string
+		descriptor  *Descriptor
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:        "nil descriptor",
+			descriptor:  nil,
+			wantErr:     true,
+			errContains: "descriptor is nil",
+		},
+		{
+			name: "no introduction points",
+			descriptor: &Descriptor{
+				Version:     3,
+				IntroPoints: []IntroductionPoint{},
+			},
+			wantErr:     true,
+			errContains: "no introduction points available",
+		},
+		{
+			name: "valid descriptor with one intro point",
+			descriptor: &Descriptor{
+				Version: 3,
+				IntroPoints: []IntroductionPoint{
+					{
+						OnionKey: make([]byte, 32),
+						AuthKey:  make([]byte, 32),
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid descriptor with multiple intro points",
+			descriptor: &Descriptor{
+				Version: 3,
+				IntroPoints: []IntroductionPoint{
+					{OnionKey: make([]byte, 32), AuthKey: make([]byte, 32)},
+					{OnionKey: make([]byte, 32), AuthKey: make([]byte, 32)},
+					{OnionKey: make([]byte, 32), AuthKey: make([]byte, 32)},
+				},
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			point, err := intro.SelectIntroductionPoint(tt.descriptor)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("Expected error but got none")
+				} else if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
+					t.Errorf("Error message %q does not contain %q", err.Error(), tt.errContains)
+				}
+				if point != nil {
+					t.Error("Expected nil introduction point on error")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+				if point == nil {
+					t.Error("Expected introduction point but got nil")
+				}
+			}
+		})
+	}
+}
+
+// TestBuildIntroduce1Cell tests INTRODUCE1 cell construction
+func TestBuildIntroduce1Cell(t *testing.T) {
+	log := logger.NewDefault()
+	intro := NewIntroductionProtocol(log)
+
+	rendezvousCookie := make([]byte, 20)
+	for i := range rendezvousCookie {
+		rendezvousCookie[i] = byte(i)
+	}
+
+	tests := []struct {
+		name        string
+		request     *IntroduceRequest
+		wantErr     bool
+		errContains string
+		checkSize   bool
+		minSize     int
+	}{
+		{
+			name:        "nil request",
+			request:     nil,
+			wantErr:     true,
+			errContains: "introduce request is nil",
+		},
+		{
+			name: "nil introduction point",
+			request: &IntroduceRequest{
+				IntroPoint:       nil,
+				RendezvousCookie: rendezvousCookie,
+			},
+			wantErr:     true,
+			errContains: "introduction point is nil",
+		},
+		{
+			name: "invalid rendezvous cookie length",
+			request: &IntroduceRequest{
+				IntroPoint:       &IntroductionPoint{AuthKey: make([]byte, 32)},
+				RendezvousCookie: make([]byte, 10), // Wrong length
+			},
+			wantErr:     true,
+			errContains: "invalid rendezvous cookie length",
+		},
+		{
+			name: "valid request with auth key",
+			request: &IntroduceRequest{
+				IntroPoint: &IntroductionPoint{
+					AuthKey: make([]byte, 32),
+				},
+				RendezvousCookie: rendezvousCookie,
+				RendezvousPoint:  "test-rendezvous-point",
+				OnionKey:         make([]byte, 32),
+			},
+			wantErr:   false,
+			checkSize: true,
+			minSize:   75, // LEGACY_KEY_ID(20) + AUTH_KEY_TYPE(1) + AUTH_KEY_LEN(2) + AUTH_KEY(32) + EXT(1) + ENCRYPTED(>=20)
+		},
+		{
+			name: "valid request without auth key",
+			request: &IntroduceRequest{
+				IntroPoint:       &IntroductionPoint{},
+				RendezvousCookie: rendezvousCookie,
+				RendezvousPoint:  "test-rendezvous-point",
+			},
+			wantErr:   false,
+			checkSize: true,
+			minSize:   75,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data, err := intro.BuildIntroduce1Cell(tt.request)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("Expected error but got none")
+				} else if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
+					t.Errorf("Error message %q does not contain %q", err.Error(), tt.errContains)
+				}
+				if data != nil {
+					t.Error("Expected nil data on error")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+				if data == nil {
+					t.Error("Expected data but got nil")
+				}
+				if tt.checkSize && len(data) < tt.minSize {
+					t.Errorf("Cell data too small: got %d bytes, expected at least %d", len(data), tt.minSize)
+				}
+			}
+		})
+	}
+}
+
+// TestCreateIntroductionCircuit tests introduction circuit creation
+func TestCreateIntroductionCircuit(t *testing.T) {
+	log := logger.NewDefault()
+	intro := NewIntroductionProtocol(log)
+	ctx := context.Background()
+
+	tests := []struct {
+		name        string
+		introPoint  *IntroductionPoint
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:        "nil introduction point",
+			introPoint:  nil,
+			wantErr:     true,
+			errContains: "introduction point is nil",
+		},
+		{
+			name: "valid introduction point",
+			introPoint: &IntroductionPoint{
+				OnionKey: make([]byte, 32),
+				AuthKey:  make([]byte, 32),
+			},
+			wantErr: false,
+		},
+		{
+			name: "introduction point with link specifiers",
+			introPoint: &IntroductionPoint{
+				OnionKey: make([]byte, 32),
+				AuthKey:  make([]byte, 32),
+				LinkSpecifiers: []LinkSpecifier{
+					{Type: 0, Data: []byte{192, 168, 1, 1}},
+				},
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			circuitID, err := intro.CreateIntroductionCircuit(ctx, tt.introPoint)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("Expected error but got none")
+				} else if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
+					t.Errorf("Error message %q does not contain %q", err.Error(), tt.errContains)
+				}
+				if circuitID != 0 {
+					t.Errorf("Expected circuit ID 0 on error, got %d", circuitID)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+				if circuitID == 0 {
+					t.Error("Expected non-zero circuit ID")
+				}
+			}
+		})
+	}
+}
+
+// TestSendIntroduce1 tests sending INTRODUCE1 cells
+func TestSendIntroduce1(t *testing.T) {
+	log := logger.NewDefault()
+	intro := NewIntroductionProtocol(log)
+	ctx := context.Background()
+
+	tests := []struct {
+		name        string
+		circuitID   uint32
+		data        []byte
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:        "empty data",
+			circuitID:   1000,
+			data:        []byte{},
+			wantErr:     true,
+			errContains: "introduce1 data is empty",
+		},
+		{
+			name:      "valid data",
+			circuitID: 1000,
+			data:      make([]byte, 100),
+			wantErr:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := intro.SendIntroduce1(ctx, tt.circuitID, tt.data)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("Expected error but got none")
+				} else if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
+					t.Errorf("Error message %q does not contain %q", err.Error(), tt.errContains)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+			}
+		})
+	}
+}
+
+// TestConnectToOnionService tests the full connection orchestration
+func TestConnectToOnionService(t *testing.T) {
+	log := logger.NewDefault()
+	client := NewClient(log)
+
+	// Create a test address
+	pubkey, _, _ := ed25519.GenerateKey(rand.Reader)
+	addr := &Address{
+		Version: V3,
+		Pubkey:  pubkey,
+	}
+	addr.Raw = addr.Encode()
+
+	// Create a mock descriptor with introduction points
+	desc := &Descriptor{
+		Version:     3,
+		Address:     addr,
+		IntroPoints: []IntroductionPoint{
+			{
+				OnionKey: make([]byte, 32),
+				AuthKey:  make([]byte, 32),
+			},
+		},
+		CreatedAt: time.Now(),
+		Lifetime:  3 * time.Hour,
+	}
+
+	// Cache the descriptor so we don't need HSDirs
+	client.cache.Put(addr, desc)
+
+	ctx := context.Background()
+
+	// Test connection
+	circuitID, err := client.ConnectToOnionService(ctx, addr)
+	if err != nil {
+		t.Errorf("Failed to connect to onion service: %v", err)
+	}
+
+	if circuitID == 0 {
+		t.Error("Expected non-zero circuit ID")
+	}
+}
+
+// TestIntroduce1CellFormat tests the format of INTRODUCE1 cells
+func TestIntroduce1CellFormat(t *testing.T) {
+	log := logger.NewDefault()
+	intro := NewIntroductionProtocol(log)
+
+	rendezvousCookie := make([]byte, 20)
+	for i := range rendezvousCookie {
+		rendezvousCookie[i] = byte(i)
+	}
+
+	req := &IntroduceRequest{
+		IntroPoint: &IntroductionPoint{
+			AuthKey: make([]byte, 32),
+		},
+		RendezvousCookie: rendezvousCookie,
+		RendezvousPoint:  "test-rp",
+		OnionKey:         make([]byte, 32),
+	}
+
+	data, err := intro.BuildIntroduce1Cell(req)
+	if err != nil {
+		t.Fatalf("Failed to build INTRODUCE1 cell: %v", err)
+	}
+
+	// Verify structure
+	if len(data) < 23 { // Minimum: LEGACY_KEY_ID(20) + AUTH_KEY_TYPE(1) + AUTH_KEY_LEN(2)
+		t.Fatalf("Cell data too short: %d bytes", len(data))
+	}
+
+	// Check LEGACY_KEY_ID is zero
+	legacyKeyID := data[0:20]
+	if !bytes.Equal(legacyKeyID, make([]byte, 20)) {
+		t.Error("LEGACY_KEY_ID should be all zeros for v3")
+	}
+
+	// Check AUTH_KEY_TYPE
+	authKeyType := data[20]
+	if authKeyType != 0x02 {
+		t.Errorf("AUTH_KEY_TYPE should be 0x02 (ed25519), got 0x%02x", authKeyType)
+	}
+
+	// Check AUTH_KEY_LEN
+	authKeyLen := uint16(data[21])<<8 | uint16(data[22])
+	if authKeyLen != 32 {
+		t.Errorf("AUTH_KEY_LEN should be 32, got %d", authKeyLen)
+	}
+}
+
+// BenchmarkSelectIntroductionPoint benchmarks introduction point selection
+func BenchmarkSelectIntroductionPoint(b *testing.B) {
+	log := logger.NewDefault()
+	intro := NewIntroductionProtocol(log)
+
+	desc := &Descriptor{
+		Version: 3,
+		IntroPoints: []IntroductionPoint{
+			{OnionKey: make([]byte, 32), AuthKey: make([]byte, 32)},
+			{OnionKey: make([]byte, 32), AuthKey: make([]byte, 32)},
+			{OnionKey: make([]byte, 32), AuthKey: make([]byte, 32)},
+		},
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		intro.SelectIntroductionPoint(desc)
+	}
+}
+
+// BenchmarkBuildIntroduce1Cell benchmarks INTRODUCE1 cell construction
+func BenchmarkBuildIntroduce1Cell(b *testing.B) {
+	log := logger.NewDefault()
+	intro := NewIntroductionProtocol(log)
+
+	req := &IntroduceRequest{
+		IntroPoint: &IntroductionPoint{
+			AuthKey: make([]byte, 32),
+		},
+		RendezvousCookie: make([]byte, 20),
+		RendezvousPoint:  "test-rp",
+		OnionKey:         make([]byte, 32),
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		intro.BuildIntroduce1Cell(req)
+	}
+}

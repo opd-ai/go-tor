@@ -690,5 +690,265 @@ func (h *HSDir) fetchFromHSDir(ctx context.Context, hsdir *HSDirectory, descript
 	return desc, nil
 }
 
-// TODO: Implement introduction point protocol (Phase 7.3.3)
+// IntroductionProtocol handles introduction point operations for onion services
+type IntroductionProtocol struct {
+	logger *logger.Logger
+}
+
+// NewIntroductionProtocol creates a new introduction protocol handler
+func NewIntroductionProtocol(log *logger.Logger) *IntroductionProtocol {
+	if log == nil {
+		log = logger.NewDefault()
+	}
+
+	return &IntroductionProtocol{
+		logger: log.Component("intro-protocol"),
+	}
+}
+
+// SelectIntroductionPoint selects an appropriate introduction point from a descriptor
+// Per Tor spec (rend-spec-v3.txt): Clients should pick a random introduction point
+func (ip *IntroductionProtocol) SelectIntroductionPoint(desc *Descriptor) (*IntroductionPoint, error) {
+	if desc == nil {
+		return nil, fmt.Errorf("descriptor is nil")
+	}
+
+	if len(desc.IntroPoints) == 0 {
+		return nil, fmt.Errorf("no introduction points available in descriptor")
+	}
+
+	// For Phase 7.3.3, select the first available introduction point
+	// In a full implementation, this would:
+	// 1. Filter out introduction points we've tried and failed
+	// 2. Randomly select from remaining points
+	// 3. Consider network conditions and performance
+	selected := &desc.IntroPoints[0]
+
+	ip.logger.Debug("Selected introduction point",
+		"intro_points_available", len(desc.IntroPoints),
+		"selected_index", 0)
+
+	return selected, nil
+}
+
+// IntroduceRequest represents an INTRODUCE1 request
+type IntroduceRequest struct {
+	IntroPoint     *IntroductionPoint // Target introduction point
+	RendezvousCookie []byte           // Rendezvous cookie (20 bytes)
+	RendezvousPoint string            // Rendezvous point fingerprint
+	OnionKey       []byte             // Client's ephemeral onion key
+}
+
+// BuildIntroduce1Cell constructs an INTRODUCE1 cell for the introduction protocol
+// Per Tor spec (rend-spec-v3.txt section 3.2):
+// INTRODUCE1 {
+//   LEGACY_KEY_ID     [20 bytes]
+//   AUTH_KEY_TYPE     [1 byte]
+//   AUTH_KEY_LEN      [2 bytes]
+//   AUTH_KEY          [AUTH_KEY_LEN bytes]
+//   EXTENSIONS        [N bytes]
+//   ENCRYPTED_DATA    [remaining bytes]
+// }
+func (ip *IntroductionProtocol) BuildIntroduce1Cell(req *IntroduceRequest) ([]byte, error) {
+	if req == nil {
+		return nil, fmt.Errorf("introduce request is nil")
+	}
+	if req.IntroPoint == nil {
+		return nil, fmt.Errorf("introduction point is nil")
+	}
+	if len(req.RendezvousCookie) != 20 {
+		return nil, fmt.Errorf("invalid rendezvous cookie length: %d, expected 20", len(req.RendezvousCookie))
+	}
+
+	ip.logger.Debug("Building INTRODUCE1 cell",
+		"rendezvous_point", req.RendezvousPoint)
+
+	var buf bytes.Buffer
+
+	// LEGACY_KEY_ID (20 bytes) - set to zero for v3
+	legacyKeyID := make([]byte, 20)
+	buf.Write(legacyKeyID)
+
+	// AUTH_KEY_TYPE (1 byte) - 0x02 for ed25519
+	buf.WriteByte(0x02)
+
+	// AUTH_KEY_LEN (2 bytes) - 32 bytes for ed25519
+	authKeyLen := uint16(32)
+	if len(req.IntroPoint.AuthKey) > 0 {
+		authKeyLen = uint16(len(req.IntroPoint.AuthKey))
+	}
+	binary.BigEndian.PutUint16(buf.Bytes()[len(buf.Bytes()):len(buf.Bytes())+2], authKeyLen)
+	buf.Write(make([]byte, 2)) // placeholder, then overwrite
+	buf.Truncate(buf.Len() - 2)
+	authKeyLenBytes := make([]byte, 2)
+	binary.BigEndian.PutUint16(authKeyLenBytes, authKeyLen)
+	buf.Write(authKeyLenBytes)
+
+	// AUTH_KEY (AUTH_KEY_LEN bytes)
+	if len(req.IntroPoint.AuthKey) > 0 {
+		buf.Write(req.IntroPoint.AuthKey)
+	} else {
+		// Mock auth key for testing
+		buf.Write(make([]byte, 32))
+	}
+
+	// EXTENSIONS (N bytes) - empty for now
+	buf.WriteByte(0) // N_EXTENSIONS = 0
+
+	// ENCRYPTED_DATA would contain:
+	// - RENDEZVOUS_COOKIE (20 bytes)
+	// - ONION_KEY (32 bytes for x25519)
+	// - LINK_SPECIFIERS for rendezvous point
+	// For Phase 7.3.3, we'll create a simplified version
+	encryptedData := ip.buildEncryptedData(req)
+	buf.Write(encryptedData)
+
+	ip.logger.Debug("Built INTRODUCE1 cell",
+		"total_size", buf.Len(),
+		"encrypted_data_size", len(encryptedData))
+
+	return buf.Bytes(), nil
+}
+
+// buildEncryptedData constructs the encrypted portion of INTRODUCE1
+// In a full implementation, this would be encrypted with the intro point's key
+func (ip *IntroductionProtocol) buildEncryptedData(req *IntroduceRequest) []byte {
+	var buf bytes.Buffer
+
+	// RENDEZVOUS_COOKIE (20 bytes)
+	buf.Write(req.RendezvousCookie)
+
+	// ONION_KEY (32 bytes for x25519)
+	if len(req.OnionKey) > 0 {
+		buf.Write(req.OnionKey)
+	} else {
+		// Mock onion key
+		buf.Write(make([]byte, 32))
+	}
+
+	// LINK_SPECIFIERS for rendezvous point
+	// Format: N_SPEC [1 byte] || LINK_SPEC_1 || ... || LINK_SPEC_N
+	// For Phase 7.3.3, simplified version
+	buf.WriteByte(0) // N_SPEC = 0 (no link specifiers in this phase)
+
+	// In a full implementation, this entire buffer would be encrypted
+	// using the introduction point's encryption key
+
+	return buf.Bytes()
+}
+
+// CreateIntroductionCircuit creates a circuit to an introduction point
+// This is a placeholder for the full circuit creation logic
+func (ip *IntroductionProtocol) CreateIntroductionCircuit(ctx context.Context, introPoint *IntroductionPoint) (uint32, error) {
+	if introPoint == nil {
+		return 0, fmt.Errorf("introduction point is nil")
+	}
+
+	ip.logger.Info("Creating introduction circuit",
+		"link_specifiers_count", len(introPoint.LinkSpecifiers))
+
+	// In Phase 7.3.3, we return a mock circuit ID
+	// In a full implementation (Phase 8), this would:
+	// 1. Use the circuit builder to create a 3-hop circuit
+	// 2. Extend the circuit to the introduction point
+	// 3. Wait for circuit to be established
+	// 4. Return the circuit ID
+
+	// Mock circuit ID for testing
+	circuitID := uint32(1000)
+
+	ip.logger.Debug("Introduction circuit created (mock)",
+		"circuit_id", circuitID)
+
+	return circuitID, nil
+}
+
+// SendIntroduce1 sends an INTRODUCE1 cell over a circuit
+// This is a placeholder for the full send logic
+func (ip *IntroductionProtocol) SendIntroduce1(ctx context.Context, circuitID uint32, introduce1Data []byte) error {
+	if len(introduce1Data) == 0 {
+		return fmt.Errorf("introduce1 data is empty")
+	}
+
+	ip.logger.Info("Sending INTRODUCE1 cell",
+		"circuit_id", circuitID,
+		"data_size", len(introduce1Data))
+
+	// In a full implementation (Phase 8), this would:
+	// 1. Wrap introduce1Data in a RELAY cell with command INTRODUCE1
+	// 2. Send the cell over the circuit
+	// 3. Wait for acknowledgment or timeout
+	// 4. Handle retries and errors
+
+	ip.logger.Debug("INTRODUCE1 cell sent (mock)")
+
+	return nil
+}
+
+// ConnectToOnionService orchestrates the full connection process to an onion service
+// This combines descriptor fetching, introduction point selection, and connection establishment
+func (c *Client) ConnectToOnionService(ctx context.Context, addr *Address) (uint32, error) {
+	c.logger.Info("Connecting to onion service", "address", addr.String())
+
+	// Step 1: Get descriptor (from cache or fetch from HSDirs)
+	desc, err := c.GetDescriptor(ctx, addr)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get descriptor: %w", err)
+	}
+
+	c.logger.Debug("Descriptor retrieved", "intro_points", len(desc.IntroPoints))
+
+	// Step 2: Select an introduction point
+	intro := NewIntroductionProtocol(c.logger)
+	introPoint, err := intro.SelectIntroductionPoint(desc)
+	if err != nil {
+		return 0, fmt.Errorf("failed to select introduction point: %w", err)
+	}
+
+	c.logger.Debug("Introduction point selected")
+
+	// Step 3: Create circuit to introduction point
+	circuitID, err := intro.CreateIntroductionCircuit(ctx, introPoint)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create introduction circuit: %w", err)
+	}
+
+	c.logger.Debug("Introduction circuit created", "circuit_id", circuitID)
+
+	// Step 4: Generate rendezvous cookie and create INTRODUCE1 cell
+	rendezvousCookie := make([]byte, 20)
+	// In production, use crypto/rand
+	// For Phase 7.3.3, use zeros
+	req := &IntroduceRequest{
+		IntroPoint:       introPoint,
+		RendezvousCookie: rendezvousCookie,
+		RendezvousPoint:  "mock-rendezvous-point",
+		OnionKey:         make([]byte, 32), // Mock key
+	}
+
+	introduce1Data, err := intro.BuildIntroduce1Cell(req)
+	if err != nil {
+		return 0, fmt.Errorf("failed to build INTRODUCE1 cell: %w", err)
+	}
+
+	c.logger.Debug("INTRODUCE1 cell built", "size", len(introduce1Data))
+
+	// Step 5: Send INTRODUCE1 cell
+	if err := intro.SendIntroduce1(ctx, circuitID, introduce1Data); err != nil {
+		return 0, fmt.Errorf("failed to send INTRODUCE1: %w", err)
+	}
+
+	c.logger.Info("Successfully initiated connection to onion service",
+		"address", addr.String(),
+		"circuit_id", circuitID)
+
+	// In a full implementation, we would now:
+	// - Wait for INTRODUCE_ACK
+	// - Create rendezvous circuit
+	// - Wait for RENDEZVOUS2
+	// - Complete the connection
+
+	return circuitID, nil
+}
+
 // TODO: Implement rendezvous protocol (Phase 7.3.4)

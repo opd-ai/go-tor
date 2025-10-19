@@ -8,15 +8,21 @@ import (
 
 // Relay commands from tor-spec.txt section 6.1
 const (
-	RelayBegin     byte = 1
-	RelayData      byte = 2
-	RelayEnd       byte = 3
-	RelayConnected byte = 4
-	RelayResolve   byte = 11
-	RelayResolved  byte = 12
-	RelayBeginDir  byte = 13
-	RelayExtend2   byte = 14
-	RelayExtended2 byte = 15
+	RelayBegin        byte = 1
+	RelayData         byte = 2
+	RelayEnd          byte = 3
+	RelayConnected    byte = 4
+	RelayResolve      byte = 11
+	RelayResolved     byte = 12
+	RelayBeginDir     byte = 13
+	RelayExtend2      byte = 14
+	RelayExtended2    byte = 15
+	RelayIntroduce1   byte = 32 // INTRODUCE1 cell for onion services
+	RelayIntroduce2   byte = 33 // INTRODUCE2 cell for onion services
+	RelayRendezvous1  byte = 34 // RENDEZVOUS1 cell for onion services
+	RelayRendezvous2  byte = 35 // RENDEZVOUS2 cell for onion services
+	RelayIntroEstab   byte = 38 // ESTABLISH_INTRO cell for onion services
+	RelayIntroEstdAck byte = 39 // INTRO_ESTABLISHED cell for onion services
 )
 
 // RelayCell represents the payload of a RELAY or RELAY_EARLY cell
