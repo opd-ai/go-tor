@@ -923,13 +923,13 @@ func (c *Client) ConnectToOnionService(ctx context.Context, addr *Address) (uint
 
 	// Step 4: Generate rendezvous cookie and create INTRODUCE1 cell
 	rendezvousCookie := make([]byte, 20)
-	// In production, use crypto/rand
-	// For Phase 7.3.3, use zeros
+	// NOTE: In Phase 7.3.3, using zeros for testing
+	// Phase 8 will use crypto/rand.Read(rendezvousCookie) for production security
 	req := &IntroduceRequest{
 		IntroPoint:       introPoint,
 		RendezvousCookie: rendezvousCookie,
 		RendezvousPoint:  "mock-rendezvous-point",
-		OnionKey:         make([]byte, 32), // Mock key
+		OnionKey:         make([]byte, 32), // Phase 8 will generate real ephemeral key
 	}
 
 	introduce1Data, err := intro.BuildIntroduce1Cell(req)
