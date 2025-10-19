@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/opd-ai/go-tor/pkg/autoconfig"
 	"github.com/opd-ai/go-tor/pkg/circuit"
 	"github.com/opd-ai/go-tor/pkg/config"
 	"github.com/opd-ai/go-tor/pkg/control"
@@ -54,6 +55,16 @@ func New(cfg *config.Config, log *logger.Logger) (*Client, error) {
 	}
 	if log == nil {
 		log = logger.NewDefault()
+	}
+
+	// Ensure data directory exists with proper permissions
+	if err := autoconfig.EnsureDataDir(cfg.DataDirectory); err != nil {
+		return nil, fmt.Errorf("failed to create data directory: %w", err)
+	}
+
+	// Cleanup any temporary files from previous runs
+	if err := autoconfig.CleanupTempFiles(cfg.DataDirectory); err != nil {
+		log.Warn("Failed to cleanup temporary files", "error", err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
