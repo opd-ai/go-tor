@@ -58,7 +58,11 @@ func (b *Builder) BuildCircuit(ctx context.Context, p *path.Path, timeout time.D
 		circuit.SetState(StateFailed)
 		return nil, fmt.Errorf("failed to connect to guard: %w", err)
 	}
-	defer guardConn.Close()
+	defer func() {
+		if err := guardConn.Close(); err != nil {
+			b.logger.Error("Failed to close guard connection", "function", "BuildCircuit", "error", err)
+		}
+	}()
 
 	// Add guard hop
 	if err := circuit.AddHop(&Hop{
@@ -119,7 +123,9 @@ func (b *Builder) connectToRelay(ctx context.Context, address string) (*connecti
 	// Wait for connection to be ready
 	select {
 	case <-ctx.Done():
-		conn.Close()
+		if err := conn.Close(); err != nil {
+			b.logger.Error("Failed to close connection on context cancellation", "function", "connectToRelay", "error", err)
+		}
 		return nil, ctx.Err()
 	case <-time.After(100 * time.Millisecond):
 		// Connection established

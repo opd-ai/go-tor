@@ -78,7 +78,9 @@ func (p *ConnectionPool) Get(ctx context.Context, address string, cfg *connectio
 			}
 			// Connection too old, close it
 			p.logger.Debug("Closing old pooled connection", "address", address, "age", time.Since(pc.createdAt))
-			pc.conn.Close()
+			if err := pc.conn.Close(); err != nil {
+				p.logger.Error("Failed to close old pooled connection", "function", "Get", "address", address, "error", err)
+			}
 			delete(p.connections, key)
 		}
 	}
@@ -124,7 +126,9 @@ func (p *ConnectionPool) Remove(address string) {
 	key := address
 
 	if pc, ok := p.connections[key]; ok {
-		pc.conn.Close()
+		if err := pc.conn.Close(); err != nil {
+			p.logger.Error("Failed to close connection during removal", "function", "Remove", "address", address, "error", err)
+		}
 		delete(p.connections, key)
 		p.logger.Debug("Removed connection from pool", "address", address)
 	}
@@ -139,7 +143,9 @@ func (p *ConnectionPool) CleanupIdle(maxIdleTime time.Duration) {
 	for key, pc := range p.connections {
 		if !pc.inUse && now.Sub(pc.lastUsed) > maxIdleTime {
 			p.logger.Debug("Closing idle connection", "address", key, "idle_time", now.Sub(pc.lastUsed))
-			pc.conn.Close()
+			if err := pc.conn.Close(); err != nil {
+				p.logger.Error("Failed to close idle connection", "function", "CleanupIdle", "address", key, "error", err)
+			}
 			delete(p.connections, key)
 		}
 	}
@@ -154,7 +160,9 @@ func (p *ConnectionPool) CleanupExpired() {
 	for key, pc := range p.connections {
 		if now.Sub(pc.createdAt) > p.maxLifetime {
 			p.logger.Debug("Closing expired connection", "address", key, "age", now.Sub(pc.createdAt))
-			pc.conn.Close()
+			if err := pc.conn.Close(); err != nil {
+				p.logger.Error("Failed to close expired connection", "function", "CleanupExpired", "address", key, "error", err)
+			}
 			delete(p.connections, key)
 		}
 	}
@@ -165,13 +173,17 @@ func (p *ConnectionPool) Close() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	var lastErr error
 	for key, pc := range p.connections {
 		p.logger.Debug("Closing pooled connection", "address", key)
-		pc.conn.Close()
+		if err := pc.conn.Close(); err != nil {
+			p.logger.Error("Failed to close pooled connection", "function", "Close", "address", key, "error", err)
+			lastErr = err
+		}
 	}
 	p.connections = make(map[string]*pooledConnection)
 
-	return nil
+	return lastErr
 }
 
 // Stats returns statistics about the connection pool

@@ -166,7 +166,9 @@ func (s *Server) acceptLoop(ctx context.Context) {
 			s.mu.Unlock()
 			s.logger.Warn("Connection limit reached, rejecting connection",
 				"limit", maxConns, "current", len(s.activeConns), "remote", conn.RemoteAddr())
-			conn.Close()
+			if err := conn.Close(); err != nil {
+				s.logger.Error("Failed to close rejected connection", "function", "acceptLoop", "error", err)
+			}
 			continue
 		}
 
@@ -182,14 +184,19 @@ func (s *Server) acceptLoop(ctx context.Context) {
 // handleConnection handles a SOCKS5 connection
 func (s *Server) handleConnection(ctx context.Context, conn net.Conn) {
 	defer func() {
-		conn.Close()
+		if err := conn.Close(); err != nil {
+			s.logger.Error("Failed to close connection", "function", "handleConnection", "error", err)
+		}
 		s.mu.Lock()
 		delete(s.activeConns, conn)
 		s.mu.Unlock()
 	}()
 
 	// Set read deadline
-	conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+	if err := conn.SetReadDeadline(time.Now().Add(30 * time.Second)); err != nil {
+		s.logger.Error("Failed to set read deadline", "function", "handleConnection", "error", err)
+		return
+	}
 
 	// Handshake - returns username if password auth was used
 	username, err := s.handshake(conn)
@@ -310,7 +317,9 @@ func (s *Server) handshake(conn net.Conn) (string, error) {
 	} else {
 		// No acceptable methods
 		response := []byte{socks5Version, authNoAccept}
-		conn.Write(response)
+		if _, err := conn.Write(response); err != nil {
+			return "", fmt.Errorf("failed to write auth rejection: %w", err)
+		}
 		return "", fmt.Errorf("no acceptable authentication methods")
 	}
 
@@ -482,7 +491,9 @@ func (s *Server) sendReply(conn net.Conn, reply byte, bindAddr net.Addr) error {
 
 			// Add port
 			var port uint16
-			fmt.Sscanf(portStr, "%d", &port)
+			if _, err := fmt.Sscanf(portStr, "%d", &port); err != nil {
+				port = 0
+			}
 			portBytes := make([]byte, 2)
 			binary.BigEndian.PutUint16(portBytes, port)
 			response = append(response, portBytes...)
@@ -510,14 +521,18 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		// Close listener
 		s.closeListener.Do(func() {
 			if s.listener != nil {
-				s.listener.Close()
+				if err := s.listener.Close(); err != nil {
+					s.logger.Error("Failed to close listener", "function", "Shutdown", "error", err)
+				}
 			}
 		})
 
 		// Close active connections
 		s.mu.Lock()
 		for conn := range s.activeConns {
-			conn.Close()
+			if err := conn.Close(); err != nil {
+				s.logger.Error("Failed to close active connection", "function", "Shutdown", "error", err)
+			}
 		}
 		s.mu.Unlock()
 
