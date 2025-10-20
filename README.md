@@ -66,11 +66,13 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 - ✅ **Circuit age enforcement (MaxCircuitDirtiness)**
 - ✅ **Resource pooling (buffers, connections, circuits)**
 - ✅ **Circuit prebuilding for instant availability**
+- ✅ **Adaptive circuit selection (pool-based and legacy modes)**
 - ✅ **Performance tuning configuration options**
 - ✅ **Security hardening (zero HIGH/MEDIUM severity issues)**
 - ✅ **HTTP metrics endpoint (Prometheus, JSON, health, dashboard)**
 
 ### Recently Completed
+- ✅ **Phase 9.4**: Advanced circuit strategies (circuit pool integration, adaptive selection)
 - ✅ **Phase 9.3**: Testing infrastructure enhancement (integration tests, stress tests, benchmarks)
 - ✅ **Phase 9.2**: Onion service production integration
 - ✅ **Phase 9.1**: HTTP metrics and observability (Prometheus, JSON endpoints, HTML dashboard)
@@ -86,7 +88,8 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
   - [x] HTTP metrics endpoint (Phase 9.1)
   - [x] Onion service production integration (Phase 9.2)
   - [x] Testing infrastructure enhancement (Phase 9.3)
-  - [ ] Advanced circuit strategies (Phase 9.4)
+  - [x] Advanced circuit strategies (Phase 9.4)
+  - [ ] Performance benchmarking (Phase 9.5)
   - [ ] Additional onion service features
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture and roadmap.
