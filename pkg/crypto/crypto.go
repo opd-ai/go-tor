@@ -78,7 +78,13 @@ var bufferPool = sync.Pool{
 
 // GetBuffer retrieves a buffer from the pool (SEC-L003)
 func GetBuffer() []byte {
-	bufPtr := bufferPool.Get().(*[]byte)
+	// Safe type assertion with ok check (AUDIT-011)
+	obj := bufferPool.Get()
+	bufPtr, ok := obj.(*[]byte)
+	if !ok {
+		// This should never happen with our pool, but be defensive
+		panic(fmt.Sprintf("bufferPool returned unexpected type: %T", obj))
+	}
 	return (*bufPtr)[:512]
 }
 

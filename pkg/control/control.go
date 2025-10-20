@@ -101,15 +101,19 @@ func (s *Server) Stop() error {
 	// Cancel context
 	s.cancel()
 
-	// Close listener
+	// Close listener (AUDIT-013)
 	if s.listener != nil {
-		s.listener.Close()
+		if err := s.listener.Close(); err != nil {
+			s.logger.Error("Failed to close control protocol listener", "error", err)
+		}
 	}
 
-	// Close all connections
+	// Close all connections (AUDIT-013)
 	s.connsMu.Lock()
 	for conn := range s.conns {
-		conn.Close()
+		if err := conn.Close(); err != nil {
+			s.logger.Error("Failed to close control protocol connection", "error", err)
+		}
 	}
 	s.connsMu.Unlock()
 
@@ -184,8 +188,11 @@ func (s *Server) handleConnection(netConn net.Conn) {
 		default:
 		}
 
-		// Set read deadline
-		netConn.SetReadDeadline(time.Now().Add(30 * time.Second))
+		// Set read deadline (AUDIT-014)
+		if err := netConn.SetReadDeadline(time.Now().Add(30 * time.Second)); err != nil {
+			s.logger.Error("Failed to set read deadline", "error", err)
+			return
+		}
 
 		// Read command
 		line, err := conn.reader.ReadString('\n')
@@ -231,7 +238,10 @@ func (s *Server) handleCommand(conn *connection, line string) {
 		s.handleSetEvents(conn, args)
 	case "QUIT":
 		conn.writeReply(250, "closing connection")
-		conn.conn.Close()
+		// Handle Close error (AUDIT-013)
+		if err := conn.conn.Close(); err != nil {
+			s.logger.Error("Failed to close connection on QUIT", "error", err)
+		}
 	case "PROTOCOLINFO":
 		s.handleProtocolInfo(conn, args)
 	default:
@@ -384,8 +394,12 @@ func (c *connection) writeReply(code int, message string) {
 	defer c.mu.Unlock()
 
 	line := fmt.Sprintf("%d %s\r\n", code, message)
-	c.writer.WriteString(line)
-	c.writer.Flush()
+	// Handle WriteString error (AUDIT-012)
+	// Note: Errors are intentionally ignored here as they indicate a broken connection
+	// which will be detected on the next read. Logging would require access to the server's logger.
+	_, _ = c.writer.WriteString(line)
+	// Handle Flush error (AUDIT-012)
+	_ = c.writer.Flush()
 }
 
 // writeDataReply writes a multi-line reply
@@ -394,7 +408,11 @@ func (c *connection) writeDataReply(lines []string) {
 	defer c.mu.Unlock()
 
 	for _, line := range lines {
-		c.writer.WriteString(line + "\r\n")
+		// Handle WriteString error (AUDIT-012)
+		// Note: Errors are intentionally ignored here as they indicate a broken connection
+		// which will be detected on the next read. Logging would require access to the server's logger.
+		_, _ = c.writer.WriteString(line + "\r\n")
 	}
-	c.writer.Flush()
+	// Handle Flush error (AUDIT-012)
+	_ = c.writer.Flush()
 }

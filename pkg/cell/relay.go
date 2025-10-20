@@ -99,7 +99,11 @@ func DecodeRelayCell(payload []byte) (*RelayCell, error) {
 	}
 	copy(rc.Digest[:], payload[5:9])
 
-	// Validate length
+	// Validate length - defense in depth (AUDIT-015)
+	maxDataLen := uint16(PayloadLen - RelayCellHeaderLen)
+	if rc.Length > maxDataLen {
+		return nil, fmt.Errorf("relay cell length exceeds maximum: %d > %d", rc.Length, maxDataLen)
+	}
 	if int(rc.Length) > len(payload)-RelayCellHeaderLen {
 		return nil, fmt.Errorf("relay cell data length exceeds payload: %d > %d", rc.Length, len(payload)-RelayCellHeaderLen)
 	}
