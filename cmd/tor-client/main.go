@@ -25,6 +25,7 @@ func main() {
 	configFile := flag.String("config", "", "Path to configuration file (torrc format)")
 	socksPort := flag.Int("socks-port", 0, "SOCKS5 proxy port (default: auto-detect or 9050)")
 	controlPort := flag.Int("control-port", 0, "Control protocol port (default: 9051)")
+	metricsPort := flag.Int("metrics-port", 0, "HTTP metrics server port (default: 0 = disabled)")
 	dataDir := flag.String("data-dir", "", "Data directory for persistent state (default: auto-detect)")
 	logLevel := flag.String("log-level", "info", "Log level (debug, info, warn, error)")
 	showVersion := flag.Bool("version", false, "Show version information")
@@ -59,6 +60,10 @@ func main() {
 	if *controlPort != 0 {
 		cfg.ControlPort = *controlPort
 	}
+	if *metricsPort != 0 {
+		cfg.MetricsPort = *metricsPort
+		cfg.EnableMetrics = true // Auto-enable if port is specified
+	}
 	if *dataDir != "" {
 		cfg.DataDirectory = *dataDir
 	}
@@ -86,6 +91,7 @@ func main() {
 	log.Info("Configuration loaded",
 		"socks_port", cfg.SocksPort,
 		"control_port", cfg.ControlPort,
+		"metrics_port", cfg.MetricsPort,
 		"data_directory", cfg.DataDirectory,
 		"log_level", cfg.LogLevel)
 
@@ -135,6 +141,10 @@ func run(ctx context.Context, cfg *config.Config, log *logger.Logger) error {
 	log.Info("✓ SOCKS proxy available",
 		"address", fmt.Sprintf("127.0.0.1:%d", stats.SocksPort),
 		"url", fmt.Sprintf("socks5://127.0.0.1:%d", stats.SocksPort))
+	if cfg.EnableMetrics && cfg.MetricsPort > 0 {
+		log.Info("✓ HTTP metrics available",
+			"url", fmt.Sprintf("http://127.0.0.1:%d/", cfg.MetricsPort))
+	}
 	log.Info("Configure your application to use the SOCKS5 proxy for anonymous connections")
 
 	// Example usage instructions

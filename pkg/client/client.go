@@ -13,6 +13,8 @@ import (
 	"github.com/opd-ai/go-tor/pkg/config"
 	"github.com/opd-ai/go-tor/pkg/control"
 	"github.com/opd-ai/go-tor/pkg/directory"
+	"github.com/opd-ai/go-tor/pkg/health"
+	"github.com/opd-ai/go-tor/pkg/httpmetrics"
 	"github.com/opd-ai/go-tor/pkg/logger"
 	"github.com/opd-ai/go-tor/pkg/metrics"
 	"github.com/opd-ai/go-tor/pkg/path"
@@ -27,6 +29,8 @@ type Client struct {
 	circuitMgr    *circuit.Manager
 	socksServer   *socks.Server
 	controlServer *control.Server
+	metricsServer *httpmetrics.Server
+	healthMonitor *health.Monitor
 	pathSelector  *path.Selector
 	guardManager  *path.GuardManager
 	metrics       *metrics.Metrics
@@ -87,22 +91,29 @@ func New(cfg *config.Config, log *logger.Logger) (*Client, error) {
 	}
 
 	client := &Client{
-		config:       cfg,
-		logger:       log.Component("client"),
-		directory:    dirClient,
-		circuitMgr:   circuitMgr,
-		socksServer:  socksServer,
-		guardManager: guardMgr,
-		metrics:      metrics.New(),
-		circuits:     make([]*circuit.Circuit, 0),
-		ctx:          ctx,
-		cancel:       cancel,
-		shutdown:     make(chan struct{}),
+		config:        cfg,
+		logger:        log.Component("client"),
+		directory:     dirClient,
+		circuitMgr:    circuitMgr,
+		socksServer:   socksServer,
+		guardManager:  guardMgr,
+		metrics:       metrics.New(),
+		healthMonitor: health.NewMonitor(),
+		circuits:      make([]*circuit.Circuit, 0),
+		ctx:           ctx,
+		cancel:        cancel,
+		shutdown:      make(chan struct{}),
 	}
 
 	// Initialize control protocol server
 	controlAddr := fmt.Sprintf("127.0.0.1:%d", cfg.ControlPort)
 	client.controlServer = control.NewServer(controlAddr, &clientStatsAdapter{client: client}, log)
+
+	// Initialize HTTP metrics server if enabled
+	if cfg.EnableMetrics && cfg.MetricsPort > 0 {
+		metricsAddr := fmt.Sprintf("127.0.0.1:%d", cfg.MetricsPort)
+		client.metricsServer = httpmetrics.NewServer(metricsAddr, client.metrics, client.healthMonitor, log)
+	}
 
 	return client, nil
 }
@@ -159,6 +170,14 @@ func (c *Client) Start(ctx context.Context) error {
 	c.logger.Info("Starting control protocol server", "port", c.config.ControlPort)
 	if err := c.controlServer.Start(); err != nil {
 		return fmt.Errorf("failed to start control server: %w", err)
+	}
+
+	// Step 6.5: Start HTTP metrics server if enabled
+	if c.metricsServer != nil {
+		c.logger.Info("Starting HTTP metrics server", "port", c.config.MetricsPort)
+		if err := c.metricsServer.Start(); err != nil {
+			return fmt.Errorf("failed to start metrics server: %w", err)
+		}
 	}
 
 	// Step 7: Start circuit maintenance loop
@@ -218,6 +237,13 @@ func (c *Client) Stop() error {
 	// Stop control server
 	if err := c.controlServer.Stop(); err != nil {
 		c.logger.Warn("Failed to stop control server", "error", err)
+	}
+
+	// Stop metrics server
+	if c.metricsServer != nil {
+		if err := c.metricsServer.Stop(); err != nil {
+			c.logger.Warn("Failed to stop metrics server", "error", err)
+		}
 	}
 
 	return nil
