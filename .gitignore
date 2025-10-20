@@ -62,3 +62,4 @@ examples/*/zero-config
 examples/*/zero-config-custom
 tor-client
 tor-client-stripped
+circuit-isolation
