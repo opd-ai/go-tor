@@ -25,6 +25,12 @@ build: ## Build the binary
 	$(GOBUILD) $(LDFLAGS) -o $(BINARY_PATH) ./cmd/tor-client
 	@echo "Build complete: $(BINARY_PATH)"
 
+build-benchmark: ## Build the benchmark tool
+	@echo "Building benchmark tool..."
+	@mkdir -p bin
+	$(GOBUILD) -o bin/benchmark ./cmd/benchmark
+	@echo "Build complete: bin/benchmark"
+
 test: ## Run tests
 	@echo "Running tests..."
 	$(GOTEST) -v -race ./...
@@ -38,6 +44,10 @@ test-coverage: ## Run tests with coverage
 bench: ## Run benchmarks
 	@echo "Running benchmarks..."
 	$(GOTEST) -bench=. -benchmem ./...
+
+benchmark-full: build-benchmark ## Run comprehensive performance benchmarks
+	@echo "Running comprehensive performance benchmarks..."
+	@./bin/benchmark
 
 fmt: ## Format code
 	@echo "Formatting code..."
