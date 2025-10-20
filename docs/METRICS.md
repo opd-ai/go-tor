@@ -265,8 +265,9 @@ prometheus --config.file=prometheus.yml
 ```
 
 3. **Add Grafana Dashboard**:
-   - Import dashboard from `docs/grafana-dashboard.json` (create this)
-   - Or create custom dashboard using available metrics
+   - Create custom dashboard using available metrics
+   - Example queries provided below
+   - (Pre-built dashboard JSON coming in a future release)
 
 ### Automated Health Checks
 
@@ -403,9 +404,9 @@ grep MetricsPort /path/to/torrc
 # Check port availability
 netstat -an | grep 9052
 
-# Use unprivileged port
-./tor-client --metrics-port 9052  # Good
-./tor-client --metrics-port 80    # Requires root
+# Use unprivileged port (recommended)
+tor-client --metrics-port 9052  # Good
+tor-client --metrics-port 80    # Requires root (not recommended)
 ```
 
 ### Missing Metrics
