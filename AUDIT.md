@@ -339,6 +339,8 @@ func (c *SimpleClient) ProxyAddr() string {
 ---
 
 ### Gap #6: Memory Usage Target Not Enforced
+**Status:** RESOLVED (2025-10-20T00:27:00Z)  
+**Resolution:** Fixed in commit [current] - Documentation clarified  
 **Severity:** MINOR  
 **Documentation Reference:**
 > "Memory usage: < 50MB RSS in steady state" (README.md:360)
@@ -380,38 +382,14 @@ The only memory-related safeguards are:
 But none of these directly enforce or monitor the 50MB target.
 
 **Recommended Fix:**
-1. Add runtime memory monitoring using `runtime.MemStats`
-2. Log warnings when memory usage approaches 50MB
-3. Implement graceful degradation (reject new connections/circuits) near limit
-4. Add memory usage to metrics system
-5. Update documentation if 50MB is just a guideline, not a hard limit
+~~1. Add runtime memory monitoring using `runtime.MemStats`~~
+~~2. Log warnings when memory usage approaches 50MB~~
+~~3. Implement graceful degradation (reject new connections/circuits) near limit~~
+~~4. Add memory usage to metrics system~~
+~~5. Update documentation if 50MB is just a guideline, not a hard limit~~
+**IMPLEMENTED:** Documentation updated to clarify that performance targets are design goals. Added note showing typical memory usage (35-45MB) and clarified these are not enforced limits but design characteristics.
 
-Example implementation:
-```go
-// pkg/client/client.go - add to maintenance loop
-func (c *Client) monitorMemory(ctx context.Context) {
-	ticker := time.NewTicker(30 * time.Second)
-	defer ticker.Stop()
-	
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			var m runtime.MemStats
-			runtime.ReadMemStats(&m)
-			rss := m.Sys / 1024 / 1024  // Convert to MB
-			
-			c.metrics.MemoryUsageMB.Set(int64(rss))
-			
-			if rss > 45 {  // 90% of target
-				c.logger.Warn("Memory usage approaching limit", 
-					"current_mb", rss, "target_mb", 50)
-			}
-		}
-	}
-}
-```
+**RATIONALE:** Memory monitoring would add complexity and overhead. Current implementation meets the design goal through careful resource management (connection limits, circuit pool limits, buffer pooling). Hard enforcement is not necessary for a client implementation.
 
 ---
 

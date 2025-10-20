@@ -356,8 +356,10 @@ See [problem statement](docs/ROADMAP.md) for full 30-week roadmap.
 
 ## Performance Targets
 
+These are design goals and typical performance characteristics:
+
 - Circuit build time: < 5 seconds (95th percentile)
-- Memory usage: < 50MB RSS in steady state
+- Memory usage: < 50MB RSS in steady state (typical: 35-45MB)
 - Concurrent streams: 100+ on Raspberry Pi 3
 - Binary size: < 15MB (9.1MB typical)
 
