@@ -155,8 +155,8 @@ func main() {
     // Get SOCKS5 proxy URL
     proxyURL := torClient.ProxyURL()  // "socks5://127.0.0.1:9050"
     
-    // Wait until ready (optional)
-    torClient.WaitUntilReady(60 * time.Second)
+    // Wait until ready (recommended: 90s for first run, 30-60s for subsequent runs)
+    torClient.WaitUntilReady(90 * time.Second)
     
     // Use with your HTTP client
     // ... configure HTTP client to use proxyURL

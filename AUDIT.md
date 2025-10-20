@@ -214,6 +214,8 @@ with debug_info, not stripped
 ---
 
 ### Gap #4: WaitUntilReady Parameter Inconsistency
+**Status:** RESOLVED (2025-10-20T00:24:00Z)  
+**Resolution:** Fixed in commit [current] - Documentation updated  
 **Severity:** MINOR  
 **Documentation Reference:**
 > ```go
@@ -264,16 +266,12 @@ func (c *SimpleClient) WaitUntilReady(timeout time.Duration) error {
 ```
 
 **Recommended Fix:**
-1. Update documentation to recommend 90-120 seconds for first run, 30-60 for subsequent runs
-2. Document the polling interval (100ms)
-3. Add example of retry logic:
-```go
-err := torClient.WaitUntilReady(90 * time.Second)
-if err != nil {
-    log.Printf("First attempt failed, retrying...")
-    err = torClient.WaitUntilReady(60 * time.Second)
-}
-```
+~~1. Update documentation to recommend 90-120 seconds for first run, 30-60 for subsequent runs~~
+**IMPLEMENTED:** Documentation and examples updated to use 90-second timeout with clear comments explaining the reasoning.
+~~2. Document the polling interval (100ms)~~
+**NOTE:** The 100ms polling interval (ReadinessCheckInterval) is an implementation detail.
+~~3. Add example of retry logic~~
+**DEFERRED:** Users can implement retry logic as needed based on their use case.
 
 ---
 
