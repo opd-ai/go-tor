@@ -399,7 +399,36 @@ This implementation follows Tor protocol specifications for security:
 
 ⚠️ **Security Notice**: This is pre-production software. Do not rely on it for anonymity until security audit is complete.
 
-See [AUDIT_SUMMARY.md](AUDIT_SUMMARY.md) for comprehensive security audit results and considerations.
+See [AUDIT.md](AUDIT.md) for comprehensive security audit results and considerations.
+
+## Documentation
+
+Comprehensive documentation is available in the [docs/](docs/) directory:
+
+### Core Documentation
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture and design
+- [API.md](docs/API.md) - API reference and usage
+- [TUTORIAL.md](docs/TUTORIAL.md) - Getting started tutorial
+
+### Operations & Deployment
+- [PRODUCTION.md](docs/PRODUCTION.md) - Production deployment guide
+- [ZERO_CONFIG.md](docs/ZERO_CONFIG.md) - Zero-configuration mode
+- [CONTROL_PROTOCOL.md](docs/CONTROL_PROTOCOL.md) - Control protocol interface
+- [METRICS.md](docs/METRICS.md) - Metrics and monitoring
+
+### Development & Testing
+- [DEVELOPMENT.md](docs/DEVELOPMENT.md) - Development guidelines
+- [TESTING.md](docs/TESTING.md) - Testing strategies
+- [BENCHMARKING.md](docs/BENCHMARKING.md) - Performance benchmarks
+
+### Advanced Topics
+- [ONION_SERVICE_INTEGRATION.md](docs/ONION_SERVICE_INTEGRATION.md) - Onion services
+- [PERFORMANCE.md](docs/PERFORMANCE.md) - Performance optimization
+- [RESOURCE_PROFILES.md](docs/RESOURCE_PROFILES.md) - Resource profiles
+- [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) - Common issues and solutions
+
+### Examples
+See [examples/](examples/) directory for 18 working demonstrations covering all major features.
 
 ## Contributing
 
