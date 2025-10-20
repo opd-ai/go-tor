@@ -191,8 +191,9 @@ func (s *Server) handleConnection(ctx context.Context, conn net.Conn) {
 	// Set read deadline
 	conn.SetReadDeadline(time.Now().Add(30 * time.Second))
 
-	// Handshake
-	if err := s.handshake(conn); err != nil {
+	// Handshake - returns username if password auth was used
+	username, err := s.handshake(conn)
+	if err != nil {
 		s.logger.Error("Handshake failed", "error", err, "remote", conn.RemoteAddr())
 		return
 	}
@@ -204,7 +205,7 @@ func (s *Server) handleConnection(ctx context.Context, conn net.Conn) {
 		return
 	}
 
-	s.logger.Info("SOCKS5 request", "target", targetAddr, "remote", conn.RemoteAddr())
+	s.logger.Info("SOCKS5 request", "target", targetAddr, "remote", conn.RemoteAddr(), "username", username)
 
 	// Extract hostname from targetAddr (format: "host:port")
 	host := targetAddr
@@ -249,63 +250,134 @@ func (s *Server) handleConnection(ctx context.Context, conn net.Conn) {
 
 	// For regular addresses, return success without actually routing through Tor
 	// In a full implementation, this would:
-	// 1. Select or create a circuit
+	// 1. Select or create a circuit (with isolation key if configured)
 	// 2. Open a stream through the circuit
 	// 3. Relay data between client and stream
+	//
+	// Note: Circuit isolation would be applied here based on:
+	// - targetAddr (destination isolation)
+	// - username (credential isolation)
+	// - conn.RemoteAddr().(*net.TCPAddr).Port (port isolation)
 	s.sendReply(conn, replySuccess, conn.LocalAddr())
 
-	s.logger.Info("Connection established", "target", targetAddr)
+	s.logger.Info("Connection established", "target", targetAddr, "username", username)
 
 	// Relay data (simplified - just close for now)
 	// In production: relay between conn and circuit stream
 	time.Sleep(100 * time.Millisecond)
 }
 
-// handshake performs SOCKS5 handshake
-func (s *Server) handshake(conn net.Conn) error {
+// handshake performs SOCKS5 handshake and returns optional username for isolation
+func (s *Server) handshake(conn net.Conn) (string, error) {
 	// Read version and methods
 	header := make([]byte, 2)
 	if _, err := io.ReadFull(conn, header); err != nil {
-		return fmt.Errorf("failed to read handshake header: %w", err)
+		return "", fmt.Errorf("failed to read handshake header: %w", err)
 	}
 
 	version := header[0]
 	nmethods := header[1]
 
 	if version != socks5Version {
-		return fmt.Errorf("unsupported SOCKS version: %d", version)
+		return "", fmt.Errorf("unsupported SOCKS version: %d", version)
 	}
 
 	// Read methods
 	methods := make([]byte, nmethods)
 	if _, err := io.ReadFull(conn, methods); err != nil {
-		return fmt.Errorf("failed to read methods: %w", err)
+		return "", fmt.Errorf("failed to read methods: %w", err)
 	}
 
-	// We only support no authentication
+	// Check which methods are supported
 	supportsNoAuth := false
+	supportsPassword := false
 	for _, method := range methods {
 		if method == authNone {
 			supportsNoAuth = true
-			break
+		}
+		if method == authPassword {
+			supportsPassword = true
 		}
 	}
 
+	// Prefer password auth for isolation support, fall back to no auth
+	var selectedMethod byte
+	var username string
+	if supportsPassword {
+		selectedMethod = authPassword
+	} else if supportsNoAuth {
+		selectedMethod = authNone
+	} else {
+		// No acceptable methods
+		response := []byte{socks5Version, authNoAccept}
+		conn.Write(response)
+		return "", fmt.Errorf("no acceptable authentication methods")
+	}
+
 	// Send method selection
-	response := []byte{socks5Version, authNone}
-	if !supportsNoAuth {
-		response[1] = authNoAccept
-	}
-
+	response := []byte{socks5Version, selectedMethod}
 	if _, err := conn.Write(response); err != nil {
-		return fmt.Errorf("failed to write method selection: %w", err)
+		return "", fmt.Errorf("failed to write method selection: %w", err)
 	}
 
-	if !supportsNoAuth {
-		return fmt.Errorf("no acceptable authentication methods")
+	// Perform username/password authentication if selected
+	if selectedMethod == authPassword {
+		var err error
+		username, err = s.authenticatePassword(conn)
+		if err != nil {
+			return "", err
+		}
 	}
 
-	return nil
+	return username, nil
+}
+
+// authenticatePassword performs username/password authentication (RFC 1929)
+// Returns the username for circuit isolation purposes
+func (s *Server) authenticatePassword(conn net.Conn) (string, error) {
+	// Read version
+	version := make([]byte, 1)
+	if _, err := io.ReadFull(conn, version); err != nil {
+		return "", fmt.Errorf("failed to read auth version: %w", err)
+	}
+
+	if version[0] != 0x01 {
+		return "", fmt.Errorf("unsupported auth version: %d", version[0])
+	}
+
+	// Read username length
+	ulenBuf := make([]byte, 1)
+	if _, err := io.ReadFull(conn, ulenBuf); err != nil {
+		return "", fmt.Errorf("failed to read username length: %w", err)
+	}
+	ulen := int(ulenBuf[0])
+
+	// Read username
+	username := make([]byte, ulen)
+	if _, err := io.ReadFull(conn, username); err != nil {
+		return "", fmt.Errorf("failed to read username: %w", err)
+	}
+
+	// Read password length
+	plenBuf := make([]byte, 1)
+	if _, err := io.ReadFull(conn, plenBuf); err != nil {
+		return "", fmt.Errorf("failed to read password length: %w", err)
+	}
+	plen := int(plenBuf[0])
+
+	// Read password (we don't validate it, just use for isolation)
+	password := make([]byte, plen)
+	if _, err := io.ReadFull(conn, password); err != nil {
+		return "", fmt.Errorf("failed to read password: %w", err)
+	}
+
+	// Send success response (version=1, status=0 for success)
+	response := []byte{0x01, 0x00}
+	if _, err := conn.Write(response); err != nil {
+		return "", fmt.Errorf("failed to write auth response: %w", err)
+	}
+
+	return string(username), nil
 }
 
 // readRequest reads a SOCKS5 request
