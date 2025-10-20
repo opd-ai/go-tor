@@ -5,8 +5,8 @@ Date: 2025-10-20
 - Files deleted: 7
 - Storage recovered: ~36 KB
 - Total files: 169 → 162 (7 files removed)
-- Markdown files: 28 → 26 (2 markdown files removed)
-- Example directories: 19 → 15 (4 phase demo directories removed)
+- Markdown files: 28 → 27 (1 old cleanup report removed)
+- Example directories: 18 → 14 (4 phase demo directories removed)
 
 ## Deletion Criteria Used
 - **Age threshold**: Completed development phases (Phase 2-5 all marked COMPLETE)
@@ -113,7 +113,7 @@ All technical documentation for current project use:
 - Troubleshooting resources
 - Protocol-specific documentation
 
-### Current Examples (15 directories)
+### Current Examples (14 directories)
 Functional, user-facing examples for library usage:
 - basic-usage, intro-demo, zero-config (getting started)
 - config-demo, errors-demo, health-demo (configuration and monitoring)
@@ -126,16 +126,16 @@ Functional, user-facing examples for library usage:
 
 **Before Cleanup:**
 - 169 total files
-- 28 markdown files
-- 19 example directories (including 4 historical phase demos)
+- 28 markdown files (27 active + 1 old cleanup report)
+- 18 example directories (14 current + 4 historical phase demos)
 - docs/archive/ directory with historical content
 - Previous cleanup report
 - Confusing mix of historical and current examples
 
 **After Cleanup:**
 - 162 total files (4% reduction)
-- 26 markdown files (7% reduction)
-- 15 example directories (21% reduction in example directories)
+- 27 markdown files (4% reduction - old cleanup report removed)
+- 14 example directories (22% reduction in example directories)
 - No archive directory
 - Single cleanup report
 - Clear separation between current functional examples and removed historical demos
