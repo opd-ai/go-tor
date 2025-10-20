@@ -144,6 +144,8 @@ func isPortAvailable(port int) bool {
 	if err != nil {
 		return false
 	}
-	listener.Close()
+	if err := listener.Close(); err != nil {
+		return false
+	}
 	return true
 }

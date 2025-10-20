@@ -176,7 +176,10 @@ func main() {
 
 // generateTestAddress generates a test v3 onion address
 func generateTestAddress() *onion.Address {
-	pubkey, _, _ := ed25519.GenerateKey(rand.Reader)
+	pubkey, _, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to generate key: %v", err))
+	}
 	addr := &onion.Address{
 		Version: onion.V3,
 		Pubkey:  pubkey,

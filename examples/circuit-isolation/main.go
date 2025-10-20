@@ -51,7 +51,11 @@ func main() {
 
 	// Create circuit pool
 	circuitPool := pool.NewCircuitPool(poolConfig, buildCircuit, torLogger)
-	defer circuitPool.Close()
+	defer func() {
+		if err := circuitPool.Close(); err != nil {
+			log.Printf("Failed to close circuit pool: %v", err)
+		}
+	}()
 
 	ctx := context.Background()
 

@@ -94,7 +94,11 @@ func demonstrateCircuitPooling() {
 	}
 
 	circuitPool := pool.NewCircuitPool(cfg, builder, log)
-	defer circuitPool.Close()
+	defer func() {
+		if err := circuitPool.Close(); err != nil {
+			log.Error("Failed to close circuit pool", "error", err)
+		}
+	}()
 
 	// Without prebuilding - build on demand
 	fmt.Println("   Without Prebuilding:")

@@ -101,7 +101,11 @@ func (c *Client) fetchFromAuthority(ctx context.Context, authorityURL string) ([
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch consensus: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			c.logger.Error("Failed to close response body", "function", "fetchFromAuthority", "error", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)

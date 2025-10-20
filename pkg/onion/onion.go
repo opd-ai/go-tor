@@ -1073,7 +1073,11 @@ func (h *HSDir) fetchFromHSDir(ctx context.Context, hsdir *HSDirectory, descript
 		h.logger.Debug("Failed to fetch descriptor, using mock", "error", err)
 		return h.createMockDescriptor(descriptorID), nil
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			h.logger.Error("Failed to close response body", "function", "fetchFromHSDir", "error", err)
+		}
+	}()
 
 	// Check status code
 	if resp.StatusCode != http.StatusOK {

@@ -6,6 +6,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/opd-ai/go-tor/pkg/onion"
@@ -75,7 +76,10 @@ func main() {
 	fmt.Printf("Original: %s\n", original)
 
 	// Parse
-	addr1, _ := onion.ParseAddress(original)
+	addr1, err := onion.ParseAddress(original)
+	if err != nil {
+		log.Fatalf("Failed to parse address: %v", err)
+	}
 
 	// Encode back
 	encoded := addr1.Encode()
@@ -112,7 +116,10 @@ func main() {
 	// Example 6: Using the String() method
 	fmt.Println("Example 6: Address string representation")
 	fmt.Println("-----------------------------------------")
-	addr6, _ := onion.ParseAddress(exampleAddr)
+	addr6, err := onion.ParseAddress(exampleAddr)
+	if err != nil {
+		log.Fatalf("Failed to parse address: %v", err)
+	}
 	fmt.Printf("String() output: %s\n", addr6.String())
 	fmt.Printf("Encode() output: %s\n", addr6.Encode())
 	fmt.Println()

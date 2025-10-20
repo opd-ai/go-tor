@@ -30,7 +30,11 @@ func LoadFromFile(path string, cfg *Config) error {
 	if err != nil {
 		return fmt.Errorf("failed to open config file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			return
+		}
+	}()
 
 	scanner := bufio.NewScanner(file)
 	lineNum := 0
@@ -258,10 +262,18 @@ func SaveToFile(path string, cfg *Config) error {
 	if err != nil {
 		return fmt.Errorf("failed to create config file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			return
+		}
+	}()
 
 	writer := bufio.NewWriter(file)
-	defer writer.Flush()
+	defer func() {
+		if err := writer.Flush(); err != nil {
+			return
+		}
+	}()
 
 	// Write header comment
 	fmt.Fprintf(writer, "# go-tor configuration file\n")
