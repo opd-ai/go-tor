@@ -11,6 +11,7 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/opd-ai/go-tor/pkg/client"
@@ -96,6 +97,7 @@ func FormatBytes(bytes uint64) string {
 
 // LatencyTracker tracks operation latencies for percentile calculation
 type LatencyTracker struct {
+	mu        sync.Mutex
 	latencies []time.Duration
 }
 
@@ -107,12 +109,19 @@ func NewLatencyTracker(capacity int) *LatencyTracker {
 }
 
 // Record records a latency measurement
+// This method is thread-safe and can be called concurrently.
 func (lt *LatencyTracker) Record(latency time.Duration) {
+	lt.mu.Lock()
+	defer lt.mu.Unlock()
 	lt.latencies = append(lt.latencies, latency)
 }
 
 // Percentile calculates the specified percentile (0.0 to 1.0)
+// This method is thread-safe and can be called concurrently.
 func (lt *LatencyTracker) Percentile(p float64) time.Duration {
+	lt.mu.Lock()
+	defer lt.mu.Unlock()
+	
 	if len(lt.latencies) == 0 {
 		return 0
 	}
@@ -137,7 +146,11 @@ func (lt *LatencyTracker) Percentile(p float64) time.Duration {
 }
 
 // Max returns the maximum latency
+// This method is thread-safe and can be called concurrently.
 func (lt *LatencyTracker) Max() time.Duration {
+	lt.mu.Lock()
+	defer lt.mu.Unlock()
+	
 	if len(lt.latencies) == 0 {
 		return 0
 	}
@@ -151,7 +164,10 @@ func (lt *LatencyTracker) Max() time.Duration {
 }
 
 // Count returns the number of recorded latencies
+// This method is thread-safe and can be called concurrently.
 func (lt *LatencyTracker) Count() int {
+	lt.mu.Lock()
+	defer lt.mu.Unlock()
 	return len(lt.latencies)
 }
 
