@@ -3,6 +3,7 @@
 package pool
 
 import (
+	"fmt"
 	"sync"
 )
 
@@ -27,7 +28,13 @@ func NewBufferPool(size int) *BufferPool {
 
 // Get retrieves a buffer from the pool
 func (p *BufferPool) Get() []byte {
-	bufPtr := p.pool.Get().(*[]byte)
+	// Safe type assertion with ok check (AUDIT-011)
+	obj := p.pool.Get()
+	bufPtr, ok := obj.(*[]byte)
+	if !ok {
+		// This should never happen with our pool, but be defensive
+		panic(fmt.Sprintf("BufferPool returned unexpected type: %T", obj))
+	}
 	return (*bufPtr)[:p.size]
 }
 

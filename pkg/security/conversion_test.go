@@ -247,6 +247,121 @@ func TestSafeInt64ToUint64(t *testing.T) {
 	}
 }
 
+func TestSafeUint64ToInt64(t *testing.T) {
+	tests := []struct {
+		name    string
+		val     uint64
+		want    int64
+		wantErr bool
+	}{
+		{
+			name:    "positive value",
+			val:     uint64(1234567890),
+			want:    int64(1234567890),
+			wantErr: false,
+		},
+		{
+			name:    "zero",
+			val:     0,
+			want:    0,
+			wantErr: false,
+		},
+		{
+			name:    "max int64",
+			val:     uint64(math.MaxInt64),
+			want:    math.MaxInt64,
+			wantErr: false,
+		},
+		{
+			name:    "exceeds int64",
+			val:     uint64(math.MaxInt64) + 1,
+			want:    0,
+			wantErr: true,
+		},
+		{
+			name:    "max uint64",
+			val:     math.MaxUint64,
+			want:    0,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := SafeUint64ToInt64(tt.val)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("SafeUint64ToInt64() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && got != tt.want {
+				t.Errorf("SafeUint64ToInt64() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSafeIntToUint32(t *testing.T) {
+	tests := []struct {
+		name    string
+		val     int
+		want    uint32
+		wantErr bool
+	}{
+		{
+			name:    "small positive value",
+			val:     12345,
+			want:    12345,
+			wantErr: false,
+		},
+		{
+			name:    "zero",
+			val:     0,
+			want:    0,
+			wantErr: false,
+		},
+		{
+			name:    "max uint32",
+			val:     int(math.MaxUint32),
+			want:    math.MaxUint32,
+			wantErr: false,
+		},
+		{
+			name:    "negative value",
+			val:     -1,
+			want:    0,
+			wantErr: true,
+		},
+	}
+
+	// Only test overflow on 64-bit systems where int can exceed uint32
+	if ^uint(0) > math.MaxUint32 {
+		tests = append(tests, struct {
+			name    string
+			val     int
+			want    uint32
+			wantErr bool
+		}{
+			name:    "exceeds uint32",
+			val:     int(math.MaxUint32) + 1,
+			want:    0,
+			wantErr: true,
+		})
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := SafeIntToUint32(tt.val)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("SafeIntToUint32() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && got != tt.want {
+				t.Errorf("SafeIntToUint32() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestSafeLenToUint16(t *testing.T) {
 	tests := []struct {
 		name    string

@@ -187,9 +187,11 @@ func (p *Pool) Put(conn *Connection) {
 	case p.available <- conn:
 		p.logger.Debug("Returned connection to pool", "address", conn.Address())
 	default:
-		// Pool is full, close connection
+		// Pool is full, close connection (AUDIT-013)
 		p.logger.Debug("Pool full, closing connection", "address", conn.Address())
-		conn.Close()
+		if err := conn.Close(); err != nil {
+			p.logger.Error("Failed to close excess connection", "error", err)
+		}
 	}
 }
 
@@ -198,9 +200,11 @@ func (p *Pool) Close() {
 	p.logger.Info("Closing connection pool")
 	close(p.available)
 
-	// Drain available channel and close connections
+	// Drain available channel and close connections (AUDIT-013)
 	for conn := range p.available {
-		conn.Close()
+		if err := conn.Close(); err != nil {
+			p.logger.Error("Failed to close pooled connection", "error", err)
+		}
 	}
 
 	p.logger.Info("Connection pool closed")

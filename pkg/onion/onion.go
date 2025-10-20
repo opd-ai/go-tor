@@ -1158,20 +1158,30 @@ func (ip *IntroductionProtocol) SelectIntroductionPoint(desc *Descriptor) (*Intr
 	// 1. Filter out introduction points we've tried and failed
 	// 2. Consider network conditions and performance
 	
+	// Validate intro points count (AUDIT-007)
+	numIntroPoints := len(desc.IntroPoints)
+	if numIntroPoints == 0 {
+		return nil, fmt.Errorf("no introduction points available")
+	}
+	// Check for uint32 overflow before conversion
+	if numIntroPoints > int(^uint32(0)) {
+		return nil, fmt.Errorf("too many introduction points: %d (max: %d)", numIntroPoints, ^uint32(0))
+	}
+	
 	// Generate random index using crypto/rand for security
 	var randomBytes [4]byte
 	if _, err := rand.Read(randomBytes[:]); err != nil {
 		return nil, fmt.Errorf("failed to generate random index: %w", err)
 	}
 	
-	// Convert to uint32 and mod by length to get index
+	// Convert to uint32 and mod by length to get index (now safe after validation)
 	randomValue := binary.BigEndian.Uint32(randomBytes[:])
-	selectedIndex := int(randomValue % uint32(len(desc.IntroPoints)))
+	selectedIndex := int(randomValue % uint32(numIntroPoints))
 	
 	selected := &desc.IntroPoints[selectedIndex]
 
 	ip.logger.Debug("Selected introduction point",
-		"intro_points_available", len(desc.IntroPoints),
+		"intro_points_available", numIntroPoints,
 		"selected_index", selectedIndex)
 
 	return selected, nil
