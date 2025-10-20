@@ -65,8 +65,15 @@ func ParseAddress(addr string) (*Address, error) {
 // Format: <base32 encoded: pubkey (32 bytes) || checksum (2 bytes) || version (1 byte)>.onion
 func parseV3Address(addr string) (*Address, error) {
 	// Decode base32
+	// SEC-L005: Use bytes for efficient uppercase conversion
 	decoder := base32.StdEncoding.WithPadding(base32.NoPadding)
-	decoded, err := decoder.DecodeString(strings.ToUpper(addr))
+	addrBytes := []byte(addr)
+	for i := range addrBytes {
+		if addrBytes[i] >= 'a' && addrBytes[i] <= 'z' {
+			addrBytes[i] -= 32 // Convert to uppercase in-place
+		}
+	}
+	decoded, err := decoder.DecodeString(string(addrBytes))
 	if err != nil {
 		return nil, fmt.Errorf("invalid base32 encoding: %w", err)
 	}

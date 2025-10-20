@@ -397,10 +397,13 @@ func (c *Client) maintainCircuits(ctx context.Context) {
 }
 
 // checkAndRebuildCircuits checks circuit health and rebuilds if needed
+// SEC-L008: Enforces MaxCircuitDirtiness to prevent long-lived circuits
+// that increase linkability risk per tor-spec.txt §6.1
 func (c *Client) checkAndRebuildCircuits(ctx context.Context) {
 	c.circuitsMu.Lock()
 
-	// Remove failed/closed circuits and enforce max circuit age
+	// Remove failed/closed circuits and enforce max circuit age (SEC-L008)
+	// Circuits older than MaxCircuitDirtiness are closed to prevent linkability attacks
 	activeCircuits := make([]*circuit.Circuit, 0)
 	maxAge := c.config.MaxCircuitDirtiness
 	for _, circ := range c.circuits {
