@@ -562,6 +562,7 @@ defer cancel()
 // Bad: time.Sleep(100 * time.Millisecond)
 
 // Good: Use channels for synchronization
+// chan struct{} is idiomatic for signaling (zero memory overhead)
 ready := make(chan struct{})
 go func() {
     // Setup...
