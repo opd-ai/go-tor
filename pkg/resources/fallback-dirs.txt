@@ -1,0 +1,34 @@
+# Fallback Directory Authorities for go-tor
+# These are hardcoded Tor directory authority servers that provide the network consensus
+# Source: https://gitweb.torproject.org/tor.git/tree/src/app/config/auth_dirs.inc
+# Last updated: 2025-10-20
+
+# gabelmoo - Germany
+https://194.109.206.212/tor/status-vote/current/consensus.z
+
+# moria1 - Germany  
+https://131.188.40.189/tor/status-vote/current/consensus.z
+
+# tor26 - USA (MIT)
+https://128.31.0.34:9131/tor/status-vote/current/consensus.z
+
+# dizum - Netherlands
+https://45.66.33.45/tor/status-vote/current/consensus.z
+
+# Serge - France
+https://66.111.2.131:9030/tor/status-vote/current/consensus.z
+
+# dannenberg - Germany
+https://193.23.244.244/tor/status-vote/current/consensus.z
+
+# maatuska - Sweden
+https://171.25.193.9:443/tor/status-vote/current/consensus.z
+
+# Faravahar - Unknown
+https://154.35.175.225/tor/status-vote/current/consensus.z
+
+# longclaw - USA
+https://199.58.81.140/tor/status-vote/current/consensus.z
+
+# bastet - Unknown
+https://204.13.164.118:80/tor/status-vote/current/consensus.z

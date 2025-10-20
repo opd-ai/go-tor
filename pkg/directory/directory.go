@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/opd-ai/go-tor/pkg/logger"
+	"github.com/opd-ai/go-tor/pkg/resources"
 )
 
 const (
@@ -60,12 +61,21 @@ func NewClient(log *logger.Logger) *Client {
 		log = logger.NewDefault()
 	}
 
+	// Try to load embedded fallback authorities, fall back to hardcoded defaults
+	authorities := DefaultAuthorities
+	if embeddedAuth, err := resources.GetFallbackAuthorities(); err == nil && len(embeddedAuth) > 0 {
+		authorities = embeddedAuth
+		log.Component("directory").Debug("Loaded fallback authorities from embedded resources", "count", len(embeddedAuth))
+	} else {
+		log.Component("directory").Debug("Using hardcoded fallback authorities", "count", len(DefaultAuthorities))
+	}
+
 	return &Client{
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
 		logger:      log.Component("directory"),
-		authorities: DefaultAuthorities,
+		authorities: authorities,
 	}
 }
 

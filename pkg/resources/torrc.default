@@ -1,0 +1,44 @@
+# Default Tor configuration for go-tor client
+# This is a minimal, secure configuration for client-only operation
+
+# Client mode - do not operate as relay or exit node
+ClientOnly 1
+
+# SOCKS proxy settings
+# Port will be auto-configured if not specified
+SocksPort auto
+
+# Control protocol settings  
+# Port will be auto-configured if not specified
+ControlPort auto
+
+# Data directory - will be auto-configured based on platform
+# DataDirectory [AUTO-DETECTED]
+
+# Logging - minimal for privacy
+# Log level: debug, info, notice, warn, err
+Log notice stdout
+
+# Circuit settings
+# Build circuits quickly but safely
+CircuitBuildTimeout 60
+LearnCircuitBuildTimeout 0
+
+# Use entry guards for consistent performance
+UseEntryGuards 1
+NumEntryGuards 3
+
+# Don't be a relay - client only
+ORPort 0
+DirPort 0
+
+# Disable features not needed for client operation
+PublishServerDescriptor 0
+FetchDirInfoEarly 0
+FetchDirInfoExtraEarly 0
+
+# Connection limits appropriate for client usage
+ConnLimit 1000
+
+# Dormant mode timeout (enter low-power mode after inactivity)
+DormantClientTimeout 24 hours
