@@ -31,7 +31,10 @@ func main() {
 	cfg.LogLevel = "info"
 
 	// Initialize logger
-	logLevel, _ := logger.ParseLevel(cfg.LogLevel)
+	logLevel, err := logger.ParseLevel(cfg.LogLevel)
+	if err != nil {
+		log.Fatalf("Failed to parse log level: %v", err)
+	}
 	appLogger := logger.New(logLevel, os.Stdout)
 
 	// Create Tor client
@@ -109,7 +112,11 @@ func displayMetrics(port int) {
 		log.Printf("Failed to fetch metrics: %v", err)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Failed to close response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		log.Printf("Metrics endpoint returned status %d", resp.StatusCode)

@@ -31,7 +31,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to connect to Tor: %v", err)
 	}
-	defer torClient.Close()
+	defer func() {
+		if err := torClient.Close(); err != nil {
+			log.Printf("Failed to close Tor client: %v", err)
+		}
+	}()
 
 	// Wait for the client to be ready
 	// Use 90s timeout for first run (consensus download + circuit build)
