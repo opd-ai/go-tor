@@ -315,7 +315,12 @@ func (s *Service) establishIntroductionPoint(ctx context.Context, relay *HSDirec
 	// 1. Build a 3-hop circuit to the relay
 	// 2. Send ESTABLISH_INTRO cell
 	// 3. Wait for INTRO_ESTABLISHED acknowledgment
-	circuitID := uint32(3000 + len(s.introPoints))
+	// Safe conversion with bounds check (AUDIT-006)
+	numIntroPoints := len(s.introPoints)
+	circuitID, err := security.SafeIntToUint32(3000 + numIntroPoints)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate circuit ID: %w", err)
+	}
 
 	intro := &ServiceIntroPoint{
 		Relay:       relay,

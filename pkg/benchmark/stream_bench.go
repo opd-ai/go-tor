@@ -7,6 +7,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/opd-ai/go-tor/pkg/security"
 )
 
 // BenchmarkConcurrentStreams validates the concurrent streams target
@@ -108,9 +110,20 @@ func (s *Suite) BenchmarkConcurrentStreams(ctx context.Context) error {
 			"error_count":        totalErrors,
 			"ops_per_stream":     float64(totalOps) / float64(targetStreams),
 			"avg_latency":        totalDuration / time.Duration(totalOps),
-			"data_transferred":   FormatBytes(uint64(totalOps * dataSize)),
-			"gc_runs":            memAfter.NumGC - memBefore.NumGC,
-			"meets_target":       success,
+			// Safe conversion for data transfer calculation (AUDIT-002)
+			"data_transferred": func() string {
+				transferred := totalOps * dataSize
+				if transferred < 0 {
+					return "error: overflow"
+				}
+				bytesTransferred, err := security.SafeInt64ToUint64(transferred)
+				if err != nil {
+					return "error: " + err.Error()
+				}
+				return FormatBytes(bytesTransferred)
+			}(),
+			"gc_runs":      memAfter.NumGC - memBefore.NumGC,
+			"meets_target": success,
 		},
 	}
 	

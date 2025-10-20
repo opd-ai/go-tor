@@ -66,6 +66,27 @@ func SafeInt64ToUint64(val int64) (uint64, error) {
 	return uint64(val), nil
 }
 
+// SafeUint64ToInt64 safely converts a uint64 to int64
+// Returns error if the value would overflow int64
+func SafeUint64ToInt64(val uint64) (int64, error) {
+	if val > math.MaxInt64 {
+		return 0, fmt.Errorf("uint64 value exceeds int64 range: %d (max: %d)", val, math.MaxInt64)
+	}
+	return int64(val), nil
+}
+
+// SafeIntToUint32 safely converts an int to uint32
+// Returns error if the value is negative or exceeds uint32 range
+func SafeIntToUint32(val int) (uint32, error) {
+	if val < 0 {
+		return 0, fmt.Errorf("value out of uint32 range (negative): %d", val)
+	}
+	if val > math.MaxUint32 {
+		return 0, fmt.Errorf("value out of uint32 range: %d (max: %d)", val, math.MaxUint32)
+	}
+	return uint32(val), nil
+}
+
 // SafeLenToUint16 is a convenience function to safely convert a slice length to uint16
 // This is commonly needed for protocol length fields
 func SafeLenToUint16(data []byte) (uint16, error) {

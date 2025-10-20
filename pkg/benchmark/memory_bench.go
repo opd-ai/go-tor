@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"runtime"
 	"time"
+
+	"github.com/opd-ai/go-tor/pkg/security"
 )
 
 // BenchmarkMemoryUsage validates the memory usage target
@@ -55,15 +57,25 @@ func (s *Suite) BenchmarkMemoryUsage(ctx context.Context) error {
 	
 	circuits := make([]mockCircuit, numCircuits)
 	for i := range circuits {
+		// Safe conversion for circuit ID (AUDIT-003)
+		circuitID, err := security.SafeIntToUint32(i)
+		if err != nil {
+			return fmt.Errorf("circuit index out of range: %w", err)
+		}
 		circuits[i] = mockCircuit{
-			id:      uint32(i),
+			id:      circuitID,
 			data:    make([]byte, 1024*100), // ~100KB per circuit
 			streams: make([]mockStream, numStreams),
 		}
 		
 		for j := range circuits[i].streams {
+			// Safe conversion for stream ID (AUDIT-004)
+			streamID, err := security.SafeIntToUint16(j)
+			if err != nil {
+				return fmt.Errorf("stream index out of range: %w", err)
+			}
 			circuits[i].streams[j] = mockStream{
-				id:   uint16(j),
+				id:   streamID,
 				data: make([]byte, 1024*10), // ~10KB per stream
 			}
 		}
@@ -216,8 +228,16 @@ func (s *Suite) BenchmarkMemoryLeaks(ctx context.Context) error {
 	runtime.GC()
 	memAfter := GetMemorySnapshot()
 	
-	// Calculate memory growth
-	memoryGrowth := int64(memAfter.Alloc) - int64(memBefore.Alloc)
+	// Calculate memory growth - use safe conversion to avoid overflow (AUDIT-001)
+	allocAfter, err := security.SafeUint64ToInt64(memAfter.Alloc)
+	if err != nil {
+		return fmt.Errorf("failed to convert memory after: %w", err)
+	}
+	allocBefore, err := security.SafeUint64ToInt64(memBefore.Alloc)
+	if err != nil {
+		return fmt.Errorf("failed to convert memory before: %w", err)
+	}
+	memoryGrowth := allocAfter - allocBefore
 	success := memoryGrowth <= int64(threshold)
 	
 	result := Result{
@@ -244,8 +264,15 @@ func (s *Suite) BenchmarkMemoryLeaks(ctx context.Context) error {
 	}
 	
 	s.addResult(result)
+	// Safe conversion for display - handle negative growth (AUDIT-005)
+	var growthDisplay string
+	if memoryGrowth < 0 {
+		growthDisplay = fmt.Sprintf("-%s", FormatBytes(uint64(-memoryGrowth)))
+	} else {
+		growthDisplay = FormatBytes(uint64(memoryGrowth))
+	}
 	s.log.Info("Memory leak detection complete",
-		"growth", FormatBytes(uint64(memoryGrowth)),
+		"growth", growthDisplay,
 		"success", success)
 	
 	return nil
