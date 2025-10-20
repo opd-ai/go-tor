@@ -63,6 +63,65 @@ func TestLatencyTrackerEmpty(t *testing.T) {
 	}
 }
 
+// TestLatencyTrackerConcurrent tests thread-safety of LatencyTracker
+// This test ensures the race condition fix works correctly
+func TestLatencyTrackerConcurrent(t *testing.T) {
+	tracker := NewLatencyTracker(1000)
+	
+	// Number of concurrent goroutines
+	numGoroutines := 10
+	numRecordsPerGoroutine := 100
+	
+	// Use a channel to synchronize goroutines
+	done := make(chan bool, numGoroutines)
+	
+	// Launch concurrent recorders
+	for i := 0; i < numGoroutines; i++ {
+		go func(id int) {
+			for j := 0; j < numRecordsPerGoroutine; j++ {
+				// Record different latencies from each goroutine
+				latency := time.Duration(id*100+j) * time.Microsecond
+				tracker.Record(latency)
+			}
+			done <- true
+		}(i)
+	}
+	
+	// Wait for all goroutines to complete
+	for i := 0; i < numGoroutines; i++ {
+		<-done
+	}
+	
+	// Verify all records were captured
+	expectedCount := numGoroutines * numRecordsPerGoroutine
+	if tracker.Count() != expectedCount {
+		t.Errorf("Expected count %d, got %d", expectedCount, tracker.Count())
+	}
+	
+	// Test that Percentile and Max can be called concurrently with Record
+	done2 := make(chan bool, 3)
+	
+	go func() {
+		tracker.Record(999 * time.Millisecond)
+		done2 <- true
+	}()
+	
+	go func() {
+		_ = tracker.Percentile(0.95)
+		done2 <- true
+	}()
+	
+	go func() {
+		_ = tracker.Max()
+		done2 <- true
+	}()
+	
+	// Wait for concurrent operations to complete
+	for i := 0; i < 3; i++ {
+		<-done2
+	}
+}
+
 func TestFormatBytes(t *testing.T) {
 	tests := []struct {
 		bytes    uint64
