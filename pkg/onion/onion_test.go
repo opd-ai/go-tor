@@ -1329,7 +1329,7 @@ func TestCreateIntroductionCircuit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			circuitID, err := intro.CreateIntroductionCircuit(ctx, tt.introPoint)
+			circuitID, err := intro.CreateIntroductionCircuit(ctx, tt.introPoint, nil)
 
 			if tt.wantErr {
 				if err == nil {
@@ -1382,7 +1382,7 @@ func TestSendIntroduce1(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := intro.SendIntroduce1(ctx, tt.circuitID, tt.data)
+			err := intro.SendIntroduce1(ctx, tt.circuitID, tt.data, nil)
 
 			if tt.wantErr {
 				if err == nil {
@@ -1699,7 +1699,7 @@ func TestCreateRendezvousCircuit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			circuitID, err := rendezvous.CreateRendezvousCircuit(ctx, tt.rendezvousPoint)
+			circuitID, err := rendezvous.CreateRendezvousCircuit(ctx, tt.rendezvousPoint, nil)
 
 			if tt.expectError {
 				if err == nil {
@@ -1745,7 +1745,7 @@ func TestSendEstablishRendezvous(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := rendezvous.SendEstablishRendezvous(ctx, tt.circuitID, tt.data)
+			err := rendezvous.SendEstablishRendezvous(ctx, tt.circuitID, tt.data, nil)
 
 			if tt.expectError {
 				if err == nil {
@@ -1881,7 +1881,7 @@ func TestWaitForRendezvous2(t *testing.T) {
 
 	circuitID := uint32(2000)
 
-	handshakeData, err := rendezvous.WaitForRendezvous2(ctx, circuitID)
+	handshakeData, err := rendezvous.WaitForRendezvous2(ctx, circuitID, nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
