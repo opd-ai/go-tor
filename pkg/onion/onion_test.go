@@ -2025,3 +2025,98 @@ func BenchmarkParseRendezvous2Cell(b *testing.B) {
 		rendezvous.ParseRendezvous2Cell(data)
 	}
 }
+
+
+// SPEC-005: Test for random introduction point selection
+func TestSelectIntroductionPointRandomization(t *testing.T) {
+log := logger.NewDefault()
+ip := NewIntroductionProtocol(log)
+
+// Create a descriptor with multiple introduction points
+desc := &Descriptor{
+IntroPoints: []IntroductionPoint{
+{OnionKey: []byte{1}},
+{OnionKey: []byte{2}},
+{OnionKey: []byte{3}},
+{OnionKey: []byte{4}},
+{OnionKey: []byte{5}},
+},
+}
+
+// Select multiple times and verify we get different indices
+// With 5 points, selecting 100 times should give us variety
+selections := make(map[int]int)
+numSelections := 100
+
+for i := 0; i < numSelections; i++ {
+selected, err := ip.SelectIntroductionPoint(desc)
+if err != nil {
+t.Fatalf("SelectIntroductionPoint failed: %v", err)
+}
+
+// Find which index was selected by comparing OnionKey
+for idx := range desc.IntroPoints {
+if selected.OnionKey[0] == desc.IntroPoints[idx].OnionKey[0] {
+selections[idx]++
+break
+}
+}
+}
+
+// Verify we got at least 2 different indices (very likely with random selection)
+if len(selections) < 2 {
+t.Errorf("Expected multiple different intro points to be selected, got only %d unique selections", len(selections))
+}
+
+// Log distribution for debugging
+t.Logf("Selection distribution over %d attempts:", numSelections)
+for idx, count := range selections {
+t.Logf("  Index %d: %d times (%.1f%%)", idx, count, float64(count)/float64(numSelections)*100)
+}
+}
+
+func TestSelectIntroductionPointSinglePoint(t *testing.T) {
+log := logger.NewDefault()
+ip := NewIntroductionProtocol(log)
+
+// Test with single introduction point
+desc := &Descriptor{
+IntroPoints: []IntroductionPoint{
+{OnionKey: []byte{1}},
+},
+}
+
+selected, err := ip.SelectIntroductionPoint(desc)
+if err != nil {
+t.Fatalf("SelectIntroductionPoint failed: %v", err)
+}
+
+if selected.OnionKey[0] != desc.IntroPoints[0].OnionKey[0] {
+t.Error("Expected the only available intro point to be selected")
+}
+}
+
+func TestSelectIntroductionPointEmptyDescriptor(t *testing.T) {
+log := logger.NewDefault()
+ip := NewIntroductionProtocol(log)
+
+// Test with no introduction points
+desc := &Descriptor{
+IntroPoints: []IntroductionPoint{},
+}
+
+_, err := ip.SelectIntroductionPoint(desc)
+if err == nil {
+t.Error("Expected error for descriptor with no intro points, got nil")
+}
+}
+
+func TestSelectIntroductionPointNilDescriptor(t *testing.T) {
+log := logger.NewDefault()
+ip := NewIntroductionProtocol(log)
+
+_, err := ip.SelectIntroductionPoint(nil)
+if err == nil {
+t.Error("Expected error for nil descriptor, got nil")
+}
+}
