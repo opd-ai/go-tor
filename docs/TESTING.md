@@ -557,9 +557,30 @@ defer cancel()
 ```
 
 **Issue**: Flaky tests
-```bash
-# Solution: Increase timeouts, use retry logic, or improve synchronization
-time.Sleep(100 * time.Millisecond) // Wait for goroutine to start
+```go
+// Solution: Use proper synchronization instead of sleep
+// Bad: time.Sleep(100 * time.Millisecond)
+
+// Good: Use channels for synchronization
+ready := make(chan struct{})
+go func() {
+    // Setup...
+    close(ready) // Signal ready
+}()
+<-ready // Wait for ready
+
+// Good: Use sync.WaitGroup
+var wg sync.WaitGroup
+wg.Add(1)
+go func() {
+    defer wg.Done()
+    // Work...
+}()
+wg.Wait()
+
+// Good: Use context with timeout
+ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+defer cancel()
 ```
 
 ## Contributing
