@@ -433,3 +433,97 @@ func TestServerShutdownWithActiveConnections(t *testing.T) {
 		t.Error("Expected connection to be closed")
 	}
 }
+
+
+// SEC-L006: Tests for configurable connection limits
+
+func TestDefaultConfig(t *testing.T) {
+cfg := DefaultConfig()
+if cfg == nil {
+t.Fatal("DefaultConfig returned nil")
+}
+if cfg.MaxConnections != defaultMaxConnections {
+t.Errorf("MaxConnections = %d, want %d", cfg.MaxConnections, defaultMaxConnections)
+}
+if cfg.MaxConnections != 1000 {
+t.Errorf("Expected default of 1000 connections, got %d", cfg.MaxConnections)
+}
+}
+
+func TestNewServerWithConfig(t *testing.T) {
+log := logger.NewDefault()
+mgr := circuit.NewManager()
+
+// Test with custom config
+cfg := &Config{
+MaxConnections: 100,
+}
+
+server := NewServerWithConfig("127.0.0.1:0", mgr, log, cfg)
+if server == nil {
+t.Fatal("NewServerWithConfig returned nil")
+}
+if server.config.MaxConnections != 100 {
+t.Errorf("MaxConnections = %d, want 100", server.config.MaxConnections)
+}
+}
+
+func TestNewServerWithNilConfig(t *testing.T) {
+log := logger.NewDefault()
+mgr := circuit.NewManager()
+
+// Test with nil config (should use defaults)
+server := NewServerWithConfig("127.0.0.1:0", mgr, log, nil)
+if server == nil {
+t.Fatal("NewServerWithConfig returned nil")
+}
+if server.config.MaxConnections != defaultMaxConnections {
+t.Errorf("MaxConnections = %d, want %d (default)", server.config.MaxConnections, defaultMaxConnections)
+}
+}
+
+func TestNewServerBackwardsCompatibility(t *testing.T) {
+log := logger.NewDefault()
+mgr := circuit.NewManager()
+
+// Test that old NewServer still works and uses defaults
+server := NewServer("127.0.0.1:0", mgr, log)
+if server == nil {
+t.Fatal("NewServer returned nil")
+}
+if server.config.MaxConnections != defaultMaxConnections {
+t.Errorf("MaxConnections = %d, want %d (default)", server.config.MaxConnections, defaultMaxConnections)
+}
+}
+
+func TestConfigurableConnectionLimit(t *testing.T) {
+log := logger.NewDefault()
+mgr := circuit.NewManager()
+
+tests := []struct {
+name       string
+maxConns   int
+shouldWork bool
+}{
+{"low_limit", 10, true},
+{"medium_limit", 500, true},
+{"high_limit", 2000, true},
+{"zero_unlimited", 0, true}, // 0 = unlimited
+}
+
+for _, tt := range tests {
+t.Run(tt.name, func(t *testing.T) {
+cfg := &Config{
+MaxConnections: tt.maxConns,
+}
+
+server := NewServerWithConfig("127.0.0.1:0", mgr, log, cfg)
+if server == nil {
+t.Fatal("NewServerWithConfig returned nil")
+}
+if server.config.MaxConnections != tt.maxConns {
+t.Errorf("MaxConnections = %d, want %d", server.config.MaxConnections, tt.maxConns)
+}
+})
+}
+}

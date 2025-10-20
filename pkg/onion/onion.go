@@ -1136,6 +1136,7 @@ func NewIntroductionProtocol(log *logger.Logger) *IntroductionProtocol {
 
 // SelectIntroductionPoint selects an appropriate introduction point from a descriptor
 // Per Tor spec (rend-spec-v3.txt): Clients should pick a random introduction point
+// SPEC-005: Implements random selection to avoid predictable behavior
 func (ip *IntroductionProtocol) SelectIntroductionPoint(desc *Descriptor) (*IntroductionPoint, error) {
 	if desc == nil {
 		return nil, fmt.Errorf("descriptor is nil")
@@ -1145,16 +1146,26 @@ func (ip *IntroductionProtocol) SelectIntroductionPoint(desc *Descriptor) (*Intr
 		return nil, fmt.Errorf("no introduction points available in descriptor")
 	}
 
-	// For Phase 7.3.3, select the first available introduction point
-	// In a full implementation, this would:
+	// SPEC-005: Randomly select from available introduction points
+	// In a full implementation, this would also:
 	// 1. Filter out introduction points we've tried and failed
-	// 2. Randomly select from remaining points
-	// 3. Consider network conditions and performance
-	selected := &desc.IntroPoints[0]
+	// 2. Consider network conditions and performance
+	
+	// Generate random index using crypto/rand for security
+	var randomBytes [4]byte
+	if _, err := rand.Read(randomBytes[:]); err != nil {
+		return nil, fmt.Errorf("failed to generate random index: %w", err)
+	}
+	
+	// Convert to uint32 and mod by length to get index
+	randomValue := binary.BigEndian.Uint32(randomBytes[:])
+	selectedIndex := int(randomValue % uint32(len(desc.IntroPoints)))
+	
+	selected := &desc.IntroPoints[selectedIndex]
 
 	ip.logger.Debug("Selected introduction point",
 		"intro_points_available", len(desc.IntroPoints),
-		"selected_index", 0)
+		"selected_index", selectedIndex)
 
 	return selected, nil
 }
