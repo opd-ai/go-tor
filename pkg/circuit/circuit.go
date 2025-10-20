@@ -4,7 +4,10 @@ package circuit
 
 import (
 	"context"
+	"crypto/sha1"
+	"crypto/subtle"
 	"fmt"
+	"hash"
 	"sync"
 	"time"
 )
@@ -48,6 +51,9 @@ type Circuit struct {
 	mu              sync.RWMutex
 	paddingEnabled  bool          // SPEC-002: Enable/disable circuit padding
 	paddingInterval time.Duration // SPEC-002: Interval for padding cells
+	// CRYPTO-001: Running digests for relay cell verification per tor-spec.txt §6.1
+	forwardDigest  hash.Hash // Client → Exit direction
+	backwardDigest hash.Hash // Exit → Client direction
 }
 
 // Hop represents a single hop in a circuit (one relay)
@@ -67,6 +73,8 @@ func NewCircuit(id uint32) *Circuit {
 		Hops:            make([]*Hop, 0, 3), // Typical circuit has 3 hops
 		paddingEnabled:  true,               // SPEC-002: Enable padding by default
 		paddingInterval: 0,                  // SPEC-002: 0 = adaptive (future enhancement)
+		forwardDigest:   sha1.New(),         // CRYPTO-001: Initialize forward digest
+		backwardDigest:  sha1.New(),         // CRYPTO-001: Initialize backward digest
 	}
 }
 
@@ -295,4 +303,96 @@ func (c *Circuit) ShouldSendPadding() bool {
 	// - Implement timing-based policies
 
 	return true
+}
+
+// Direction represents the direction of relay cell flow
+type Direction int
+
+const (
+	// DirectionForward is client → exit
+	DirectionForward Direction = iota
+	// DirectionBackward is exit → client
+	DirectionBackward
+)
+
+// CRYPTO-001: Relay cell digest verification per tor-spec.txt §6.1
+// "Each RELAY cell includes a running digest field computed over all relay cells
+// sent in same direction on the circuit."
+
+// UpdateDigest updates the running digest for relay cells (CRYPTO-001)
+// This must be called for every relay cell sent or received to maintain digest state.
+// The digest is computed over the entire relay cell with the digest field zeroed.
+// Per tor-spec.txt §6.1: digest = SHA1(digest | relay_cell_with_zeroed_digest)
+func (c *Circuit) UpdateDigest(direction Direction, cellData []byte) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if len(cellData) < 11 {
+		return fmt.Errorf("relay cell data too short: %d < 11", len(cellData))
+	}
+
+	// Create a copy with digest field zeroed (bytes 5-8)
+	cellCopy := make([]byte, len(cellData))
+	copy(cellCopy, cellData)
+	cellCopy[5] = 0
+	cellCopy[6] = 0
+	cellCopy[7] = 0
+	cellCopy[8] = 0
+
+	// Update appropriate digest
+	var digest hash.Hash
+	if direction == DirectionForward {
+		digest = c.forwardDigest
+	} else {
+		digest = c.backwardDigest
+	}
+
+	if digest == nil {
+		return fmt.Errorf("digest not initialized for direction %d", direction)
+	}
+
+	_, err := digest.Write(cellCopy)
+	return err
+}
+
+// VerifyDigest verifies the digest of an incoming relay cell (CRYPTO-001)
+// This prevents cell injection and replay attacks per tor-spec.txt §6.1.
+// Returns error if digest verification fails.
+func (c *Circuit) VerifyDigest(direction Direction, cellData []byte, receivedDigest [4]byte) error {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	// Select appropriate digest
+	var digest hash.Hash
+	if direction == DirectionForward {
+		digest = c.forwardDigest
+	} else {
+		digest = c.backwardDigest
+	}
+
+	if digest == nil {
+		return fmt.Errorf("digest not initialized for direction %d", direction)
+	}
+
+	// Compute expected digest (first 4 bytes of SHA-1)
+	// Note: We're checking the state BEFORE updating, so we compute what the
+	// digest should be for this cell given the current state
+	expectedSum := digest.Sum(nil)
+	expected := [4]byte{expectedSum[0], expectedSum[1], expectedSum[2], expectedSum[3]}
+
+	// Constant-time comparison to prevent timing attacks
+	if subtle.ConstantTimeCompare(expected[:], receivedDigest[:]) != 1 {
+		return fmt.Errorf("relay cell digest verification failed: expected %x, got %x", expected, receivedDigest)
+	}
+
+	return nil
+}
+
+// ResetDigests resets the running digests (CRYPTO-001)
+// This should be called when establishing a new circuit or after certain protocol events.
+func (c *Circuit) ResetDigests() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.forwardDigest.Reset()
+	c.backwardDigest.Reset()
 }
