@@ -281,8 +281,7 @@ make lint         # Run golint
 - [Tutorial](docs/TUTORIAL.md) - Getting started guide
 - [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and solutions
 - [Production Guide](docs/PRODUCTION.md) - Production deployment guide
-- [Security Audit](AUDIT_SUMMARY.md) - Security audit results and status
-- [Historical Archive](docs/archive/) - Audit reports and development phase history
+- [Security Audit](AUDIT.md) - Security audit results and status
 
 ### Cross-Compilation
 
