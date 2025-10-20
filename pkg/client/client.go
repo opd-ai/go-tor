@@ -18,6 +18,7 @@ import (
 	"github.com/opd-ai/go-tor/pkg/logger"
 	"github.com/opd-ai/go-tor/pkg/metrics"
 	"github.com/opd-ai/go-tor/pkg/path"
+	"github.com/opd-ai/go-tor/pkg/pool"
 	"github.com/opd-ai/go-tor/pkg/socks"
 )
 
@@ -35,9 +36,10 @@ type Client struct {
 	guardManager  *path.GuardManager
 	metrics       *metrics.Metrics
 
-	// Circuit management
-	circuits   []*circuit.Circuit
-	circuitsMu sync.RWMutex
+	// Circuit management with advanced pooling (Phase 9.4)
+	circuitPool *pool.CircuitPool
+	circuits    []*circuit.Circuit // Legacy circuit list for backward compatibility
+	circuitsMu  sync.RWMutex
 
 	// Bandwidth tracking (for BW events)
 	bytesRead    uint64
@@ -149,6 +151,21 @@ func (c *Client) Start(ctx context.Context) error {
 	c.metrics.GuardsActive.Set(int64(guardStats.TotalGuards))
 	c.metrics.GuardsConfirmed.Set(int64(guardStats.ConfirmedGuards))
 
+	// Step 3.6: Initialize circuit pool if prebuilding is enabled (Phase 9.4)
+	if c.config.EnableCircuitPrebuilding {
+		c.logger.Info("Initializing circuit pool with prebuilding",
+			"min_size", c.config.CircuitPoolMinSize,
+			"max_size", c.config.CircuitPoolMaxSize)
+		
+		poolCfg := &pool.CircuitPoolConfig{
+			MinCircuits:     c.config.CircuitPoolMinSize,
+			MaxCircuits:     c.config.CircuitPoolMaxSize,
+			PrebuildEnabled: true,
+			RebuildInterval: 30 * time.Second,
+		}
+		c.circuitPool = pool.NewCircuitPool(poolCfg, c.circuitBuilderFunc(), c.logger)
+	}
+
 	// Step 4: Build initial circuits
 	c.logger.Info("Building initial circuits...")
 	if err := c.buildInitialCircuits(ctx); err != nil {
@@ -220,6 +237,13 @@ func (c *Client) Stop() error {
 		c.logger.Warn("Shutdown timeout exceeded")
 	}
 
+	// Close circuit pool if enabled (Phase 9.4)
+	if c.circuitPool != nil {
+		if err := c.circuitPool.Close(); err != nil {
+			c.logger.Warn("Failed to close circuit pool", "error", err)
+		}
+	}
+
 	// Close all circuits
 	c.circuitsMu.Lock()
 	for _, circ := range c.circuits {
@@ -249,13 +273,28 @@ func (c *Client) Stop() error {
 	return nil
 }
 
+// circuitBuilderFunc returns a circuit builder function for the circuit pool
+func (c *Client) circuitBuilderFunc() pool.CircuitBuilder {
+	return func(ctx context.Context) (*circuit.Circuit, error) {
+		return c.buildCircuitForPool(ctx)
+	}
+}
+
 // buildInitialCircuits builds a pool of circuits for use
 func (c *Client) buildInitialCircuits(ctx context.Context) error {
-	// Build 3 initial circuits for redundancy
+	// If circuit prebuilding is enabled, the circuit pool will handle initial circuits
+	if c.config.EnableCircuitPrebuilding && c.circuitPool != nil {
+		c.logger.Info("Circuit pool will handle prebuilding, waiting for initial circuits...")
+		// Give the pool a moment to prebuild circuits
+		time.Sleep(1 * time.Second)
+		return nil
+	}
+
+	// Legacy mode: Build 3 initial circuits manually
 	const initialCircuitCount = 3
 
 	for i := 0; i < initialCircuitCount; i++ {
-		if err := c.buildCircuit(ctx); err != nil {
+		if _, err := c.buildCircuitForPool(ctx); err != nil {
 			c.logger.Warn("Failed to build circuit", "attempt", i+1, "error", err)
 			// Continue trying - we need at least one circuit
 			if i == initialCircuitCount-1 {
@@ -267,12 +306,12 @@ func (c *Client) buildInitialCircuits(ctx context.Context) error {
 	return nil
 }
 
-// buildCircuit builds a single circuit
-func (c *Client) buildCircuit(ctx context.Context) error {
+// buildCircuitForPool builds a single circuit and returns it for pool management
+func (c *Client) buildCircuitForPool(ctx context.Context) (*circuit.Circuit, error) {
 	// Select path (port 80 for general web traffic)
 	selectedPath, err := c.pathSelector.SelectPath(80)
 	if err != nil {
-		return fmt.Errorf("failed to select path: %w", err)
+		return nil, fmt.Errorf("failed to select path: %w", err)
 	}
 
 	c.logger.Info("Building circuit",
@@ -303,7 +342,7 @@ func (c *Client) buildCircuit(ctx context.Context) error {
 				TimeCreated: startTime,
 			})
 		}
-		return fmt.Errorf("failed to build circuit: %w", err)
+		return nil, fmt.Errorf("failed to build circuit: %w", err)
 	}
 
 	// Publish circuit built event
@@ -330,14 +369,14 @@ func (c *Client) buildCircuit(ctx context.Context) error {
 		Status:    "GOOD",
 	})
 
-	// Add to circuit pool
+	// Add to legacy circuit list for backward compatibility
 	c.circuitsMu.Lock()
 	c.circuits = append(c.circuits, circ)
 	c.metrics.ActiveCircuits.Set(int64(len(c.circuits)))
 	c.circuitsMu.Unlock()
 
 	c.logger.Info("Circuit built successfully", "circuit_id", circ.ID, "duration", buildDuration)
-	return nil
+	return circ, nil
 }
 
 // maintainCircuits maintains the circuit pool
@@ -396,25 +435,86 @@ func (c *Client) checkAndRebuildCircuits(ctx context.Context) {
 	c.circuits = activeCircuits
 	c.metrics.ActiveCircuits.Set(int64(len(c.circuits)))
 
-	// Rebuild if needed
-	const minCircuitCount = 2
-	if len(c.circuits) < minCircuitCount {
-		c.logger.Info("Circuit pool low, rebuilding", "current", len(c.circuits), "min", minCircuitCount)
-		// Unlock before building (buildCircuit needs to acquire lock)
-		c.circuitsMu.Unlock()
+	// Rebuild if needed (only in legacy mode; circuit pool handles its own rebuilding)
+	if !c.config.EnableCircuitPrebuilding || c.circuitPool == nil {
+		const minCircuitCount = 2
+		if len(c.circuits) < minCircuitCount {
+			c.logger.Info("Circuit pool low, rebuilding", "current", len(c.circuits), "min", minCircuitCount)
+			// Unlock before building (buildCircuitForPool needs to acquire lock)
+			c.circuitsMu.Unlock()
 
-		needed := minCircuitCount - len(c.circuits)
-		for i := 0; i < needed; i++ {
-			if err := c.buildCircuit(ctx); err != nil {
-				c.logger.Warn("Failed to rebuild circuit", "error", err)
+			needed := minCircuitCount - len(c.circuits)
+			for i := 0; i < needed; i++ {
+				if _, err := c.buildCircuitForPool(ctx); err != nil {
+					c.logger.Warn("Failed to rebuild circuit", "error", err)
+				}
 			}
-		}
 
-		// Re-acquire lock for defer
-		c.circuitsMu.Lock()
+			// Re-acquire lock for defer
+			c.circuitsMu.Lock()
+		}
 	}
 
 	c.circuitsMu.Unlock()
+}
+
+// GetCircuit returns a circuit using adaptive selection strategy (Phase 9.4)
+// This method implements intelligent circuit selection:
+// - If circuit pool is enabled, get from pool (prebuilt circuits)
+// - Otherwise, use legacy mode (select from circuit list)
+func (c *Client) GetCircuit(ctx context.Context) (*circuit.Circuit, error) {
+	// Strategy 1: Use circuit pool if enabled (Phase 9.4)
+	if c.config.EnableCircuitPrebuilding && c.circuitPool != nil {
+		circ, err := c.circuitPool.Get(ctx)
+		if err != nil {
+			c.logger.Debug("Failed to get circuit from pool, falling back to legacy", "error", err)
+			// Fall through to legacy mode
+		} else {
+			c.logger.Debug("Retrieved circuit from pool", "circuit_id", circ.ID)
+			return circ, nil
+		}
+	}
+
+	// Strategy 2: Legacy mode - select from circuit list
+	c.circuitsMu.RLock()
+	defer c.circuitsMu.RUnlock()
+
+	if len(c.circuits) == 0 {
+		return nil, fmt.Errorf("no circuits available")
+	}
+
+	// Select the youngest healthy circuit for better performance
+	var bestCircuit *circuit.Circuit
+	var bestAge time.Duration = 1<<63 - 1 // Max duration
+
+	for _, circ := range c.circuits {
+		if circ.GetState() == circuit.StateOpen {
+			age := circ.Age()
+			if age < bestAge {
+				bestCircuit = circ
+				bestAge = age
+			}
+		}
+	}
+
+	if bestCircuit == nil {
+		return nil, fmt.Errorf("no healthy circuits available")
+	}
+
+	c.logger.Debug("Selected circuit from legacy pool",
+		"circuit_id", bestCircuit.ID,
+		"age", bestAge)
+
+	return bestCircuit, nil
+}
+
+// ReturnCircuit returns a circuit to the pool if pooling is enabled (Phase 9.4)
+func (c *Client) ReturnCircuit(circ *circuit.Circuit) {
+	if c.config.EnableCircuitPrebuilding && c.circuitPool != nil {
+		c.circuitPool.Put(circ)
+		c.logger.Debug("Returned circuit to pool", "circuit_id", circ.ID)
+	}
+	// In legacy mode, circuits stay in the list and are managed by maintainCircuits
 }
 
 // GetStats returns client statistics
@@ -428,7 +528,7 @@ func (c *Client) GetStats() Stats {
 	// Get metrics snapshot
 	metricsSnap := c.metrics.Snapshot()
 
-	return Stats{
+	stats := Stats{
 		ActiveCircuits:      len(c.circuits),
 		SocksPort:           c.config.SocksPort,
 		ControlPort:         c.config.ControlPort,
@@ -443,6 +543,18 @@ func (c *Client) GetStats() Stats {
 		ConnectionRetries:   metricsSnap.ConnectionRetries,
 		UptimeSeconds:       metricsSnap.UptimeSeconds,
 	}
+
+	// Add circuit pool statistics if enabled (Phase 9.4)
+	if c.circuitPool != nil {
+		poolStats := c.circuitPool.Stats()
+		stats.CircuitPoolEnabled = true
+		stats.CircuitPoolTotal = poolStats.Total
+		stats.CircuitPoolOpen = poolStats.Open
+		stats.CircuitPoolMin = poolStats.MinCircuits
+		stats.CircuitPoolMax = poolStats.MaxCircuits
+	}
+
+	return stats
 }
 
 // Stats represents client statistics
@@ -458,6 +570,13 @@ type Stats struct {
 	CircuitBuildFailure int64
 	CircuitBuildTimeAvg time.Duration
 	CircuitBuildTimeP95 time.Duration
+
+	// Circuit pool metrics (Phase 9.4)
+	CircuitPoolEnabled bool
+	CircuitPoolTotal   int
+	CircuitPoolOpen    int
+	CircuitPoolMin     int
+	CircuitPoolMax     int
 
 	// Guard metrics
 	GuardsActive    int
