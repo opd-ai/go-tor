@@ -15,7 +15,7 @@ import (
 // mockRelay simulates a Tor relay for testing handshake
 type mockRelay struct {
 	listener net.Listener
-	t        *testing.T
+	logger   *logger.Logger
 }
 
 func newMockRelay(t *testing.T) (*mockRelay, string, error) {
@@ -24,9 +24,11 @@ func newMockRelay(t *testing.T) (*mockRelay, string, error) {
 		return nil, "", err
 	}
 
+	log := logger.NewDefault()
+
 	return &mockRelay{
 		listener: listener,
-		t:        t,
+		logger:   log,
 	}, listener.Addr().String(), nil
 }
 
@@ -42,18 +44,18 @@ func (m *mockRelay) serve() {
 		buf := make([]byte, 514)
 		n, err := conn.Read(buf)
 		if err != nil {
-			m.t.Logf("Failed to read VERSIONS: %v", err)
+			m.logger.Debug("Failed to read VERSIONS", "error", err)
 			return
 		}
 
 		versionsCell, err := cell.DecodeCell(bytes.NewReader(buf[:n]))
 		if err != nil {
-			m.t.Logf("Failed to decode VERSIONS: %v", err)
+			m.logger.Debug("Failed to decode VERSIONS", "error", err)
 			return
 		}
 
 		if versionsCell.Command != cell.CmdVersions {
-			m.t.Logf("Expected VERSIONS, got %v", versionsCell.Command)
+			m.logger.Debug("Expected VERSIONS command", "got", versionsCell.Command)
 			return
 		}
 
@@ -62,30 +64,30 @@ func (m *mockRelay) serve() {
 		responseCell.Payload = []byte{0x00, 0x04} // Version 4
 		var encBuf bytes.Buffer
 		if err := responseCell.Encode(&encBuf); err != nil {
-			m.t.Logf("Failed to encode VERSIONS response: %v", err)
+			m.logger.Debug("Failed to encode VERSIONS response", "error", err)
 			return
 		}
 
 		if _, err := conn.Write(encBuf.Bytes()); err != nil {
-			m.t.Logf("Failed to write VERSIONS response: %v", err)
+			m.logger.Debug("Failed to write VERSIONS response", "error", err)
 			return
 		}
 
 		// Read NETINFO cell
 		n, err = conn.Read(buf)
 		if err != nil {
-			m.t.Logf("Failed to read NETINFO: %v", err)
+			m.logger.Debug("Failed to read NETINFO", "error", err)
 			return
 		}
 
 		netinfoCell, err := cell.DecodeCell(bytes.NewReader(buf[:n]))
 		if err != nil {
-			m.t.Logf("Failed to decode NETINFO: %v", err)
+			m.logger.Debug("Failed to decode NETINFO", "error", err)
 			return
 		}
 
 		if netinfoCell.Command != cell.CmdNetinfo {
-			m.t.Logf("Expected NETINFO, got %v", netinfoCell.Command)
+			m.logger.Debug("Expected NETINFO command", "got", netinfoCell.Command)
 			return
 		}
 
@@ -107,12 +109,12 @@ func (m *mockRelay) serve() {
 
 		var netBuf bytes.Buffer
 		if err := netinfoResponse.Encode(&netBuf); err != nil {
-			m.t.Logf("Failed to encode NETINFO response: %v", err)
+			m.logger.Debug("Failed to encode NETINFO response", "error", err)
 			return
 		}
 
 		if _, err := conn.Write(netBuf.Bytes()); err != nil {
-			m.t.Logf("Failed to write NETINFO response: %v", err)
+			m.logger.Debug("Failed to write NETINFO response", "error", err)
 			return
 		}
 	}()
