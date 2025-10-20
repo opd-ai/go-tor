@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/opd-ai/go-tor/pkg/circuit"
 	"github.com/opd-ai/go-tor/pkg/logger"
 )
 
@@ -47,18 +48,19 @@ func (s State) String() string {
 
 // Stream represents a single connection multiplexed over a circuit
 type Stream struct {
-	ID        uint16
-	CircuitID uint32
-	Target    string
-	Port      uint16
-	State     State
-	CreatedAt time.Time
-	sendQueue chan []byte
-	recvQueue chan []byte
-	closeChan chan struct{}
-	closeOnce sync.Once
-	mu        sync.RWMutex
-	logger    *logger.Logger
+	ID           uint16
+	CircuitID    uint32
+	Target       string
+	Port         uint16
+	State        State
+	IsolationKey *circuit.IsolationKey // Isolation key for this stream
+	CreatedAt    time.Time
+	sendQueue    chan []byte
+	recvQueue    chan []byte
+	closeChan    chan struct{}
+	closeOnce    sync.Once
+	mu           sync.RWMutex
+	logger       *logger.Logger
 }
 
 // NewStream creates a new stream
@@ -289,4 +291,18 @@ func (m *Manager) Count() int {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return len(m.streams)
+}
+
+// SetIsolationKey sets the isolation key for a stream
+func (s *Stream) SetIsolationKey(key *circuit.IsolationKey) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.IsolationKey = key
+}
+
+// GetIsolationKey returns the isolation key for a stream
+func (s *Stream) GetIsolationKey() *circuit.IsolationKey {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.IsolationKey
 }

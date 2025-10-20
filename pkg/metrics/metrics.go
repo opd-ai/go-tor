@@ -42,6 +42,12 @@ type Metrics struct {
 	SocksRequests    *Counter
 	SocksErrors      *Counter
 
+	// Circuit isolation metrics
+	IsolatedCircuits *Gauge   // Total isolated circuits
+	IsolationKeys    *Gauge   // Number of unique isolation keys
+	IsolationHits    *Counter // Circuit reused from isolated pool
+	IsolationMisses  *Counter // New circuit built for isolation
+
 	// System metrics
 	Uptime      *Gauge
 	startTime   time.Time
@@ -82,6 +88,12 @@ func New() *Metrics {
 		SocksConnections: NewCounter(),
 		SocksRequests:    NewCounter(),
 		SocksErrors:      NewCounter(),
+
+		// Circuit isolation metrics
+		IsolatedCircuits: NewGauge(),
+		IsolationKeys:    NewGauge(),
+		IsolationHits:    NewCounter(),
+		IsolationMisses:  NewCounter(),
 
 		// System metrics
 		Uptime:    NewGauge(),
@@ -160,6 +172,12 @@ func (m *Metrics) Snapshot() *Snapshot {
 		SocksRequests:    m.SocksRequests.Value(),
 		SocksErrors:      m.SocksErrors.Value(),
 
+		// Circuit isolation metrics
+		IsolatedCircuits: m.IsolatedCircuits.Value(),
+		IsolationKeys:    m.IsolationKeys.Value(),
+		IsolationHits:    m.IsolationHits.Value(),
+		IsolationMisses:  m.IsolationMisses.Value(),
+
 		// System metrics
 		UptimeSeconds: m.Uptime.Value(),
 	}
@@ -199,6 +217,12 @@ type Snapshot struct {
 	SocksConnections int64
 	SocksRequests    int64
 	SocksErrors      int64
+
+	// Circuit isolation metrics
+	IsolatedCircuits int64
+	IsolationKeys    int64
+	IsolationHits    int64
+	IsolationMisses  int64
 
 	// System metrics
 	UptimeSeconds int64

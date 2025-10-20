@@ -50,6 +50,13 @@ type Config struct {
 	CircuitPoolMinSize       int           // Minimum circuits to prebuild (default: 2)
 	CircuitPoolMaxSize       int           // Maximum circuits in pool (default: 10)
 	EnableBufferPooling      bool          // Enable buffer pooling for cell operations (default: true)
+
+	// Circuit isolation (backward compatible - disabled by default)
+	IsolationLevel       string // Isolation level: "none", "destination", "credential", "port", "session" (default: "none")
+	IsolateDestinations  bool   // Isolate circuits by destination host:port (default: false)
+	IsolateSOCKSAuth     bool   // Isolate circuits by SOCKS5 username (default: false)
+	IsolateClientPort    bool   // Isolate circuits by client source port (default: false)
+	IsolateClientProtocol bool  // Isolate circuits by protocol (default: false)
 }
 
 // OnionServiceConfig represents configuration for a single onion service
@@ -100,6 +107,12 @@ func DefaultConfig() *Config {
 		CircuitPoolMinSize:       2,
 		CircuitPoolMaxSize:       10,
 		EnableBufferPooling:      true,
+		// Circuit isolation defaults (backward compatible - disabled by default)
+		IsolationLevel:        "none",
+		IsolateDestinations:   false,
+		IsolateSOCKSAuth:      false,
+		IsolateClientPort:     false,
+		IsolateClientProtocol: false,
 	}
 }
 
@@ -160,6 +173,18 @@ func (c *Config) Validate() error {
 	}
 	if c.CircuitPoolMaxSize < c.CircuitPoolMinSize {
 		return fmt.Errorf("CircuitPoolMaxSize must be >= CircuitPoolMinSize")
+	}
+
+	// Validate circuit isolation settings
+	validIsolationLevels := map[string]bool{
+		"none":        true,
+		"destination": true,
+		"credential":  true,
+		"port":        true,
+		"session":     true,
+	}
+	if !validIsolationLevels[c.IsolationLevel] {
+		return fmt.Errorf("invalid IsolationLevel: %s (must be none, destination, credential, port, or session)", c.IsolationLevel)
 	}
 
 	return nil

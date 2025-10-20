@@ -48,6 +48,7 @@ type Circuit struct {
 	State           State
 	CreatedAt       time.Time
 	Hops            []*Hop
+	IsolationKey    *IsolationKey // Isolation key for circuit isolation
 	mu              sync.RWMutex
 	paddingEnabled  bool          // SPEC-002: Enable/disable circuit padding
 	paddingInterval time.Duration // SPEC-002: Interval for padding cells
@@ -74,6 +75,7 @@ func NewCircuit(id uint32) *Circuit {
 		State:            StateBuilding,
 		CreatedAt:        now,
 		Hops:             make([]*Hop, 0, 3),    // Typical circuit has 3 hops
+		IsolationKey:     nil,                   // No isolation by default (backward compatible)
 		paddingEnabled:   true,                  // SPEC-002: Enable padding by default
 		paddingInterval:  5 * time.Second,       // SPEC-002: Default 5-second padding interval
 		lastPaddingTime:  now,                   // SPEC-002: Initialize padding timer
@@ -435,4 +437,18 @@ func (c *Circuit) ResetDigests() {
 	defer c.mu.Unlock()
 	c.forwardDigest.Reset()
 	c.backwardDigest.Reset()
+}
+
+// SetIsolationKey sets the isolation key for this circuit
+func (c *Circuit) SetIsolationKey(key *IsolationKey) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.IsolationKey = key
+}
+
+// GetIsolationKey returns the isolation key for this circuit
+func (c *Circuit) GetIsolationKey() *IsolationKey {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.IsolationKey
 }
