@@ -458,6 +458,65 @@ func (c *Client) checkAndRebuildCircuits(ctx context.Context) {
 	c.circuitsMu.Unlock()
 }
 
+// GetCircuit returns a circuit using adaptive selection strategy (Phase 9.4)
+// This method implements intelligent circuit selection:
+// - If circuit pool is enabled, get from pool (prebuilt circuits)
+// - Otherwise, use legacy mode (select from circuit list)
+func (c *Client) GetCircuit(ctx context.Context) (*circuit.Circuit, error) {
+	// Strategy 1: Use circuit pool if enabled (Phase 9.4)
+	if c.config.EnableCircuitPrebuilding && c.circuitPool != nil {
+		circ, err := c.circuitPool.Get(ctx)
+		if err != nil {
+			c.logger.Debug("Failed to get circuit from pool, falling back to legacy", "error", err)
+			// Fall through to legacy mode
+		} else {
+			c.logger.Debug("Retrieved circuit from pool", "circuit_id", circ.ID)
+			return circ, nil
+		}
+	}
+
+	// Strategy 2: Legacy mode - select from circuit list
+	c.circuitsMu.RLock()
+	defer c.circuitsMu.RUnlock()
+
+	if len(c.circuits) == 0 {
+		return nil, fmt.Errorf("no circuits available")
+	}
+
+	// Select the youngest healthy circuit for better performance
+	var bestCircuit *circuit.Circuit
+	var bestAge time.Duration = 1<<63 - 1 // Max duration
+
+	for _, circ := range c.circuits {
+		if circ.GetState() == circuit.StateOpen {
+			age := circ.Age()
+			if age < bestAge {
+				bestCircuit = circ
+				bestAge = age
+			}
+		}
+	}
+
+	if bestCircuit == nil {
+		return nil, fmt.Errorf("no healthy circuits available")
+	}
+
+	c.logger.Debug("Selected circuit from legacy pool",
+		"circuit_id", bestCircuit.ID,
+		"age", bestAge)
+
+	return bestCircuit, nil
+}
+
+// ReturnCircuit returns a circuit to the pool if pooling is enabled (Phase 9.4)
+func (c *Client) ReturnCircuit(circ *circuit.Circuit) {
+	if c.config.EnableCircuitPrebuilding && c.circuitPool != nil {
+		c.circuitPool.Put(circ)
+		c.logger.Debug("Returned circuit to pool", "circuit_id", circ.ID)
+	}
+	// In legacy mode, circuits stay in the list and are managed by maintainCircuits
+}
+
 // GetStats returns client statistics
 func (c *Client) GetStats() Stats {
 	c.circuitsMu.RLock()
