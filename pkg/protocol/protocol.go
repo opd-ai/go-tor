@@ -21,6 +21,10 @@ const (
 
 	// DefaultHandshakeTimeout is the default timeout for protocol handshake (SEC-009)
 	DefaultHandshakeTimeout = 10 * time.Second
+
+	// SEC-M004: Timeout bounds validation to prevent DoS or protocol failures
+	MinHandshakeTimeout = 5 * time.Second  // Minimum timeout to allow handshake to complete
+	MaxHandshakeTimeout = 60 * time.Second // Maximum timeout to prevent indefinite blocking
 )
 
 // Handshake performs the Tor protocol handshake on a connection
@@ -44,9 +48,19 @@ func NewHandshake(conn *connection.Connection, log *logger.Logger) *Handshake {
 }
 
 // SetTimeout sets the handshake timeout (SEC-009)
-// This allows configuring shorter timeouts for embedded systems
-func (h *Handshake) SetTimeout(timeout time.Duration) {
+// This allows configuring shorter timeouts for embedded systems.
+// SEC-M004: Validates timeout is within safe bounds (5s-60s) to prevent
+// DoS attacks (too short) or indefinite blocking (too long).
+// Returns error if timeout is outside valid range.
+func (h *Handshake) SetTimeout(timeout time.Duration) error {
+	if timeout < MinHandshakeTimeout {
+		return fmt.Errorf("timeout too short: %v < %v (minimum)", timeout, MinHandshakeTimeout)
+	}
+	if timeout > MaxHandshakeTimeout {
+		return fmt.Errorf("timeout too long: %v > %v (maximum)", timeout, MaxHandshakeTimeout)
+	}
 	h.timeout = timeout
+	return nil
 }
 
 // PerformHandshake performs the version negotiation handshake
