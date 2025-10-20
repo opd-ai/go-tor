@@ -72,6 +72,7 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 - ✅ **HTTP metrics endpoint (Prometheus, JSON, health, dashboard)**
 
 ### Recently Completed
+- ✅ **Phase 9.6**: Race condition fix in benchmark package (thread safety)
 - ✅ **Phase 9.5**: Performance benchmarking and validation
 - ✅ **Phase 9.4**: Advanced circuit strategies (circuit pool integration, adaptive selection)
 - ✅ **Phase 9.3**: Testing infrastructure enhancement (integration tests, stress tests, benchmarks)
@@ -82,7 +83,6 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 - ✅ **Phase 8.5**: Comprehensive testing and documentation
 - ✅ **Phase 8.4**: Security hardening and audit
 - ✅ **Phase 8.3**: Performance optimization and tuning (resource pooling, circuit prebuilding)
-- ✅ **Phase 8.2**: Enhanced error handling and resilience
 
 ### Planned
 - [ ] **Phase 9**: Advanced monitoring and production features
