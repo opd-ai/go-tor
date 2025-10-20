@@ -318,16 +318,22 @@ func TestCircuitPaddingEnabled(t *testing.T) {
 func TestCircuitPaddingInterval(t *testing.T) {
 	c := NewCircuit(1)
 
-	// Initial interval should be 0 (adaptive)
-	if c.GetPaddingInterval() != 0 {
-		t.Errorf("Initial padding interval should be 0, got %v", c.GetPaddingInterval())
+	// Initial interval should be 5 seconds (default)
+	if c.GetPaddingInterval() != 5*time.Second {
+		t.Errorf("Initial padding interval should be 5s, got %v", c.GetPaddingInterval())
 	}
 
 	// Set custom interval
-	interval := 5 * time.Second
+	interval := 10 * time.Second
 	c.SetPaddingInterval(interval)
 	if c.GetPaddingInterval() != interval {
 		t.Errorf("Padding interval should be %v, got %v", interval, c.GetPaddingInterval())
+	}
+	
+	// Set to 0 to disable adaptive padding
+	c.SetPaddingInterval(0)
+	if c.GetPaddingInterval() != 0 {
+		t.Errorf("Padding interval should be 0, got %v", c.GetPaddingInterval())
 	}
 }
 
@@ -336,36 +342,49 @@ func TestShouldSendPadding(t *testing.T) {
 		name           string
 		paddingEnabled bool
 		state          State
+		timeSinceStart time.Duration
 		expected       bool
 	}{
 		{
-			name:           "enabled_open",
+			name:           "enabled_open_after_interval",
 			paddingEnabled: true,
 			state:          StateOpen,
+			timeSinceStart: 6 * time.Second, // After default 5s interval
 			expected:       true,
+		},
+		{
+			name:           "enabled_open_before_interval",
+			paddingEnabled: true,
+			state:          StateOpen,
+			timeSinceStart: 2 * time.Second, // Before 5s interval
+			expected:       false,
 		},
 		{
 			name:           "disabled_open",
 			paddingEnabled: false,
 			state:          StateOpen,
+			timeSinceStart: 6 * time.Second,
 			expected:       false,
 		},
 		{
 			name:           "enabled_building",
 			paddingEnabled: true,
 			state:          StateBuilding,
+			timeSinceStart: 6 * time.Second,
 			expected:       false,
 		},
 		{
 			name:           "enabled_closed",
 			paddingEnabled: true,
 			state:          StateClosed,
+			timeSinceStart: 6 * time.Second,
 			expected:       false,
 		},
 		{
 			name:           "disabled_closed",
 			paddingEnabled: false,
 			state:          StateClosed,
+			timeSinceStart: 6 * time.Second,
 			expected:       false,
 		},
 	}
@@ -375,6 +394,12 @@ func TestShouldSendPadding(t *testing.T) {
 			c := NewCircuit(1)
 			c.SetPaddingEnabled(tt.paddingEnabled)
 			c.SetState(tt.state)
+
+			// Simulate time passage by setting lastPaddingTime in the past
+			c.mu.Lock()
+			c.lastPaddingTime = time.Now().Add(-tt.timeSinceStart)
+			c.lastActivityTime = time.Now().Add(-tt.timeSinceStart)
+			c.mu.Unlock()
 
 			if got := c.ShouldSendPadding(); got != tt.expected {
 				t.Errorf("ShouldSendPadding() = %v, want %v", got, tt.expected)
@@ -389,23 +414,61 @@ func TestPaddingConcurrency(t *testing.T) {
 
 	// Test concurrent access to padding settings
 	done := make(chan bool, 10)
-
+	
+	// Test concurrent RecordActivity and RecordPaddingSent
 	for i := 0; i < 5; i++ {
-		go func(id int) {
-			for j := 0; j < 100; j++ {
-				c.SetPaddingEnabled(id%2 == 0)
-				_ = c.IsPaddingEnabled()
-				c.SetPaddingInterval(time.Duration(id) * time.Second)
-				_ = c.GetPaddingInterval()
+		go func() {
+			for j := 0; j < 20; j++ {
+				c.RecordActivity()
 				_ = c.ShouldSendPadding()
+				c.RecordPaddingSent()
 			}
 			done <- true
-		}(i)
+		}()
 	}
-
-	// Wait for all goroutines
+	
 	for i := 0; i < 5; i++ {
 		<-done
+	}
+}
+
+func TestRecordPaddingSent(t *testing.T) {
+	c := NewCircuit(1)
+	
+	// Set last padding time in the past
+	pastTime := time.Now().Add(-10 * time.Second)
+	c.mu.Lock()
+	c.lastPaddingTime = pastTime
+	c.mu.Unlock()
+	
+	// Record padding sent
+	c.RecordPaddingSent()
+	
+	// Verify time was updated
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if c.lastPaddingTime == pastTime {
+		t.Error("RecordPaddingSent() did not update lastPaddingTime")
+	}
+}
+
+func TestRecordActivity(t *testing.T) {
+	c := NewCircuit(1)
+	
+	// Set last activity time in the past
+	pastTime := time.Now().Add(-10 * time.Second)
+	c.mu.Lock()
+	c.lastActivityTime = pastTime
+	c.mu.Unlock()
+	
+	// Record activity
+	c.RecordActivity()
+	
+	// Verify time was updated
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if c.lastActivityTime == pastTime {
+		t.Error("RecordActivity() did not update lastActivityTime")
 	}
 }
 
