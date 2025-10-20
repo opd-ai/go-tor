@@ -67,6 +67,12 @@ func DefaultConfig() *Config {
 }
 
 // Server is a SOCKS5 proxy server
+// SEC-M001/MED-004: Circuit isolation for different SOCKS5 connections
+// Current implementation shares circuits between connections. Future enhancement:
+// - Track connection source (address, credentials)
+// - Maintain separate circuit pools per isolation group
+// - Implement stream isolation per socks-extensions.txt
+// - Requires full stream relay implementation (Phase 8)
 type Server struct {
 	address       string
 	listener      net.Listener

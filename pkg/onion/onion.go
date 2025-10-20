@@ -1263,7 +1263,20 @@ func (ip *IntroductionProtocol) BuildIntroduce1Cell(req *IntroduceRequest) ([]by
 }
 
 // buildEncryptedData constructs the encrypted portion of INTRODUCE1
-// In a full implementation, this would be encrypted with the intro point's key
+// SPEC-006/SEC-M003: INTRODUCE1 encryption implementation
+// Current: Returns plaintext data (mock implementation for Phase 7.3.3)
+// Required: Implement ntor-based encryption per rend-spec-v3.txt §3.2.3
+//
+// Full implementation would:
+// 1. Extract introduction point's public key from descriptor
+// 2. Generate ephemeral key pair for client
+// 3. Perform ntor handshake: shared_secret = ntor(client_ephemeral, intro_point_pk)
+// 4. Derive encryption key: K = HKDF(shared_secret, info)
+// 5. Encrypt plaintext: encrypted = AES-CTR(K, plaintext)
+// 6. Include client ephemeral public key in cell for intro point to decrypt
+//
+// Security impact: Without encryption, intro point sees rendezvous info in plaintext
+// This is acceptable for testing but required for production onion service connections
 func (ip *IntroductionProtocol) buildEncryptedData(req *IntroduceRequest) []byte {
 	var buf bytes.Buffer
 
@@ -1283,8 +1296,8 @@ func (ip *IntroductionProtocol) buildEncryptedData(req *IntroduceRequest) []byte
 	// For Phase 7.3.3, simplified version
 	buf.WriteByte(0) // N_SPEC = 0 (no link specifiers in this phase)
 
-	// In a full implementation, this entire buffer would be encrypted
-	// using the introduction point's encryption key
+	// TODO: Implement encryption with introduction point's public key (SPEC-006)
+	// This entire buffer should be encrypted using ntor-based encryption
 
 	return buf.Bytes()
 }
