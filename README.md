@@ -286,7 +286,7 @@ go test -race ./...
 go test -cover ./...
 ```
 
-Current test coverage: ~90% for implemented packages.
+Current test coverage: ~74% overall, with critical packages at 90%+ coverage.
 
 ## Roadmap
 
