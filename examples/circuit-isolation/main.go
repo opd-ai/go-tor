@@ -20,7 +20,7 @@ import (
 )
 
 func main() {
-	fmt.Println("=== Circuit Isolation Example ===\n")
+	fmt.Println("=== Circuit Isolation Example ===")
 
 	// Create a logger
 	torLogger := logger.NewDefault()
