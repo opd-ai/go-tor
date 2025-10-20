@@ -93,6 +93,207 @@ func TestNegotiatedVersion(t *testing.T) {
 	}
 }
 
+// TestSetTimeout tests the SetTimeout method and bounds validation
+func TestSetTimeout(t *testing.T) {
+	log := logger.NewDefault()
+	h := NewHandshake(nil, log)
+
+	tests := []struct {
+		name        string
+		timeout     time.Duration
+		expectError bool
+	}{
+		{
+			name:        "valid_default",
+			timeout:     DefaultHandshakeTimeout,
+			expectError: false,
+		},
+		{
+			name:        "valid_min",
+			timeout:     MinHandshakeTimeout,
+			expectError: false,
+		},
+		{
+			name:        "valid_max",
+			timeout:     MaxHandshakeTimeout,
+			expectError: false,
+		},
+		{
+			name:        "valid_mid_range",
+			timeout:     20 * time.Second,
+			expectError: false,
+		},
+		{
+			name:        "too_short",
+			timeout:     1 * time.Second,
+			expectError: true,
+		},
+		{
+			name:        "too_long",
+			timeout:     120 * time.Second,
+			expectError: true,
+		},
+		{
+			name:        "zero",
+			timeout:     0,
+			expectError: true,
+		},
+		{
+			name:        "negative",
+			timeout:     -5 * time.Second,
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := h.SetTimeout(tt.timeout)
+			if tt.expectError && err == nil {
+				t.Errorf("SetTimeout(%v) expected error, got nil", tt.timeout)
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("SetTimeout(%v) unexpected error: %v", tt.timeout, err)
+			}
+			if !tt.expectError && h.timeout != tt.timeout {
+				t.Errorf("SetTimeout(%v) timeout not set correctly, got %v", tt.timeout, h.timeout)
+			}
+		})
+	}
+}
+
+// TestTimeoutBounds validates the timeout constants
+func TestTimeoutBounds(t *testing.T) {
+	if MinHandshakeTimeout >= MaxHandshakeTimeout {
+		t.Errorf("MinHandshakeTimeout (%v) should be less than MaxHandshakeTimeout (%v)",
+			MinHandshakeTimeout, MaxHandshakeTimeout)
+	}
+
+	if DefaultHandshakeTimeout < MinHandshakeTimeout || DefaultHandshakeTimeout > MaxHandshakeTimeout {
+		t.Errorf("DefaultHandshakeTimeout (%v) should be between min (%v) and max (%v)",
+			DefaultHandshakeTimeout, MinHandshakeTimeout, MaxHandshakeTimeout)
+	}
+}
+
+// TestHandshakeTimeoutSetting tests that timeout can be set correctly
+func TestHandshakeTimeoutSetting(t *testing.T) {
+	log := logger.NewDefault()
+	h := NewHandshake(nil, log)
+
+	// Set a very short timeout
+	err := h.SetTimeout(MinHandshakeTimeout)
+	if err != nil {
+		t.Fatalf("Failed to set timeout: %v", err)
+	}
+
+	if h.timeout != MinHandshakeTimeout {
+		t.Errorf("Expected timeout %v, got %v", MinHandshakeTimeout, h.timeout)
+	}
+}
+
+// TestSelectVersionWithNilSlice tests edge case of nil slice
+func TestSelectVersionWithNilSlice(t *testing.T) {
+	h := &Handshake{}
+
+	got := h.selectVersion(nil)
+	if got != 0 {
+		t.Errorf("selectVersion(nil) = %d, want 0", got)
+	}
+}
+
+// TestSelectVersionBoundaryVersions tests versions at boundaries
+func TestSelectVersionBoundaryVersions(t *testing.T) {
+	h := &Handshake{}
+
+	tests := []struct {
+		name           string
+		remoteVersions []int
+		expected       int
+	}{
+		{
+			name:           "just_below_min",
+			remoteVersions: []int{1, 2},
+			expected:       0,
+		},
+		{
+			name:           "just_above_max",
+			remoteVersions: []int{6, 7, 8},
+			expected:       0,
+		},
+		{
+			name:           "min_and_max",
+			remoteVersions: []int{MinLinkProtocolVersion, MaxLinkProtocolVersion},
+			expected:       MaxLinkProtocolVersion,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := h.selectVersion(tt.remoteVersions)
+			if got != tt.expected {
+				t.Errorf("selectVersion(%v) = %d, want %d", tt.remoteVersions, got, tt.expected)
+			}
+		})
+	}
+}
+
+// TestNegotiatedVersionInitial tests initial negotiated version
+func TestNegotiatedVersionInitial(t *testing.T) {
+	log := logger.NewDefault()
+	h := NewHandshake(nil, log)
+
+	// Initially should be 0
+	if got := h.NegotiatedVersion(); got != 0 {
+		t.Errorf("Initial NegotiatedVersion() = %d, want 0", got)
+	}
+}
+
+// TestHandshakeLoggerInitialization tests logger initialization in handshake
+func TestHandshakeLoggerInitialization(t *testing.T) {
+	// Test with explicit logger
+	log := logger.NewDefault()
+	h1 := NewHandshake(nil, log)
+	if h1.logger == nil {
+		t.Error("Logger should be set when provided")
+	}
+
+	// Test with nil logger (should get default)
+	h2 := NewHandshake(nil, nil)
+	if h2.logger == nil {
+		t.Error("Logger should be initialized with default when nil")
+	}
+}
+
+// TestConnectionNil tests handshake with nil connection
+func TestConnectionNil(t *testing.T) {
+	log := logger.NewDefault()
+	h := NewHandshake(nil, log)
+
+	if h == nil {
+		t.Fatal("NewHandshake() returned nil")
+	}
+
+	// Connection can be nil (will fail on actual handshake attempts)
+	if h.conn != nil {
+		t.Error("Connection should be nil when passed nil")
+	}
+}
+
+// TestHandshakeDefaults tests default values after creation
+func TestHandshakeDefaults(t *testing.T) {
+	log := logger.NewDefault()
+	h := NewHandshake(nil, log)
+
+	// Check default timeout
+	if h.timeout != DefaultHandshakeTimeout {
+		t.Errorf("Default timeout = %v, want %v", h.timeout, DefaultHandshakeTimeout)
+	}
+
+	// Check negotiated version starts at 0
+	if h.negotiatedVersion != 0 {
+		t.Errorf("Initial negotiatedVersion = %d, want 0", h.negotiatedVersion)
+	}
+}
+
 func TestSelectVersionAdditionalCases(t *testing.T) {
 	h := &Handshake{}
 
@@ -256,27 +457,7 @@ func TestVersionPayloadEncoding(t *testing.T) {
 
 // SEC-L002: Additional tests to improve protocol package coverage to 70%+
 
-func TestSetTimeout(t *testing.T) {
-	h := NewHandshake(nil, nil)
-
-	// Test default timeout
-	if h.timeout != DefaultHandshakeTimeout {
-		t.Errorf("Expected default timeout %v, got %v", DefaultHandshakeTimeout, h.timeout)
-	}
-
-	// Set custom timeout (within valid range)
-	customTimeout := 15 * time.Second
-	err := h.SetTimeout(customTimeout)
-	if err != nil {
-		t.Errorf("SetTimeout failed: %v", err)
-	}
-
-	if h.timeout != customTimeout {
-		t.Errorf("Expected timeout %v after SetTimeout, got %v", customTimeout, h.timeout)
-	}
-}
-
-func TestHandshakeTimeout(t *testing.T) {
+func TestHandshakeTimeoutConstant(t *testing.T) {
 	// Verify the default timeout constant
 	if DefaultHandshakeTimeout != 10*time.Second {
 		t.Errorf("Expected DefaultHandshakeTimeout of 10s, got %v", DefaultHandshakeTimeout)

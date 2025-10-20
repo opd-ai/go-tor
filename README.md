@@ -71,6 +71,8 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 - ✅ **HTTP metrics endpoint (Prometheus, JSON, health, dashboard)**
 
 ### Recently Completed
+- ✅ **Phase 9.3**: Testing infrastructure enhancement (integration tests, stress tests, benchmarks)
+- ✅ **Phase 9.2**: Onion service production integration
 - ✅ **Phase 9.1**: HTTP metrics and observability (Prometheus, JSON endpoints, HTML dashboard)
 - ✅ **Phase 7.4**: Onion services server (hidden service hosting)
 - ✅ **Phase 8.6**: Onion Service Infrastructure Completion
@@ -82,7 +84,9 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 ### Planned
 - [ ] **Phase 9**: Advanced monitoring and production features
   - [x] HTTP metrics endpoint (Phase 9.1)
-  - [ ] Advanced circuit strategies
+  - [x] Onion service production integration (Phase 9.2)
+  - [x] Testing infrastructure enhancement (Phase 9.3)
+  - [ ] Advanced circuit strategies (Phase 9.4)
   - [ ] Additional onion service features
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture and roadmap.
@@ -260,6 +264,7 @@ make lint         # Run golint
 
 - [Architecture](docs/ARCHITECTURE.md) - System architecture and design
 - [Development Guide](docs/DEVELOPMENT.md) - Development workflow and guidelines
+- [Testing Guide](docs/TESTING.md) - Comprehensive testing guide (NEW in Phase 9.3)
 - [Structured Logging](docs/LOGGING.md) - Using the structured logging system
 - [Graceful Shutdown](docs/SHUTDOWN.md) - Implementing graceful shutdown
 - [HTTP Metrics](docs/METRICS.md) - Metrics and observability endpoints
