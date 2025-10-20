@@ -47,9 +47,24 @@ const (
 	replyCommandNotSupported  = 0x07
 	replyAddressNotSupported  = 0x08
 
-	// Connection limits (SEC-006: prevent unbounded memory growth)
-	maxConnections = 1000
+	// SEC-L006: Default connection limit (configurable via Config)
+	defaultMaxConnections = 1000
 )
+
+// Config holds configuration for the SOCKS5 server
+type Config struct {
+	// MaxConnections limits concurrent SOCKS5 connections
+	// SEC-L006: Configurable for resource-constrained embedded systems
+	// Set to 0 for unlimited (not recommended for production)
+	MaxConnections int
+}
+
+// DefaultConfig returns default SOCKS5 server configuration
+func DefaultConfig() *Config {
+	return &Config{
+		MaxConnections: defaultMaxConnections,
+	}
+}
 
 // Server is a SOCKS5 proxy server
 type Server struct {
@@ -58,6 +73,7 @@ type Server struct {
 	circuitMgr    *circuit.Manager
 	onionClient   *onion.Client
 	logger        *logger.Logger
+	config        *Config // SEC-L006: Configurable server settings
 	mu            sync.Mutex
 	activeConns   map[net.Conn]struct{}
 	shutdown      chan struct{}
@@ -67,9 +83,19 @@ type Server struct {
 }
 
 // NewServer creates a new SOCKS5 proxy server
+// SEC-L006: Accepts optional Config for configurable settings
 func NewServer(address string, circuitMgr *circuit.Manager, log *logger.Logger) *Server {
+	return NewServerWithConfig(address, circuitMgr, log, nil)
+}
+
+// NewServerWithConfig creates a new SOCKS5 proxy server with custom configuration
+// SEC-L006: Allows customization of connection limits and other settings
+func NewServerWithConfig(address string, circuitMgr *circuit.Manager, log *logger.Logger, cfg *Config) *Server {
 	if log == nil {
 		log = logger.NewDefault()
+	}
+	if cfg == nil {
+		cfg = DefaultConfig()
 	}
 
 	return &Server{
@@ -77,6 +103,7 @@ func NewServer(address string, circuitMgr *circuit.Manager, log *logger.Logger) 
 		circuitMgr:    circuitMgr,
 		onionClient:   onion.NewClient(log),
 		logger:        log.Component("socks5"),
+		config:        cfg,
 		activeConns:   make(map[net.Conn]struct{}),
 		shutdown:      make(chan struct{}),
 		listenerReady: make(chan struct{}),
@@ -126,12 +153,13 @@ func (s *Server) acceptLoop(ctx context.Context) {
 			}
 		}
 
-		// Check connection limit (SEC-006: prevent unbounded memory growth)
+		// Check connection limit (SEC-L006: configurable limit)
 		s.mu.Lock()
-		if len(s.activeConns) >= maxConnections {
+		maxConns := s.config.MaxConnections
+		if maxConns > 0 && len(s.activeConns) >= maxConns {
 			s.mu.Unlock()
 			s.logger.Warn("Connection limit reached, rejecting connection",
-				"limit", maxConnections, "remote", conn.RemoteAddr())
+				"limit", maxConns, "current", len(s.activeConns), "remote", conn.RemoteAddr())
 			conn.Close()
 			continue
 		}
