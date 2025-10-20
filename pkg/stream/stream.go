@@ -243,7 +243,9 @@ func (m *Manager) RemoveStream(streamID uint16) error {
 		return fmt.Errorf("stream not found: %d", streamID)
 	}
 
-	stream.Close()
+	if err := stream.Close(); err != nil {
+		m.logger.Error("Failed to close stream during removal", "function", "RemoveStream", "stream_id", streamID, "error", err)
+	}
 	delete(m.streams, streamID)
 
 	m.logger.Info("Stream removed", "stream_id", streamID)
@@ -275,8 +277,9 @@ func (m *Manager) Close() error {
 		defer m.mu.Unlock()
 
 		for id, stream := range m.streams {
-			// Best-effort close during shutdown - errors are logged by the stream itself
-			stream.Close() // nolint:errcheck
+			if err := stream.Close(); err != nil {
+				m.logger.Error("Failed to close stream during shutdown", "function", "Close", "stream_id", id, "error", err)
+			}
 			delete(m.streams, id)
 		}
 
