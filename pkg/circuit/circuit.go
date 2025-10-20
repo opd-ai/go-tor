@@ -51,6 +51,8 @@ type Circuit struct {
 	mu              sync.RWMutex
 	paddingEnabled  bool          // SPEC-002: Enable/disable circuit padding
 	paddingInterval time.Duration // SPEC-002: Interval for padding cells
+	lastPaddingTime time.Time     // SPEC-002: Last time a padding cell was sent
+	lastActivityTime time.Time    // SPEC-002: Last time any cell was sent/received
 	// CRYPTO-001: Running digests for relay cell verification per tor-spec.txt §6.1
 	forwardDigest  hash.Hash // Client → Exit direction
 	backwardDigest hash.Hash // Exit → Client direction
@@ -66,15 +68,18 @@ type Hop struct {
 
 // NewCircuit creates a new circuit with the given ID
 func NewCircuit(id uint32) *Circuit {
+	now := time.Now()
 	return &Circuit{
-		ID:              id,
-		State:           StateBuilding,
-		CreatedAt:       time.Now(),
-		Hops:            make([]*Hop, 0, 3), // Typical circuit has 3 hops
-		paddingEnabled:  true,               // SPEC-002: Enable padding by default
-		paddingInterval: 0,                  // SPEC-002: 0 = adaptive (future enhancement)
-		forwardDigest:   sha1.New(),         // CRYPTO-001: Initialize forward digest
-		backwardDigest:  sha1.New(),         // CRYPTO-001: Initialize backward digest
+		ID:               id,
+		State:            StateBuilding,
+		CreatedAt:        now,
+		Hops:             make([]*Hop, 0, 3),    // Typical circuit has 3 hops
+		paddingEnabled:   true,                  // SPEC-002: Enable padding by default
+		paddingInterval:  5 * time.Second,       // SPEC-002: Default 5-second padding interval
+		lastPaddingTime:  now,                   // SPEC-002: Initialize padding timer
+		lastActivityTime: now,                   // SPEC-002: Initialize activity timer
+		forwardDigest:    sha1.New(),            // CRYPTO-001: Initialize forward digest
+		backwardDigest:   sha1.New(),            // CRYPTO-001: Initialize backward digest
 	}
 }
 
@@ -282,12 +287,14 @@ func (c *Circuit) GetPaddingInterval() time.Duration {
 }
 
 // ShouldSendPadding determines if a padding cell should be sent (SPEC-002)
-// This is a hook for implementing adaptive padding logic per padding-spec.txt
-// Current implementation returns basic policy; future versions can implement:
-// - Traffic pattern analysis
-// - Time-based adaptive padding
-// - Connection state-dependent padding
-// - Burst-detection and response
+// Implements basic time-based padding to improve traffic analysis resistance
+// per tor-spec.txt §7.1 and padding-spec.txt
+// 
+// Basic policy: Send padding if:
+// 1. Padding is enabled
+// 2. Circuit is open
+// 3. paddingInterval has elapsed since last padding cell
+// 4. No recent activity (prevents redundant padding during active use)
 func (c *Circuit) ShouldSendPadding() bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -297,13 +304,46 @@ func (c *Circuit) ShouldSendPadding() bool {
 		return false
 	}
 
-	// Future enhancement: implement adaptive logic here per padding-spec.txt
-	// - Analyze traffic patterns
-	// - Adjust padding based on activity
-	// - Implement timing-based policies
+	// If no interval configured (0), padding is disabled
+	if c.paddingInterval == 0 {
+		return false
+	}
+
+	now := time.Now()
+	
+	// Check if padding interval has elapsed since last padding
+	timeSinceLastPadding := now.Sub(c.lastPaddingTime)
+	if timeSinceLastPadding < c.paddingInterval {
+		return false
+	}
+	
+	// Don't send padding if there's been recent activity (within 80% of padding interval)
+	// This prevents redundant padding when circuit is actively used
+	activityThreshold := time.Duration(float64(c.paddingInterval) * 0.8)
+	timeSinceActivity := now.Sub(c.lastActivityTime)
+	if timeSinceActivity < activityThreshold {
+		return false
+	}
 
 	return true
 }
+
+// RecordPaddingSent updates the last padding time (SPEC-002)
+// Should be called after successfully sending a padding cell
+func (c *Circuit) RecordPaddingSent() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.lastPaddingTime = time.Now()
+}
+
+// RecordActivity updates the last activity time (SPEC-002)
+// Should be called when sending or receiving non-padding cells
+func (c *Circuit) RecordActivity() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.lastActivityTime = time.Now()
+}
+
 
 // Direction represents the direction of relay cell flow
 type Direction int
