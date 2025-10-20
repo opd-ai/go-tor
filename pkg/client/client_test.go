@@ -247,7 +247,7 @@ func TestPublishEvent(t *testing.T) {
 	// However, since the control server hasn't started accepting connections,
 	// the event just goes to the dispatcher which may or may not have subscribers
 	// This test mainly ensures the method is accessible and doesn't crash
-	
+
 	// Just verify the method exists and is callable
 	// We can't meaningfully test event publishing without a full integration test
 	_ = client.controlServer
@@ -527,7 +527,7 @@ func TestStatsSnapshot(t *testing.T) {
 
 	// Get stats snapshot
 	stats := client.GetStats()
-	
+
 	// Verify all fields (Stats is a value type, not pointer)
 	if stats.SocksPort != 19056 {
 		t.Errorf("Expected SocksPort 19056, got %d", stats.SocksPort)

@@ -296,18 +296,18 @@ func TestManagerCloseWithTimeout(t *testing.T) {
 
 func TestCircuitPaddingEnabled(t *testing.T) {
 	c := NewCircuit(1)
-	
+
 	// Padding should be enabled by default
 	if !c.IsPaddingEnabled() {
 		t.Error("Padding should be enabled by default")
 	}
-	
+
 	// Disable padding
 	c.SetPaddingEnabled(false)
 	if c.IsPaddingEnabled() {
 		t.Error("Padding should be disabled after SetPaddingEnabled(false)")
 	}
-	
+
 	// Re-enable padding
 	c.SetPaddingEnabled(true)
 	if !c.IsPaddingEnabled() {
@@ -317,12 +317,12 @@ func TestCircuitPaddingEnabled(t *testing.T) {
 
 func TestCircuitPaddingInterval(t *testing.T) {
 	c := NewCircuit(1)
-	
+
 	// Initial interval should be 0 (adaptive)
 	if c.GetPaddingInterval() != 0 {
 		t.Errorf("Initial padding interval should be 0, got %v", c.GetPaddingInterval())
 	}
-	
+
 	// Set custom interval
 	interval := 5 * time.Second
 	c.SetPaddingInterval(interval)
@@ -369,13 +369,13 @@ func TestShouldSendPadding(t *testing.T) {
 			expected:       false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := NewCircuit(1)
 			c.SetPaddingEnabled(tt.paddingEnabled)
 			c.SetState(tt.state)
-			
+
 			if got := c.ShouldSendPadding(); got != tt.expected {
 				t.Errorf("ShouldSendPadding() = %v, want %v", got, tt.expected)
 			}
@@ -386,10 +386,10 @@ func TestShouldSendPadding(t *testing.T) {
 func TestPaddingConcurrency(t *testing.T) {
 	c := NewCircuit(1)
 	c.SetState(StateOpen)
-	
+
 	// Test concurrent access to padding settings
 	done := make(chan bool, 10)
-	
+
 	for i := 0; i < 5; i++ {
 		go func(id int) {
 			for j := 0; j < 100; j++ {
@@ -402,7 +402,7 @@ func TestPaddingConcurrency(t *testing.T) {
 			done <- true
 		}(i)
 	}
-	
+
 	// Wait for all goroutines
 	for i := 0; i < 5; i++ {
 		<-done

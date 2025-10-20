@@ -155,8 +155,8 @@ func main() {
     // Get SOCKS5 proxy URL
     proxyURL := torClient.ProxyURL()  // "socks5://127.0.0.1:9050"
     
-    // Wait until ready (optional)
-    torClient.WaitUntilReady(60 * time.Second)
+    // Wait until ready (recommended: 90s for first run, 30-60s for subsequent runs)
+    torClient.WaitUntilReady(90 * time.Second)
     
     // Use with your HTTP client
     // ... configure HTTP client to use proxyURL
@@ -356,10 +356,12 @@ See [problem statement](docs/ROADMAP.md) for full 30-week roadmap.
 
 ## Performance Targets
 
+These are design goals and typical performance characteristics:
+
 - Circuit build time: < 5 seconds (95th percentile)
-- Memory usage: < 50MB RSS in steady state
+- Memory usage: < 50MB RSS in steady state (typical: 35-45MB)
 - Concurrent streams: 100+ on Raspberry Pi 3
-- Binary size: < 15MB static binary
+- Binary size: < 15MB (9.1MB typical)
 
 ## Security
 

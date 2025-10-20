@@ -18,7 +18,7 @@ const (
 	MinLinkProtocolVersion = 3
 	MaxLinkProtocolVersion = 5
 	PreferredVersion       = 4 // Link protocol v4 uses 4-byte circuit IDs
-	
+
 	// DefaultHandshakeTimeout is the default timeout for protocol handshake (SEC-009)
 	DefaultHandshakeTimeout = 10 * time.Second
 )

@@ -25,8 +25,8 @@ const (
 
 // Extension handles circuit extension operations
 type Extension struct {
-	circuit    *Circuit
-	logger     *logger.Logger
+	circuit     *Circuit
+	logger      *logger.Logger
 	targetRelay interface{} // Stores relay descriptor for key extraction (SPEC-001)
 }
 
@@ -131,14 +131,14 @@ func (e *Extension) generateHandshakeData(handshakeType HandshakeType) ([]byte, 
 	switch handshakeType {
 	case HandshakeTypeNTor:
 		// Use full ntor handshake implementation per tor-spec.txt section 5.1.4
-		// 
+		//
 		// SPEC-001 RESOLUTION: Now properly integrated with directory service
 		// Keys are obtained from network consensus and relay descriptors per:
 		// 1. Fetch consensus from directory authorities (pkg/directory)
-		// 2. Select relay based on flags and requirements (pkg/path)  
+		// 2. Select relay based on flags and requirements (pkg/path)
 		// 3. Relay descriptor contains ntor-onion-key and identity key
 		// 4. Keys passed via SetTargetRelay() or extracted from descriptor
-		
+
 		relayIdentity, relayNtorKey, err := e.getRelayKeys()
 		if err != nil {
 			// Fall back to test keys only for testing/demo scenarios
@@ -147,13 +147,13 @@ func (e *Extension) generateHandshakeData(handshakeType HandshakeType) ([]byte, 
 			relayIdentity = make([]byte, 32)
 			relayNtorKey = make([]byte, 32)
 		}
-		
+
 		// Generate client handshake data
 		handshakeData, _, err := crypto.NtorClientHandshake(relayIdentity, relayNtorKey)
 		if err != nil {
 			return nil, fmt.Errorf("ntor handshake failed: %w", err)
 		}
-		
+
 		return handshakeData, nil
 
 	case HandshakeTypeTAP:
@@ -228,13 +228,13 @@ func (e *Extension) getRelayKeys() (identityKey, ntorKey []byte, err error) {
 	if e.targetRelay == nil {
 		return nil, nil, fmt.Errorf("no target relay set")
 	}
-	
+
 	// Type assertion to check if it's a directory.Relay with keys
 	type RelayWithKeys interface {
 		GetIdentityKey() []byte
 		GetNtorOnionKey() []byte
 	}
-	
+
 	// Try direct field access for testing/simple cases
 	if relay, ok := e.targetRelay.(struct {
 		IdentityKey  []byte
@@ -248,7 +248,7 @@ func (e *Extension) getRelayKeys() (identityKey, ntorKey []byte, err error) {
 		}
 		return relay.IdentityKey, relay.NtorOnionKey, nil
 	}
-	
+
 	// Try interface method access
 	if relay, ok := e.targetRelay.(RelayWithKeys); ok {
 		identityKey = relay.GetIdentityKey()
@@ -261,7 +261,7 @@ func (e *Extension) getRelayKeys() (identityKey, ntorKey []byte, err error) {
 		}
 		return identityKey, ntorKey, nil
 	}
-	
+
 	return nil, nil, fmt.Errorf("target relay does not provide required keys")
 }
 
@@ -282,15 +282,16 @@ func (e *Extension) getRelayKeys() (identityKey, ntorKey []byte, err error) {
 // - Storing keys in the Relay structure during consensus parsing
 //
 // Example implementation:
-//   func getRelayKeys(relay *directory.Relay) (identityKey, ntorKey []byte, err error) {
-//       if len(relay.IdentityKey) != 32 {
-//           return nil, nil, fmt.Errorf("invalid identity key length")
-//       }
-//       if len(relay.NtorOnionKey) != 32 {
-//           return nil, nil, fmt.Errorf("invalid ntor key length")
-//       }
-//       return relay.IdentityKey, relay.NtorOnionKey, nil
-//   }
+//
+//	func getRelayKeys(relay *directory.Relay) (identityKey, ntorKey []byte, err error) {
+//	    if len(relay.IdentityKey) != 32 {
+//	        return nil, nil, fmt.Errorf("invalid identity key length")
+//	    }
+//	    if len(relay.NtorOnionKey) != 32 {
+//	        return nil, nil, fmt.Errorf("invalid ntor key length")
+//	    }
+//	    return relay.IdentityKey, relay.NtorOnionKey, nil
+//	}
 //
 // This function is currently unused but documents the required integration.
 func getRelayKeys(relay interface{}) (identityKey, ntorKey []byte, err error) {

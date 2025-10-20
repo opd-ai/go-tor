@@ -130,12 +130,12 @@ func (s *Server) acceptLoop(ctx context.Context) {
 		s.mu.Lock()
 		if len(s.activeConns) >= maxConnections {
 			s.mu.Unlock()
-			s.logger.Warn("Connection limit reached, rejecting connection", 
+			s.logger.Warn("Connection limit reached, rejecting connection",
 				"limit", maxConnections, "remote", conn.RemoteAddr())
 			conn.Close()
 			continue
 		}
-		
+
 		// Track connection
 		s.activeConns[conn] = struct{}{}
 		s.mu.Unlock()

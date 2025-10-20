@@ -642,12 +642,12 @@ func VerifyDescriptorSignature(descriptor *Descriptor, address *Address) error {
 	//
 	// For now, we verify with the identity key which provides authentication
 	// (though not full certificate chain validation per spec)
-	
+
 	// Import the crypto package Ed25519 verification function
 	if !ed25519.Verify(ed25519.PublicKey(address.Pubkey), signedMessage, descriptor.Signature) {
 		return fmt.Errorf("descriptor signature verification failed: invalid signature")
 	}
-	
+
 	return nil
 }
 
@@ -659,9 +659,9 @@ func parseCertificate(certData []byte) (*Certificate, error) {
 	if len(certData) < 13 { // Minimum certificate size
 		return nil, fmt.Errorf("certificate too short: %d bytes", len(certData))
 	}
-	
+
 	cert := &Certificate{}
-	
+
 	// Certificate format (simplified):
 	// [1 byte] version (must be 1)
 	// [1 byte] cert_type
@@ -671,20 +671,20 @@ func parseCertificate(certData []byte) (*Certificate, error) {
 	// [1 byte] n_extensions
 	// [extensions]
 	// [64 bytes] signature
-	
+
 	cert.Version = certData[0]
 	if cert.Version != 1 {
 		return nil, fmt.Errorf("unsupported certificate version: %d", cert.Version)
 	}
-	
+
 	cert.CertType = certData[1]
 	cert.SigningKey = certData[7:39] // Simplified: extract signing key
-	
+
 	// Signature is last 64 bytes
 	if len(certData) >= 64 {
 		cert.Signature = certData[len(certData)-64:]
 	}
-	
+
 	return cert, nil
 }
 
@@ -707,7 +707,7 @@ func VerifyDescriptorSignatureWithCertChain(descriptor *Descriptor, address *Add
 	//
 	// For now, we use the simplified approach in VerifyDescriptorSignature
 	// which verifies directly with the identity key
-	
+
 	return VerifyDescriptorSignature(descriptor, address)
 }
 

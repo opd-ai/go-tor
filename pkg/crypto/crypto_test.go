@@ -263,11 +263,11 @@ func TestGenerateNtorKeyPair(t *testing.T) {
 	// Check that public and private keys are non-zero
 	zeroPriv := [32]byte{}
 	zeroPub := [32]byte{}
-	
+
 	if bytes.Equal(kp1.Private[:], zeroPriv[:]) {
 		t.Error("Generated all-zero private key")
 	}
-	
+
 	if bytes.Equal(kp1.Public[:], zeroPub[:]) {
 		t.Error("Generated all-zero public key")
 	}
@@ -281,7 +281,7 @@ func TestGenerateNtorKeyPair(t *testing.T) {
 	if bytes.Equal(kp1.Private[:], kp2.Private[:]) {
 		t.Error("Generated identical private keys")
 	}
-	
+
 	if bytes.Equal(kp1.Public[:], kp2.Public[:]) {
 		t.Error("Generated identical public keys")
 	}
@@ -291,7 +291,7 @@ func TestNtorClientHandshake(t *testing.T) {
 	// Generate mock relay keys
 	identityKey := make([]byte, 32)
 	ntorOnionKey := make([]byte, 32)
-	
+
 	for i := range identityKey {
 		identityKey[i] = byte(i)
 	}
@@ -344,7 +344,7 @@ func TestNtorProcessResponse(t *testing.T) {
 	clientPrivate := make([]byte, 32)
 	serverNtorKey := make([]byte, 32)
 	serverIdentity := make([]byte, 32)
-	
+
 	// Fill with test data
 	for i := range clientPrivate {
 		clientPrivate[i] = byte(i)
@@ -355,13 +355,13 @@ func TestNtorProcessResponse(t *testing.T) {
 	for i := range serverIdentity {
 		serverIdentity[i] = byte(i + 64)
 	}
-	
+
 	// Test invalid response length
 	_, err := NtorProcessResponse([]byte("short"), clientPrivate, serverNtorKey, serverIdentity)
 	if err == nil {
 		t.Error("Expected error with invalid response length")
 	}
-	
+
 	// Note: Full end-to-end test would require a real server response
 	// For now, we verify that the function properly rejects invalid auth MACs
 	// A production test would involve:
@@ -410,7 +410,7 @@ func TestConstantTimeCompare(t *testing.T) {
 			want: false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := constantTimeCompare(tt.a, tt.b)
@@ -429,7 +429,7 @@ func TestEd25519Verify(t *testing.T) {
 	}
 
 	message := []byte("test message for signature verification")
-	
+
 	// Sign the message
 	signature, err := Ed25519Sign(priv, message)
 	if err != nil {
@@ -489,7 +489,7 @@ func TestGenerateEd25519KeyPair(t *testing.T) {
 	if bytes.Equal(pub1, pub2) {
 		t.Error("Generated identical public keys")
 	}
-	
+
 	if bytes.Equal(priv1, priv2) {
 		t.Error("Generated identical private keys")
 	}
@@ -502,21 +502,21 @@ func TestBufferPooling(t *testing.T) {
 	if len(buf1) != 512 {
 		t.Errorf("GetBuffer() returned buffer of length %d, want 512", len(buf1))
 	}
-	
+
 	// Write some data to it
 	for i := 0; i < len(buf1); i++ {
 		buf1[i] = byte(i % 256)
 	}
-	
+
 	// Return it to the pool
 	PutBuffer(buf1)
-	
+
 	// Get another buffer (may or may not be the same one)
 	buf2 := GetBuffer()
 	if len(buf2) != 512 {
 		t.Errorf("GetBuffer() returned buffer of length %d, want 512", len(buf2))
 	}
-	
+
 	// Return it
 	PutBuffer(buf2)
 }
@@ -525,9 +525,9 @@ func TestBufferPoolConcurrency(t *testing.T) {
 	// Test concurrent access to buffer pool
 	const numGoroutines = 10
 	const opsPerGoroutine = 100
-	
+
 	done := make(chan bool, numGoroutines)
-	
+
 	for i := 0; i < numGoroutines; i++ {
 		go func() {
 			for j := 0; j < opsPerGoroutine; j++ {
@@ -541,7 +541,7 @@ func TestBufferPoolConcurrency(t *testing.T) {
 			done <- true
 		}()
 	}
-	
+
 	// Wait for all goroutines
 	for i := 0; i < numGoroutines; i++ {
 		<-done
@@ -552,7 +552,7 @@ func TestBufferPoolSmallBuffer(t *testing.T) {
 	// Test that small buffers are not returned to pool
 	smallBuf := make([]byte, 100)
 	PutBuffer(smallBuf) // Should not panic, just ignore
-	
+
 	// Get a buffer - should be 512 bytes
 	buf := GetBuffer()
 	if len(buf) != 512 {

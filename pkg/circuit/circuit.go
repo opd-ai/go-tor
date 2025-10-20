@@ -65,8 +65,8 @@ func NewCircuit(id uint32) *Circuit {
 		State:           StateBuilding,
 		CreatedAt:       time.Now(),
 		Hops:            make([]*Hop, 0, 3), // Typical circuit has 3 hops
-		paddingEnabled:  true,                // SPEC-002: Enable padding by default
-		paddingInterval: 0,                   // SPEC-002: 0 = adaptive (future enhancement)
+		paddingEnabled:  true,               // SPEC-002: Enable padding by default
+		paddingInterval: 0,                  // SPEC-002: 0 = adaptive (future enhancement)
 	}
 }
 
@@ -277,22 +277,22 @@ func (c *Circuit) GetPaddingInterval() time.Duration {
 // This is a hook for implementing adaptive padding logic per padding-spec.txt
 // Current implementation returns basic policy; future versions can implement:
 // - Traffic pattern analysis
-// - Time-based adaptive padding  
+// - Time-based adaptive padding
 // - Connection state-dependent padding
 // - Burst-detection and response
 func (c *Circuit) ShouldSendPadding() bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	
+
 	// Basic policy: padding enabled and circuit is open
 	if !c.paddingEnabled || c.State != StateOpen {
 		return false
 	}
-	
+
 	// Future enhancement: implement adaptive logic here per padding-spec.txt
 	// - Analyze traffic patterns
 	// - Adjust padding based on activity
 	// - Implement timing-based policies
-	
+
 	return true
 }

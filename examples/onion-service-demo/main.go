@@ -68,7 +68,7 @@ func main() {
 	fmt.Println("  1. Establishing introduction points...")
 	fmt.Println("  2. Creating and signing descriptor...")
 	fmt.Println("  3. Publishing descriptor to HSDirs...")
-	
+
 	if err := service.Start(ctx, hsdirs); err != nil {
 		log.Fatalf("Failed to start service: %v", err)
 	}
@@ -116,11 +116,11 @@ func main() {
 		case <-sigChan:
 			fmt.Println()
 			fmt.Println("Shutting down onion service...")
-			
+
 			if err := service.Stop(); err != nil {
 				log.Printf("Error during shutdown: %v", err)
 			}
-			
+
 			fmt.Println("✓ Service stopped")
 			fmt.Println("Goodbye!")
 			return
@@ -148,7 +148,7 @@ func createMockHSDirs() []*onion.HSDirectory {
 
 func displayStats(service *onion.Service) {
 	stats := service.GetStats()
-	
+
 	fmt.Println("─────────────────────────────────────────")
 	fmt.Printf("Address:         %s\n", stats.Address)
 	fmt.Printf("Status:          %s\n", formatStatus(stats.Running))

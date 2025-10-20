@@ -221,21 +221,21 @@ type NtorKeyPair struct {
 // This implements tor-spec.txt section 5.1.4 (ntor handshake)
 func GenerateNtorKeyPair() (*NtorKeyPair, error) {
 	kp := &NtorKeyPair{}
-	
+
 	// Generate random private key
 	if _, err := rand.Read(kp.Private[:]); err != nil {
 		return nil, fmt.Errorf("failed to generate private key: %w", err)
 	}
-	
+
 	// Compute public key: X = x*G
 	curve25519.ScalarBaseMult(&kp.Public, &kp.Private)
-	
+
 	return kp, nil
 }
 
 // NtorClientHandshake performs the client side of the ntor handshake
 // Returns the handshake data to send to the relay and the shared secret
-// 
+//
 // Parameters:
 //   - identityKey: The relay's Ed25519 identity key (32 bytes)
 //   - ntorOnionKey: The relay's ntor onion key (32 bytes)
@@ -252,22 +252,22 @@ func NtorClientHandshake(identityKey, ntorOnionKey []byte) (handshakeData []byte
 	if len(ntorOnionKey) != 32 {
 		return nil, nil, fmt.Errorf("invalid ntor onion key length: %d", len(ntorOnionKey))
 	}
-	
+
 	// Generate ephemeral key pair (x, X)
 	ephemeral, err := GenerateNtorKeyPair()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to generate ephemeral key: %w", err)
 	}
-	
+
 	// Handshake data is: NODEID || KEYID || CLIENT_PK
 	// NODEID (20 bytes): relay identity fingerprint (we use first 20 bytes of Ed25519 key)
-	// KEYID (32 bytes): relay's ntor onion key  
+	// KEYID (32 bytes): relay's ntor onion key
 	// CLIENT_PK (32 bytes): client's ephemeral public key X
 	handshakeData = make([]byte, 20+32+32)
-	copy(handshakeData[0:20], identityKey[0:20])     // NODEID
-	copy(handshakeData[20:52], ntorOnionKey)         // KEYID
-	copy(handshakeData[52:84], ephemeral.Public[:])  // CLIENT_PK
-	
+	copy(handshakeData[0:20], identityKey[0:20])    // NODEID
+	copy(handshakeData[20:52], ntorOnionKey)        // KEYID
+	copy(handshakeData[52:84], ephemeral.Public[:]) // CLIENT_PK
+
 	// Note: The complete ntor handshake requires processing the server's response
 	// to compute the actual shared secret. For now, we return a placeholder.
 	// A full implementation would:
@@ -275,16 +275,16 @@ func NtorClientHandshake(identityKey, ntorOnionKey []byte) (handshakeData []byte
 	// 2. Compute shared secrets: EXP(Y,x) and EXP(B,x)
 	// 3. Derive key material using HKDF-SHA256
 	// 4. Verify auth MAC
-	
+
 	// Placeholder shared secret (will be replaced when processing server response)
 	sharedSecret = make([]byte, 32)
 	copy(sharedSecret, ephemeral.Private[:])
-	
+
 	return handshakeData, sharedSecret, nil
 }
 
 // NtorProcessResponse processes the server's response to complete the ntor handshake
-// 
+//
 // Parameters:
 //   - response: The server's response from CREATED2/EXTENDED2 (HLEN bytes of handshake data)
 //   - clientPrivate: The client's ephemeral private key from the initial handshake
@@ -300,29 +300,29 @@ func NtorProcessResponse(response []byte, clientPrivate, serverNtorKey, serverId
 	if len(response) != 64 {
 		return nil, fmt.Errorf("invalid response length: %d, expected 64", len(response))
 	}
-	
+
 	var serverY, auth [32]byte
 	copy(serverY[:], response[0:32])
 	copy(auth[:], response[32:64])
-	
+
 	// Convert client private key
 	var clientX [32]byte
 	copy(clientX[:], clientPrivate)
-	
+
 	// Compute shared secrets
 	// secret_input = EXP(Y,x) | EXP(B,x) | ID | B | X | Y | PROTOID
 	// where PROTOID = "ntor-curve25519-sha256-1"
-	
+
 	var sharedXY, sharedXB [32]byte
-	
+
 	// EXP(Y,x) - Diffie-Hellman with server's ephemeral key
 	curve25519.ScalarMult(&sharedXY, &clientX, &serverY)
-	
+
 	// EXP(B,x) - Diffie-Hellman with server's ntor onion key
 	var serverB [32]byte
 	copy(serverB[:], serverNtorKey)
 	curve25519.ScalarMult(&sharedXB, &clientX, &serverB)
-	
+
 	// Build secret_input
 	protoid := []byte("ntor-curve25519-sha256-1")
 	secretInput := make([]byte, 0, 32+32+32+32+32+32+len(protoid))
@@ -330,18 +330,18 @@ func NtorProcessResponse(response []byte, clientPrivate, serverNtorKey, serverId
 	secretInput = append(secretInput, sharedXB[:]...)
 	secretInput = append(secretInput, serverIdentity[0:32]...)
 	secretInput = append(secretInput, serverNtorKey...)
-	
+
 	var clientPub [32]byte
 	curve25519.ScalarBaseMult(&clientPub, &clientX)
 	secretInput = append(secretInput, clientPub[:]...)
 	secretInput = append(secretInput, serverY[:]...)
 	secretInput = append(secretInput, protoid...)
-	
+
 	// Derive keys using HKDF-SHA256 per tor-spec.txt section 5.1.4
 	// The handshake uses two derivation steps:
 	// 1. verify = HKDF(secret_input, t_verify, M_EXPAND) for auth verification
 	// 2. key_material = HKDF(secret_input, t_key, M_EXPAND) for circuit keys
-	
+
 	// First derive the verification key to check the AUTH value
 	verify := []byte("ntor-curve25519-sha256-1:verify")
 	hkdfVerify := hkdf.New(sha256.New, secretInput, nil, verify)
@@ -349,13 +349,13 @@ func NtorProcessResponse(response []byte, clientPrivate, serverNtorKey, serverId
 	if _, err := io.ReadFull(hkdfVerify, expectedAuth); err != nil {
 		return nil, fmt.Errorf("HKDF verify derivation failed: %w", err)
 	}
-	
+
 	// Verify the AUTH value matches our computation (constant-time comparison)
 	// This ensures the server has the correct private keys
 	if !constantTimeCompare(auth[:], expectedAuth) {
 		return nil, fmt.Errorf("auth MAC verification failed: server authentication invalid")
 	}
-	
+
 	// Now derive the actual key material for circuit use
 	keyInfo := []byte("ntor-curve25519-sha256-1:key_extract")
 	hkdfKey := hkdf.New(sha256.New, secretInput, nil, keyInfo)
@@ -363,7 +363,7 @@ func NtorProcessResponse(response []byte, clientPrivate, serverNtorKey, serverId
 	if _, err := io.ReadFull(hkdfKey, keyMaterial); err != nil {
 		return nil, fmt.Errorf("HKDF key derivation failed: %w", err)
 	}
-	
+
 	return keyMaterial, nil
 }
 
@@ -373,7 +373,7 @@ func constantTimeCompare(a, b []byte) bool {
 	if len(a) != len(b) {
 		return false
 	}
-	
+
 	var result byte = 0
 	for i := 0; i < len(a); i++ {
 		result |= a[i] ^ b[i]
@@ -391,7 +391,7 @@ func Ed25519Verify(publicKey, message, signature []byte) bool {
 	if len(signature) != ed25519.SignatureSize {
 		return false
 	}
-	
+
 	return ed25519.Verify(ed25519.PublicKey(publicKey), message, signature)
 }
 
@@ -400,7 +400,7 @@ func Ed25519Sign(privateKey, message []byte) ([]byte, error) {
 	if len(privateKey) != ed25519.PrivateKeySize {
 		return nil, fmt.Errorf("invalid private key length: %d", len(privateKey))
 	}
-	
+
 	signature := ed25519.Sign(ed25519.PrivateKey(privateKey), message)
 	return signature, nil
 }

@@ -69,8 +69,8 @@ func DefaultConfig() *Config {
 	}
 
 	return &Config{
-		SocksPort:           9050,
-		ControlPort:         9051,
+		SocksPort:           autoconfig.FindAvailablePort(9050),
+		ControlPort:         autoconfig.FindAvailablePort(9051),
 		DataDirectory:       dataDir,
 		CircuitBuildTimeout: 60 * time.Second,
 		MaxCircuitDirtiness: 10 * time.Minute,

@@ -269,7 +269,7 @@ func TestDefaultAuthorities(t *testing.T) {
 
 func TestValidateConsensusMetadata(t *testing.T) {
 	now := time.Now()
-	
+
 	tests := []struct {
 		name    string
 		meta    *ConsensusMetadata
@@ -331,7 +331,7 @@ func TestValidateConsensusMetadata(t *testing.T) {
 			wantErr: true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := ValidateConsensusMetadata(tt.meta)
@@ -351,7 +351,7 @@ func TestConsensusMetadataStructure(t *testing.T) {
 		Signatures:  5,
 		Authorities: 9,
 	}
-	
+
 	if meta.Signatures != 5 {
 		t.Errorf("Expected 5 signatures, got %d", meta.Signatures)
 	}

@@ -37,7 +37,7 @@ type SimpleClient struct {
 //	    log.Fatal(err)
 //	}
 //	defer client.Close()
-//	
+//
 //	proxyURL := client.ProxyURL()
 //	// Use proxyURL with your HTTP client
 func Connect() (*SimpleClient, error) {
@@ -48,7 +48,7 @@ func Connect() (*SimpleClient, error) {
 func ConnectWithContext(ctx context.Context) (*SimpleClient, error) {
 	// Create default configuration
 	cfg := config.DefaultConfig()
-	
+
 	// Create logger with info level by default
 	logLevel, err := logger.ParseLevel("info")
 	if err != nil {
@@ -138,13 +138,13 @@ func ConnectWithOptionsContext(ctx context.Context, opts *Options) (*SimpleClien
 type Options struct {
 	// SocksPort specifies the SOCKS5 proxy port (default: 9050)
 	SocksPort int
-	
+
 	// ControlPort specifies the control protocol port (default: 9051)
 	ControlPort int
-	
+
 	// DataDirectory specifies the data directory (default: platform-specific)
 	DataDirectory string
-	
+
 	// LogLevel specifies the log level: debug, info, warn, error (default: info)
 	LogLevel string
 }
@@ -154,13 +154,17 @@ func (c *SimpleClient) Close() error {
 	return c.client.Stop()
 }
 
-// ProxyURL returns the SOCKS5 proxy URL that applications can use.
+// ProxyURL returns the SOCKS5 proxy URL in format "socks5://127.0.0.1:port".
+// Use this when configuring HTTP clients that accept proxy URLs.
+// Example: http.Transport.Proxy or similar libraries that expect a full URL.
 func (c *SimpleClient) ProxyURL() string {
 	stats := c.client.GetStats()
 	return fmt.Sprintf("socks5://127.0.0.1:%d", stats.SocksPort)
 }
 
-// ProxyAddr returns the SOCKS5 proxy address (host:port).
+// ProxyAddr returns the SOCKS5 proxy address in format "127.0.0.1:port".
+// Use this when configuring low-level network dial functions or libraries
+// that expect just the host:port without the protocol scheme.
 func (c *SimpleClient) ProxyAddr() string {
 	stats := c.client.GetStats()
 	return fmt.Sprintf("127.0.0.1:%d", stats.SocksPort)

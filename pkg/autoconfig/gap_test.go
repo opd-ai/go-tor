@@ -9,8 +9,8 @@ import (
 	"github.com/opd-ai/go-tor/pkg/config"
 )
 
-// TestPortSelectionGap demonstrates Gap #2 from IMPLEMENTATION_GAP_AUDIT.md
-// This test shows that FindAvailablePort exists but is not used in zero-config mode
+// TestPortSelectionGap was demonstrating Gap #2 from IMPLEMENTATION_GAP_AUDIT.md
+// This test now verifies that the gap has been fixed - DefaultConfig uses FindAvailablePort
 func TestPortSelectionGap(t *testing.T) {
 	// Reserve the default SOCKS port to simulate it being in use
 	listener, err := net.Listen("tcp", "127.0.0.1:9050")
@@ -28,50 +28,44 @@ func TestPortSelectionGap(t *testing.T) {
 	}
 	t.Logf("FindAvailablePort correctly found alternative: %d", availablePort)
 
-	// However, DefaultConfig doesn't use FindAvailablePort
+	// DefaultConfig should now use FindAvailablePort (Gap #2 fix)
 	cfg := config.DefaultConfig()
-	t.Logf("DefaultConfig SocksPort: %d (hardcoded, doesn't check availability)", cfg.SocksPort)
+	t.Logf("DefaultConfig SocksPort: %d (uses FindAvailablePort)", cfg.SocksPort)
 
-	// This demonstrates the gap: the config always uses 9050
-	// even though 9050 is already in use and FindAvailablePort could find an alternative
-	if cfg.SocksPort != 9050 {
-		t.Errorf("Expected DefaultConfig to use hardcoded 9050, got %d", cfg.SocksPort)
+	// Verify the fix: config should NOT use 9050 since it's in use
+	// It should find an available port (9051 or higher)
+	if cfg.SocksPort == 9050 {
+		t.Errorf("DefaultConfig still uses hardcoded 9050 even though it's in use - Gap #2 not fixed!")
 	}
 
-	// In a true zero-config mode, we'd expect:
-	// cfg.SocksPort = autoconfig.FindAvailablePort(9050)
-	// which would return 9051 or another available port
-
-	t.Log("Gap confirmed: DefaultConfig doesn't use FindAvailablePort")
-	t.Log("See IMPLEMENTATION_GAP_AUDIT.md Gap #2 for details")
+	t.Logf("Gap #2 fixed: DefaultConfig uses FindAvailablePort and found port %d", cfg.SocksPort)
 }
 
-// TestCircuitTimeoutGap demonstrates Gap #1 from IMPLEMENTATION_GAP_AUDIT.md
-// This test shows the configuration timeout is not used in circuit building
+// TestCircuitTimeoutGap was demonstrating Gap #1 from IMPLEMENTATION_GAP_AUDIT.md
+// This test now verifies that the gap has been partially fixed - config timeout is used
 func TestCircuitTimeoutGap(t *testing.T) {
 	cfg := config.DefaultConfig()
-	
+
 	t.Logf("Config CircuitBuildTimeout: %v", cfg.CircuitBuildTimeout)
-	
-	// The documentation states "< 5 seconds (95th percentile)" 
+
+	// The documentation states "< 5 seconds (95th percentile)"
 	// but the default is 60 seconds
 	if cfg.CircuitBuildTimeout.Seconds() != 60 {
 		t.Errorf("Expected default CircuitBuildTimeout to be 60s, got %v", cfg.CircuitBuildTimeout)
 	}
 
-	// Furthermore, pkg/client/client.go:264 hardcodes 30 seconds:
-	// circ, err := builder.BuildCircuit(ctx, selectedPath, 30*time.Second)
-	// 
-	// This means:
-	// 1. The documented target is 5 seconds
-	// 2. The config default is 60 seconds  
-	// 3. The actual implementation uses 30 seconds (hardcoded)
-	// 
-	// None of these align!
+	// Gap #1 fix: pkg/client/client.go now uses c.config.CircuitBuildTimeout
+	// instead of hardcoded 30*time.Second
+	//
+	// However, there's still a documentation discrepancy:
+	// 1. The documented target is < 5 seconds (95th percentile)
+	// 2. The config default is 60 seconds
+	//
+	// This is acceptable - the timeout should be higher than the target
+	// to allow for network variability
 
-	t.Log("Gap confirmed: Circuit timeout values inconsistent")
-	t.Log("  - README target: < 5 seconds (95th percentile)")
-	t.Log("  - Config default: 60 seconds")
-	t.Log("  - Implementation: 30 seconds (hardcoded)")
-	t.Log("See IMPLEMENTATION_GAP_AUDIT.md Gap #1 for details")
+	t.Log("Gap #1 partially fixed: Implementation now uses config timeout")
+	t.Log("  - README target: < 5 seconds (95th percentile) - performance goal")
+	t.Log("  - Config default: 60 seconds - timeout value (correctly higher than target)")
+	t.Log("  - Implementation: Uses c.config.CircuitBuildTimeout (FIXED)")
 }

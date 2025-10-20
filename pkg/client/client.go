@@ -260,8 +260,8 @@ func (c *Client) buildCircuit(ctx context.Context) error {
 	// Track circuit build time
 	startTime := time.Now()
 
-	// Build the circuit with 30 second timeout
-	circ, err := builder.BuildCircuit(ctx, selectedPath, 30*time.Second)
+	// Build the circuit with configured timeout
+	circ, err := builder.BuildCircuit(ctx, selectedPath, c.config.CircuitBuildTimeout)
 	buildDuration := time.Since(startTime)
 
 	// Record metrics

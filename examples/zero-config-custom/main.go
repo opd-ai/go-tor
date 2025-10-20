@@ -34,8 +34,9 @@ func main() {
 	defer torClient.Close()
 
 	// Wait for ready state
+	// Use 90s timeout for first run (consensus download + circuit build)
 	fmt.Println("Waiting for circuits to be established...")
-	if err := torClient.WaitUntilReady(60 * time.Second); err != nil {
+	if err := torClient.WaitUntilReady(90 * time.Second); err != nil {
 		log.Fatalf("Timeout waiting for Tor to be ready: %v", err)
 	}
 
