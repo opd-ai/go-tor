@@ -23,6 +23,9 @@ The client package provides the high-level orchestration for the Tor client.
 
 ```go
 import (
+    "log/slog"
+    "os"
+    
     "github.com/opd-ai/go-tor/pkg/client"
     "github.com/opd-ai/go-tor/pkg/config"
     "github.com/opd-ai/go-tor/pkg/logger"
@@ -35,7 +38,9 @@ cfg.ControlPort = 9051
 cfg.DataDirectory = "/var/lib/tor"
 
 // Create logger
-log := logger.New(logger.LevelInfo, os.Stdout)
+log := logger.New(slog.LevelInfo, os.Stdout)
+// Or use the default logger
+// log := logger.NewDefault()
 
 // Create client
 torClient, err := client.New(cfg, log)
