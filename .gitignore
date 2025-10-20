@@ -60,3 +60,5 @@ examples/*/phase*-integration
 examples/*/onion-address-demo
 examples/*/zero-config
 examples/*/zero-config-custom
+tor-client
+tor-client-stripped
