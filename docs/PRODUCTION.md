@@ -163,6 +163,17 @@ curl --socks5 127.0.0.1:9050 https://check.torproject.org
 - Connection pooling reuses connections when possible
 - Typical: 3-10 active circuits = 9-30 connections
 
+**SOCKS5 Connection Limits (AUDIT-066):**
+- Default maximum concurrent SOCKS5 connections: 1000
+- Configurable via `Config.MaxConnections` in code
+- Recommended limits based on deployment:
+  - Embedded systems (limited RAM): 100-500 connections
+  - Standard servers: 1000-5000 connections
+  - High-capacity proxies: 5000-10000 connections
+- Each SOCKS5 connection consumes minimal memory (~1-2KB)
+- Connection limit prevents resource exhaustion attacks
+- Configure based on available RAM and expected load
+
 **Memory:**
 - Base: ~20MB
 - Per circuit: ~2-5MB
