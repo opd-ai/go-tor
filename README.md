@@ -68,8 +68,10 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 - ✅ **Circuit prebuilding for instant availability**
 - ✅ **Performance tuning configuration options**
 - ✅ **Security hardening (zero HIGH/MEDIUM severity issues)**
+- ✅ **HTTP metrics endpoint (Prometheus, JSON, health, dashboard)**
 
 ### Recently Completed
+- ✅ **Phase 9.1**: HTTP metrics and observability (Prometheus, JSON endpoints, HTML dashboard)
 - ✅ **Phase 7.4**: Onion services server (hidden service hosting)
 - ✅ **Phase 8.6**: Onion Service Infrastructure Completion
 - ✅ **Phase 8.5**: Comprehensive testing and documentation
@@ -78,7 +80,10 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 - ✅ **Phase 8.2**: Enhanced error handling and resilience
 
 ### Planned
-- [ ] **Phase 8**: Advanced features and optimization
+- [ ] **Phase 9**: Advanced monitoring and production features
+  - [x] HTTP metrics endpoint (Phase 9.1)
+  - [ ] Advanced circuit strategies
+  - [ ] Additional onion service features
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture and roadmap.
 
@@ -120,6 +125,9 @@ The easiest way to get started - just run the binary with no arguments:
 
 # With configuration file
 ./bin/tor-client -config /etc/tor/torrc
+
+# With HTTP metrics enabled (Prometheus, JSON, HTML dashboard)
+./bin/tor-client -metrics-port 9052
 
 # Show version
 ./bin/tor-client -version
@@ -254,6 +262,7 @@ make lint         # Run golint
 - [Development Guide](docs/DEVELOPMENT.md) - Development workflow and guidelines
 - [Structured Logging](docs/LOGGING.md) - Using the structured logging system
 - [Graceful Shutdown](docs/SHUTDOWN.md) - Implementing graceful shutdown
+- [HTTP Metrics](docs/METRICS.md) - Metrics and observability endpoints
 - [API Reference](docs/API.md) - Package APIs and usage examples
 - [Tutorial](docs/TUTORIAL.md) - Getting started guide
 - [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and solutions
