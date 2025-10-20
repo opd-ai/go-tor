@@ -147,6 +147,10 @@ type Options struct {
 
 	// LogLevel specifies the log level: debug, info, warn, error (default: info)
 	LogLevel string
+
+	// OnBootstrap is called during bootstrap with progress updates (0-100%)
+	// and a description of the current bootstrap phase.
+	OnBootstrap func(progress int, description string)
 }
 
 // Close gracefully shuts down the Tor client.
