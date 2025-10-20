@@ -165,8 +165,8 @@ func NewCell(circID uint32, cmd Command) *Cell {
 ### Markdown Documentation
 - Architecture overview: `docs/ARCHITECTURE.md`
 - Development guide: `docs/DEVELOPMENT.md` (this file)
-- User guide: `docs/USER_GUIDE.md`
-- Security considerations: `docs/SECURITY.md`
+- Tutorial: `docs/TUTORIAL.md`
+- Security audit: `AUDIT_SUMMARY.md`
 
 ## Contributing
 

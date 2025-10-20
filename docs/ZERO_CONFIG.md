@@ -248,4 +248,4 @@ A: The project is in active development. See [security notice](../README.md#secu
 - Read the [full documentation](../README.md)
 - Explore [examples](../examples/)
 - Check the [API reference](../docs/API.md)
-- Learn about [security considerations](../docs/SECURITY.md)
+- Learn about [security considerations](../AUDIT_SUMMARY.md)
