@@ -17,6 +17,8 @@ This audit focuses specifically on discrepancies between the documented behavior
 ## Detailed Findings
 
 ### Gap #1: Circuit Build Timeout Discrepancy
+**Status:** RESOLVED (2025-10-20T00:19:00Z)  
+**Resolution:** Fixed in commit [current]  
 **Severity:** MODERATE  
 **Documentation Reference:** 
 > "Circuit build time: < 5 seconds (95th percentile)" (README.md:359)
@@ -65,7 +67,8 @@ buildDuration := time.Since(startTime)
 ```
 
 **Recommended Fix:**
-1. Use `cfg.CircuitBuildTimeout` instead of hardcoded value: `builder.BuildCircuit(ctx, selectedPath, c.config.CircuitBuildTimeout)`
+~~1. Use `cfg.CircuitBuildTimeout` instead of hardcoded value: `builder.BuildCircuit(ctx, selectedPath, c.config.CircuitBuildTimeout)`~~
+**IMPLEMENTED:** Circuit building now uses `c.config.CircuitBuildTimeout` from configuration.
 2. Either update documentation to reflect realistic targets (e.g., "< 30 seconds (95th percentile)") or optimize implementation to meet 5s target
 3. Ensure circuit builder respects configuration timeout
 
