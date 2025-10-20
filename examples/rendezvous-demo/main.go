@@ -104,7 +104,8 @@ func main() {
 	fmt.Println("--- Creating Rendezvous Circuit ---")
 
 	ctx := context.Background()
-	circuitID, err := rendezvous.CreateRendezvousCircuit(ctx, rendezvousPoint)
+	// Pass nil for circuit builder to use mock implementation
+	circuitID, err := rendezvous.CreateRendezvousCircuit(ctx, rendezvousPoint, nil)
 	if err != nil {
 		log.Fatalf("Failed to create rendezvous circuit: %v", err)
 	}
@@ -116,7 +117,8 @@ func main() {
 	// Demo 4: Sending ESTABLISH_RENDEZVOUS
 	fmt.Println("--- Sending ESTABLISH_RENDEZVOUS ---")
 
-	err = rendezvous.SendEstablishRendezvous(ctx, circuitID, establishData)
+	// Pass nil for cell sender to use mock implementation
+	err = rendezvous.SendEstablishRendezvous(ctx, circuitID, establishData, nil)
 	if err != nil {
 		log.Fatalf("Failed to send ESTABLISH_RENDEZVOUS: %v", err)
 	}
