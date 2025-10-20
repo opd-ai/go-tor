@@ -109,7 +109,7 @@ func main() {
 func run(ctx context.Context, cfg *config.Config, log *logger.Logger) error {
 	// Display initialization message
 	log.Info("Initializing Tor client...")
-	
+
 	// Initialize Tor client
 	torClient, err := client.New(cfg, log)
 	if err != nil {
@@ -119,7 +119,7 @@ func run(ctx context.Context, cfg *config.Config, log *logger.Logger) error {
 	// Display bootstrapping message
 	log.Info("Bootstrapping Tor network connection...")
 	log.Info("This may take 30-60 seconds on first run")
-	
+
 	// Start the client
 	startTime := time.Now()
 	if err := torClient.Start(ctx); err != nil {
@@ -136,7 +136,7 @@ func run(ctx context.Context, cfg *config.Config, log *logger.Logger) error {
 		"address", fmt.Sprintf("127.0.0.1:%d", stats.SocksPort),
 		"url", fmt.Sprintf("socks5://127.0.0.1:%d", stats.SocksPort))
 	log.Info("Configure your application to use the SOCKS5 proxy for anonymous connections")
-	
+
 	// Example usage instructions
 	fmt.Println()
 	fmt.Println("Example: Test with curl")

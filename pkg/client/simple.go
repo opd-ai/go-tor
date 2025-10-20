@@ -37,7 +37,7 @@ type SimpleClient struct {
 //	    log.Fatal(err)
 //	}
 //	defer client.Close()
-//	
+//
 //	proxyURL := client.ProxyURL()
 //	// Use proxyURL with your HTTP client
 func Connect() (*SimpleClient, error) {
@@ -48,7 +48,7 @@ func Connect() (*SimpleClient, error) {
 func ConnectWithContext(ctx context.Context) (*SimpleClient, error) {
 	// Create default configuration
 	cfg := config.DefaultConfig()
-	
+
 	// Create logger with info level by default
 	logLevel, err := logger.ParseLevel("info")
 	if err != nil {
@@ -138,13 +138,13 @@ func ConnectWithOptionsContext(ctx context.Context, opts *Options) (*SimpleClien
 type Options struct {
 	// SocksPort specifies the SOCKS5 proxy port (default: 9050)
 	SocksPort int
-	
+
 	// ControlPort specifies the control protocol port (default: 9051)
 	ControlPort int
-	
+
 	// DataDirectory specifies the data directory (default: platform-specific)
 	DataDirectory string
-	
+
 	// LogLevel specifies the log level: debug, info, warn, error (default: info)
 	LogLevel string
 }

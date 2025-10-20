@@ -29,14 +29,14 @@ type Service struct {
 	config *ServiceConfig
 
 	// State
-	descriptor       *Descriptor
-	introPoints      []*ServiceIntroPoint
-	publishedHSDirs  []*HSDirectory
-	lastPublish      time.Time
-	running          bool
-	ctx              context.Context
-	cancel           context.CancelFunc
-	logger           *logger.Logger
+	descriptor      *Descriptor
+	introPoints     []*ServiceIntroPoint
+	publishedHSDirs []*HSDirectory
+	lastPublish     time.Time
+	running         bool
+	ctx             context.Context
+	cancel          context.CancelFunc
+	logger          *logger.Logger
 
 	// Connections
 	pendingIntros map[string]*PendingIntro // cookie -> intro
@@ -63,20 +63,20 @@ type ServiceConfig struct {
 
 // ServiceIntroPoint represents an introduction point for this service
 type ServiceIntroPoint struct {
-	Relay      *HSDirectory // The relay acting as intro point
-	CircuitID  uint32       // Circuit to the intro point
-	AuthKey    []byte       // Authentication key for this intro point
-	EncKey     []byte       // Encryption key for this intro point
-	Established bool        // Whether ESTABLISH_INTRO succeeded
-	CreatedAt  time.Time
+	Relay       *HSDirectory // The relay acting as intro point
+	CircuitID   uint32       // Circuit to the intro point
+	AuthKey     []byte       // Authentication key for this intro point
+	EncKey      []byte       // Encryption key for this intro point
+	Established bool         // Whether ESTABLISH_INTRO succeeded
+	CreatedAt   time.Time
 }
 
 // PendingIntro represents a pending introduction request
 type PendingIntro struct {
-	Cookie           []byte    // Rendezvous cookie
-	RendezvousPoint  string    // Rendezvous point fingerprint
-	ClientOnionKey   []byte    // Client's onion key
-	ReceivedAt       time.Time
+	Cookie          []byte // Rendezvous cookie
+	RendezvousPoint string // Rendezvous point fingerprint
+	ClientOnionKey  []byte // Client's onion key
+	ReceivedAt      time.Time
 }
 
 // NewService creates a new onion service
@@ -96,7 +96,7 @@ func NewService(config *ServiceConfig, log *logger.Logger) (*Service, error) {
 	if len(config.PrivateKey) > 0 {
 		// Use provided key
 		if len(config.PrivateKey) != ed25519.PrivateKeySize {
-			return nil, fmt.Errorf("invalid private key size: %d, expected %d", 
+			return nil, fmt.Errorf("invalid private key size: %d, expected %d",
 				len(config.PrivateKey), ed25519.PrivateKeySize)
 		}
 		privateKey = config.PrivateKey
@@ -444,12 +444,12 @@ func (s *Service) publishDescriptor(ctx context.Context, hsdirs []*HSDirectory) 
 
 	// Select responsible HSDirs using HSDir protocol
 	hsdir := NewHSDir(s.logger)
-	
+
 	// Publish to both replicas
 	published := 0
 	for replica := 0; replica < 2; replica++ {
 		selectedHSDirs := hsdir.SelectHSDirs(desc.DescriptorID, hsdirs, replica)
-		
+
 		for _, targetHSDir := range selectedHSDirs {
 			if err := s.uploadDescriptor(ctx, targetHSDir, desc, replica); err != nil {
 				s.logger.Warn("Failed to publish to HSDir",
@@ -486,7 +486,7 @@ func (s *Service) uploadDescriptor(ctx context.Context, hsdir *HSDirectory, desc
 	// 2. Send an HTTP POST to /tor/hs/3/publish
 	// 3. Wait for 200 OK response
 	// 4. Handle retries and errors
-	
+
 	// For Phase 7.4, we'll simulate successful upload
 	s.logger.Debug("Uploading descriptor to HSDir",
 		"hsdir", hsdir.Fingerprint,
@@ -520,7 +520,7 @@ func (s *Service) maintenanceLoop(ctx context.Context, hsdirs []*HSDirectory) {
 			return
 		case <-ticker.C:
 			s.logger.Debug("Running maintenance tasks")
-			
+
 			// Re-publish descriptor
 			if err := s.createDescriptor(); err != nil {
 				s.logger.Error("Failed to refresh descriptor", "error", err)
@@ -577,12 +577,12 @@ func (s *Service) GetStats() ServiceStats {
 	defer s.mu.RUnlock()
 
 	return ServiceStats{
-		Address:          s.address.String(),
-		Running:          s.running,
-		IntroPoints:      len(s.introPoints),
-		DescriptorAge:    time.Since(s.lastPublish),
-		PendingIntros:    len(s.pendingIntros),
-		PublishedHSDirs:  len(s.publishedHSDirs),
+		Address:         s.address.String(),
+		Running:         s.running,
+		IntroPoints:     len(s.introPoints),
+		DescriptorAge:   time.Since(s.lastPublish),
+		PendingIntros:   len(s.pendingIntros),
+		PublishedHSDirs: len(s.publishedHSDirs),
 	}
 }
 

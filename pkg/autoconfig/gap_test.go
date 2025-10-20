@@ -50,10 +50,10 @@ func TestPortSelectionGap(t *testing.T) {
 // This test shows the configuration timeout is not used in circuit building
 func TestCircuitTimeoutGap(t *testing.T) {
 	cfg := config.DefaultConfig()
-	
+
 	t.Logf("Config CircuitBuildTimeout: %v", cfg.CircuitBuildTimeout)
-	
-	// The documentation states "< 5 seconds (95th percentile)" 
+
+	// The documentation states "< 5 seconds (95th percentile)"
 	// but the default is 60 seconds
 	if cfg.CircuitBuildTimeout.Seconds() != 60 {
 		t.Errorf("Expected default CircuitBuildTimeout to be 60s, got %v", cfg.CircuitBuildTimeout)
@@ -61,12 +61,12 @@ func TestCircuitTimeoutGap(t *testing.T) {
 
 	// Furthermore, pkg/client/client.go:264 hardcodes 30 seconds:
 	// circ, err := builder.BuildCircuit(ctx, selectedPath, 30*time.Second)
-	// 
+	//
 	// This means:
 	// 1. The documented target is 5 seconds
-	// 2. The config default is 60 seconds  
+	// 2. The config default is 60 seconds
 	// 3. The actual implementation uses 30 seconds (hardcoded)
-	// 
+	//
 	// None of these align!
 
 	t.Log("Gap confirmed: Circuit timeout values inconsistent")

@@ -18,13 +18,13 @@ const (
 	// Consensus validation thresholds (SEC-004, SEC-014)
 	maxMalformedEntryRate = 10 // Reject if >10% of entries are malformed
 	maxPortParseErrorRate = 20 // Warn if >20% of entries have port parse errors
-	
+
 	// SPEC-003: Enhanced consensus signature validation thresholds
 	// These constants support future implementation of multi-signature threshold validation
 	// per dir-spec.txt section 3.4 (Voting and consensus signature requirements)
-	minDirectoryAuthorities  = 3 // Minimum authorities for valid consensus
-	minSignatureThreshold    = 2 // Minimum signatures required (future: implement proper quorum)
-	maxClockSkew             = 30 * time.Minute // Maximum allowed clock skew for consensus timestamps
+	minDirectoryAuthorities = 3                // Minimum authorities for valid consensus
+	minSignatureThreshold   = 2                // Minimum signatures required (future: implement proper quorum)
+	maxClockSkew            = 30 * time.Minute // Maximum allowed clock skew for consensus timestamps
 )
 
 // Default directory authority addresses (hardcoded fallback directories)
@@ -132,7 +132,7 @@ func (c *Client) parseConsensus(r io.Reader) ([]*Relay, error) {
 		// Parse "r" lines (router status entries)
 		if strings.HasPrefix(line, "r ") {
 			totalEntries++
-			
+
 			if currentRelay != nil {
 				relays = append(relays, currentRelay)
 			}
@@ -277,32 +277,32 @@ type ConsensusMetadata struct {
 // This provides infrastructure for implementing multi-signature threshold validation
 // Current implementation provides basic timing validation; future versions should:
 // - Parse and verify all directory authority signatures
-// - Validate signature threshold meets quorum requirements  
+// - Validate signature threshold meets quorum requirements
 // - Check authority keys against hardcoded trusted set
 // - Implement proper Byzantine fault tolerance
 func ValidateConsensusMetadata(meta *ConsensusMetadata) error {
 	now := time.Now()
-	
+
 	// Check clock skew
 	if meta.ValidAfter.After(now.Add(maxClockSkew)) {
 		return fmt.Errorf("consensus valid-after time is too far in the future")
 	}
-	
+
 	// Check expiration
 	if meta.ValidUntil.Before(now.Add(-maxClockSkew)) {
 		return fmt.Errorf("consensus has expired")
 	}
-	
+
 	// Basic signature count validation
 	// Future enhancement: implement proper quorum calculation per dir-spec.txt
 	if meta.Signatures < minSignatureThreshold {
 		return fmt.Errorf("insufficient signatures: %d < %d", meta.Signatures, minSignatureThreshold)
 	}
-	
+
 	// Authority count validation
 	if meta.Authorities < minDirectoryAuthorities {
 		return fmt.Errorf("insufficient authorities: %d < %d", meta.Authorities, minDirectoryAuthorities)
 	}
-	
+
 	return nil
 }

@@ -153,9 +153,9 @@ func TestSelectVersionAdditionalCases(t *testing.T) {
 
 func TestProtocolConstantsValidation(t *testing.T) {
 	tests := []struct {
-		name     string
-		check    func() bool
-		errMsg   string
+		name   string
+		check  func() bool
+		errMsg string
 	}{
 		{
 			name:   "min_version_positive",
@@ -168,8 +168,10 @@ func TestProtocolConstantsValidation(t *testing.T) {
 			errMsg: "MaxLinkProtocolVersion must be >= MinLinkProtocolVersion",
 		},
 		{
-			name:   "preferred_in_range",
-			check:  func() bool { return PreferredVersion >= MinLinkProtocolVersion && PreferredVersion <= MaxLinkProtocolVersion },
+			name: "preferred_in_range",
+			check: func() bool {
+				return PreferredVersion >= MinLinkProtocolVersion && PreferredVersion <= MaxLinkProtocolVersion
+			},
 			errMsg: "PreferredVersion must be in supported range",
 		},
 		{
@@ -204,19 +206,19 @@ func TestNewHandshakeWithConnection(t *testing.T) {
 	log := logger.NewDefault()
 
 	h := NewHandshake(conn, log)
-	
+
 	if h == nil {
 		t.Fatal("NewHandshake returned nil")
 	}
-	
+
 	if h.conn != conn {
 		t.Error("Connection not set correctly")
 	}
-	
+
 	if h.logger == nil {
 		t.Error("Logger not initialized")
 	}
-	
+
 	if h.negotiatedVersion != 0 {
 		t.Errorf("Expected initial negotiatedVersion to be 0, got %d", h.negotiatedVersion)
 	}
@@ -225,26 +227,26 @@ func TestNewHandshakeWithConnection(t *testing.T) {
 func TestVersionPayloadEncoding(t *testing.T) {
 	// Test that version encoding/decoding is consistent
 	testVersions := []uint16{3, 4, 5}
-	
+
 	// Encode versions (simulating what sendVersions does)
 	payload := make([]byte, len(testVersions)*2)
 	for i, v := range testVersions {
 		payload[i*2] = byte(v >> 8)
 		payload[i*2+1] = byte(v)
 	}
-	
+
 	// Decode versions (simulating what receiveVersions does)
 	var decoded []int
 	for i := 0; i < len(payload); i += 2 {
 		version := int(payload[i])<<8 | int(payload[i+1])
 		decoded = append(decoded, version)
 	}
-	
+
 	// Verify round-trip
 	if len(decoded) != len(testVersions) {
 		t.Fatalf("Length mismatch: encoded %d versions, decoded %d", len(testVersions), len(decoded))
 	}
-	
+
 	for i, v := range testVersions {
 		if decoded[i] != int(v) {
 			t.Errorf("Version mismatch at index %d: encoded %d, decoded %d", i, v, decoded[i])
@@ -256,16 +258,16 @@ func TestVersionPayloadEncoding(t *testing.T) {
 
 func TestSetTimeout(t *testing.T) {
 	h := NewHandshake(nil, nil)
-	
+
 	// Test default timeout
 	if h.timeout != DefaultHandshakeTimeout {
 		t.Errorf("Expected default timeout %v, got %v", DefaultHandshakeTimeout, h.timeout)
 	}
-	
+
 	// Set custom timeout
 	customTimeout := 5 * time.Second
 	h.SetTimeout(customTimeout)
-	
+
 	if h.timeout != customTimeout {
 		t.Errorf("Expected timeout %v after SetTimeout, got %v", customTimeout, h.timeout)
 	}
@@ -280,7 +282,7 @@ func TestHandshakeTimeout(t *testing.T) {
 
 func TestSelectVersionExtraCases(t *testing.T) {
 	h := &Handshake{}
-	
+
 	tests := []struct {
 		name           string
 		remoteVersions []int
@@ -324,7 +326,7 @@ func TestSelectVersionExtraCases(t *testing.T) {
 			description:    "Should select highest available even with gaps",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := h.selectVersion(tt.remoteVersions)
@@ -340,17 +342,17 @@ func TestNetinfoTimestampEncoding(t *testing.T) {
 	// Test timestamp encoding logic (similar to sendNetinfo)
 	testTime := time.Unix(1234567890, 0) // Known timestamp
 	timestamp := uint32(testTime.Unix())
-	
+
 	// Encode timestamp (big-endian)
 	payload := make([]byte, 4)
 	payload[0] = byte(timestamp >> 24)
 	payload[1] = byte(timestamp >> 16)
 	payload[2] = byte(timestamp >> 8)
 	payload[3] = byte(timestamp)
-	
+
 	// Decode timestamp
 	decoded := uint32(payload[0])<<24 | uint32(payload[1])<<16 | uint32(payload[2])<<8 | uint32(payload[3])
-	
+
 	if decoded != timestamp {
 		t.Errorf("Timestamp encoding/decoding mismatch: encoded %d, decoded %d", timestamp, decoded)
 	}
@@ -358,19 +360,19 @@ func TestNetinfoTimestampEncoding(t *testing.T) {
 
 func TestVersionNegotiationLogic(t *testing.T) {
 	h := &Handshake{}
-	
+
 	// Test that we prefer the highest mutual version
 	scenarios := []struct {
 		remote   []int
 		expected int
 	}{
-		{[]int{3, 4, 5, 6}, MaxLinkProtocolVersion},     // Select our max
-		{[]int{1, 2, 3}, MinLinkProtocolVersion},        // Select our min
-		{[]int{4}, PreferredVersion},                     // Select preferred if available
-		{[]int{3, 5}, MaxLinkProtocolVersion},           // Skip 4 if not in remote
-		{[]int{1, 2, 6, 7}, 0},                          // No mutual version
+		{[]int{3, 4, 5, 6}, MaxLinkProtocolVersion}, // Select our max
+		{[]int{1, 2, 3}, MinLinkProtocolVersion},    // Select our min
+		{[]int{4}, PreferredVersion},                // Select preferred if available
+		{[]int{3, 5}, MaxLinkProtocolVersion},       // Skip 4 if not in remote
+		{[]int{1, 2, 6, 7}, 0},                      // No mutual version
 	}
-	
+
 	for i, sc := range scenarios {
 		got := h.selectVersion(sc.remote)
 		if got != sc.expected {
@@ -382,24 +384,24 @@ func TestVersionNegotiationLogic(t *testing.T) {
 func TestHandshakeInitialization(t *testing.T) {
 	log := logger.NewDefault()
 	h := NewHandshake(nil, log)
-	
+
 	// Verify all fields are properly initialized
 	if h == nil {
 		t.Fatal("NewHandshake returned nil")
 	}
-	
+
 	if h.logger != log {
 		t.Error("Logger not set correctly")
 	}
-	
+
 	if h.timeout != DefaultHandshakeTimeout {
 		t.Errorf("Expected default timeout %v, got %v", DefaultHandshakeTimeout, h.timeout)
 	}
-	
+
 	if h.negotiatedVersion != 0 {
 		t.Errorf("Expected initial negotiatedVersion 0, got %d", h.negotiatedVersion)
 	}
-	
+
 	if h.conn != nil {
 		t.Error("Connection should be nil when passed nil")
 	}
@@ -410,20 +412,20 @@ func TestVersionRangeValidation(t *testing.T) {
 	if MinLinkProtocolVersion != 3 {
 		t.Errorf("MinLinkProtocolVersion should be 3 (per Tor spec), got %d", MinLinkProtocolVersion)
 	}
-	
+
 	if MaxLinkProtocolVersion != 5 {
 		t.Errorf("MaxLinkProtocolVersion should be 5 (current implementation), got %d", MaxLinkProtocolVersion)
 	}
-	
+
 	if PreferredVersion != 4 {
 		t.Errorf("PreferredVersion should be 4 (4-byte CircID), got %d", PreferredVersion)
 	}
-	
+
 	// Verify logical consistency
 	if MinLinkProtocolVersion > MaxLinkProtocolVersion {
 		t.Error("MinLinkProtocolVersion > MaxLinkProtocolVersion")
 	}
-	
+
 	if PreferredVersion < MinLinkProtocolVersion || PreferredVersion > MaxLinkProtocolVersion {
 		t.Error("PreferredVersion not in valid range")
 	}
@@ -432,13 +434,13 @@ func TestVersionRangeValidation(t *testing.T) {
 func TestPayloadLengthValidation(t *testing.T) {
 	// Test odd-length payload (invalid for VERSIONS cell)
 	oddPayload := []byte{0x00, 0x03, 0x00} // 3 bytes - invalid
-	
+
 	versions := []int{}
 	for i := 0; i < len(oddPayload)/2; i++ {
 		version := int(oddPayload[i*2])<<8 | int(oddPayload[i*2+1])
 		versions = append(versions, version)
 	}
-	
+
 	// Should only decode complete version pairs
 	expectedCount := len(oddPayload) / 2
 	if len(versions) != expectedCount {
@@ -448,7 +450,7 @@ func TestPayloadLengthValidation(t *testing.T) {
 
 func TestMultipleTimeoutSettings(t *testing.T) {
 	h := NewHandshake(nil, nil)
-	
+
 	timeouts := []time.Duration{
 		1 * time.Second,
 		5 * time.Second,
@@ -456,7 +458,7 @@ func TestMultipleTimeoutSettings(t *testing.T) {
 		30 * time.Second,
 		1 * time.Minute,
 	}
-	
+
 	for _, timeout := range timeouts {
 		h.SetTimeout(timeout)
 		if h.timeout != timeout {
@@ -467,7 +469,7 @@ func TestMultipleTimeoutSettings(t *testing.T) {
 
 func TestZeroTimeout(t *testing.T) {
 	h := NewHandshake(nil, nil)
-	
+
 	// Setting zero timeout should be allowed (caller's responsibility to use valid values)
 	h.SetTimeout(0)
 	if h.timeout != 0 {
@@ -477,7 +479,7 @@ func TestZeroTimeout(t *testing.T) {
 
 func TestNegativeVersionSelection(t *testing.T) {
 	h := &Handshake{}
-	
+
 	// Negative versions should never be selected
 	result := h.selectVersion([]int{-1, -5, -10})
 	if result != 0 {
