@@ -75,6 +75,8 @@ buildDuration := time.Since(startTime)
 ---
 
 ### Gap #2: Zero-Configuration Port Selection Not Implemented
+**Status:** RESOLVED (2025-10-20T00:20:00Z)  
+**Resolution:** Fixed in commit [current]  
 **Severity:** MODERATE  
 **Documentation Reference:**
 > "The client now works in **zero-configuration mode** by default. It automatically:
@@ -150,13 +152,15 @@ func FindAvailablePort(preferredPort int) int {
 ```
 
 **Recommended Fix:**
-1. Call `FindAvailablePort()` in `config.DefaultConfig()`:
+~~1. Call `FindAvailablePort()` in `config.DefaultConfig()`:~~
+**IMPLEMENTED:** DefaultConfig now uses FindAvailablePort for both SocksPort and ControlPort:
 ```go
 SocksPort:   autoconfig.FindAvailablePort(9050),
 ControlPort: autoconfig.FindAvailablePort(9051),
 ```
-2. Update initialization logic to handle port conflicts gracefully
-3. Log the actual ports being used for user awareness
+~~2. Update initialization logic to handle port conflicts gracefully~~
+**IMPLEMENTED:** Port conflicts are now handled automatically.
+3. Log the actual ports being used for user awareness - consider adding logging
 
 ---
 
