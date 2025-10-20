@@ -129,13 +129,14 @@ Subscribe to asynchronous event notifications.
 SETEVENTS [event ...]
 ```
 
-**Supported Events (planned):**
+**Supported Events:**
 - `CIRC` - Circuit status changes
 - `STREAM` - Stream status changes
 - `ORCONN` - OR connection status
 - `BW` - Bandwidth usage
 - `NEWDESC` - New relay descriptors
 - `GUARD` - Guard node changes
+- `NS` - Network status changes
 
 **Example:**
 ```
@@ -143,7 +144,7 @@ SETEVENTS [event ...]
 < 250 OK
 ```
 
-**Note:** Event subscriptions are accepted but events are not yet published. Event generation will be added in future updates.
+Events will be sent asynchronously as they occur. Each event is prefixed with `650` status code.
 
 ### QUIT
 

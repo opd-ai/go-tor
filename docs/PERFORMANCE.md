@@ -17,7 +17,7 @@ The go-tor client demonstrates excellent performance characteristics:
 | Circuit build time | < 5 seconds (95th percentile) | ⏳ To be validated in integration tests |
 | Memory usage | < 50MB RSS in steady state | ⏳ To be validated in production |
 | Concurrent streams | 100+ on Raspberry Pi 3 | ⏳ To be validated on target hardware |
-| Binary size | < 15MB static binary | ✅ Validated (current: 8.9MB) |
+| Binary size | < 15MB static binary | ✅ Validated (current: 9.1MB unstripped, 6.2MB stripped) |
 
 ## Cell Operations
 

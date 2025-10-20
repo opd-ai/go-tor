@@ -128,13 +128,6 @@ Core Tor protocol implementation including version negotiation and handshake.
 
 ### pkg/directory ✅ (NEW in Phase 2)
 Directory protocol client for fetching network information.
-- Version negotiation
-- TLS connection setup
-- Link protocol handshake
-- Cell multiplexing
-
-### pkg/directory ✅ (NEW in Phase 2)
-Directory protocol client for fetching network information.
 
 **Key Types:**
 - `Client`: HTTP-based directory client
@@ -145,34 +138,52 @@ Directory protocol client for fetching network information.
 - Parse consensus documents
 - Extract relay information (address, ports, flags)
 - Filter relays by flags (Guard, Exit, etc.)
+- Version negotiation
+- TLS connection setup
+- Link protocol handshake
+- Cell multiplexing
 
-### pkg/path (TODO)
-Path selection algorithms:
+### pkg/path ✅
+Path selection algorithms for building circuits.
+
+**Key Features:**
 - Guard node selection and persistence
 - Middle node selection
 - Exit node selection based on policies
 - Path diversity enforcement
+- Bandwidth-weighted selection
 
-### pkg/socks (TODO)
-SOCKS5 proxy server (RFC 1928):
+### pkg/socks ✅
+SOCKS5 proxy server (RFC 1928).
+
+**Key Features:**
 - SOCKS5 protocol handling
 - Stream routing through circuits
 - DNS resolution over Tor
-- Stream isolation
+- .onion address support
+- Connection multiplexing
 
-### pkg/onion (TODO)
-Onion service functionality:
-- Client: .onion address resolution
+### pkg/onion ✅
+Onion service functionality for v3 onion services.
+
+**Key Features:**
+- Client: .onion address resolution and connection
 - Server: Service hosting and descriptor publishing
 - Introduction point protocol
 - Rendezvous protocol
+- Descriptor management and caching
+- Ed25519 cryptographic operations
 
-### pkg/control (TODO)
-Tor control protocol (client-relevant subset):
-- Authentication
-- Circuit/stream information
+### pkg/control ✅
+Tor control protocol implementation.
+
+**Key Features:**
+- Authentication (NULL method)
+- Circuit and stream information
 - Configuration management
-- Event monitoring
+- Event monitoring and notifications
+- GETINFO, SETCONF, GETCONF commands
+- Event types: CIRC, STREAM, BW, ORCONN, NEWDESC, GUARD, NS
 
 ## Data Flow
 
@@ -238,22 +249,49 @@ Tor control protocol (client-relevant subset):
 ✅ Connection lifecycle management
 ✅ Error handling and timeouts
 
-### Phase 3: Client Functionality (Planned)
-- [ ] SOCKS5 proxy
-- [ ] Path selection
-- [ ] Guard persistence
-- [ ] Stream handling
+### Phase 3: Client Functionality ✅ (Complete)
+✅ SOCKS5 proxy server (RFC 1928)
+✅ Path selection (guard, middle, exit)
+✅ Guard persistence
+✅ Stream handling and multiplexing
 
-### Phase 4: Onion Services (Planned)
-- [ ] Client-side .onion support
-- [ ] Server-side service hosting
-- [ ] Descriptor management
+### Phase 4: Stream Management ✅ (Complete)
+✅ Stream multiplexing over circuits
+✅ Circuit extension (CREATE2/EXTENDED2)
+✅ Key derivation (KDF-TOR)
+✅ Stream isolation foundation
 
-### Phase 5: Production Ready (Planned)
-- [ ] Control protocol
-- [ ] Optimization for embedded
-- [ ] Security hardening
-- [ ] Comprehensive testing
+### Phase 5: Component Integration ✅ (Complete)
+✅ Client orchestration package
+✅ Circuit pool management
+✅ Health monitoring
+✅ Functional Tor client application
+✅ End-to-end testing
+
+### Phase 6: Production Hardening ✅ (Complete)
+✅ Complete circuit extension cryptography
+✅ Guard node persistence
+✅ Performance optimization
+✅ Security hardening and audit
+✅ Comprehensive testing and benchmarking
+
+### Phase 7: Control Protocol & Onion Services ✅ (Complete)
+✅ Control protocol server with basic commands
+✅ Event notification system (CIRC, STREAM, BW, ORCONN, NEWDESC, GUARD, NS)
+✅ v3 onion address parsing and validation
+✅ Descriptor management (caching, crypto)
+✅ HSDir protocol and descriptor fetching
+✅ Introduction protocol
+✅ Rendezvous protocol
+✅ Hidden service server (hosting)
+
+### Phase 8: Advanced Features ✅ (Complete)
+✅ Configuration file loading (torrc-compatible)
+✅ Enhanced error handling and resilience
+✅ Performance optimization and tuning
+✅ Security hardening and audit
+✅ Comprehensive testing and documentation
+✅ Onion Service Infrastructure Completion
 
 ## References
 

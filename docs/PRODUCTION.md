@@ -96,7 +96,7 @@ err := conn.ConnectWithRetry(ctx, cfg, retryCfg)
 ### System Requirements
 
 **Minimum:**
-- Go 1.21+
+- Go 1.24+
 - 50MB RAM
 - 100MB disk space
 - Network connectivity to Tor directory authorities

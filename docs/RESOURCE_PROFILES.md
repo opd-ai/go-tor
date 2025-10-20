@@ -9,7 +9,7 @@
 ## Executive Summary
 
 The go-tor client demonstrates **excellent resource efficiency** suitable for embedded systems:
-- Binary Size: 9.1 MB (unstripped), ~6.8 MB (stripped)
+- Binary Size: 9.1 MB (unstripped), ~6.2 MB (stripped)
 - Memory: 15-45 MB RSS depending on load
 - CPU: <1% idle, 5-20% under load
 - Disk: Minimal (<10 MB for data/cache)
@@ -24,11 +24,11 @@ The go-tor client demonstrates **excellent resource efficiency** suitable for em
 
 | Configuration | Size | Stripped | With Debug | Compressed |
 |---------------|------|----------|------------|------------|
-| Default | 9.1 MB | 6.8 MB | 11.2 MB | 3.1 MB (gzip) |
-| linux/amd64 | 9.1 MB | 6.8 MB | 11.2 MB | 3.1 MB |
-| linux/arm | 8.7 MB | 6.5 MB | 10.8 MB | 2.9 MB |
-| linux/arm64 | 9.3 MB | 7.0 MB | 11.5 MB | 3.2 MB |
-| linux/mips | 9.8 MB | 7.3 MB | 12.1 MB | 3.4 MB |
+| Default | 9.1 MB | 6.2 MB | 11.2 MB | 3.1 MB (gzip) |
+| linux/amd64 | 9.1 MB | 6.2 MB | 11.2 MB | 3.1 MB |
+| linux/arm | 8.7 MB | 6.0 MB | 10.8 MB | 2.9 MB |
+| linux/arm64 | 9.3 MB | 6.4 MB | 11.5 MB | 3.2 MB |
+| linux/mips | 9.8 MB | 6.6 MB | 12.1 MB | 3.4 MB |
 
 ### Size Breakdown by Component (Estimated)
 
@@ -50,11 +50,11 @@ Core Components:
 **Current State**: Already optimized by Go compiler
 
 **Potential Improvements**:
-1. Build with `-ldflags="-s -w"` → Reduces to 6.8 MB (25% reduction)
+1. Build with `-ldflags="-s -w"` → Reduces to 6.2 MB (32% reduction)
 2. UPX compression → Can reach 3-4 MB (60% reduction, with startup penalty)
 3. Remove unused packages → Minimal benefit (already modular)
 
-**Recommendation**: Use stripped binary (6.8 MB) for production. Avoid UPX on embedded systems due to decompression overhead.
+**Recommendation**: Use stripped binary (6.2 MB) for production. Avoid UPX on embedded systems due to decompression overhead.
 
 ---
 
