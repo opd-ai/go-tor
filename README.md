@@ -359,7 +359,7 @@ See [problem statement](docs/ROADMAP.md) for full 30-week roadmap.
 - Circuit build time: < 5 seconds (95th percentile)
 - Memory usage: < 50MB RSS in steady state
 - Concurrent streams: 100+ on Raspberry Pi 3
-- Binary size: < 15MB static binary
+- Binary size: < 15MB (9.1MB typical)
 
 ## Security
 

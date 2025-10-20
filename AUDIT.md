@@ -165,6 +165,8 @@ ControlPort: autoconfig.FindAvailablePort(9051),
 ---
 
 ### Gap #3: Binary Size Claim vs Static Build Reality
+**Status:** RESOLVED (2025-10-20T00:23:00Z)  
+**Resolution:** Fixed in commit [current] - Documentation updated  
 **Severity:** MINOR  
 **Documentation Reference:**
 > "Binary size: < 15MB static binary" (README.md:362)
@@ -204,12 +206,10 @@ with debug_info, not stripped
 ```
 
 **Recommended Fix:**
-1. Update Makefile to build truly static binary:
-```makefile
-go build -ldflags "-linkmode external -extldflags '-static' -X ..." -o bin/tor-client ./cmd/tor-client
-```
-2. Or update README.md to remove "static" claim and document dynamic linking
-3. Consider providing both static and dynamic build targets
+~~1. Update Makefile to build truly static binary:~~
+~~2. Or update README.md to remove "static" claim and document dynamic linking~~
+**IMPLEMENTED:** README.md updated to remove "static" claim. Binary size claim updated from "< 15MB static binary" to "< 15MB (9.1MB typical)" which accurately reflects the dynamically-linked binary.
+3. Consider providing both static and dynamic build targets in future - OPTIONAL
 
 ---
 
