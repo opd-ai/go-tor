@@ -154,13 +154,17 @@ func (c *SimpleClient) Close() error {
 	return c.client.Stop()
 }
 
-// ProxyURL returns the SOCKS5 proxy URL that applications can use.
+// ProxyURL returns the SOCKS5 proxy URL in format "socks5://127.0.0.1:port".
+// Use this when configuring HTTP clients that accept proxy URLs.
+// Example: http.Transport.Proxy or similar libraries that expect a full URL.
 func (c *SimpleClient) ProxyURL() string {
 	stats := c.client.GetStats()
 	return fmt.Sprintf("socks5://127.0.0.1:%d", stats.SocksPort)
 }
 
-// ProxyAddr returns the SOCKS5 proxy address (host:port).
+// ProxyAddr returns the SOCKS5 proxy address in format "127.0.0.1:port".
+// Use this when configuring low-level network dial functions or libraries
+// that expect just the host:port without the protocol scheme.
 func (c *SimpleClient) ProxyAddr() string {
 	stats := c.client.GetStats()
 	return fmt.Sprintf("127.0.0.1:%d", stats.SocksPort)

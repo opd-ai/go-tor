@@ -276,6 +276,8 @@ func (c *SimpleClient) WaitUntilReady(timeout time.Duration) error {
 ---
 
 ### Gap #5: ProxyURL Return Value Format Undocumented
+**Status:** RESOLVED (2025-10-20T00:26:00Z)  
+**Resolution:** Fixed in commit [current] - Documentation improved  
 **Severity:** MINOR  
 **Documentation Reference:**
 > ```go
@@ -327,9 +329,12 @@ func (c *SimpleClient) ProxyAddr() string {
 ```
 
 **Recommended Fix:**
-1. Document the difference between `ProxyURL()` and `ProxyAddr()` in API documentation
-2. Consider getting actual listening address from SOCKS server config instead of hardcoding
-3. Add error return if stats are unavailable: `func ProxyURL() (string, error)`
+~~1. Document the difference between `ProxyURL()` and `ProxyAddr()` in API documentation~~
+**IMPLEMENTED:** Added detailed godoc comments explaining when to use each method:
+- ProxyURL(): Returns "socks5://127.0.0.1:port" for HTTP clients
+- ProxyAddr(): Returns "127.0.0.1:port" for low-level network functions
+2. Consider getting actual listening address from SOCKS server config instead of hardcoding - OPTIONAL
+3. Add error return if stats are unavailable - DEFERRED (current implementation handles this gracefully)
 
 ---
 
