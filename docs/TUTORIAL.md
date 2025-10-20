@@ -19,7 +19,7 @@ This tutorial will guide you through setting up and using go-tor, from installat
 
 Before you begin, ensure you have:
 
-- **Go 1.21 or later** installed
+- **Go 1.24 or later** installed
 - Basic understanding of Go programming
 - Terminal/command line access
 - Internet connection (for downloading dependencies and connecting to Tor network)
@@ -28,7 +28,7 @@ Check your Go version:
 
 ```bash
 go version
-# Should output: go version go1.21+ ...
+# Should output: go version go1.24+ ...
 ```
 
 ---

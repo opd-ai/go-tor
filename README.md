@@ -94,7 +94,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture and r
 
 ### Prerequisites
 
-- Go 1.21 or later
+- Go 1.24 or later
 
 ### Installation
 
@@ -352,7 +352,7 @@ Current test coverage: ~90% for implemented packages.
 - ✅ Comprehensive testing and documentation (Phase 8.5)
 - ✅ Onion Service Infrastructure Completion (Phase 8.6)
 
-See [problem statement](docs/ROADMAP.md) for full 30-week roadmap.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed development roadmap and architecture information.
 
 ## Performance Targets
 
@@ -361,7 +361,7 @@ These are design goals and typical performance characteristics:
 - Circuit build time: < 5 seconds (95th percentile)
 - Memory usage: < 50MB RSS in steady state (typical: 35-45MB)
 - Concurrent streams: 100+ on Raspberry Pi 3
-- Binary size: < 15MB (9.1MB typical)
+- Binary size: < 15MB (9.1MB unstripped, 6.2MB stripped)
 
 ## Security
 
@@ -374,7 +374,7 @@ This implementation follows Tor protocol specifications for security:
 
 ⚠️ **Security Notice**: This is pre-production software. Do not rely on it for anonymity until security audit is complete.
 
-See [docs/SECURITY.md](docs/SECURITY.md) for security considerations.
+See [AUDIT_SUMMARY.md](AUDIT_SUMMARY.md) for comprehensive security audit results and considerations.
 
 ## Contributing
 
