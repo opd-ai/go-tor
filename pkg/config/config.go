@@ -38,6 +38,10 @@ type Config struct {
 	// Logging
 	LogLevel string // Log level: debug, info, warn, error (default: info)
 
+	// Monitoring and observability (Phase 9.1)
+	MetricsPort int  // HTTP metrics server port (default: 0 = disabled)
+	EnableMetrics bool // Enable HTTP metrics endpoint (default: false)
+
 	// Performance tuning (Phase 8.3)
 	EnableConnectionPooling  bool          // Enable connection pooling for relay connections
 	ConnectionPoolMaxIdle    int           // Max idle connections per relay (default: 5)
@@ -85,6 +89,9 @@ func DefaultConfig() *Config {
 		DormantTimeout:      24 * time.Hour,
 		OnionServices:       []OnionServiceConfig{},
 		LogLevel:            "info",
+		// Monitoring defaults (Phase 9.1)
+		MetricsPort:   0,    // Disabled by default
+		EnableMetrics: false, // Disabled by default
 		// Performance tuning defaults (Phase 8.3)
 		EnableConnectionPooling:  true,
 		ConnectionPoolMaxIdle:    5,
