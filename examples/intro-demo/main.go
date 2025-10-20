@@ -102,7 +102,8 @@ func main() {
 	fmt.Println("--- Creating Introduction Circuit ---")
 
 	ctx := context.Background()
-	circuitID, err := intro.CreateIntroductionCircuit(ctx, introPoint)
+	// Pass nil for circuit builder to use mock implementation
+	circuitID, err := intro.CreateIntroductionCircuit(ctx, introPoint, nil)
 	if err != nil {
 		fmt.Printf("✗ Failed to create introduction circuit: %v\n", err)
 		return
@@ -118,7 +119,8 @@ func main() {
 	// === Part 5: Sending INTRODUCE1 Cell ===
 	fmt.Println("--- Sending INTRODUCE1 Cell ---")
 
-	err = intro.SendIntroduce1(ctx, circuitID, introduce1Data)
+	// Pass nil for cell sender to use mock implementation
+	err = intro.SendIntroduce1(ctx, circuitID, introduce1Data, nil)
 	if err != nil {
 		fmt.Printf("✗ Failed to send INTRODUCE1: %v\n", err)
 		return
