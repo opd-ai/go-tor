@@ -134,7 +134,7 @@ func TestParseIsolationLevel(t *testing.T) {
 		{"port", circuit.IsolationPort},
 		{"session", circuit.IsolationSession},
 		{"invalid", circuit.IsolationNone}, // Fallback to none
-		{"", circuit.IsolationNone},         // Fallback to none
+		{"", circuit.IsolationNone},        // Fallback to none
 	}
 
 	for _, tt := range tests {

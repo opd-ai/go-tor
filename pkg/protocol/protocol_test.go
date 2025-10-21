@@ -692,124 +692,124 @@ func TestNegativeVersionSelection(t *testing.T) {
 // SEC-M004: Tests for timeout bounds validation
 
 func TestSetTimeoutValid(t *testing.T) {
-cfg := connection.DefaultConfig("test:9001")
-torConn := connection.New(cfg, nil)
-h := NewHandshake(torConn, nil)
+	cfg := connection.DefaultConfig("test:9001")
+	torConn := connection.New(cfg, nil)
+	h := NewHandshake(torConn, nil)
 
-tests := []struct {
-name    string
-timeout time.Duration
-wantErr bool
-}{
-{
-name:    "minimum_timeout",
-timeout: MinHandshakeTimeout,
-wantErr: false,
-},
-{
-name:    "maximum_timeout",
-timeout: MaxHandshakeTimeout,
-wantErr: false,
-},
-{
-name:    "default_timeout",
-timeout: DefaultHandshakeTimeout,
-wantErr: false,
-},
-{
-name:    "mid_range_timeout",
-timeout: 30 * time.Second,
-wantErr: false,
-},
-}
+	tests := []struct {
+		name    string
+		timeout time.Duration
+		wantErr bool
+	}{
+		{
+			name:    "minimum_timeout",
+			timeout: MinHandshakeTimeout,
+			wantErr: false,
+		},
+		{
+			name:    "maximum_timeout",
+			timeout: MaxHandshakeTimeout,
+			wantErr: false,
+		},
+		{
+			name:    "default_timeout",
+			timeout: DefaultHandshakeTimeout,
+			wantErr: false,
+		},
+		{
+			name:    "mid_range_timeout",
+			timeout: 30 * time.Second,
+			wantErr: false,
+		},
+	}
 
-for _, tt := range tests {
-t.Run(tt.name, func(t *testing.T) {
-err := h.SetTimeout(tt.timeout)
-if (err != nil) != tt.wantErr {
-t.Errorf("SetTimeout() error = %v, wantErr %v", err, tt.wantErr)
-}
-if err == nil && h.timeout != tt.timeout {
-t.Errorf("timeout = %v, want %v", h.timeout, tt.timeout)
-}
-})
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := h.SetTimeout(tt.timeout)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("SetTimeout() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err == nil && h.timeout != tt.timeout {
+				t.Errorf("timeout = %v, want %v", h.timeout, tt.timeout)
+			}
+		})
+	}
 }
 
 func TestSetTimeoutTooShort(t *testing.T) {
-cfg := connection.DefaultConfig("test:9001")
-torConn := connection.New(cfg, nil)
-h := NewHandshake(torConn, nil)
+	cfg := connection.DefaultConfig("test:9001")
+	torConn := connection.New(cfg, nil)
+	h := NewHandshake(torConn, nil)
 
-tests := []struct {
-name    string
-timeout time.Duration
-}{
-{"one_second", 1 * time.Second},
-{"four_seconds", 4 * time.Second},
-{"just_below_min", MinHandshakeTimeout - 1*time.Millisecond},
-{"zero", 0},
-{"negative", -1 * time.Second},
-}
+	tests := []struct {
+		name    string
+		timeout time.Duration
+	}{
+		{"one_second", 1 * time.Second},
+		{"four_seconds", 4 * time.Second},
+		{"just_below_min", MinHandshakeTimeout - 1*time.Millisecond},
+		{"zero", 0},
+		{"negative", -1 * time.Second},
+	}
 
-for _, tt := range tests {
-t.Run(tt.name, func(t *testing.T) {
-err := h.SetTimeout(tt.timeout)
-if err == nil {
-t.Errorf("Expected error for timeout %v, got nil", tt.timeout)
-}
-})
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := h.SetTimeout(tt.timeout)
+			if err == nil {
+				t.Errorf("Expected error for timeout %v, got nil", tt.timeout)
+			}
+		})
+	}
 }
 
 func TestSetTimeoutTooLong(t *testing.T) {
-cfg := connection.DefaultConfig("test:9001")
-torConn := connection.New(cfg, nil)
-h := NewHandshake(torConn, nil)
+	cfg := connection.DefaultConfig("test:9001")
+	torConn := connection.New(cfg, nil)
+	h := NewHandshake(torConn, nil)
 
-tests := []struct {
-name    string
-timeout time.Duration
-}{
-{"just_above_max", MaxHandshakeTimeout + 1*time.Millisecond},
-{"two_minutes", 2 * time.Minute},
-{"five_minutes", 5 * time.Minute},
-{"one_hour", 1 * time.Hour},
-}
+	tests := []struct {
+		name    string
+		timeout time.Duration
+	}{
+		{"just_above_max", MaxHandshakeTimeout + 1*time.Millisecond},
+		{"two_minutes", 2 * time.Minute},
+		{"five_minutes", 5 * time.Minute},
+		{"one_hour", 1 * time.Hour},
+	}
 
-for _, tt := range tests {
-t.Run(tt.name, func(t *testing.T) {
-err := h.SetTimeout(tt.timeout)
-if err == nil {
-t.Errorf("Expected error for timeout %v, got nil", tt.timeout)
-}
-})
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := h.SetTimeout(tt.timeout)
+			if err == nil {
+				t.Errorf("Expected error for timeout %v, got nil", tt.timeout)
+			}
+		})
+	}
 }
 
 func TestTimeoutBoundsConstants(t *testing.T) {
-// Verify timeout bounds are sensible
-if MinHandshakeTimeout <= 0 {
-t.Errorf("MinHandshakeTimeout should be positive, got %v", MinHandshakeTimeout)
-}
-if MaxHandshakeTimeout <= MinHandshakeTimeout {
-t.Errorf("MaxHandshakeTimeout (%v) should be > MinHandshakeTimeout (%v)",
-MaxHandshakeTimeout, MinHandshakeTimeout)
-}
-if DefaultHandshakeTimeout < MinHandshakeTimeout {
-t.Errorf("DefaultHandshakeTimeout (%v) should be >= MinHandshakeTimeout (%v)",
-DefaultHandshakeTimeout, MinHandshakeTimeout)
-}
-if DefaultHandshakeTimeout > MaxHandshakeTimeout {
-t.Errorf("DefaultHandshakeTimeout (%v) should be <= MaxHandshakeTimeout (%v)",
-DefaultHandshakeTimeout, MaxHandshakeTimeout)
-}
+	// Verify timeout bounds are sensible
+	if MinHandshakeTimeout <= 0 {
+		t.Errorf("MinHandshakeTimeout should be positive, got %v", MinHandshakeTimeout)
+	}
+	if MaxHandshakeTimeout <= MinHandshakeTimeout {
+		t.Errorf("MaxHandshakeTimeout (%v) should be > MinHandshakeTimeout (%v)",
+			MaxHandshakeTimeout, MinHandshakeTimeout)
+	}
+	if DefaultHandshakeTimeout < MinHandshakeTimeout {
+		t.Errorf("DefaultHandshakeTimeout (%v) should be >= MinHandshakeTimeout (%v)",
+			DefaultHandshakeTimeout, MinHandshakeTimeout)
+	}
+	if DefaultHandshakeTimeout > MaxHandshakeTimeout {
+		t.Errorf("DefaultHandshakeTimeout (%v) should be <= MaxHandshakeTimeout (%v)",
+			DefaultHandshakeTimeout, MaxHandshakeTimeout)
+	}
 
-// Verify specific values per audit requirement (SEC-M004)
-if MinHandshakeTimeout != 5*time.Second {
-t.Errorf("MinHandshakeTimeout = %v, expected 5s", MinHandshakeTimeout)
-}
-if MaxHandshakeTimeout != 60*time.Second {
-t.Errorf("MaxHandshakeTimeout = %v, expected 60s", MaxHandshakeTimeout)
-}
+	// Verify specific values per audit requirement (SEC-M004)
+	if MinHandshakeTimeout != 5*time.Second {
+		t.Errorf("MinHandshakeTimeout = %v, expected 5s", MinHandshakeTimeout)
+	}
+	if MaxHandshakeTimeout != 60*time.Second {
+		t.Errorf("MaxHandshakeTimeout = %v, expected 60s", MaxHandshakeTimeout)
+	}
 }

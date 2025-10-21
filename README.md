@@ -502,7 +502,7 @@ Comprehensive documentation is available in the [docs/](docs/) directory:
 - [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) - Common issues and solutions
 
 ### Examples
-See [examples/](examples/) directory for 19 working demonstrations covering all major features, including the new [context-demo](examples/context-demo) showing timeout control and graceful cancellation.
+See [examples/](examples/) directory for 18 working demonstrations covering all major features, including the new [context-demo](examples/context-demo) showing timeout control and graceful cancellation.
 
 ## Repository Structure
 

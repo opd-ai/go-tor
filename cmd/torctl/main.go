@@ -160,16 +160,16 @@ func sendCommand(conn net.Conn, command string) ([]string, error) {
 
 	reader := bufio.NewReader(conn)
 	var lines []string
-	
+
 	for {
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			return nil, err
 		}
-		
+
 		line = strings.TrimSpace(line)
 		lines = append(lines, line)
-		
+
 		// Check for end of response
 		if strings.HasPrefix(line, "250 ") {
 			break
@@ -181,7 +181,7 @@ func sendCommand(conn net.Conn, command string) ([]string, error) {
 			return lines, fmt.Errorf("command failed: %s", line)
 		}
 	}
-	
+
 	return lines, nil
 }
 
@@ -236,7 +236,7 @@ func showStatus(conn net.Conn) error {
 
 	fmt.Println()
 	fmt.Println("Status: Running")
-	
+
 	return nil
 }
 
@@ -262,7 +262,7 @@ func listCircuits(conn net.Conn) error {
 		} else if strings.HasPrefix(line, "250 ") {
 			break
 		}
-		
+
 		// Parse circuit line format: ID STATUS PATH
 		parts := strings.Fields(line)
 		if len(parts) >= 2 {
@@ -298,7 +298,7 @@ func listStreams(conn net.Conn) error {
 		} else if strings.HasPrefix(line, "250 ") {
 			break
 		}
-		
+
 		// Parse stream line
 		parts := strings.Fields(line)
 		if len(parts) >= 3 {
@@ -380,7 +380,7 @@ func getConfig(conn net.Conn, key string) error {
 
 func sendSignal(conn net.Conn, signal string) error {
 	signal = strings.ToUpper(signal)
-	
+
 	response, err := sendCommand(conn, fmt.Sprintf("SIGNAL %s", signal))
 	if err != nil {
 		return err

@@ -10,7 +10,7 @@ import (
 
 func TestLatencyTracker(t *testing.T) {
 	tracker := NewLatencyTracker(10)
-	
+
 	// Record some latencies
 	latencies := []time.Duration{
 		100 * time.Millisecond,
@@ -19,28 +19,28 @@ func TestLatencyTracker(t *testing.T) {
 		300 * time.Millisecond,
 		250 * time.Millisecond,
 	}
-	
+
 	for _, l := range latencies {
 		tracker.Record(l)
 	}
-	
+
 	// Test Count
 	if tracker.Count() != len(latencies) {
 		t.Errorf("Expected count %d, got %d", len(latencies), tracker.Count())
 	}
-	
+
 	// Test Max
 	expectedMax := 300 * time.Millisecond
 	if tracker.Max() != expectedMax {
 		t.Errorf("Expected max %v, got %v", expectedMax, tracker.Max())
 	}
-	
+
 	// Test Percentile
 	p50 := tracker.Percentile(0.50)
 	if p50 < 100*time.Millisecond || p50 > 300*time.Millisecond {
 		t.Errorf("P50 %v out of reasonable range", p50)
 	}
-	
+
 	p95 := tracker.Percentile(0.95)
 	if p95 < 250*time.Millisecond || p95 > 300*time.Millisecond {
 		t.Errorf("P95 %v should be close to max", p95)
@@ -49,15 +49,15 @@ func TestLatencyTracker(t *testing.T) {
 
 func TestLatencyTrackerEmpty(t *testing.T) {
 	tracker := NewLatencyTracker(10)
-	
+
 	if tracker.Count() != 0 {
 		t.Errorf("Expected count 0, got %d", tracker.Count())
 	}
-	
+
 	if tracker.Max() != 0 {
 		t.Errorf("Expected max 0, got %v", tracker.Max())
 	}
-	
+
 	if tracker.Percentile(0.95) != 0 {
 		t.Errorf("Expected percentile 0, got %v", tracker.Percentile(0.95))
 	}
@@ -67,14 +67,14 @@ func TestLatencyTrackerEmpty(t *testing.T) {
 // This test ensures the race condition fix works correctly
 func TestLatencyTrackerConcurrent(t *testing.T) {
 	tracker := NewLatencyTracker(1000)
-	
+
 	// Number of concurrent goroutines
 	numGoroutines := 10
 	numRecordsPerGoroutine := 100
-	
+
 	// Use a channel to synchronize goroutines
 	done := make(chan bool, numGoroutines)
-	
+
 	// Launch concurrent recorders
 	for i := 0; i < numGoroutines; i++ {
 		go func(id int) {
@@ -86,36 +86,36 @@ func TestLatencyTrackerConcurrent(t *testing.T) {
 			done <- true
 		}(i)
 	}
-	
+
 	// Wait for all goroutines to complete
 	for i := 0; i < numGoroutines; i++ {
 		<-done
 	}
-	
+
 	// Verify all records were captured
 	expectedCount := numGoroutines * numRecordsPerGoroutine
 	if tracker.Count() != expectedCount {
 		t.Errorf("Expected count %d, got %d", expectedCount, tracker.Count())
 	}
-	
+
 	// Test that Percentile and Max can be called concurrently with Record
 	done2 := make(chan bool, 3)
-	
+
 	go func() {
 		tracker.Record(999 * time.Millisecond)
 		done2 <- true
 	}()
-	
+
 	go func() {
 		_ = tracker.Percentile(0.95)
 		done2 <- true
 	}()
-	
+
 	go func() {
 		_ = tracker.Max()
 		done2 <- true
 	}()
-	
+
 	// Wait for concurrent operations to complete
 	for i := 0; i < 3; i++ {
 		<-done2
@@ -135,7 +135,7 @@ func TestFormatBytes(t *testing.T) {
 		{50 * 1024 * 1024, "50.0 MiB"},
 		{1024 * 1024 * 1024, "1.0 GiB"},
 	}
-	
+
 	for _, tt := range tests {
 		result := FormatBytes(tt.bytes)
 		if result != tt.expected {
@@ -146,15 +146,15 @@ func TestFormatBytes(t *testing.T) {
 
 func TestGetMemorySnapshot(t *testing.T) {
 	snapshot := GetMemorySnapshot()
-	
+
 	if snapshot.Alloc == 0 {
 		t.Error("Expected non-zero memory allocation")
 	}
-	
+
 	if snapshot.TotalAlloc == 0 {
 		t.Error("Expected non-zero total allocation")
 	}
-	
+
 	if snapshot.Sys == 0 {
 		t.Error("Expected non-zero system memory")
 	}
@@ -163,22 +163,22 @@ func TestGetMemorySnapshot(t *testing.T) {
 func TestSuiteBasic(t *testing.T) {
 	log := logger.NewDefault()
 	suite := NewSuite(log)
-	
+
 	if suite == nil {
 		t.Fatal("NewSuite returned nil")
 	}
-	
+
 	if len(suite.Results()) != 0 {
 		t.Errorf("Expected 0 results, got %d", len(suite.Results()))
 	}
-	
+
 	// Add a result
 	suite.addResult(Result{
 		Name:     "Test",
 		Duration: time.Second,
 		Success:  true,
 	})
-	
+
 	if len(suite.Results()) != 1 {
 		t.Errorf("Expected 1 result, got %d", len(suite.Results()))
 	}
@@ -188,34 +188,34 @@ func TestBenchmarkCircuitBuild(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping benchmark in short mode")
 	}
-	
+
 	log := logger.NewDefault()
 	suite := NewSuite(log)
-	
+
 	ctx := context.Background()
 	err := suite.BenchmarkCircuitBuild(ctx)
 	if err != nil {
 		t.Fatalf("BenchmarkCircuitBuild failed: %v", err)
 	}
-	
+
 	results := suite.Results()
 	if len(results) == 0 {
 		t.Fatal("Expected at least one result")
 	}
-	
+
 	result := results[0]
 	if result.Name == "" {
 		t.Error("Result name is empty")
 	}
-	
+
 	if result.Duration == 0 {
 		t.Error("Result duration is zero")
 	}
-	
+
 	if result.TotalOperations == 0 {
 		t.Error("No operations were performed")
 	}
-	
+
 	t.Logf("Circuit build benchmark: p95=%v, ops=%d", result.P95Latency, result.TotalOperations)
 }
 
@@ -223,23 +223,23 @@ func TestBenchmarkMemoryUsage(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping benchmark in short mode")
 	}
-	
+
 	log := logger.NewDefault()
 	suite := NewSuite(log)
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
 	defer cancel()
-	
+
 	err := suite.BenchmarkMemoryUsage(ctx)
 	if err != nil && err != context.Canceled {
 		t.Fatalf("BenchmarkMemoryUsage failed: %v", err)
 	}
-	
+
 	results := suite.Results()
 	if len(results) == 0 {
 		t.Fatal("Expected at least one result")
 	}
-	
+
 	result := results[0]
 	t.Logf("Memory usage: %s (target: 50 MB)", FormatBytes(result.MemoryInUse))
 }
@@ -248,28 +248,28 @@ func TestBenchmarkConcurrentStreams(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping benchmark in short mode")
 	}
-	
+
 	log := logger.NewDefault()
 	suite := NewSuite(log)
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	
+
 	err := suite.BenchmarkConcurrentStreams(ctx)
 	if err != nil && err != context.Canceled {
 		t.Fatalf("BenchmarkConcurrentStreams failed: %v", err)
 	}
-	
+
 	results := suite.Results()
 	if len(results) == 0 {
 		t.Fatal("Expected at least one result")
 	}
-	
+
 	result := results[0]
 	if result.TotalOperations == 0 {
 		t.Error("No operations were performed")
 	}
-	
+
 	t.Logf("Concurrent streams: ops=%d, throughput=%.2f ops/sec",
 		result.TotalOperations, result.OperationsPerSec)
 }
@@ -277,7 +277,7 @@ func TestBenchmarkConcurrentStreams(t *testing.T) {
 func TestPrintSummary(t *testing.T) {
 	log := logger.NewDefault()
 	suite := NewSuite(log)
-	
+
 	// Add some test results
 	suite.addResult(Result{
 		Name:             "Test Benchmark 1",
@@ -295,13 +295,13 @@ func TestPrintSummary(t *testing.T) {
 			"test_metric": "value",
 		},
 	})
-	
+
 	suite.addResult(Result{
 		Name:    "Test Benchmark 2",
 		Success: false,
 		Error:   context.DeadlineExceeded,
 	})
-	
+
 	// Should not panic
 	suite.PrintSummary()
 }
@@ -314,16 +314,16 @@ func TestQuickSort(t *testing.T) {
 		1 * time.Second,
 		4 * time.Second,
 	}
-	
+
 	quickSort(durations, 0, len(durations)-1)
-	
+
 	// Verify sorted
 	for i := 1; i < len(durations); i++ {
 		if durations[i] < durations[i-1] {
 			t.Errorf("Array not sorted at index %d: %v > %v", i, durations[i-1], durations[i])
 		}
 	}
-	
+
 	// Check values
 	if durations[0] != 1*time.Second {
 		t.Errorf("Expected first element to be 1s, got %v", durations[0])

@@ -1167,7 +1167,7 @@ func (ip *IntroductionProtocol) SelectIntroductionPoint(desc *Descriptor) (*Intr
 	// In a full implementation, this would also:
 	// 1. Filter out introduction points we've tried and failed
 	// 2. Consider network conditions and performance
-	
+
 	// Validate intro points count (AUDIT-007)
 	numIntroPoints := len(desc.IntroPoints)
 	if numIntroPoints == 0 {
@@ -1177,17 +1177,17 @@ func (ip *IntroductionProtocol) SelectIntroductionPoint(desc *Descriptor) (*Intr
 	if numIntroPoints > int(^uint32(0)) {
 		return nil, fmt.Errorf("too many introduction points: %d (max: %d)", numIntroPoints, ^uint32(0))
 	}
-	
+
 	// Generate random index using crypto/rand for security
 	var randomBytes [4]byte
 	if _, err := rand.Read(randomBytes[:]); err != nil {
 		return nil, fmt.Errorf("failed to generate random index: %w", err)
 	}
-	
+
 	// Convert to uint32 and mod by length to get index (now safe after validation)
 	randomValue := binary.BigEndian.Uint32(randomBytes[:])
 	selectedIndex := int(randomValue % uint32(numIntroPoints))
-	
+
 	selected := &desc.IntroPoints[selectedIndex]
 
 	ip.logger.Debug("Selected introduction point",
@@ -1294,9 +1294,12 @@ func (ip *IntroductionProtocol) BuildIntroduce1Cell(req *IntroduceRequest) ([]by
 // 5. Prepend client's ephemeral public key X for intro point to decrypt
 //
 // Wire format of encrypted data:
-//   CLIENT_PK (32 bytes) || ENCRYPTED_DATA (variable length)
+//
+//	CLIENT_PK (32 bytes) || ENCRYPTED_DATA (variable length)
+//
 // Where ENCRYPTED_DATA contains:
-//   RENDEZVOUS_COOKIE (20 bytes) || ONION_KEY (32 bytes) || LINK_SPECIFIERS (variable)
+//
+//	RENDEZVOUS_COOKIE (20 bytes) || ONION_KEY (32 bytes) || LINK_SPECIFIERS (variable)
 func (ip *IntroductionProtocol) buildEncryptedData(req *IntroduceRequest) []byte {
 	// Build plaintext payload
 	var plaintext bytes.Buffer
@@ -1442,7 +1445,7 @@ func (ip *IntroductionProtocol) CreateIntroductionCircuit(ctx context.Context, i
 			ORPort:      0,  // Would be extracted from link specifiers
 			HSDir:       false,
 		}
-		
+
 		// Build circuit with 5 second timeout
 		circuitID, err := circuitBuilder.BuildCircuitToRelay(ctx, relay, 5*time.Second)
 		if err != nil {
@@ -1476,7 +1479,7 @@ func (ip *IntroductionProtocol) SendIntroduce1(ctx context.Context, circuitID ui
 	// If we have a cell sender, use it to send the cell
 	if cellSender != nil {
 		const RELAY_COMMAND_INTRODUCE1 = 0x22 // Per Tor spec
-		
+
 		// Send the INTRODUCE1 cell over the circuit
 		if err := cellSender.SendRelayCell(ctx, circuitID, RELAY_COMMAND_INTRODUCE1, introduce1Data); err != nil {
 			ip.logger.Error("Failed to send INTRODUCE1 cell", "error", err)
@@ -1692,7 +1695,7 @@ func (rp *RendezvousProtocol) SendEstablishRendezvous(ctx context.Context, circu
 	// If we have a cell sender, use it to send the cell
 	if cellSender != nil {
 		const RELAY_COMMAND_ESTABLISH_RENDEZVOUS = 0x21 // Per Tor spec
-		
+
 		// Send the ESTABLISH_RENDEZVOUS cell over the circuit
 		if err := cellSender.SendRelayCell(ctx, circuitID, RELAY_COMMAND_ESTABLISH_RENDEZVOUS, establishData); err != nil {
 			rp.logger.Error("Failed to send ESTABLISH_RENDEZVOUS cell", "error", err)
@@ -1794,7 +1797,7 @@ func (rp *RendezvousProtocol) WaitForRendezvous2(ctx context.Context, circuitID 
 	if cellSender != nil {
 		// Wait for RENDEZVOUS2 cell with 30 second timeout (onion services can be slow)
 		const RELAY_COMMAND_RENDEZVOUS2 = 0x25
-		
+
 		waitCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 

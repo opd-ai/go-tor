@@ -173,7 +173,7 @@ func (c *Client) Start(ctx context.Context) error {
 		c.logger.Info("Initializing circuit pool with prebuilding",
 			"min_size", c.config.CircuitPoolMinSize,
 			"max_size", c.config.CircuitPoolMaxSize)
-		
+
 		poolCfg := &pool.CircuitPoolConfig{
 			MinCircuits:     c.config.CircuitPoolMinSize,
 			MaxCircuits:     c.config.CircuitPoolMaxSize,

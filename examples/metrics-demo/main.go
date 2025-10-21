@@ -26,8 +26,8 @@ func main() {
 
 	// Create configuration with metrics enabled
 	cfg := config.DefaultConfig()
-	cfg.MetricsPort = 9052       // HTTP metrics on port 9052
-	cfg.EnableMetrics = true     // Enable metrics endpoint
+	cfg.MetricsPort = 9052   // HTTP metrics on port 9052
+	cfg.EnableMetrics = true // Enable metrics endpoint
 	cfg.LogLevel = "info"
 
 	// Initialize logger
@@ -106,7 +106,7 @@ func displayMetricsPeriodically(port int) {
 // displayMetrics fetches and displays current metrics
 func displayMetrics(port int) {
 	url := fmt.Sprintf("http://127.0.0.1:%d/metrics/json", port)
-	
+
 	resp, err := http.Get(url)
 	if err != nil {
 		log.Printf("Failed to fetch metrics: %v", err)
@@ -153,13 +153,13 @@ func displayMetrics(port int) {
 	fmt.Printf("SOCKS:        %d connections, %d requests\n",
 		snapshot.SocksConnections,
 		snapshot.SocksRequests)
-	
+
 	if snapshot.CircuitBuilds > 0 {
 		fmt.Printf("Build Time:   avg %.2fs, p95 %.2fs\n",
 			snapshot.CircuitBuildTimeAvg.Seconds(),
 			snapshot.CircuitBuildTimeP95.Seconds())
 	}
-	
+
 	fmt.Println("─────────────────────────────────────────────")
 	fmt.Println()
 }

@@ -150,7 +150,7 @@ func main() {
 				status = "✗ FAIL"
 			}
 			fmt.Printf("%s: %s\n", status, r.Name)
-			
+
 			// Print specific target information
 			if r.Name == "Circuit Build Performance" {
 				if targetP95, ok := r.AdditionalMetrics["target_p95"].(time.Duration); ok {

@@ -280,11 +280,11 @@ func TestCheckAndRebuildCircuitsWithPool(t *testing.T) {
 	// This test verifies that checkAndRebuildCircuits respects the
 	// EnableCircuitPrebuilding flag. We can't actually test the full
 	// flow without network access, but we can verify the flag is checked.
-	
+
 	// The key behavior is: when EnableCircuitPrebuilding is true,
 	// checkAndRebuildCircuits should NOT try to rebuild circuits
 	// because the pool handles that automatically.
-	
+
 	// Since we can't fully test this without initializing the pool
 	// (which requires network access), we just verify the config is set
 	if !client.config.EnableCircuitPrebuilding {
