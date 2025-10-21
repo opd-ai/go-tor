@@ -4,7 +4,7 @@ package circuit
 
 import (
 	"context"
-	"crypto/sha1"
+	"crypto/sha1" // #nosec G505 - SHA-1 required by Tor protocol (tor-spec.txt §6.1)
 	"crypto/subtle"
 	"fmt"
 	"hash"

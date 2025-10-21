@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 
 	"github.com/opd-ai/go-tor/pkg/onion"
@@ -132,7 +133,9 @@ func generateOnionAddress() string {
 	// Generate a random ed25519 public key
 	pubkey, _, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
-		panic(fmt.Sprintf("Failed to generate key: %v", err))
+		// AUDIT-R-003: Replace panic with proper error handling
+		fmt.Fprintf(os.Stderr, "Failed to generate key: %v\n", err)
+		os.Exit(1)
 	}
 
 	// Compute checksum: SHA3-256(".onion checksum" || pubkey || 0x03)[:2]
