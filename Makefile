@@ -31,6 +31,20 @@ build-benchmark: ## Build the benchmark tool
 	$(GOBUILD) -o bin/benchmark ./cmd/benchmark
 	@echo "Build complete: bin/benchmark"
 
+build-torctl: ## Build the torctl utility
+	@echo "Building torctl utility..."
+	@mkdir -p bin
+	$(GOBUILD) $(LDFLAGS) -o bin/torctl ./cmd/torctl
+	@echo "Build complete: bin/torctl"
+
+build-config-validator: ## Build the config validator tool
+	@echo "Building config validator..."
+	@mkdir -p bin
+	$(GOBUILD) $(LDFLAGS) -o bin/tor-config-validator ./cmd/tor-config-validator
+	@echo "Build complete: bin/tor-config-validator"
+
+build-tools: build-benchmark build-torctl build-config-validator ## Build all development tools
+
 test: ## Run tests
 	@echo "Running tests..."
 	$(GOTEST) -v -race ./...
