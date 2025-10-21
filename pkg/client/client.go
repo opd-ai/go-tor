@@ -23,6 +23,15 @@ import (
 	"github.com/opd-ai/go-tor/pkg/socks"
 )
 
+// parseIsolationLevel converts a string isolation level to circuit.IsolationLevel
+func parseIsolationLevel(level string) circuit.IsolationLevel {
+	parsed, err := circuit.ParseIsolationLevel(level)
+	if err != nil {
+		return circuit.IsolationNone
+	}
+	return parsed
+}
+
 // Client represents a Tor client instance
 type Client struct {
 	config        *config.Config
@@ -82,9 +91,16 @@ func New(cfg *config.Config, log *logger.Logger) (*Client, error) {
 	// Initialize circuit manager
 	circuitMgr := circuit.NewManager()
 
-	// Initialize SOCKS5 server
+	// Initialize SOCKS5 server with isolation config
 	socksAddr := fmt.Sprintf("127.0.0.1:%d", cfg.SocksPort)
-	socksServer := socks.NewServer(socksAddr, circuitMgr, log)
+	socksConfig := &socks.Config{
+		MaxConnections:      1000,
+		IsolationLevel:      parseIsolationLevel(cfg.IsolationLevel),
+		IsolateDestinations: cfg.IsolateDestinations,
+		IsolateSOCKSAuth:    cfg.IsolateSOCKSAuth,
+		IsolateClientPort:   cfg.IsolateClientPort,
+	}
+	socksServer := socks.NewServerWithConfig(socksAddr, circuitMgr, log, socksConfig)
 
 	// Initialize guard manager for persistent guard nodes
 	guardMgr, err := path.NewGuardManager(cfg.DataDirectory, log)
@@ -165,6 +181,9 @@ func (c *Client) Start(ctx context.Context) error {
 			RebuildInterval: 30 * time.Second,
 		}
 		c.circuitPool = pool.NewCircuitPool(poolCfg, c.circuitBuilderFunc(), c.logger)
+
+		// Wire circuit pool to SOCKS server for stream isolation
+		c.socksServer.SetCircuitPool(c.circuitPool)
 	}
 
 	// Step 4: Build initial circuits

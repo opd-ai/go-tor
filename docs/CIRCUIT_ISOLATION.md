@@ -258,6 +258,38 @@ fmt.Printf("Isolated circuits: %d\n", stats.IsolatedCircuits)
 
 ## SOCKS5 Integration
 
+### Automatic Isolation
+
+The SOCKS5 server automatically applies circuit isolation based on the configured isolation policy. No changes are required to SOCKS5 clients - the server extracts isolation metadata and selects appropriate circuits transparently.
+
+### Configuration
+
+Circuit isolation for SOCKS5 is configured via the Tor client config:
+
+```go
+import (
+    "github.com/opd-ai/go-tor/pkg/config"
+    "github.com/opd-ai/go-tor/pkg/client"
+)
+
+cfg := config.DefaultConfig()
+
+// Enable destination-based isolation
+cfg.IsolationLevel = "destination"
+cfg.IsolateDestinations = true
+
+// Or enable credential-based isolation
+cfg.IsolationLevel = "credential"
+cfg.IsolateSOCKSAuth = true
+
+// Or enable port-based isolation
+cfg.IsolationLevel = "port"
+cfg.IsolateClientPort = true
+
+// Create client - SOCKS server will use isolation automatically
+client, err := client.New(cfg, logger)
+```
+
 ### Username/Password Authentication
 
 The SOCKS5 server supports RFC 1929 username/password authentication for credential-based isolation:
@@ -265,15 +297,24 @@ The SOCKS5 server supports RFC 1929 username/password authentication for credent
 ```go
 import "github.com/opd-ai/go-tor/pkg/socks"
 
-// SOCKS5 server automatically extracts username
+// SOCKS5 server automatically extracts username and applies isolation
 server := socks.NewServer(":9050", circuitManager, logger)
+
+// Or configure isolation explicitly
+socksConfig := &socks.Config{
+    MaxConnections:      1000,
+    IsolationLevel:      circuit.IsolationCredential,
+    IsolateSOCKSAuth:    true,
+}
+server := socks.NewServerWithConfig(":9050", circuitManager, logger, socksConfig)
 ```
 
 ### Client Usage
 
 ```bash
-# curl with SOCKS5 authentication
+# curl with SOCKS5 authentication - each user gets isolated circuit
 curl --socks5 alice:password@localhost:9050 https://example.com
+curl --socks5 bob:password@localhost:9050 https://example.com
 
 # Environment variable
 export ALL_PROXY=socks5://bob:password@localhost:9050
@@ -287,6 +328,18 @@ proxies = {
 response = requests.get('https://example.com', proxies=proxies)
 ```
 
+### How It Works
+
+1. **SOCKS5 Handshake**: Client connects and optionally authenticates
+2. **Metadata Extraction**: Server extracts isolation parameters:
+   - Target destination (for destination isolation)
+   - Username (for credential isolation)
+   - Source port (for port isolation)
+3. **Isolation Key Creation**: Server creates isolation key based on config
+4. **Circuit Selection**: Server requests circuit from pool with isolation key
+5. **Circuit Reuse**: Subsequent requests with same isolation parameters reuse the circuit
+6. **Transparent Operation**: No client-side changes required
+
 ### Source Port Detection
 
 The SOCKS5 server automatically detects the client's source port for port-based isolation:
@@ -295,6 +348,29 @@ The SOCKS5 server automatically detects the client's source port for port-based 
 // Automatically extracted from connection
 remoteAddr := conn.RemoteAddr().(*net.TCPAddr)
 sourcePort := remoteAddr.Port
+```
+
+### Example: Multi-User Proxy
+
+```go
+cfg := config.DefaultConfig()
+cfg.IsolationLevel = "credential"
+cfg.IsolateSOCKSAuth = true
+cfg.EnableCircuitPrebuilding = true
+
+client, err := client.New(cfg, logger)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Start client - SOCKS5 server will isolate users automatically
+if err := client.Start(context.Background()); err != nil {
+    log.Fatal(err)
+}
+
+// Users alice and bob will get separate circuits:
+// curl --socks5 alice:pass@localhost:9050 https://example.com
+// curl --socks5 bob:pass@localhost:9050 https://example.com
 ```
 
 ## Performance Considerations
