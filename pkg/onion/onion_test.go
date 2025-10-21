@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/crypto/curve25519"
+
 	"github.com/opd-ai/go-tor/pkg/logger"
 )
 
@@ -2119,4 +2121,334 @@ _, err := ip.SelectIntroductionPoint(nil)
 if err == nil {
 t.Error("Expected error for nil descriptor, got nil")
 }
+}
+
+// TestEncryptIntroduce1Data tests the INTRODUCE1 encryption implementation (SPEC-006)
+func TestEncryptIntroduce1Data(t *testing.T) {
+	log := logger.NewDefault()
+	ip := NewIntroductionProtocol(log)
+
+	// Create test plaintext
+	plaintext := []byte("test plaintext data for encryption")
+	
+	// Generate a valid curve25519 public key for introduction point
+	var introPointPrivate, introPointPublic [32]byte
+	if _, err := rand.Read(introPointPrivate[:]); err != nil {
+		t.Fatalf("Failed to generate intro point key: %v", err)
+	}
+	
+	// Compute public key using curve25519
+	var basePoint = [32]byte{9}
+	curve25519.ScalarMult(&introPointPublic, &introPointPrivate, &basePoint)
+
+	// Test encryption
+	encrypted, clientPubKey, err := ip.encryptIntroduce1Data(plaintext, introPointPublic[:])
+	if err != nil {
+		t.Fatalf("Encryption failed: %v", err)
+	}
+
+	// Verify encrypted data is different from plaintext
+	if bytes.Equal(encrypted, plaintext) {
+		t.Error("Encrypted data should be different from plaintext")
+	}
+
+	// Verify client public key is 32 bytes
+	if len(clientPubKey) != 32 {
+		t.Errorf("Client public key length = %d, want 32", len(clientPubKey))
+	}
+
+	// Verify encrypted data has same length as plaintext (CTR mode)
+	if len(encrypted) != len(plaintext) {
+		t.Errorf("Encrypted data length = %d, want %d", len(encrypted), len(plaintext))
+	}
+}
+
+// TestEncryptIntroduce1DataInvalidKey tests error handling for invalid keys
+func TestEncryptIntroduce1DataInvalidKey(t *testing.T) {
+	log := logger.NewDefault()
+	ip := NewIntroductionProtocol(log)
+
+	plaintext := []byte("test data")
+	
+	tests := []struct {
+		name    string
+		keyLen  int
+		wantErr bool
+	}{
+		{
+			name:    "invalid key length - too short",
+			keyLen:  16,
+			wantErr: true,
+		},
+		{
+			name:    "invalid key length - too long",
+			keyLen:  64,
+			wantErr: true,
+		},
+		{
+			name:    "valid key length",
+			keyLen:  32,
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			key := make([]byte, tt.keyLen)
+			_, _, err := ip.encryptIntroduce1Data(plaintext, key)
+			
+			if tt.wantErr && err == nil {
+				t.Error("Expected error for invalid key, got nil")
+			}
+			if !tt.wantErr && err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+// TestBuildEncryptedDataWithEncryption tests the complete encrypted data building
+func TestBuildEncryptedDataWithEncryption(t *testing.T) {
+	log := logger.NewDefault()
+	ip := NewIntroductionProtocol(log)
+
+	// Generate introduction point with valid encryption key
+	var introPointPrivate, introPointPublic [32]byte
+	if _, err := rand.Read(introPointPrivate[:]); err != nil {
+		t.Fatalf("Failed to generate intro point key: %v", err)
+	}
+	var basePoint = [32]byte{9}
+	curve25519.ScalarMult(&introPointPublic, &introPointPrivate, &basePoint)
+
+	// Create test request
+	rendezvousCookie := make([]byte, 20)
+	for i := range rendezvousCookie {
+		rendezvousCookie[i] = byte(i)
+	}
+
+	onionKey := make([]byte, 32)
+	for i := range onionKey {
+		onionKey[i] = byte(i + 20)
+	}
+
+	req := &IntroduceRequest{
+		IntroPoint: &IntroductionPoint{
+			EncKey:  introPointPublic[:],
+			AuthKey: make([]byte, 32),
+		},
+		RendezvousCookie: rendezvousCookie,
+		RendezvousPoint:  "test-rendezvous",
+		OnionKey:         onionKey,
+	}
+
+	// Build encrypted data
+	result := ip.buildEncryptedData(req)
+
+	// Verify result contains: CLIENT_PK (32 bytes) + ENCRYPTED_DATA
+	// Plaintext would be: RENDEZVOUS_COOKIE (20) + ONION_KEY (32) + N_SPEC (1) = 53 bytes
+	// With encryption: CLIENT_PK (32) + ENCRYPTED (53) = 85 bytes
+	expectedMinLen := 32 + 53 // CLIENT_PK + encrypted payload
+	if len(result) < expectedMinLen {
+		t.Errorf("Encrypted result length = %d, want >= %d", len(result), expectedMinLen)
+	}
+
+	// First 32 bytes should be client's ephemeral public key
+	clientPubKey := result[0:32]
+	// Verify it's a valid curve25519 public key (not all zeros)
+	allZeros := true
+	for _, b := range clientPubKey {
+		if b != 0 {
+			allZeros = false
+			break
+		}
+	}
+	if allZeros {
+		t.Error("Client public key should not be all zeros")
+	}
+}
+
+// TestBuildEncryptedDataWithoutEncKey tests fallback to plaintext mode
+func TestBuildEncryptedDataWithoutEncKey(t *testing.T) {
+	log := logger.NewDefault()
+	ip := NewIntroductionProtocol(log)
+
+	rendezvousCookie := make([]byte, 20)
+	onionKey := make([]byte, 32)
+
+	tests := []struct {
+		name       string
+		introPoint *IntroductionPoint
+	}{
+		{
+			name:       "nil introduction point",
+			introPoint: nil,
+		},
+		{
+			name: "introduction point with no EncKey",
+			introPoint: &IntroductionPoint{
+				AuthKey: make([]byte, 32),
+			},
+		},
+		{
+			name: "introduction point with invalid EncKey length",
+			introPoint: &IntroductionPoint{
+				EncKey:  make([]byte, 16), // Wrong length
+				AuthKey: make([]byte, 32),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := &IntroduceRequest{
+				IntroPoint:       tt.introPoint,
+				RendezvousCookie: rendezvousCookie,
+				OnionKey:         onionKey,
+			}
+
+			result := ip.buildEncryptedData(req)
+
+			// Should return plaintext: RENDEZVOUS_COOKIE (20) + ONION_KEY (32) + N_SPEC (1) = 53 bytes
+			expectedLen := 53
+			if len(result) != expectedLen {
+				t.Errorf("Plaintext result length = %d, want %d", len(result), expectedLen)
+			}
+
+			// Verify it starts with rendezvous cookie
+			if !bytes.Equal(result[0:20], rendezvousCookie) {
+				t.Error("Result should start with rendezvous cookie")
+			}
+		})
+	}
+}
+
+// TestDeriveKey tests the key derivation function
+func TestDeriveKey(t *testing.T) {
+	secret := []byte("test secret key for HKDF derivation")
+	info := []byte("test-info-string")
+
+	tests := []struct {
+		name    string
+		length  int
+		wantErr bool
+	}{
+		{
+			name:    "derive 16 bytes",
+			length:  16,
+			wantErr: false,
+		},
+		{
+			name:    "derive 32 bytes",
+			length:  32,
+			wantErr: false,
+		},
+		{
+			name:    "derive 64 bytes",
+			length:  64,
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			key, err := deriveKey(secret, info, tt.length)
+			
+			if tt.wantErr && err == nil {
+				t.Error("Expected error, got nil")
+			}
+			if !tt.wantErr && err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+			if !tt.wantErr && len(key) != tt.length {
+				t.Errorf("Derived key length = %d, want %d", len(key), tt.length)
+			}
+		})
+	}
+}
+
+// TestDeriveKeyDeterministic tests that key derivation is deterministic
+func TestDeriveKeyDeterministic(t *testing.T) {
+	secret := []byte("test secret")
+	info := []byte("test info")
+	length := 32
+
+	// Derive key twice with same inputs
+	key1, err1 := deriveKey(secret, info, length)
+	key2, err2 := deriveKey(secret, info, length)
+
+	if err1 != nil || err2 != nil {
+		t.Fatalf("Key derivation failed: %v, %v", err1, err2)
+	}
+
+	// Keys should be identical
+	if !bytes.Equal(key1, key2) {
+		t.Error("Key derivation should be deterministic")
+	}
+
+	// Different info should produce different keys
+	differentInfo := []byte("different info")
+	key3, err3 := deriveKey(secret, differentInfo, length)
+	if err3 != nil {
+		t.Fatalf("Key derivation failed: %v", err3)
+	}
+
+	if bytes.Equal(key1, key3) {
+		t.Error("Different info should produce different keys")
+	}
+}
+
+// TestEncryptionIntegration tests the full encryption flow in INTRODUCE1
+func TestEncryptionIntegration(t *testing.T) {
+	log := logger.NewDefault()
+	intro := NewIntroductionProtocol(log)
+
+	// Generate introduction point keys
+	var introPointPrivate, introPointPublic [32]byte
+	if _, err := rand.Read(introPointPrivate[:]); err != nil {
+		t.Fatalf("Failed to generate intro point key: %v", err)
+	}
+	var basePoint = [32]byte{9}
+	curve25519.ScalarMult(&introPointPublic, &introPointPrivate, &basePoint)
+
+	// Create valid request
+	rendezvousCookie := make([]byte, 20)
+	if _, err := rand.Read(rendezvousCookie); err != nil {
+		t.Fatalf("Failed to generate cookie: %v", err)
+	}
+
+	onionKey := make([]byte, 32)
+	if _, err := rand.Read(onionKey); err != nil {
+		t.Fatalf("Failed to generate onion key: %v", err)
+	}
+
+	authKey := make([]byte, 32)
+	if _, err := rand.Read(authKey); err != nil {
+		t.Fatalf("Failed to generate auth key: %v", err)
+	}
+
+	req := &IntroduceRequest{
+		IntroPoint: &IntroductionPoint{
+			EncKey:  introPointPublic[:],
+			AuthKey: authKey,
+		},
+		RendezvousCookie: rendezvousCookie,
+		RendezvousPoint:  "test-rendezvous-point",
+		OnionKey:         onionKey,
+	}
+
+	// Build INTRODUCE1 cell
+	introduce1Cell, err := intro.BuildIntroduce1Cell(req)
+	if err != nil {
+		t.Fatalf("Failed to build INTRODUCE1 cell: %v", err)
+	}
+
+	// Verify cell structure
+	// INTRODUCE1 cell format:
+	// LEGACY_KEY_ID (20) + AUTH_KEY_TYPE (1) + AUTH_KEY_LEN (2) + AUTH_KEY (32) + N_EXTENSIONS (1) + ENCRYPTED_DATA
+	minLen := 20 + 1 + 2 + 32 + 1 + 32 + 53 // +32 for client PK, +53 for encrypted payload
+	if len(introduce1Cell) < minLen {
+		t.Errorf("INTRODUCE1 cell length = %d, want >= %d", len(introduce1Cell), minLen)
+	}
+
+	t.Logf("Successfully created encrypted INTRODUCE1 cell of %d bytes", len(introduce1Cell))
 }
