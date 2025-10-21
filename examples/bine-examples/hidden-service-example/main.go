@@ -1,10 +1,14 @@
-// Package main demonstrates creating a v3 onion service using cretz/bine.
+// Package main demonstrates creating a v3 onion service using the bine wrapper.
 //
 // This example shows how to:
-// 1. Create and manage a v3 onion service (hidden service) using bine
+// 1. Create a hidden service with one function call using the bine wrapper
 // 2. Serve HTTP content over the onion service
-// 3. Handle the complete lifecycle of a hidden service
-// 4. Optionally integrate with go-tor for additional functionality
+// 3. Handle the complete lifecycle with automatic cleanup
+//
+// The wrapper simplifies hidden service creation by:
+// - Automatically starting go-tor for connectivity
+// - Enabling bine for hidden service management
+// - Managing lifecycle and cleanup
 //
 // IMPORTANT: This example requires the Tor binary to be installed on your system.
 // - Ubuntu/Debian: sudo apt-get install tor
@@ -22,62 +26,49 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cretz/bine/tor"
+	"github.com/opd-ai/go-tor/pkg/bine"
 )
 
 func main() {
-	fmt.Println("=== Bine Hidden Service Example ===")
+	fmt.Println("=== Bine Wrapper Hidden Service Example ===")
 	fmt.Println()
-	fmt.Println("This example demonstrates creating a v3 onion service using cretz/bine.")
-	fmt.Println("The onion service will host a simple HTTP server.")
-	fmt.Println()
-
-	// Check for Tor binary
-	fmt.Println("Checking for Tor binary...")
-	if !checkTorBinary() {
-		fmt.Println("❌ Tor binary not found!")
-		fmt.Println()
-		fmt.Println("Please install Tor:")
-		fmt.Println("  Ubuntu/Debian: sudo apt-get install tor")
-		fmt.Println("  macOS: brew install tor")
-		fmt.Println("  Windows: Download from https://www.torproject.org/download/")
-		fmt.Println()
-		os.Exit(1)
-	}
-	fmt.Println("✓ Tor binary found")
+	fmt.Println("This example demonstrates creating a v3 onion service with zero configuration.")
+	fmt.Println("The wrapper handles all the setup automatically.")
 	fmt.Println()
 
 	// Create context with cancellation
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Step 1: Start Tor
-	fmt.Println("Step 1: Starting Tor (this may take 30-60 seconds)...")
-	t, err := startTor(ctx)
+	// Step 1: Connect with bine enabled
+	fmt.Println("Step 1: Connecting with bine enabled (this may take 30-60 seconds)...")
+	client, err := bine.ConnectWithOptions(&bine.Options{
+		EnableBine:     true, // Required for hidden services
+		StartupTimeout: 120 * time.Second,
+	})
 	if err != nil {
-		log.Fatalf("Failed to start Tor: %v", err)
+		log.Fatalf("Failed to connect: %v\n\nThis requires Tor binary to be installed:\n  Ubuntu/Debian: sudo apt-get install tor\n  macOS: brew install tor\n  Windows: Download from https://www.torproject.org/download/", err)
 	}
 	defer func() {
-		fmt.Println("\nShutting down Tor...")
-		if err := t.Close(); err != nil {
-			log.Printf("Error closing Tor: %v", err)
-		}
-		fmt.Println("✓ Tor shut down successfully")
+		fmt.Println("\nShutting down...")
+		client.Close()
+		fmt.Println("✓ Shut down successfully")
 	}()
-	fmt.Println("✓ Tor started successfully")
+
+	fmt.Println("✓ Connected successfully")
 	fmt.Println()
 
-	// Step 2: Create onion service
+	// Step 2: Create hidden service with one function call
 	fmt.Println("Step 2: Creating v3 onion service...")
 	fmt.Println("  This may take 2-3 minutes as the service is published to the network...")
-	onion, err := createOnionService(ctx, t)
+	service, err := client.CreateHiddenService(ctx, 80)
 	if err != nil {
-		log.Fatalf("Failed to create onion service: %v", err)
+		log.Fatalf("Failed to create hidden service: %v", err)
 	}
-	defer onion.Close()
+	defer service.Close()
 
 	// Display onion address
-	onionAddr := fmt.Sprintf("%v.onion", onion.ID)
+	onionAddr := service.OnionAddress()
 	fmt.Println()
 	fmt.Println("✓ Onion service created successfully!")
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
@@ -92,7 +83,7 @@ func main() {
 	// Start server in background
 	errChan := make(chan error, 1)
 	go func() {
-		if err := srv.Serve(onion); err != http.ErrServerClosed {
+		if err := srv.Serve(service); err != http.ErrServerClosed {
 			errChan <- err
 		}
 	}()
@@ -124,59 +115,7 @@ func main() {
 	}
 }
 
-// checkTorBinary checks if the Tor binary is available
-func checkTorBinary() bool {
-	// Try to start Tor briefly to check if it's available
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	t, err := tor.Start(ctx, nil)
-	if err != nil {
-		return false
-	}
-	t.Close()
-	return true
-}
-
-// startTor initializes and starts a Tor instance
-func startTor(ctx context.Context) (*tor.Tor, error) {
-	// Start Tor with default configuration
-	// This will start a Tor process and connect to the network
-	startCtx, cancel := context.WithTimeout(ctx, 3*time.Minute)
-	defer cancel()
-
-	t, err := tor.Start(startCtx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to start Tor: %w", err)
-	}
-
-	return t, nil
-}
-
-// createOnionService creates a v3 onion service
-func createOnionService(ctx context.Context, t *tor.Tor) (*tor.OnionService, error) {
-	// Create context with timeout for service creation
-	// This can take 2-3 minutes on first run
-	listenCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
-	defer cancel()
-
-	// Create v3 onion service listening on port 80
-	// The service will be accessible at http://<onion-id>.onion
-	conf := &tor.ListenConf{
-		RemotePorts: []int{80}, // Port that clients will connect to
-		Version3:    true,      // Use v3 onion services (recommended)
-		// LocalPort is set automatically to a random available port
-	}
-
-	onion, err := t.Listen(listenCtx, conf)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create onion service: %w", err)
-	}
-
-	return onion, nil
-}
-
-// createHTTPServer creates an HTTP server for the onion service
+// createHTTPServer creates an HTTP server for the hidden service
 func createHTTPServer(onionAddr string) *http.Server {
 	// Create HTTP mux
 	mux := http.NewServeMux()
@@ -186,7 +125,7 @@ func createHTTPServer(onionAddr string) *http.Server {
 		html := fmt.Sprintf(`<!DOCTYPE html>
 <html>
 <head>
-    <title>Bine Hidden Service</title>
+    <title>Bine Wrapper Hidden Service</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -218,23 +157,26 @@ func createHTTPServer(onionAddr string) *http.Server {
 </head>
 <body>
     <div class="container">
-        <h1>🧅 Welcome to the Bine Hidden Service!</h1>
+        <h1>🧅 Welcome to the Bine Wrapper Hidden Service!</h1>
         
-        <p>This is a v3 onion service created using <code>cretz/bine</code>.</p>
+        <p>This is a v3 onion service created with the <code>pkg/bine</code> wrapper.</p>
         
         <div class="info">
             <h3>Service Information:</h3>
             <p><strong>Onion Address:</strong> <span class="onion-addr">%s</span></p>
             <p><strong>Status:</strong> ✓ Online</p>
+            <p><strong>Created with:</strong> <code>client.CreateHiddenService(ctx, 80)</code></p>
             <p><strong>Protocol:</strong> Tor v3 Onion Services</p>
         </div>
         
         <h3>Features:</h3>
         <ul>
+            <li>Zero configuration required</li>
+            <li>One function call to create</li>
+            <li>Automatic lifecycle management</li>
             <li>End-to-end encrypted connection</li>
             <li>Hidden location and IP address</li>
             <li>NAT traversal (no port forwarding needed)</li>
-            <li>Self-authenticating address</li>
         </ul>
         
         <h3>Available Endpoints:</h3>
@@ -245,7 +187,7 @@ func createHTTPServer(onionAddr string) *http.Server {
         </ul>
         
         <hr>
-        <p><em>Created with cretz/bine and go-tor</em></p>
+        <p><em>Created with pkg/bine wrapper</em></p>
     </div>
 </body>
 </html>`, onionAddr)
@@ -258,11 +200,12 @@ func createHTTPServer(onionAddr string) *http.Server {
 	// API endpoint - returns JSON
 	mux.HandleFunc("/api", func(w http.ResponseWriter, r *http.Request) {
 		response := fmt.Sprintf(`{
-  "service": "Bine Hidden Service",
+  "service": "Bine Wrapper Hidden Service",
   "onion_address": "%s",
   "status": "online",
   "timestamp": "%s",
-  "features": ["hidden", "encrypted", "authenticated"]
+  "wrapper": "pkg/bine",
+  "features": ["zero_config", "auto_lifecycle", "v3_onion"]
 }`, onionAddr, time.Now().Format(time.RFC3339))
 
 		w.Header().Set("Content-Type", "application/json")
@@ -274,7 +217,7 @@ func createHTTPServer(onionAddr string) *http.Server {
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"healthy","service":"online"}`))
+		w.Write([]byte(`{"status":"healthy","service":"online","wrapper":"pkg/bine"}`))
 	})
 
 	return &http.Server{

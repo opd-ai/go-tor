@@ -1,14 +1,16 @@
-// Package main demonstrates the complete integration of cretz/bine with go-tor.
+// Package main demonstrates the complete integration using the bine wrapper.
 //
 // This all-in-one example shows:
-// 1. Starting go-tor client for network connectivity
-// 2. Using bine to create a hidden service
-// 3. Accessing the hidden service through go-tor's SOCKS proxy
+// 1. Zero-configuration connection using pkg/bine wrapper
+// 2. Creating a hidden service with one function call
+// 3. Accessing the hidden service through the integrated SOCKS proxy
 // 4. Complete lifecycle management
 //
-// This demonstrates the full power of combining both libraries:
-// - go-tor provides pure-Go Tor connectivity (no external binary for client)
-// - bine provides convenient hidden service management
+// The bine wrapper automatically handles:
+// - go-tor client for pure-Go Tor connectivity
+// - bine for hidden service management
+// - SOCKS5 proxy configuration
+// - Lifecycle management and graceful shutdown
 package main
 
 import (
@@ -22,46 +24,46 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cretz/bine/tor"
-	"github.com/opd-ai/go-tor/pkg/client"
-	"golang.org/x/net/proxy"
+	"github.com/opd-ai/go-tor/pkg/bine"
 )
 
 func main() {
-	fmt.Println("=== All-in-One: Bine + go-tor Integration ===")
+	fmt.Println("=== All-in-One: Bine Wrapper Integration ===")
 	fmt.Println()
-	fmt.Println("This example demonstrates the complete integration:")
-	fmt.Println("  1. go-tor for client connectivity (pure Go)")
-	fmt.Println("  2. bine for hidden service management")
-	fmt.Println("  3. Accessing the service through go-tor")
+	fmt.Println("This example demonstrates zero-configuration integration:")
+	fmt.Println("  1. Automatic go-tor client setup (pure Go)")
+	fmt.Println("  2. Optional bine for hidden service management")
+	fmt.Println("  3. Seamless SOCKS proxy configuration")
 	fmt.Println()
 
 	// Create context for managing lifecycle
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Step 1: Start go-tor client for network connectivity
-	fmt.Println("Step 1: Starting go-tor client...")
-	torClient, err := startGoTorClient()
+	// Step 1: Connect with zero configuration
+	fmt.Println("Step 1: Connecting with bine wrapper (zero configuration)...")
+	client, err := bine.ConnectWithOptions(&bine.Options{
+		EnableBine:     true, // Enable hidden service support
+		StartupTimeout: 120 * time.Second,
+	})
 	if err != nil {
-		log.Fatalf("Failed to start go-tor: %v", err)
+		log.Fatalf("Failed to connect: %v", err)
 	}
 	defer func() {
-		fmt.Println("\nShutting down go-tor client...")
-		torClient.Close()
+		fmt.Println("\nShutting down...")
+		client.Close()
 	}()
 
-	proxyAddr := torClient.ProxyAddr()
-	fmt.Printf("✓ go-tor client ready on %s\n", proxyAddr)
+	fmt.Printf("✓ Connected! SOCKS proxy: %s\n", client.ProxyAddr())
 	fmt.Println()
 
-	// Step 2: Start bine and create hidden service
-	fmt.Println("Step 2: Creating hidden service with bine...")
+	// Step 2: Create hidden service with one function call
+	fmt.Println("Step 2: Creating hidden service...")
 	fmt.Println("  (This requires Tor binary to be installed)")
 	
-	onionAddr, cleanup, err := startHiddenService(ctx)
+	service, err := createHiddenService(ctx, client)
 	if err != nil {
-		fmt.Printf("❌ Failed to start hidden service: %v\n", err)
+		fmt.Printf("❌ Failed to create hidden service: %v\n", err)
 		fmt.Println()
 		fmt.Println("This is expected if Tor binary is not installed.")
 		fmt.Println("Install Tor with:")
@@ -69,25 +71,26 @@ func main() {
 		fmt.Println("  macOS: brew install tor")
 		fmt.Println()
 		fmt.Println("Continuing with client-only demonstration...")
-		demonstrateClientOnly(proxyAddr)
+		demonstrateClientOnly(client)
 	} else {
-		defer cleanup()
+		defer service.Close()
 		
+		onionAddr := service.OnionAddress()
 		fmt.Printf("✓ Hidden service created: http://%s\n", onionAddr)
 		fmt.Println()
 
-		// Step 3: Access the hidden service through go-tor
-		fmt.Println("Step 3: Accessing hidden service through go-tor...")
+		// Step 3: Access the hidden service through integrated proxy
+		fmt.Println("Step 3: Accessing hidden service through integrated SOCKS proxy...")
 		time.Sleep(5 * time.Second) // Give service time to be fully published
 		
-		if err := accessHiddenService(proxyAddr, onionAddr); err != nil {
+		if err := accessHiddenService(client, onionAddr); err != nil {
 			fmt.Printf("Note: Could not access service yet: %v\n", err)
 			fmt.Println("(Hidden services can take 2-3 minutes to be fully accessible)")
 		}
 		fmt.Println()
 
 		// Display summary
-		displaySummary(onionAddr, proxyAddr)
+		displaySummary(onionAddr, client.ProxyAddr())
 	}
 
 	// Keep running until interrupted
@@ -101,84 +104,36 @@ func main() {
 	fmt.Println("\nReceived shutdown signal, cleaning up...")
 }
 
-// startGoTorClient initializes and starts a go-tor client
-func startGoTorClient() (*client.SimpleClient, error) {
-	torClient, err := client.Connect()
+// createHiddenService creates a hidden service using the bine wrapper
+func createHiddenService(ctx context.Context, client *bine.Client) (*bine.HiddenService, error) {
+	// Create v3 onion service with one function call
+	service, err := client.CreateHiddenService(ctx, 80)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create go-tor client: %w", err)
-	}
-
-	fmt.Println("  Waiting for Tor circuits (30-90 seconds)...")
-	if err := torClient.WaitUntilReady(90 * time.Second); err != nil {
-		torClient.Close()
-		return nil, fmt.Errorf("timeout waiting for Tor: %w", err)
-	}
-
-	return torClient, nil
-}
-
-// startHiddenService creates a hidden service using bine
-func startHiddenService(ctx context.Context) (string, func(), error) {
-	// Start Tor with bine
-	fmt.Println("  Starting bine Tor instance...")
-	startCtx, cancel := context.WithTimeout(ctx, 3*time.Minute)
-	defer cancel()
-
-	t, err := tor.Start(startCtx, nil)
-	if err != nil {
-		return "", nil, fmt.Errorf("failed to start bine Tor: %w", err)
-	}
-
-	// Create hidden service
-	fmt.Println("  Creating onion service (2-3 minutes)...")
-	listenCtx, listenCancel := context.WithTimeout(ctx, 5*time.Minute)
-	defer listenCancel()
-
-	conf := &tor.ListenConf{
-		RemotePorts: []int{80},
-		Version3:    true,
-	}
-
-	onion, err := t.Listen(listenCtx, conf)
-	if err != nil {
-		t.Close()
-		return "", nil, fmt.Errorf("failed to create onion service: %w", err)
+		return nil, fmt.Errorf("failed to create service: %w", err)
 	}
 
 	// Start HTTP server on the onion service
-	srv := &http.Server{
-		Handler: createHTTPHandler(onion.ID),
-	}
+	mux := createHTTPHandler(service.OnionAddress())
+	srv := &http.Server{Handler: mux}
 
 	go func() {
-		if err := srv.Serve(onion); err != http.ErrServerClosed {
+		if err := srv.Serve(service); err != http.ErrServerClosed {
 			log.Printf("Server error: %v", err)
 		}
 	}()
 
-	// Cleanup function
-	cleanup := func() {
-		fmt.Println("Shutting down hidden service...")
-		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer shutdownCancel()
-		srv.Shutdown(shutdownCtx)
-		onion.Close()
-		t.Close()
-		fmt.Println("✓ Hidden service shut down")
-	}
-
-	return fmt.Sprintf("%v.onion", onion.ID), cleanup, nil
+	return service, nil
 }
 
 // createHTTPHandler creates an HTTP handler for the hidden service
-func createHTTPHandler(onionID string) http.Handler {
+func createHTTPHandler(onionAddr string) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		html := fmt.Sprintf(`<!DOCTYPE html>
 <html>
 <head>
-    <title>All-in-One Example</title>
+    <title>Bine Wrapper Example</title>
     <style>
         body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
         .header { background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); color: white; padding: 20px; border-radius: 10px; }
@@ -189,27 +144,29 @@ func createHTTPHandler(onionID string) http.Handler {
 </head>
 <body>
     <div class="header">
-        <h1>🚀 All-in-One Integration Example</h1>
-        <p>Bine + go-tor working together!</p>
+        <h1>🚀 Bine Wrapper Integration</h1>
+        <p>Zero-configuration go-tor + bine</p>
     </div>
     <div class="content">
         <h2>Welcome!</h2>
-        <p>You're connected to a hidden service created with <code>cretz/bine</code>, accessible through <code>go-tor</code>'s SOCKS proxy.</p>
+        <p>You're connected to a hidden service created with the <code>pkg/bine</code> wrapper!</p>
         
         <div class="info">
-            <h3>This Demonstrates:</h3>
+            <h3>What Makes This Special:</h3>
             <ul>
-                <li>✓ go-tor providing pure-Go Tor connectivity</li>
-                <li>✓ bine managing the hidden service</li>
-                <li>✓ Complete integration between both libraries</li>
-                <li>✓ End-to-end encrypted connection</li>
+                <li>✓ Zero configuration required</li>
+                <li>✓ One function call to create service</li>
+                <li>✓ Automatic lifecycle management</li>
+                <li>✓ Integrated SOCKS proxy</li>
+                <li>✓ Production-ready error handling</li>
             </ul>
         </div>
 
         <div class="info">
             <h3>Service Details:</h3>
-            <p><strong>Onion Address:</strong> <code>%s.onion</code></p>
+            <p><strong>Onion Address:</strong> <code>%s</code></p>
             <p><strong>Time:</strong> %s</p>
+            <p><strong>Created with:</strong> <code>client.CreateHiddenService(ctx, 80)</code></p>
         </div>
 
         <h3>Try These Endpoints:</h3>
@@ -220,7 +177,7 @@ func createHTTPHandler(onionID string) http.Handler {
         </ul>
     </div>
 </body>
-</html>`, onionID, time.Now().Format(time.RFC3339))
+</html>`, onionAddr, time.Now().Format(time.RFC3339))
 
 		w.Header().Set("Content-Type", "text/html")
 		w.Write([]byte(html))
@@ -228,16 +185,16 @@ func createHTTPHandler(onionID string) http.Handler {
 
 	mux.HandleFunc("/api", func(w http.ResponseWriter, r *http.Request) {
 		response := fmt.Sprintf(`{
-  "service": "All-in-One Integration Example",
-  "onion_id": "%s",
+  "service": "Bine Wrapper Integration",
+  "onion_address": "%s",
   "timestamp": "%s",
-  "powered_by": ["go-tor", "cretz/bine"],
+  "wrapper": "pkg/bine",
   "features": {
-    "client": "go-tor (pure Go)",
-    "hidden_service": "bine",
-    "integration": "seamless"
+    "zero_config": true,
+    "auto_lifecycle": true,
+    "integrated_proxy": true
   }
-}`, onionID, time.Now().Format(time.RFC3339))
+}`, onionAddr, time.Now().Format(time.RFC3339))
 
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(response))
@@ -245,26 +202,18 @@ func createHTTPHandler(onionID string) http.Handler {
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"status":"healthy","integration":"active"}`))
+		w.Write([]byte(`{"status":"healthy","wrapper":"pkg/bine"}`))
 	})
 
 	return mux
 }
 
-// accessHiddenService attempts to access the hidden service through go-tor's SOCKS proxy
-func accessHiddenService(proxyAddr, onionAddr string) error {
-	// Create SOCKS5 dialer
-	dialer, err := proxy.SOCKS5("tcp", proxyAddr, nil, proxy.Direct)
+// accessHiddenService attempts to access the hidden service through the integrated proxy
+func accessHiddenService(client *bine.Client, onionAddr string) error {
+	// Get HTTP client from wrapper
+	httpClient, err := client.HTTPClient()
 	if err != nil {
-		return fmt.Errorf("failed to create SOCKS5 dialer: %w", err)
-	}
-
-	// Create HTTP client
-	httpClient := &http.Client{
-		Transport: &http.Transport{
-			Dial: dialer.Dial,
-		},
-		Timeout: 30 * time.Second,
+		return fmt.Errorf("failed to create HTTP client: %w", err)
 	}
 
 	// Access the hidden service
@@ -282,23 +231,22 @@ func accessHiddenService(proxyAddr, onionAddr string) error {
 	return nil
 }
 
-// demonstrateClientOnly shows client-only functionality when hidden service isn't available
-func demonstrateClientOnly(proxyAddr string) {
+// demonstrateClientOnly shows client-only functionality
+func demonstrateClientOnly(client *bine.Client) {
 	fmt.Println()
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	fmt.Println("CLIENT-ONLY DEMONSTRATION")
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	fmt.Println()
-	fmt.Printf("go-tor SOCKS Proxy: %s\n", proxyAddr)
+	fmt.Printf("SOCKS Proxy: %s\n", client.ProxyAddr())
 	fmt.Println()
-	fmt.Println("You can use this proxy with any application:")
+	fmt.Println("You can use this with any application:")
 	fmt.Println()
 	fmt.Println("Example with curl:")
-	fmt.Printf("  curl --socks5 %s https://check.torproject.org\n", proxyAddr)
+	fmt.Printf("  curl --socks5 %s https://check.torproject.org\n", client.ProxyAddr())
 	fmt.Println()
-	fmt.Println("Example with Go:")
-	fmt.Println("  dialer, _ := proxy.SOCKS5(\"tcp\", proxyAddr, nil, proxy.Direct)")
-	fmt.Println("  httpClient := &http.Client{Transport: &http.Transport{Dial: dialer.Dial}}")
+	fmt.Println("Example with the wrapper:")
+	fmt.Println("  httpClient, _ := client.HTTPClient()")
 	fmt.Println("  resp, _ := httpClient.Get(\"https://example.com\")")
 	fmt.Println()
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
@@ -312,20 +260,18 @@ func displaySummary(onionAddr, proxyAddr string) {
 	fmt.Println("ALL SERVICES RUNNING")
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	fmt.Println()
-	fmt.Println("✓ go-tor Client (Pure Go)")
+	fmt.Println("✓ Bine Wrapper (Zero Configuration)")
 	fmt.Printf("  SOCKS Proxy: %s\n", proxyAddr)
-	fmt.Println()
-	fmt.Println("✓ Bine Hidden Service")
-	fmt.Printf("  Onion Address: http://%s\n", onionAddr)
+	fmt.Printf("  Onion Service: http://%s\n", onionAddr)
 	fmt.Println()
 	fmt.Println("🌐 Access the service:")
 	fmt.Println("  1. Via Tor Browser:")
 	fmt.Printf("     http://%s\n", onionAddr)
 	fmt.Println()
-	fmt.Println("  2. Via curl (using go-tor's proxy):")
+	fmt.Println("  2. Via curl (using integrated proxy):")
 	fmt.Printf("     curl --socks5 %s http://%s\n", proxyAddr, onionAddr)
 	fmt.Println()
-	fmt.Println("  3. Via any app configured to use the SOCKS proxy")
+	fmt.Println("  3. Via the wrapper's HTTP client")
 	fmt.Println()
 	fmt.Println("📋 API Endpoints:")
 	fmt.Printf("  http://%s/         - Home page\n", onionAddr)
