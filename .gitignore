@@ -60,6 +60,7 @@ examples/*/phase*-integration
 examples/*/onion-address-demo
 examples/*/zero-config
 examples/*/zero-config-custom
+examples/*/http-helpers-demo
 tor-client
 tor-client-stripped
 circuit-isolation

@@ -72,6 +72,7 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 - ✅ **HTTP metrics endpoint (Prometheus, JSON, health, dashboard)**
 
 ### Recently Completed
+- ✅ **Phase 9.8**: HTTP client helpers and developer experience (simplified HTTP integration)
 - ✅ **Phase 9.7**: Command-line interface testing (CLI test suite)
 - ✅ **Phase 9.6**: Race condition fix in benchmark package (thread safety)
 - ✅ **Phase 9.5**: Performance benchmarking and validation
@@ -93,6 +94,7 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
   - [x] Performance benchmarking (Phase 9.5)
   - [x] Race condition fixes (Phase 9.6)
   - [x] CLI testing suite (Phase 9.7)
+  - [x] HTTP client helpers and developer experience (Phase 9.8)
   - [ ] Additional production features and enhancements
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture and roadmap.
@@ -216,6 +218,33 @@ err = torClient.Start(context.Background())
 
 See [examples/zero-config](examples/zero-config) for a complete working example.
 
+### HTTP Client Integration (NEW in Phase 9.8)
+
+The easiest way to make HTTP requests through Tor - zero boilerplate:
+
+```go
+import (
+    "github.com/opd-ai/go-tor/pkg/client"
+    "github.com/opd-ai/go-tor/pkg/helpers"
+)
+
+// Connect to Tor
+torClient, _ := client.Connect()
+defer torClient.Close()
+
+// Wait for Tor to be ready
+torClient.WaitUntilReady(90 * time.Second)
+
+// Create HTTP client - that's it!
+httpClient, _ := helpers.NewHTTPClient(torClient, nil)
+
+// Make requests through Tor
+resp, _ := httpClient.Get("https://check.torproject.org")
+```
+
+See [examples/http-helpers-demo](examples/http-helpers-demo) and [pkg/helpers/README.md](pkg/helpers/README.md) for complete documentation.
+
+
 ### As a SOCKS Proxy
 
 Configure your application to use `localhost:9050` as a SOCKS5 proxy:
@@ -249,6 +278,8 @@ The project is organized into modular packages:
 - **pkg/onion**: Onion service support 🚧 (Phase 7.3 - Foundation complete)
 - **pkg/health**: Health monitoring and checks ✅ (Phase 8.2)
 - **pkg/errors**: Structured error types ✅ (Phase 8.2)
+- **pkg/pool**: Resource pooling infrastructure ✅ (Phase 8.3)
+- **pkg/helpers**: HTTP client integration helpers ✅ (Phase 9.8)
 - **pkg/pool**: Resource pooling infrastructure ✅ (Phase 8.3)
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for details.
