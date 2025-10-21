@@ -121,7 +121,7 @@ func (lt *LatencyTracker) Record(latency time.Duration) {
 func (lt *LatencyTracker) Percentile(p float64) time.Duration {
 	lt.mu.Lock()
 	defer lt.mu.Unlock()
-	
+
 	if len(lt.latencies) == 0 {
 		return 0
 	}
@@ -129,10 +129,10 @@ func (lt *LatencyTracker) Percentile(p float64) time.Duration {
 	// Sort latencies (simple insertion sort for small datasets)
 	sorted := make([]time.Duration, len(lt.latencies))
 	copy(sorted, lt.latencies)
-	
+
 	// Quick sort implementation
 	quickSort(sorted, 0, len(sorted)-1)
-	
+
 	// Calculate percentile index
 	index := int(float64(len(sorted)-1) * p)
 	if index < 0 {
@@ -141,7 +141,7 @@ func (lt *LatencyTracker) Percentile(p float64) time.Duration {
 	if index >= len(sorted) {
 		index = len(sorted) - 1
 	}
-	
+
 	return sorted[index]
 }
 
@@ -150,7 +150,7 @@ func (lt *LatencyTracker) Percentile(p float64) time.Duration {
 func (lt *LatencyTracker) Max() time.Duration {
 	lt.mu.Lock()
 	defer lt.mu.Unlock()
-	
+
 	if len(lt.latencies) == 0 {
 		return 0
 	}
@@ -201,7 +201,7 @@ func CreateTestClient() (*client.Client, error) {
 	cfg.SocksPort = 0      // Use random port
 	cfg.ControlPort = 0    // Disable control port for benchmarks
 	cfg.MetricsPort = 0    // Disable metrics for benchmarks
-	
+
 	log := logger.NewDefault()
 	return client.New(cfg, log)
 }
@@ -222,7 +222,7 @@ func (s *Suite) PrintSummary() {
 	fmt.Println("\n" + separator)
 	fmt.Println("BENCHMARK RESULTS SUMMARY")
 	fmt.Println(separator)
-	
+
 	for _, r := range s.results {
 		fmt.Printf("\n%s\n", r.Name)
 		fmt.Printf("  Duration: %v\n", r.Duration)
@@ -242,7 +242,7 @@ func (s *Suite) PrintSummary() {
 		} else {
 			fmt.Printf("  Status: ✓ PASS\n")
 		}
-		
+
 		// Print additional metrics
 		if len(r.AdditionalMetrics) > 0 {
 			fmt.Println("  Additional Metrics:")
@@ -251,27 +251,27 @@ func (s *Suite) PrintSummary() {
 			}
 		}
 	}
-	
+
 	fmt.Println("\n" + separator)
 }
 
 // RunAll runs all benchmark suites
 func (s *Suite) RunAll(ctx context.Context) error {
 	s.log.Info("Starting comprehensive benchmark suite")
-	
+
 	// Run each benchmark category
 	if err := s.BenchmarkCircuitBuild(ctx); err != nil {
 		s.log.Warn("Circuit build benchmark failed", "error", err)
 	}
-	
+
 	if err := s.BenchmarkMemoryUsage(ctx); err != nil {
 		s.log.Warn("Memory usage benchmark failed", "error", err)
 	}
-	
+
 	if err := s.BenchmarkConcurrentStreams(ctx); err != nil {
 		s.log.Warn("Concurrent streams benchmark failed", "error", err)
 	}
-	
+
 	s.log.Info("Benchmark suite complete", "total_tests", len(s.results))
 	return nil
 }

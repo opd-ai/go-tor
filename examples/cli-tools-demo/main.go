@@ -23,7 +23,7 @@ func main() {
 	// Demonstrate config validator
 	fmt.Println("--- Configuration Validator Demo ---")
 	fmt.Println()
-	
+
 	// Generate a sample config
 	fmt.Println("Generating sample configuration...")
 	cmd := exec.Command("../../bin/tor-config-validator", "-generate", "-output", "/tmp/sample-torrc")
@@ -52,7 +52,7 @@ func main() {
 	fmt.Println("--- torctl Demo ---")
 	fmt.Println()
 	fmt.Println("Starting Tor client for demonstration...")
-	
+
 	// Start a Tor client
 	torClient, err := client.Connect()
 	if err != nil {
@@ -62,11 +62,11 @@ func main() {
 
 	fmt.Println("Tor client started successfully")
 	fmt.Println("Waiting for circuits to be established...")
-	
+
 	// Wait for client to be ready
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
-	
+
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
@@ -89,7 +89,7 @@ func main() {
 	fmt.Println()
 	fmt.Println("You can now use torctl to interact with the client:")
 	fmt.Println()
-	
+
 	// Demonstrate torctl commands
 	commands := []struct {
 		name string

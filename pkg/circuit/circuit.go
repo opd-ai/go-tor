@@ -44,16 +44,16 @@ func (s State) String() string {
 
 // Circuit represents a Tor circuit
 type Circuit struct {
-	ID              uint32
-	State           State
-	CreatedAt       time.Time
-	Hops            []*Hop
-	IsolationKey    *IsolationKey // Isolation key for circuit isolation
-	mu              sync.RWMutex
-	paddingEnabled  bool          // SPEC-002: Enable/disable circuit padding
-	paddingInterval time.Duration // SPEC-002: Interval for padding cells
-	lastPaddingTime time.Time     // SPEC-002: Last time a padding cell was sent
-	lastActivityTime time.Time    // SPEC-002: Last time any cell was sent/received
+	ID               uint32
+	State            State
+	CreatedAt        time.Time
+	Hops             []*Hop
+	IsolationKey     *IsolationKey // Isolation key for circuit isolation
+	mu               sync.RWMutex
+	paddingEnabled   bool          // SPEC-002: Enable/disable circuit padding
+	paddingInterval  time.Duration // SPEC-002: Interval for padding cells
+	lastPaddingTime  time.Time     // SPEC-002: Last time a padding cell was sent
+	lastActivityTime time.Time     // SPEC-002: Last time any cell was sent/received
 	// CRYPTO-001: Running digests for relay cell verification per tor-spec.txt §6.1
 	forwardDigest  hash.Hash // Client → Exit direction
 	backwardDigest hash.Hash // Exit → Client direction
@@ -74,14 +74,14 @@ func NewCircuit(id uint32) *Circuit {
 		ID:               id,
 		State:            StateBuilding,
 		CreatedAt:        now,
-		Hops:             make([]*Hop, 0, 3),    // Typical circuit has 3 hops
-		IsolationKey:     nil,                   // No isolation by default (backward compatible)
-		paddingEnabled:   true,                  // SPEC-002: Enable padding by default
-		paddingInterval:  5 * time.Second,       // SPEC-002: Default 5-second padding interval
-		lastPaddingTime:  now,                   // SPEC-002: Initialize padding timer
-		lastActivityTime: now,                   // SPEC-002: Initialize activity timer
-		forwardDigest:    sha1.New(),            // CRYPTO-001: Initialize forward digest
-		backwardDigest:   sha1.New(),            // CRYPTO-001: Initialize backward digest
+		Hops:             make([]*Hop, 0, 3), // Typical circuit has 3 hops
+		IsolationKey:     nil,                // No isolation by default (backward compatible)
+		paddingEnabled:   true,               // SPEC-002: Enable padding by default
+		paddingInterval:  5 * time.Second,    // SPEC-002: Default 5-second padding interval
+		lastPaddingTime:  now,                // SPEC-002: Initialize padding timer
+		lastActivityTime: now,                // SPEC-002: Initialize activity timer
+		forwardDigest:    sha1.New(),         // CRYPTO-001: Initialize forward digest
+		backwardDigest:   sha1.New(),         // CRYPTO-001: Initialize backward digest
 	}
 }
 
@@ -291,7 +291,7 @@ func (c *Circuit) GetPaddingInterval() time.Duration {
 // ShouldSendPadding determines if a padding cell should be sent (SPEC-002)
 // Implements basic time-based padding to improve traffic analysis resistance
 // per tor-spec.txt §7.1 and padding-spec.txt
-// 
+//
 // Basic policy: Send padding if:
 // 1. Padding is enabled
 // 2. Circuit is open
@@ -312,13 +312,13 @@ func (c *Circuit) ShouldSendPadding() bool {
 	}
 
 	now := time.Now()
-	
+
 	// Check if padding interval has elapsed since last padding
 	timeSinceLastPadding := now.Sub(c.lastPaddingTime)
 	if timeSinceLastPadding < c.paddingInterval {
 		return false
 	}
-	
+
 	// Don't send padding if there's been recent activity (within 80% of padding interval)
 	// This prevents redundant padding when circuit is actively used
 	activityThreshold := time.Duration(float64(c.paddingInterval) * 0.8)
@@ -345,7 +345,6 @@ func (c *Circuit) RecordActivity() {
 	defer c.mu.Unlock()
 	c.lastActivityTime = time.Now()
 }
-
 
 // Direction represents the direction of relay cell flow
 type Direction int

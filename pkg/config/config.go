@@ -39,7 +39,7 @@ type Config struct {
 	LogLevel string // Log level: debug, info, warn, error (default: info)
 
 	// Monitoring and observability (Phase 9.1)
-	MetricsPort int  // HTTP metrics server port (default: 0 = disabled)
+	MetricsPort   int  // HTTP metrics server port (default: 0 = disabled)
 	EnableMetrics bool // Enable HTTP metrics endpoint (default: false)
 
 	// Performance tuning (Phase 8.3)
@@ -52,11 +52,11 @@ type Config struct {
 	EnableBufferPooling      bool          // Enable buffer pooling for cell operations (default: true)
 
 	// Circuit isolation (backward compatible - disabled by default)
-	IsolationLevel       string // Isolation level: "none", "destination", "credential", "port", "session" (default: "none")
-	IsolateDestinations  bool   // Isolate circuits by destination host:port (default: false)
-	IsolateSOCKSAuth     bool   // Isolate circuits by SOCKS5 username (default: false)
-	IsolateClientPort    bool   // Isolate circuits by client source port (default: false)
-	IsolateClientProtocol bool  // Isolate circuits by protocol (default: false)
+	IsolationLevel        string // Isolation level: "none", "destination", "credential", "port", "session" (default: "none")
+	IsolateDestinations   bool   // Isolate circuits by destination host:port (default: false)
+	IsolateSOCKSAuth      bool   // Isolate circuits by SOCKS5 username (default: false)
+	IsolateClientPort     bool   // Isolate circuits by client source port (default: false)
+	IsolateClientProtocol bool   // Isolate circuits by protocol (default: false)
 }
 
 // OnionServiceConfig represents configuration for a single onion service
@@ -97,7 +97,7 @@ func DefaultConfig() *Config {
 		OnionServices:       []OnionServiceConfig{},
 		LogLevel:            "info",
 		// Monitoring defaults (Phase 9.1)
-		MetricsPort:   0,    // Disabled by default
+		MetricsPort:   0,     // Disabled by default
 		EnableMetrics: false, // Disabled by default
 		// Performance tuning defaults (Phase 8.3)
 		EnableConnectionPooling:  true,

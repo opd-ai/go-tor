@@ -72,6 +72,7 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 - ✅ **HTTP metrics endpoint (Prometheus, JSON, health, dashboard)**
 
 ### Recently Completed
+- ✅ **Phase 9.10**: Context propagation and cancellation (timeout control and graceful cancellation)
 - ✅ **Phase 9.9**: Enhanced CLI interface and developer tooling (torctl, config validator)
 - ✅ **Phase 9.8**: HTTP client helpers and developer experience (simplified HTTP integration)
 - ✅ **Phase 9.7**: Command-line interface testing (CLI test suite)
@@ -81,10 +82,6 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 - ✅ **Phase 9.3**: Testing infrastructure enhancement (integration tests, stress tests, benchmarks)
 - ✅ **Phase 9.2**: Onion service production integration
 - ✅ **Phase 9.1**: HTTP metrics and observability (Prometheus, JSON endpoints, HTML dashboard)
-- ✅ **Phase 7.4**: Onion services server (hidden service hosting)
-- ✅ **Phase 8.6**: Onion Service Infrastructure Completion
-- ✅ **Phase 8.5**: Comprehensive testing and documentation
-- ✅ **Phase 8.4**: Security hardening and audit
 
 ### Planned
 - [ ] **Phase 9**: Advanced monitoring and production features
@@ -97,6 +94,7 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
   - [x] CLI testing suite (Phase 9.7)
   - [x] HTTP client helpers and developer experience (Phase 9.8)
   - [x] Enhanced CLI interface and developer tooling (Phase 9.9)
+  - [x] Context propagation and cancellation (Phase 9.10)
   - [ ] Additional production features and enhancements
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture and roadmap.
@@ -504,7 +502,7 @@ Comprehensive documentation is available in the [docs/](docs/) directory:
 - [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) - Common issues and solutions
 
 ### Examples
-See [examples/](examples/) directory for 18 working demonstrations covering all major features.
+See [examples/](examples/) directory for 18 working demonstrations covering all major features, including the new [context-demo](examples/context-demo) showing timeout control and graceful cancellation.
 
 ## Repository Structure
 

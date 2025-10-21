@@ -2028,99 +2028,98 @@ func BenchmarkParseRendezvous2Cell(b *testing.B) {
 	}
 }
 
-
 // SPEC-005: Test for random introduction point selection
 func TestSelectIntroductionPointRandomization(t *testing.T) {
-log := logger.NewDefault()
-ip := NewIntroductionProtocol(log)
+	log := logger.NewDefault()
+	ip := NewIntroductionProtocol(log)
 
-// Create a descriptor with multiple introduction points
-desc := &Descriptor{
-IntroPoints: []IntroductionPoint{
-{OnionKey: []byte{1}},
-{OnionKey: []byte{2}},
-{OnionKey: []byte{3}},
-{OnionKey: []byte{4}},
-{OnionKey: []byte{5}},
-},
-}
+	// Create a descriptor with multiple introduction points
+	desc := &Descriptor{
+		IntroPoints: []IntroductionPoint{
+			{OnionKey: []byte{1}},
+			{OnionKey: []byte{2}},
+			{OnionKey: []byte{3}},
+			{OnionKey: []byte{4}},
+			{OnionKey: []byte{5}},
+		},
+	}
 
-// Select multiple times and verify we get different indices
-// With 5 points, selecting 100 times should give us variety
-selections := make(map[int]int)
-numSelections := 100
+	// Select multiple times and verify we get different indices
+	// With 5 points, selecting 100 times should give us variety
+	selections := make(map[int]int)
+	numSelections := 100
 
-for i := 0; i < numSelections; i++ {
-selected, err := ip.SelectIntroductionPoint(desc)
-if err != nil {
-t.Fatalf("SelectIntroductionPoint failed: %v", err)
-}
+	for i := 0; i < numSelections; i++ {
+		selected, err := ip.SelectIntroductionPoint(desc)
+		if err != nil {
+			t.Fatalf("SelectIntroductionPoint failed: %v", err)
+		}
 
-// Find which index was selected by comparing OnionKey
-for idx := range desc.IntroPoints {
-if selected.OnionKey[0] == desc.IntroPoints[idx].OnionKey[0] {
-selections[idx]++
-break
-}
-}
-}
+		// Find which index was selected by comparing OnionKey
+		for idx := range desc.IntroPoints {
+			if selected.OnionKey[0] == desc.IntroPoints[idx].OnionKey[0] {
+				selections[idx]++
+				break
+			}
+		}
+	}
 
-// Verify we got at least 2 different indices (very likely with random selection)
-if len(selections) < 2 {
-t.Errorf("Expected multiple different intro points to be selected, got only %d unique selections", len(selections))
-}
+	// Verify we got at least 2 different indices (very likely with random selection)
+	if len(selections) < 2 {
+		t.Errorf("Expected multiple different intro points to be selected, got only %d unique selections", len(selections))
+	}
 
-// Log distribution for debugging
-t.Logf("Selection distribution over %d attempts:", numSelections)
-for idx, count := range selections {
-t.Logf("  Index %d: %d times (%.1f%%)", idx, count, float64(count)/float64(numSelections)*100)
-}
+	// Log distribution for debugging
+	t.Logf("Selection distribution over %d attempts:", numSelections)
+	for idx, count := range selections {
+		t.Logf("  Index %d: %d times (%.1f%%)", idx, count, float64(count)/float64(numSelections)*100)
+	}
 }
 
 func TestSelectIntroductionPointSinglePoint(t *testing.T) {
-log := logger.NewDefault()
-ip := NewIntroductionProtocol(log)
+	log := logger.NewDefault()
+	ip := NewIntroductionProtocol(log)
 
-// Test with single introduction point
-desc := &Descriptor{
-IntroPoints: []IntroductionPoint{
-{OnionKey: []byte{1}},
-},
-}
+	// Test with single introduction point
+	desc := &Descriptor{
+		IntroPoints: []IntroductionPoint{
+			{OnionKey: []byte{1}},
+		},
+	}
 
-selected, err := ip.SelectIntroductionPoint(desc)
-if err != nil {
-t.Fatalf("SelectIntroductionPoint failed: %v", err)
-}
+	selected, err := ip.SelectIntroductionPoint(desc)
+	if err != nil {
+		t.Fatalf("SelectIntroductionPoint failed: %v", err)
+	}
 
-if selected.OnionKey[0] != desc.IntroPoints[0].OnionKey[0] {
-t.Error("Expected the only available intro point to be selected")
-}
+	if selected.OnionKey[0] != desc.IntroPoints[0].OnionKey[0] {
+		t.Error("Expected the only available intro point to be selected")
+	}
 }
 
 func TestSelectIntroductionPointEmptyDescriptor(t *testing.T) {
-log := logger.NewDefault()
-ip := NewIntroductionProtocol(log)
+	log := logger.NewDefault()
+	ip := NewIntroductionProtocol(log)
 
-// Test with no introduction points
-desc := &Descriptor{
-IntroPoints: []IntroductionPoint{},
-}
+	// Test with no introduction points
+	desc := &Descriptor{
+		IntroPoints: []IntroductionPoint{},
+	}
 
-_, err := ip.SelectIntroductionPoint(desc)
-if err == nil {
-t.Error("Expected error for descriptor with no intro points, got nil")
-}
+	_, err := ip.SelectIntroductionPoint(desc)
+	if err == nil {
+		t.Error("Expected error for descriptor with no intro points, got nil")
+	}
 }
 
 func TestSelectIntroductionPointNilDescriptor(t *testing.T) {
-log := logger.NewDefault()
-ip := NewIntroductionProtocol(log)
+	log := logger.NewDefault()
+	ip := NewIntroductionProtocol(log)
 
-_, err := ip.SelectIntroductionPoint(nil)
-if err == nil {
-t.Error("Expected error for nil descriptor, got nil")
-}
+	_, err := ip.SelectIntroductionPoint(nil)
+	if err == nil {
+		t.Error("Expected error for nil descriptor, got nil")
+	}
 }
 
 // TestEncryptIntroduce1Data tests the INTRODUCE1 encryption implementation (SPEC-006)
@@ -2130,13 +2129,13 @@ func TestEncryptIntroduce1Data(t *testing.T) {
 
 	// Create test plaintext
 	plaintext := []byte("test plaintext data for encryption")
-	
+
 	// Generate a valid curve25519 public key for introduction point
 	var introPointPrivate, introPointPublic [32]byte
 	if _, err := rand.Read(introPointPrivate[:]); err != nil {
 		t.Fatalf("Failed to generate intro point key: %v", err)
 	}
-	
+
 	// Compute public key using curve25519
 	var basePoint = [32]byte{9}
 	curve25519.ScalarMult(&introPointPublic, &introPointPrivate, &basePoint)
@@ -2169,7 +2168,7 @@ func TestEncryptIntroduce1DataInvalidKey(t *testing.T) {
 	ip := NewIntroductionProtocol(log)
 
 	plaintext := []byte("test data")
-	
+
 	tests := []struct {
 		name    string
 		keyLen  int
@@ -2196,7 +2195,7 @@ func TestEncryptIntroduce1DataInvalidKey(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			key := make([]byte, tt.keyLen)
 			_, _, err := ip.encryptIntroduce1Data(plaintext, key)
-			
+
 			if tt.wantErr && err == nil {
 				t.Error("Expected error for invalid key, got nil")
 			}
@@ -2352,7 +2351,7 @@ func TestDeriveKey(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			key, err := deriveKey(secret, info, tt.length)
-			
+
 			if tt.wantErr && err == nil {
 				t.Error("Expected error, got nil")
 			}

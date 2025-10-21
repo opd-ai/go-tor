@@ -12,17 +12,17 @@ import (
 
 // CircuitPool manages a pool of pre-built circuits for performance
 type CircuitPool struct {
-	mu              sync.RWMutex
-	circuits        []*circuit.Circuit
+	mu               sync.RWMutex
+	circuits         []*circuit.Circuit
 	isolatedCircuits map[string][]*circuit.Circuit // Keyed by isolation key
-	minCircuits     int
-	maxCircuits     int
-	buildFunc       CircuitBuilder
-	logger          *logger.Logger
-	prebuildEnabled bool
-	ctx             context.Context
-	cancel          context.CancelFunc
-	wg              sync.WaitGroup
+	minCircuits      int
+	maxCircuits      int
+	buildFunc        CircuitBuilder
+	logger           *logger.Logger
+	prebuildEnabled  bool
+	ctx              context.Context
+	cancel           context.CancelFunc
+	wg               sync.WaitGroup
 }
 
 // CircuitBuilder is a function that builds a new circuit

@@ -329,7 +329,7 @@ func TestCircuitPaddingInterval(t *testing.T) {
 	if c.GetPaddingInterval() != interval {
 		t.Errorf("Padding interval should be %v, got %v", interval, c.GetPaddingInterval())
 	}
-	
+
 	// Set to 0 to disable adaptive padding
 	c.SetPaddingInterval(0)
 	if c.GetPaddingInterval() != 0 {
@@ -414,7 +414,7 @@ func TestPaddingConcurrency(t *testing.T) {
 
 	// Test concurrent access to padding settings
 	done := make(chan bool, 10)
-	
+
 	// Test concurrent RecordActivity and RecordPaddingSent
 	for i := 0; i < 5; i++ {
 		go func() {
@@ -426,7 +426,7 @@ func TestPaddingConcurrency(t *testing.T) {
 			done <- true
 		}()
 	}
-	
+
 	for i := 0; i < 5; i++ {
 		<-done
 	}
@@ -434,16 +434,16 @@ func TestPaddingConcurrency(t *testing.T) {
 
 func TestRecordPaddingSent(t *testing.T) {
 	c := NewCircuit(1)
-	
+
 	// Set last padding time in the past
 	pastTime := time.Now().Add(-10 * time.Second)
 	c.mu.Lock()
 	c.lastPaddingTime = pastTime
 	c.mu.Unlock()
-	
+
 	// Record padding sent
 	c.RecordPaddingSent()
-	
+
 	// Verify time was updated
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -454,16 +454,16 @@ func TestRecordPaddingSent(t *testing.T) {
 
 func TestRecordActivity(t *testing.T) {
 	c := NewCircuit(1)
-	
+
 	// Set last activity time in the past
 	pastTime := time.Now().Add(-10 * time.Second)
 	c.mu.Lock()
 	c.lastActivityTime = pastTime
 	c.mu.Unlock()
-	
+
 	// Record activity
 	c.RecordActivity()
-	
+
 	// Verify time was updated
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -475,139 +475,139 @@ func TestRecordActivity(t *testing.T) {
 // CRYPTO-001: Tests for relay cell digest verification
 
 func TestCircuitDigestInitialization(t *testing.T) {
-c := NewCircuit(1)
+	c := NewCircuit(1)
 
-// Digests should be initialized
-if c.forwardDigest == nil {
-t.Error("Forward digest not initialized")
-}
-if c.backwardDigest == nil {
-t.Error("Backward digest not initialized")
-}
+	// Digests should be initialized
+	if c.forwardDigest == nil {
+		t.Error("Forward digest not initialized")
+	}
+	if c.backwardDigest == nil {
+		t.Error("Backward digest not initialized")
+	}
 }
 
 func TestUpdateDigest(t *testing.T) {
-c := NewCircuit(1)
+	c := NewCircuit(1)
 
-// Create a mock relay cell (11+ bytes)
-cellData := make([]byte, 20)
-cellData[0] = 1  // Command
-cellData[1] = 0  // Recognized (2 bytes)
-cellData[2] = 0
-cellData[3] = 0  // StreamID (2 bytes)
-cellData[4] = 1
-// Bytes 5-8 are digest (will be zeroed)
-cellData[5] = 0xAA
-cellData[6] = 0xBB
-cellData[7] = 0xCC
-cellData[8] = 0xDD
-cellData[9] = 0  // Length (2 bytes)
-cellData[10] = 0
+	// Create a mock relay cell (11+ bytes)
+	cellData := make([]byte, 20)
+	cellData[0] = 1 // Command
+	cellData[1] = 0 // Recognized (2 bytes)
+	cellData[2] = 0
+	cellData[3] = 0 // StreamID (2 bytes)
+	cellData[4] = 1
+	// Bytes 5-8 are digest (will be zeroed)
+	cellData[5] = 0xAA
+	cellData[6] = 0xBB
+	cellData[7] = 0xCC
+	cellData[8] = 0xDD
+	cellData[9] = 0 // Length (2 bytes)
+	cellData[10] = 0
 
-// Update forward digest
-err := c.UpdateDigest(DirectionForward, cellData)
-if err != nil {
-t.Fatalf("UpdateDigest failed: %v", err)
-}
+	// Update forward digest
+	err := c.UpdateDigest(DirectionForward, cellData)
+	if err != nil {
+		t.Fatalf("UpdateDigest failed: %v", err)
+	}
 
-// Update backward digest
-err = c.UpdateDigest(DirectionBackward, cellData)
-if err != nil {
-t.Fatalf("UpdateDigest failed: %v", err)
-}
+	// Update backward digest
+	err = c.UpdateDigest(DirectionBackward, cellData)
+	if err != nil {
+		t.Fatalf("UpdateDigest failed: %v", err)
+	}
 }
 
 func TestUpdateDigestTooShort(t *testing.T) {
-c := NewCircuit(1)
+	c := NewCircuit(1)
 
-// Cell data too short
-cellData := make([]byte, 5)
+	// Cell data too short
+	cellData := make([]byte, 5)
 
-err := c.UpdateDigest(DirectionForward, cellData)
-if err == nil {
-t.Error("Expected error for short cell data, got nil")
-}
+	err := c.UpdateDigest(DirectionForward, cellData)
+	if err == nil {
+		t.Error("Expected error for short cell data, got nil")
+	}
 }
 
 func TestVerifyDigest(t *testing.T) {
-c := NewCircuit(1)
+	c := NewCircuit(1)
 
-// Create mock relay cell
-cellData := make([]byte, 20)
-cellData[0] = 1 // Command
+	// Create mock relay cell
+	cellData := make([]byte, 20)
+	cellData[0] = 1 // Command
 
-// Get the current digest state BEFORE updating (this is the verification flow)
-currentSum := c.forwardDigest.Sum(nil)
-receivedDigest := [4]byte{currentSum[0], currentSum[1], currentSum[2], currentSum[3]}
+	// Get the current digest state BEFORE updating (this is the verification flow)
+	currentSum := c.forwardDigest.Sum(nil)
+	receivedDigest := [4]byte{currentSum[0], currentSum[1], currentSum[2], currentSum[3]}
 
-// Verify should pass with matching digest
-err := c.VerifyDigest(DirectionForward, cellData, receivedDigest)
-if err != nil {
-t.Errorf("VerifyDigest failed: %v", err)
-}
+	// Verify should pass with matching digest
+	err := c.VerifyDigest(DirectionForward, cellData, receivedDigest)
+	if err != nil {
+		t.Errorf("VerifyDigest failed: %v", err)
+	}
 
-// Now update the digest for future cells
-_ = c.UpdateDigest(DirectionForward, cellData)
+	// Now update the digest for future cells
+	_ = c.UpdateDigest(DirectionForward, cellData)
 }
 
 func TestVerifyDigestMismatch(t *testing.T) {
-c := NewCircuit(1)
+	c := NewCircuit(1)
 
-cellData := make([]byte, 20)
-cellData[0] = 1
+	cellData := make([]byte, 20)
+	cellData[0] = 1
 
-// Wrong digest
-wrongDigest := [4]byte{0xFF, 0xFF, 0xFF, 0xFF}
+	// Wrong digest
+	wrongDigest := [4]byte{0xFF, 0xFF, 0xFF, 0xFF}
 
-err := c.VerifyDigest(DirectionForward, cellData, wrongDigest)
-if err == nil {
-t.Error("Expected error for digest mismatch, got nil")
-}
+	err := c.VerifyDigest(DirectionForward, cellData, wrongDigest)
+	if err == nil {
+		t.Error("Expected error for digest mismatch, got nil")
+	}
 }
 
 func TestResetDigests(t *testing.T) {
-c := NewCircuit(1)
+	c := NewCircuit(1)
 
-// Update digests
-cellData := make([]byte, 20)
-_ = c.UpdateDigest(DirectionForward, cellData)
-_ = c.UpdateDigest(DirectionBackward, cellData)
+	// Update digests
+	cellData := make([]byte, 20)
+	_ = c.UpdateDigest(DirectionForward, cellData)
+	_ = c.UpdateDigest(DirectionBackward, cellData)
 
-// Reset
-c.ResetDigests()
+	// Reset
+	c.ResetDigests()
 
-// Digests should still be usable
-err := c.UpdateDigest(DirectionForward, cellData)
-if err != nil {
-t.Errorf("UpdateDigest after reset failed: %v", err)
-}
+	// Digests should still be usable
+	err := c.UpdateDigest(DirectionForward, cellData)
+	if err != nil {
+		t.Errorf("UpdateDigest after reset failed: %v", err)
+	}
 }
 
 func TestDigestConcurrency(t *testing.T) {
-c := NewCircuit(1)
-c.SetState(StateOpen)
+	c := NewCircuit(1)
+	c.SetState(StateOpen)
 
-done := make(chan bool, 10)
+	done := make(chan bool, 10)
 
-// Multiple goroutines updating digests concurrently
-for i := 0; i < 10; i++ {
-go func(id int) {
-cellData := make([]byte, 20)
-cellData[0] = byte(id)
+	// Multiple goroutines updating digests concurrently
+	for i := 0; i < 10; i++ {
+		go func(id int) {
+			cellData := make([]byte, 20)
+			cellData[0] = byte(id)
 
-for j := 0; j < 100; j++ {
-direction := DirectionForward
-if j%2 == 0 {
-direction = DirectionBackward
-}
-_ = c.UpdateDigest(direction, cellData)
-}
-done <- true
-}(i)
-}
+			for j := 0; j < 100; j++ {
+				direction := DirectionForward
+				if j%2 == 0 {
+					direction = DirectionBackward
+				}
+				_ = c.UpdateDigest(direction, cellData)
+			}
+			done <- true
+		}(i)
+	}
 
-// Wait for all goroutines
-for i := 0; i < 10; i++ {
-<-done
-}
+	// Wait for all goroutines
+	for i := 0; i < 10; i++ {
+		<-done
+	}
 }

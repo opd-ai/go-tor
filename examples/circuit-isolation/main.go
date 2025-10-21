@@ -31,12 +31,12 @@ func main() {
 		circ := circuit.NewCircuit(circuitCounter)
 		circuitCounter++
 		circ.SetState(circuit.StateOpen)
-		
+
 		// In a real implementation, this would:
 		// 1. Select path (guard, middle, exit)
 		// 2. Establish TLS connection to guard
 		// 3. Extend circuit through middle to exit
-		
+
 		log.Printf("Built circuit %d\n", circ.ID)
 		return circ, nil
 	}
@@ -128,7 +128,7 @@ func demonstrateDestinationIsolation(ctx context.Context, pool *pool.CircuitPool
 	// Create isolation keys for different destinations
 	keyGoogle := circuit.NewIsolationKey(circuit.IsolationDestination).
 		WithDestination("www.google.com:443")
-	
+
 	keyWikipedia := circuit.NewIsolationKey(circuit.IsolationDestination).
 		WithDestination("en.wikipedia.org:443")
 
@@ -171,7 +171,7 @@ func demonstrateCredentialIsolation(ctx context.Context, pool *pool.CircuitPool)
 	// Simulate SOCKS5 authentication with different usernames
 	keyAlice := circuit.NewIsolationKey(circuit.IsolationCredential).
 		WithCredentials("alice")
-	
+
 	keyBob := circuit.NewIsolationKey(circuit.IsolationCredential).
 		WithCredentials("bob")
 
@@ -202,7 +202,7 @@ func demonstratePortIsolation(ctx context.Context, pool *pool.CircuitPool) {
 	// Simulate connections from different client ports
 	keyPort1 := circuit.NewIsolationKey(circuit.IsolationPort).
 		WithSourcePort(12345)
-	
+
 	keyPort2 := circuit.NewIsolationKey(circuit.IsolationPort).
 		WithSourcePort(54321)
 
@@ -229,7 +229,7 @@ func demonstrateSessionIsolation(ctx context.Context, pool *pool.CircuitPool) {
 	// Create isolation keys with custom session tokens
 	keySession1 := circuit.NewIsolationKey(circuit.IsolationSession).
 		WithSessionToken("shopping-session-abc123")
-	
+
 	keySession2 := circuit.NewIsolationKey(circuit.IsolationSession).
 		WithSessionToken("browsing-session-xyz789")
 
