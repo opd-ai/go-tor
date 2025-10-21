@@ -124,6 +124,36 @@ func (c *Config) Validate() error {
 	if c.ControlPort < 0 || c.ControlPort > 65535 {
 		return fmt.Errorf("invalid ControlPort: %d", c.ControlPort)
 	}
+	if c.MetricsPort < 0 || c.MetricsPort > 65535 {
+		return fmt.Errorf("invalid MetricsPort: %d", c.MetricsPort)
+	}
+	
+	// Check for port conflicts between enabled services
+	// Build a map of used ports to detect conflicts
+	usedPorts := make(map[int]string)
+	
+	// SocksPort is always enabled if non-zero
+	if c.SocksPort > 0 {
+		usedPorts[c.SocksPort] = "SocksPort"
+	}
+	
+	// ControlPort is always enabled if non-zero
+	if c.ControlPort > 0 {
+		if existing, exists := usedPorts[c.ControlPort]; exists {
+			return fmt.Errorf("port conflict: ControlPort (%d) conflicts with %s", c.ControlPort, existing)
+		}
+		usedPorts[c.ControlPort] = "ControlPort"
+	}
+	
+	// MetricsPort is enabled when non-zero or when EnableMetrics is true
+	if c.MetricsPort > 0 || c.EnableMetrics {
+		if c.MetricsPort > 0 {
+			if existing, exists := usedPorts[c.MetricsPort]; exists {
+				return fmt.Errorf("port conflict: MetricsPort (%d) conflicts with %s", c.MetricsPort, existing)
+			}
+			usedPorts[c.MetricsPort] = "MetricsPort"
+		}
+	}
 	if c.CircuitBuildTimeout <= 0 {
 		return fmt.Errorf("CircuitBuildTimeout must be positive")
 	}

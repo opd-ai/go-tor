@@ -137,6 +137,92 @@ func TestConfigValidate(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "invalid MetricsPort negative",
+			modify: func(c *Config) {
+				c.MetricsPort = -1
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid MetricsPort too large",
+			modify: func(c *Config) {
+				c.MetricsPort = 65536
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid MetricsPort way too large",
+			modify: func(c *Config) {
+				c.MetricsPort = 99999
+			},
+			wantErr: true,
+		},
+		{
+			name: "valid MetricsPort zero (disabled)",
+			modify: func(c *Config) {
+				c.MetricsPort = 0
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid MetricsPort in range",
+			modify: func(c *Config) {
+				c.MetricsPort = 8080
+			},
+			wantErr: false,
+		},
+		{
+			name: "port conflict SocksPort and ControlPort",
+			modify: func(c *Config) {
+				c.SocksPort = 9050
+				c.ControlPort = 9050
+			},
+			wantErr: true,
+		},
+		{
+			name: "port conflict SocksPort and MetricsPort",
+			modify: func(c *Config) {
+				c.SocksPort = 9050
+				c.MetricsPort = 9050
+			},
+			wantErr: true,
+		},
+		{
+			name: "port conflict ControlPort and MetricsPort",
+			modify: func(c *Config) {
+				c.ControlPort = 9051
+				c.MetricsPort = 9051
+			},
+			wantErr: true,
+		},
+		{
+			name: "port conflict all three ports same",
+			modify: func(c *Config) {
+				c.SocksPort = 9050
+				c.ControlPort = 9050
+				c.MetricsPort = 9050
+			},
+			wantErr: true,
+		},
+		{
+			name: "no conflict with different ports",
+			modify: func(c *Config) {
+				c.SocksPort = 9050
+				c.ControlPort = 9051
+				c.MetricsPort = 8080
+			},
+			wantErr: false,
+		},
+		{
+			name: "no conflict with zero ports",
+			modify: func(c *Config) {
+				c.SocksPort = 0
+				c.ControlPort = 0
+				c.MetricsPort = 0
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
