@@ -90,8 +90,31 @@ func NewHTTPClient(torClient TorClient, config *HTTPClientConfig) (*http.Client,
 	// Create custom transport with Tor proxy
 	transport := &http.Transport{
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			// Use the SOCKS5 dialer
-			return dialer.Dial(network, addr)
+			// Apply DialTimeout if configured
+			if config.DialTimeout > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, config.DialTimeout)
+				defer cancel()
+			}
+			
+			// Use the SOCKS5 dialer with context-aware dialing
+			type result struct {
+				conn net.Conn
+				err  error
+			}
+			
+			ch := make(chan result, 1)
+			go func() {
+				conn, err := dialer.Dial(network, addr)
+				ch <- result{conn, err}
+			}()
+			
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case res := <-ch:
+				return res.conn, res.err
+			}
 		},
 		MaxIdleConns:          config.MaxIdleConns,
 		IdleConnTimeout:       config.IdleConnTimeout,
@@ -138,7 +161,31 @@ func NewHTTPTransport(torClient TorClient, config *HTTPClientConfig) (*http.Tran
 
 	return &http.Transport{
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			return dialer.Dial(network, addr)
+			// Apply DialTimeout if configured
+			if config.DialTimeout > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, config.DialTimeout)
+				defer cancel()
+			}
+			
+			// Use the SOCKS5 dialer with context-aware dialing
+			type result struct {
+				conn net.Conn
+				err  error
+			}
+			
+			ch := make(chan result, 1)
+			go func() {
+				conn, err := dialer.Dial(network, addr)
+				ch <- result{conn, err}
+			}()
+			
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case res := <-ch:
+				return res.conn, res.err
+			}
 		},
 		MaxIdleConns:          config.MaxIdleConns,
 		IdleConnTimeout:       config.IdleConnTimeout,
@@ -174,12 +221,23 @@ func DialContext(torClient TorClient) func(ctx context.Context, network, addr st
 			return nil, fmt.Errorf("failed to create SOCKS5 dialer: %w", err)
 		}
 
-		// Context is handled by the caller's timeout/cancellation
+		// Use context-aware dialing
+		type result struct {
+			conn net.Conn
+			err  error
+		}
+		
+		ch := make(chan result, 1)
+		go func() {
+			conn, err := dialer.Dial(network, addr)
+			ch <- result{conn, err}
+		}()
+		
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
-		default:
-			return dialer.Dial(network, addr)
+		case res := <-ch:
+			return res.conn, res.err
 		}
 	}
 }

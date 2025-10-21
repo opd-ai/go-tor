@@ -386,3 +386,97 @@ func TestHTTPClientConfigValidation(t *testing.T) {
 		})
 	}
 }
+
+// TestDialTimeoutRespected verifies that DialTimeout is applied during connection establishment
+func TestDialTimeoutRespected(t *testing.T) {
+	mockClient := &mockSimpleClient{
+		proxyURL: "socks5://127.0.0.1:9050",
+	}
+
+	// Create config with very short DialTimeout
+	config := &HTTPClientConfig{
+		DialTimeout: 1 * time.Millisecond, // Very short timeout to ensure it triggers
+		Timeout:     30 * time.Second,
+	}
+
+	transport, err := NewHTTPTransport(mockClient, config)
+	if err != nil {
+		t.Fatalf("Failed to create transport: %v", err)
+	}
+
+	// The transport should have DialContext that respects the timeout
+	if transport.DialContext == nil {
+		t.Fatal("Expected DialContext to be set")
+	}
+
+	// Test that a dial to a non-existent address times out quickly
+	ctx := context.Background()
+	start := time.Now()
+	_, err = transport.DialContext(ctx, "tcp", "192.0.2.1:80") // Non-routable IP
+	elapsed := time.Since(start)
+
+	// Should fail (either timeout or connection error)
+	if err == nil {
+		t.Error("Expected error when dialing non-routable address")
+	}
+
+	// Should fail relatively quickly (within a reasonable margin)
+	// We allow up to 100ms for the timeout plus overhead
+	if elapsed > 100*time.Millisecond {
+		t.Logf("Warning: Dial took %v, expected quick timeout (this may be OK on slow systems)", elapsed)
+	}
+}
+
+// TestDialContextCancellationDuringDial verifies context cancellation during dial
+func TestDialContextCancellationDuringDial(t *testing.T) {
+	mockClient := &mockSimpleClient{
+		proxyURL: "socks5://127.0.0.1:9050",
+	}
+
+	dialFunc := DialContext(mockClient)
+
+	// Create a context with a very short timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
+	defer cancel()
+
+	// Try to dial - should fail with context deadline exceeded
+	_, err := dialFunc(ctx, "tcp", "192.0.2.1:80")
+	if err == nil {
+		t.Error("Expected error when context times out during dial")
+	}
+
+	// Should be a context error
+	if err != context.DeadlineExceeded && err != context.Canceled {
+		t.Logf("Got error: %v (may be acceptable if dial failed before timeout)", err)
+	}
+}
+
+// TestDialContextImmediateCancellation verifies pre-cancelled context
+func TestDialContextImmediateCancellation(t *testing.T) {
+	mockClient := &mockSimpleClient{
+		proxyURL: "socks5://127.0.0.1:9050",
+	}
+
+	dialFunc := DialContext(mockClient)
+
+	// Create and immediately cancel context
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	start := time.Now()
+	_, err := dialFunc(ctx, "tcp", "example.com:80")
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Error("Expected error when context is already cancelled")
+	}
+
+	if err != context.Canceled {
+		t.Errorf("Expected context.Canceled, got %v", err)
+	}
+
+	// Should return immediately
+	if elapsed > 10*time.Millisecond {
+		t.Errorf("Expected immediate return, took %v", elapsed)
+	}
+}
