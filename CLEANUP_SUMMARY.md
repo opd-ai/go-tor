@@ -1,6 +1,87 @@
 # Repository Cleanup Summary
 Date: 2025-10-21
 
+## Latest Cleanup (Phase 2)
+
+### Results
+- **Files deleted:** 5 (4 phase reports + 1 performance doc)
+- **Storage recovered:** ~50KB
+- **Files consolidated:** Circuit isolation performance data merged into main documentation
+- **Files simplified:** 1 (STREAM_ISOLATION.md reduced by 60%)
+
+### Files Removed
+
+**Phase Reports (4 files, ~39KB):**
+- `PHASE_9_8_REPORT.md` - HTTP client helpers (completed Phase 9.8)
+- `PHASE_9_10_REPORT.md` - Context propagation (completed Phase 9.10)
+- `PHASE_9_11_REPORT.md` - Distributed tracing (completed Phase 9.11)
+- `PHASE_9_12_REPORT.md` - Test infrastructure (completed Phase 9.12)
+
+**Performance Documentation (1 file, ~7KB):**
+- `CIRCUIT_ISOLATION_PERFORMANCE.md` - Consolidated into CIRCUIT_ISOLATION.md
+
+### Files Consolidated
+
+**CIRCUIT_ISOLATION.md:**
+- Added performance benchmarks section
+- Integrated benchmark results and analysis
+- Included memory usage metrics
+- Added performance recommendations
+- Now serves as single source of truth for all circuit isolation documentation
+
+**STREAM_ISOLATION.md:**
+- Simplified from 51 lines to 6 lines (88% reduction)
+- Removed redundant examples and quick start guide
+- Kept as concise redirect to CIRCUIT_ISOLATION.md
+
+### Rationale
+
+**Phase Reports:** These documented completed development phases (9.8, 9.10, 9.11, 9.12). The features are now integrated into the codebase and listed in README.md. The detailed implementation reports are historical documentation preserved in git history but no longer needed in the active docs/ directory.
+
+**Performance Documentation:** The separate CIRCUIT_ISOLATION_PERFORMANCE.md file contained benchmark data that's more useful when integrated with the main circuit isolation documentation. Users can now find all isolation-related information in one place.
+
+**Stream Isolation Simplification:** The redirect file was unnecessarily verbose with duplicate examples and code samples. The simplified version maintains the redirect while eliminating redundancy.
+
+### Current Documentation Structure
+
+```
+docs/
+├── API.md                          # API reference
+├── ARCHITECTURE.md                 # System architecture
+├── BENCHMARKING.md                 # Performance benchmarking guide
+├── CIRCUIT_ISOLATION.md            # Circuit isolation (includes performance)
+├── COMPLIANCE_MATRIX.csv           # Compliance tracking
+├── CONTROL_PROTOCOL.md             # Control protocol documentation
+├── DEVELOPMENT.md                  # Developer guide
+├── LOGGING.md                      # Logging configuration
+├── METRICS.md                      # Metrics and monitoring
+├── ONION_SERVICE_INTEGRATION.md    # Onion service integration
+├── PERFORMANCE.md                  # Performance tuning
+├── PRODUCTION.md                   # Production deployment
+├── RESOURCE_PROFILES.md            # Resource profiles
+├── SHUTDOWN.md                     # Graceful shutdown
+├── STREAM_ISOLATION.md             # Redirect to CIRCUIT_ISOLATION.md
+├── TESTING.md                      # Testing guide
+├── TRACING.md                      # Distributed tracing
+├── TROUBLESHOOTING.md              # Troubleshooting guide
+├── TUTORIAL.md                     # Getting started tutorial
+└── ZERO_CONFIG.md                  # Zero-config setup
+```
+
+### Impact
+
+✅ Removed 5 obsolete/duplicate documentation files  
+✅ Consolidated circuit isolation documentation into single file  
+✅ Simplified repository structure for easier navigation  
+✅ Recovered ~50KB of storage  
+✅ Maintained all active, useful documentation  
+✅ All deleted content preserved in git history
+
+---
+
+## Previous Cleanup (Phase 1)
+Date: 2025-10-21
+
 ## Results
 - **Files deleted:** 13
 - **Storage recovered:** ~200KB (5,371 lines of documentation)

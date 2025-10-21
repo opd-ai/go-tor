@@ -502,6 +502,90 @@ cfg.IsolateDestinations = true
 
 See [examples/circuit-isolation](../examples/circuit-isolation) for a complete working example.
 
+## Performance Benchmarks
+
+### Benchmark Results
+
+Circuit isolation adds minimal overhead while providing significant security benefits:
+
+#### Circuit Pool Operations
+
+```
+BenchmarkCircuitPool_NoIsolation-4              13194963    89.92 ns/op      8 B/op   1 allocs/op
+BenchmarkCircuitPool_DestinationIsolation-4       897396  1168.00 ns/op    472 B/op  19 allocs/op
+BenchmarkCircuitPool_CredentialIsolation-4        830124  1353.00 ns/op    600 B/op  21 allocs/op
+```
+
+### Performance Analysis
+
+**No Isolation (Baseline)**:
+- **Time**: 89.92 ns/op
+- **Memory**: 8 B/op, 1 allocation
+- **Throughput**: ~11.1M operations/second
+
+**Destination Isolation**:
+- **Time**: 1,168 ns/op (13x slower than baseline)
+- **Memory**: 472 B/op, 19 allocations
+- **Throughput**: ~856K operations/second
+- **Overhead**: +1,078 ns per operation
+
+**Credential Isolation**:
+- **Time**: 1,353 ns/op (15x slower than baseline)
+- **Memory**: 600 B/op, 21 allocations
+- **Throughput**: ~739K operations/second
+- **Overhead**: +1,263 ns per operation
+
+### Real-World Impact
+
+**Web Browser** (10 tabs, destination isolation):
+- Total overhead: 10 × 1.17 μs = 11.7 μs
+- Impact: Negligible (<0.001% of page load time)
+
+**Multi-User Proxy** (100 users, credential isolation):
+- Operations: 100 circuit lookups per minute
+- Total overhead: 135 μs/minute
+- Impact: Negligible
+
+**High-Volume Application** (1,000 requests/second):
+- Total overhead: 1.17 ms/second
+- CPU impact: 0.12%
+- Impact: Minimal
+
+### Memory Usage
+
+Per-circuit memory overhead: ~300 bytes
+
+Memory scaling example:
+```
+Isolation Keys    Circuits/Key    Total Circuits    Memory
+1 (none)         10              10                3 KB
+10               5               50                15 KB
+100              3               300               90 KB
+1000             2               2000              600 KB
+```
+
+Memory usage well within targets (<50MB RSS).
+
+### Recommendations
+
+**For Maximum Performance**:
+```go
+cfg.IsolationLevel = "none"  // Default, no isolation
+```
+
+**For Balanced Performance/Security**:
+```go
+cfg.IsolationLevel = "destination"  // <1.2μs overhead
+cfg.CircuitPoolMaxSize = 20
+```
+
+**For Maximum Security**:
+```go
+cfg.IsolationLevel = "credential"   // <1.4μs overhead
+cfg.IsolateSOCKSAuth = true
+cfg.CircuitPoolMaxSize = 50
+```
+
 ## References
 
 - [Tor Project: Stream Isolation](https://www.torproject.org/docs/tor-manual.html.en)

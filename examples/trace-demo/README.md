@@ -116,6 +116,6 @@ sampler := trace.RateLimitSample(100) // Max 100 traces/sec
 
 ## Related Documentation
 
-- [Phase 9.10 Report](../../docs/PHASE_9_10_REPORT.md) - Context propagation
-- [Phase 9.1 Report](../../docs/METRICS.md) - Metrics and observability
+- [Tracing Guide](../../docs/TRACING.md) - Distributed tracing documentation
+- [Metrics Guide](../../docs/METRICS.md) - Metrics and observability
 - [Architecture](../../docs/ARCHITECTURE.md) - System architecture
