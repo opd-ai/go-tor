@@ -15,6 +15,7 @@ import (
 	"github.com/opd-ai/go-tor/pkg/circuit"
 	"github.com/opd-ai/go-tor/pkg/logger"
 	"github.com/opd-ai/go-tor/pkg/onion"
+	"github.com/opd-ai/go-tor/pkg/pool"
 )
 
 const (
@@ -57,26 +58,32 @@ type Config struct {
 	// SEC-L006: Configurable for resource-constrained embedded systems
 	// Set to 0 for unlimited (not recommended for production)
 	MaxConnections int
+
+	// Circuit isolation configuration
+	IsolationLevel      circuit.IsolationLevel // Isolation level to use
+	IsolateDestinations bool                   // Isolate by destination
+	IsolateSOCKSAuth    bool                   // Isolate by SOCKS5 credentials
+	IsolateClientPort   bool                   // Isolate by client port
 }
 
 // DefaultConfig returns default SOCKS5 server configuration
 func DefaultConfig() *Config {
 	return &Config{
-		MaxConnections: defaultMaxConnections,
+		MaxConnections:      defaultMaxConnections,
+		IsolationLevel:      circuit.IsolationNone, // Backward compatible default
+		IsolateDestinations: false,
+		IsolateSOCKSAuth:    false,
+		IsolateClientPort:   false,
 	}
 }
 
 // Server is a SOCKS5 proxy server
 // SEC-M001/MED-004: Circuit isolation for different SOCKS5 connections
-// Current implementation shares circuits between connections. Future enhancement:
-// - Track connection source (address, credentials)
-// - Maintain separate circuit pools per isolation group
-// - Implement stream isolation per socks-extensions.txt
-// - Requires full stream relay implementation (Phase 8)
 type Server struct {
 	address       string
 	listener      net.Listener
 	circuitMgr    *circuit.Manager
+	circuitPool   *pool.CircuitPool // Optional: for circuit isolation support
 	onionClient   *onion.Client
 	logger        *logger.Logger
 	config        *Config // SEC-L006: Configurable server settings
@@ -114,6 +121,14 @@ func NewServerWithConfig(address string, circuitMgr *circuit.Manager, log *logge
 		shutdown:      make(chan struct{}),
 		listenerReady: make(chan struct{}),
 	}
+}
+
+// SetCircuitPool sets the circuit pool for isolated circuit selection
+// This should be called after the pool is initialized (usually by the client)
+func (s *Server) SetCircuitPool(pool *pool.CircuitPool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.circuitPool = pool
 }
 
 // ListenAndServe starts the SOCKS5 server
@@ -255,22 +270,72 @@ func (s *Server) handleConnection(ctx context.Context, conn net.Conn) {
 		return
 	}
 
-	// For regular addresses, return success without actually routing through Tor
-	// In a full implementation, this would:
-	// 1. Select or create a circuit (with isolation key if configured)
-	// 2. Open a stream through the circuit
-	// 3. Relay data between client and stream
-	//
-	// Note: Circuit isolation would be applied here based on:
-	// - targetAddr (destination isolation)
-	// - username (credential isolation)
-	// - conn.RemoteAddr().(*net.TCPAddr).Port (port isolation)
+	// For regular addresses, use circuit isolation if configured
+	// Create isolation key based on configuration
+	var isolationKey *circuit.IsolationKey
+	s.mu.Lock()
+	isolationCfg := s.config
+	circuitPool := s.circuitPool
+	s.mu.Unlock()
+
+	// Build isolation key based on configured isolation level
+	if isolationCfg.IsolationLevel != circuit.IsolationNone {
+		isolationKey = circuit.NewIsolationKey(isolationCfg.IsolationLevel)
+
+		switch isolationCfg.IsolationLevel {
+		case circuit.IsolationDestination:
+			if isolationCfg.IsolateDestinations {
+				isolationKey = isolationKey.WithDestination(targetAddr)
+			}
+		case circuit.IsolationCredential:
+			if isolationCfg.IsolateSOCKSAuth && username != "" {
+				isolationKey = isolationKey.WithCredentials(username)
+			}
+		case circuit.IsolationPort:
+			if isolationCfg.IsolateClientPort {
+				if tcpAddr, ok := conn.RemoteAddr().(*net.TCPAddr); ok {
+					isolationKey = isolationKey.WithSourcePort(uint16(tcpAddr.Port))
+				}
+			}
+		}
+
+		// Validate the isolation key
+		if err := isolationKey.Validate(); err != nil {
+			s.logger.Warn("Invalid isolation key, falling back to no isolation",
+				"error", err,
+				"level", isolationCfg.IsolationLevel)
+			isolationKey = nil
+		}
+	}
+
+	// If circuit pool is available, request an isolated circuit
+	if circuitPool != nil && isolationKey != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		circ, err := circuitPool.GetWithIsolation(ctx, isolationKey)
+		if err != nil {
+			s.logger.Error("Failed to get isolated circuit", "error", err, "isolation_key", isolationKey)
+			s.sendReply(conn, replyGeneralFailure, nil)
+			return
+		}
+
+		s.logger.Info("Using isolated circuit",
+			"circuit_id", circ.ID,
+			"isolation_key", isolationKey.String(),
+			"target", targetAddr)
+
+		// Return circuit to pool when done
+		defer circuitPool.Put(circ)
+	}
+
+	// Send success reply
 	s.sendReply(conn, replySuccess, conn.LocalAddr())
 
-	s.logger.Info("Connection established", "target", targetAddr, "username", username)
+	s.logger.Info("Connection established", "target", targetAddr, "username", username, "isolation", isolationKey)
 
 	// Relay data (simplified - just close for now)
-	// In production: relay between conn and circuit stream
+	// In production: relay between conn and circuit stream using the isolated circuit
 	time.Sleep(100 * time.Millisecond)
 }
 
