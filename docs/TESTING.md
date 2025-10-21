@@ -616,3 +616,184 @@ For testing questions or issues:
 - Check [Troubleshooting Guide](TROUBLESHOOTING.md)
 - Open an issue on GitHub
 - Consult existing test files for examples
+
+## Integration Tests (Phase 9.12)
+
+Integration tests validate end-to-end workflows and component interactions. These tests are tagged with `+build integration` and can be run separately from unit tests.
+
+### Running Integration Tests
+
+```bash
+# Run all integration tests
+go test -tags=integration -v ./...
+
+# Run client integration tests only
+go test -tags=integration -v ./pkg/client
+
+# Run protocol integration tests only
+go test -tags=integration -v ./pkg/protocol
+```
+
+### Integration Test Coverage
+
+- **Client Package** (`pkg/client/integration_test.go`):
+  - Complete client lifecycle (start/stop)
+  - Simple client API
+  - Multiple concurrent clients
+  - Client restart scenarios
+  - Proxy connection functionality
+  - Context cancellation handling
+  - Statistics gathering
+  - Health monitoring
+  - Options validation
+
+- **Protocol Package** (`pkg/protocol/integration_test.go`):
+  - Handshake timeout behavior
+  - Version selection logic
+  - Handshake object creation
+  - Protocol constants validation
+
+### Writing Integration Tests
+
+Integration tests should:
+- Use the `+build integration` tag
+- Test complete workflows, not individual functions
+- Be independent and able to run in any order
+- Clean up resources properly
+- Skip when `testing.Short()` is true
+
+Example:
+```go
+// +build integration
+
+package client
+
+import "testing"
+
+func TestIntegrationFeature(t *testing.T) {
+    if testing.Short() {
+        t.Skip("Skipping integration test in short mode")
+    }
+    
+    // Test implementation
+}
+```
+
+## Performance Regression Tests (Phase 9.12)
+
+Regression tests detect performance degradations over time by comparing against established baselines.
+
+### Running Regression Tests
+
+```bash
+# Run regression tests
+go test -tags=regression -v ./pkg/testing
+
+# Create new baseline
+go test -tags=regression -v ./pkg/testing  # First run creates baseline
+
+# Compare against baseline
+go test -tags=regression -v ./pkg/testing  # Subsequent runs compare
+```
+
+### Regression Test Framework
+
+The regression testing framework (`pkg/testing/regression_test.go`) provides:
+- Performance baseline storage (JSON format)
+- Statistical analysis (mean, min, max, p95)
+- Automatic comparison with configurable thresholds
+- End-to-end performance validation
+
+### Baseline Management
+
+Baselines are stored in `/tmp/baseline_*.json` and include:
+- Version information
+- Timestamp
+- Client startup metrics
+- Circuit build metrics
+- Statistical data (mean, min, max, P95, P99)
+
+To reset baselines, simply delete the baseline files and rerun tests.
+
+## Test Coverage Goals
+
+Current test coverage (as of Phase 9.12):
+- Overall: 74%+
+- Critical packages: 90%+
+- Client package: 35% → Target: 70%+ (improvement in progress)
+- Protocol package: 27% → Target: 70%+ (improvement in progress)
+
+### Viewing Coverage
+
+```bash
+# Generate coverage report
+go test -cover ./...
+
+# Generate HTML coverage report
+go test -coverprofile=coverage.out -covermode=atomic ./...
+go tool cover -html=coverage.out -o coverage.html
+```
+
+## Testing Best Practices
+
+1. **Use build tags** for test categorization (`integration`, `regression`)
+2. **Respect testing.Short()** - skip long-running tests appropriately
+3. **Clean up resources** - always use `defer` for cleanup
+4. **Use unique ports** for concurrent test runs
+5. **Document test requirements** - network access, timing, etc.
+6. **Keep tests focused** - test one thing well
+7. **Use table-driven tests** for multiple scenarios
+8. **Measure what matters** - focus coverage on critical paths
+
+## Continuous Integration
+
+Integration and regression tests can be run in CI with appropriate timeouts:
+
+```yaml
+# Example CI configuration
+- name: Run unit tests
+  run: go test -short -v ./...
+
+- name: Run integration tests
+  run: go test -tags=integration -v ./...
+  timeout-minutes: 15
+
+- name: Run regression tests
+  run: go test -tags=regression -v ./pkg/testing
+  timeout-minutes: 20
+```
+
+## Troubleshooting Tests
+
+### Port Conflicts
+If tests fail with "address already in use", try:
+```bash
+# Kill processes on test ports
+pkill -9 tor-client
+
+# Run tests with unique ports
+go test -v ./pkg/client
+```
+
+### Timeout Issues
+Integration tests may timeout on slower systems:
+```bash
+# Increase timeout
+go test -tags=integration -timeout 30m ./...
+```
+
+### Network Issues
+Some tests require network access. If behind a firewall:
+```bash
+# Run only offline tests
+go test -short ./...
+```
+
+## Future Enhancements
+
+Planned testing infrastructure improvements:
+- [ ] Mock Tor relay for isolated protocol testing
+- [ ] Automated performance tracking and visualization
+- [ ] Test matrix for different Go versions and platforms
+- [ ] Fuzz testing for protocol parsers
+- [ ] Load testing framework for production scenarios
