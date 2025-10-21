@@ -6,6 +6,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/opd-ai/go-tor/pkg/logger"
@@ -144,7 +145,9 @@ func generateTestAddress() *onion.Address {
 	// Generate random ed25519 key pair
 	pubkey, _, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
-		panic(err)
+		// AUDIT-R-004: Replace panic with proper error handling
+		fmt.Fprintf(os.Stderr, "Failed to generate key: %v\n", err)
+		os.Exit(1)
 	}
 
 	// Create address from public key
