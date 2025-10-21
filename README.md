@@ -72,6 +72,7 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 - ✅ **HTTP metrics endpoint (Prometheus, JSON, health, dashboard)**
 
 ### Recently Completed
+- ✅ **Phase 9.9**: Enhanced CLI interface and developer tooling (torctl, config validator)
 - ✅ **Phase 9.8**: HTTP client helpers and developer experience (simplified HTTP integration)
 - ✅ **Phase 9.7**: Command-line interface testing (CLI test suite)
 - ✅ **Phase 9.6**: Race condition fix in benchmark package (thread safety)
@@ -95,6 +96,7 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
   - [x] Race condition fixes (Phase 9.6)
   - [x] CLI testing suite (Phase 9.7)
   - [x] HTTP client helpers and developer experience (Phase 9.8)
+  - [x] Enhanced CLI interface and developer tooling (Phase 9.9)
   - [ ] Additional production features and enhancements
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture and roadmap.
@@ -245,6 +247,49 @@ resp, _ := httpClient.Get("https://check.torproject.org")
 See [examples/http-helpers-demo](examples/http-helpers-demo) and [pkg/helpers/README.md](pkg/helpers/README.md) for complete documentation.
 
 
+### CLI Tools (NEW in Phase 9.9)
+
+Command-line tools for managing and monitoring go-tor clients:
+
+#### torctl - Control Utility
+
+Interactive control of running Tor clients:
+
+```bash
+# Show current status
+torctl status
+
+# List active circuits
+torctl circuits
+
+# List active streams  
+torctl streams
+
+# Show detailed information
+torctl info
+
+# Send control signals
+torctl signal SHUTDOWN
+```
+
+#### tor-config-validator - Configuration Tool
+
+Validate and generate Tor configurations:
+
+```bash
+# Validate configuration file
+tor-config-validator -config /etc/tor/torrc -verbose
+
+# Generate sample configuration
+tor-config-validator -generate -output sample-torrc
+
+# Generate to stdout
+tor-config-validator -generate
+```
+
+See [examples/cli-tools-demo](examples/cli-tools-demo) for complete documentation and usage examples.
+
+
 ### As a SOCKS Proxy
 
 Configure your application to use `localhost:9050` as a SOCKS5 proxy:
@@ -294,6 +339,7 @@ make test         # Run tests
 make test-coverage # Run tests with coverage
 make bench        # Run micro-benchmarks
 make benchmark-full # Run comprehensive performance benchmarks
+make build-tools  # Build all CLI tools (torctl, config-validator, benchmark)
 make fmt          # Format code
 make vet          # Run go vet
 make lint         # Run golint
