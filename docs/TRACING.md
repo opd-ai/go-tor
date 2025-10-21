@@ -450,7 +450,7 @@ Ensure:
 
 ## Related Documentation
 
-- [Context Propagation](PHASE_9_10_REPORT.md) - Phase 9.10 context features
+- [API Documentation](API.md) - Complete API reference
 - [Metrics](METRICS.md) - Complementary metrics system
 - [Health Monitoring](../pkg/health/README.md) - Health check integration
 - [Examples](../examples/trace-demo/) - Complete working examples
