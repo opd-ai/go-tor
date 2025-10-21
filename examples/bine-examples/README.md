@@ -14,23 +14,34 @@ These examples show how to integrate `cretz/bine` with `go-tor` to leverage the 
 
 ## Examples
 
-### 1. Client Example (`client-example/`)
+### 1. All-in-One Example (`all-in-one/`) ⭐ START HERE
+**Comprehensive demonstration** combining client and hidden service functionality. This example shows:
+- Starting go-tor client for network connectivity (pure Go)
+- Creating a v3 onion service with bine
+- Accessing the hidden service through go-tor's SOCKS proxy
+- Complete lifecycle management and integration
+
+**Use case**: When you want to see the complete picture of how bine and go-tor work together, or when you need both client and service functionality.
+
+**Recommended**: Start with this example to understand the full integration pattern.
+
+### 2. Client Example (`client-example/`)
 Demonstrates how to use `cretz/bine` to create a Tor client that connects through `go-tor`'s SOCKS5 proxy. This example shows:
 - Starting a go-tor client
 - Configuring bine to use go-tor's SOCKS proxy
 - Making HTTP requests through the combined setup
 - Graceful shutdown
 
-**Use case**: When you want to use bine's convenient API with go-tor's pure-Go Tor implementation.
+**Use case**: When you want to use bine's convenient API with go-tor's pure-Go Tor implementation for client-side operations only.
 
-### 2. Hidden Service Example (`hidden-service-example/`)
-Demonstrates how to create a v3 onion service (hidden service) using `cretz/bine` while leveraging `go-tor` infrastructure. This example shows:
-- Starting go-tor for Tor network connectivity
+### 3. Hidden Service Example (`hidden-service-example/`)
+Demonstrates how to create a v3 onion service (hidden service) using `cretz/bine`. This example shows:
 - Creating a v3 onion service with bine
 - Serving HTTP content over the onion service
 - Publishing and accessing the service
+- Complete hidden service lifecycle
 
-**Use case**: When you want to host a hidden service using bine's API with go-tor's networking capabilities.
+**Use case**: When you want to host a hidden service using bine's proven API and service management capabilities.
 
 ## Prerequisites
 
@@ -42,6 +53,25 @@ Demonstrates how to create a v3 onion service (hidden service) using `cretz/bine
 
 ## Quick Start
 
+### Running the All-in-One Example (Recommended)
+
+The all-in-one example provides the most comprehensive demonstration:
+
+```bash
+cd examples/bine-examples/all-in-one
+go run main.go
+```
+
+Expected output:
+```
+=== All-in-One: Bine + go-tor Integration ===
+...
+✓ go-tor client ready on socks5://127.0.0.1:9050
+✓ Hidden service created: http://abc123xyz456.onion
+✓ Successfully accessed service!
+...
+```
+
 ### Running the Client Example
 
 ```bash
@@ -51,7 +81,9 @@ go run main.go
 
 Expected output:
 ```
-Starting go-tor client...
+=== Bine + go-tor Client Integration Example ===
+
+Step 1: Starting go-tor client...
 go-tor client ready on socks5://127.0.0.1:9050
 Starting bine Tor client...
 Tor started successfully
