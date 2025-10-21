@@ -72,6 +72,7 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 - ✅ **HTTP metrics endpoint (Prometheus, JSON, health, dashboard)**
 
 ### Recently Completed
+- ✅ **Phase 9.11**: Distributed tracing and observability (end-to-end operation tracking)
 - ✅ **Phase 9.10**: Context propagation and cancellation (timeout control and graceful cancellation)
 - ✅ **Phase 9.9**: Enhanced CLI interface and developer tooling (torctl, config validator)
 - ✅ **Phase 9.8**: HTTP client helpers and developer experience (simplified HTTP integration)
@@ -95,6 +96,7 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
   - [x] HTTP client helpers and developer experience (Phase 9.8)
   - [x] Enhanced CLI interface and developer tooling (Phase 9.9)
   - [x] Context propagation and cancellation (Phase 9.10)
+  - [x] Distributed tracing and observability (Phase 9.11)
   - [ ] Additional production features and enhancements
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture and roadmap.
@@ -323,6 +325,7 @@ The project is organized into modular packages:
 - **pkg/errors**: Structured error types ✅ (Phase 8.2)
 - **pkg/pool**: Resource pooling infrastructure ✅ (Phase 8.3)
 - **pkg/helpers**: HTTP client integration helpers ✅ (Phase 9.8)
+- **pkg/trace**: Distributed tracing and observability ✅ (Phase 9.11)
 - **pkg/pool**: Resource pooling infrastructure ✅ (Phase 8.3)
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for details.
@@ -494,6 +497,7 @@ Comprehensive documentation is available in the [docs/](docs/) directory:
 - [DEVELOPMENT.md](docs/DEVELOPMENT.md) - Development guidelines
 - [TESTING.md](docs/TESTING.md) - Testing strategies
 - [BENCHMARKING.md](docs/BENCHMARKING.md) - Performance benchmarks
+- [TRACING.md](docs/TRACING.md) - Distributed tracing guide
 
 ### Advanced Topics
 - [ONION_SERVICE_INTEGRATION.md](docs/ONION_SERVICE_INTEGRATION.md) - Onion services
@@ -502,7 +506,9 @@ Comprehensive documentation is available in the [docs/](docs/) directory:
 - [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) - Common issues and solutions
 
 ### Examples
-See [examples/](examples/) directory for 18 working demonstrations covering all major features, including the new [context-demo](examples/context-demo) showing timeout control and graceful cancellation.
+See [examples/](examples/) directory for 19 working demonstrations covering all major features, including:
+- [context-demo](examples/context-demo) - Timeout control and graceful cancellation
+- [trace-demo](examples/trace-demo) - Distributed tracing and observability (NEW in Phase 9.11)
 
 ## Repository Structure
 
