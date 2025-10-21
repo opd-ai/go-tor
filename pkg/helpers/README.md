@@ -372,7 +372,7 @@ The helpers package includes comprehensive unit tests. Run them with:
 go test ./pkg/helpers -v
 ```
 
-Coverage: 100% of public API
+Coverage: 73.6% of statements (includes context-aware dialing implementation)
 
 ## License
 
