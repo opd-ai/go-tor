@@ -5,6 +5,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -177,6 +178,14 @@ func (c *Client) Start(ctx context.Context) error {
 	c.logger.Info("Starting SOCKS5 proxy server", "port", c.config.SocksPort)
 	c.wg.Add(1)
 	go func() {
+		// AUDIT-R-005: Add panic recovery for goroutine resilience
+		defer func() {
+			if r := recover(); r != nil {
+				c.logger.Error("SOCKS5 server goroutine panic recovered",
+					"panic", r,
+					"stack", string(debug.Stack()))
+			}
+		}()
 		defer c.wg.Done()
 		if err := c.socksServer.ListenAndServe(ctx); err != nil {
 			c.logger.Error("SOCKS5 server error", "error", err)
@@ -200,6 +209,14 @@ func (c *Client) Start(ctx context.Context) error {
 	// Step 7: Start circuit maintenance loop
 	c.wg.Add(1)
 	go func() {
+		// AUDIT-R-005: Add panic recovery for goroutine resilience
+		defer func() {
+			if r := recover(); r != nil {
+				c.logger.Error("Circuit maintenance goroutine panic recovered",
+					"panic", r,
+					"stack", string(debug.Stack()))
+			}
+		}()
 		defer c.wg.Done()
 		c.maintainCircuits(ctx)
 	}()
@@ -207,6 +224,14 @@ func (c *Client) Start(ctx context.Context) error {
 	// Step 8: Start bandwidth monitoring (publishes BW events)
 	c.wg.Add(1)
 	go func() {
+		// AUDIT-R-005: Add panic recovery for goroutine resilience
+		defer func() {
+			if r := recover(); r != nil {
+				c.logger.Error("Bandwidth monitoring goroutine panic recovered",
+					"panic", r,
+					"stack", string(debug.Stack()))
+			}
+		}()
 		defer c.wg.Done()
 		c.monitorBandwidth(ctx)
 	}()
@@ -225,6 +250,7 @@ func (c *Client) Stop() error {
 
 	// Wait for goroutines to finish (with timeout)
 	done := make(chan struct{})
+	// AUDIT-R-010: Launch helper goroutine (not tracked in WaitGroup as it waits on the group itself)
 	go func() {
 		c.wg.Wait()
 		close(done)
@@ -254,7 +280,10 @@ func (c *Client) Stop() error {
 	c.circuitsMu.Unlock()
 
 	// Stop SOCKS server
-	if err := c.socksServer.Shutdown(context.Background()); err != nil {
+	// AUDIT-R-009: Use timeout context for shutdown instead of Background
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+	if err := c.socksServer.Shutdown(shutdownCtx); err != nil {
 		c.logger.Warn("Failed to shutdown SOCKS server", "error", err)
 	}
 
@@ -726,6 +755,7 @@ func (a *clientStatsAdapter) GetStats() control.StatsProvider {
 func (c *Client) mergeContexts(parent, child context.Context) context.Context {
 	ctx, cancel := context.WithCancel(parent)
 
+	// AUDIT-R-012: Launch context merger goroutine (will terminate when either context cancels)
 	go func() {
 		select {
 		case <-parent.Done():
