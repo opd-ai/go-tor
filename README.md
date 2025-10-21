@@ -506,6 +506,12 @@ Comprehensive documentation is available in the [docs/](docs/) directory:
 ### Examples
 See [examples/](examples/) directory for 18 working demonstrations covering all major features.
 
+## Repository Structure
+
+The repository maintains a clean, focused documentation structure. Historical audit reports and completed phase implementation reports have been removed to reduce clutter. See [CLEANUP_SUMMARY.md](CLEANUP_SUMMARY.md) for details on the recent repository cleanup that removed 13 obsolete documentation files (~200KB).
+
+All active documentation is in the [docs/](docs/) directory, and all deleted files remain accessible in git history if needed.
+
 ## Contributing
 
 Contributions are welcome! Please see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for guidelines.
