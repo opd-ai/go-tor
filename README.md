@@ -508,7 +508,7 @@ Comprehensive documentation is available in the [docs/](docs/) directory:
 - [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) - Common issues and solutions
 
 ### Examples
-See [examples/](examples/) directory for 19 working demonstrations covering all major features, including:
+See [examples/](examples/) directory for 20 working demonstrations covering all major features, including:
 - [context-demo](examples/context-demo) - Timeout control and graceful cancellation
 - [trace-demo](examples/trace-demo) - Distributed tracing and observability (NEW in Phase 9.11)
 
