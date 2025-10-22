@@ -42,11 +42,19 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.Timeout != 30*time.Second {
 		t.Errorf("Timeout = %v, want %v", cfg.Timeout, 30*time.Second)
 	}
-	if cfg.TLSConfig == nil {
-		t.Error("TLSConfig is nil")
+	// AUDIT-004: TLSConfig is now nil by default and created in Connect()
+	if cfg.TLSConfig != nil {
+		t.Error("TLSConfig should be nil (created in Connect)")
 	}
 	if !cfg.LinkProtocolV4 {
 		t.Error("LinkProtocolV4 = false, want true")
+	}
+	// AUDIT-004: Verify pinning fields are initialized
+	if cfg.ExpectedIdentity != nil {
+		t.Error("ExpectedIdentity should be nil by default")
+	}
+	if cfg.ExpectedFingerprint != "" {
+		t.Error("ExpectedFingerprint should be empty by default")
 	}
 }
 
@@ -299,4 +307,71 @@ func TestVerifyTorRelayCertificate(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error for invalid certificate")
 	}
+}
+
+// TestCertificatePinningInfrastructure tests the pinning infrastructure (AUDIT-004)
+func TestCertificatePinningInfrastructure(t *testing.T) {
+	t.Run("no_pinning_by_default", func(t *testing.T) {
+		cfg := DefaultConfig("127.0.0.1:9001")
+		if cfg.ExpectedIdentity != nil {
+			t.Error("Expected nil identity by default")
+		}
+		if cfg.ExpectedFingerprint != "" {
+			t.Error("Expected empty fingerprint by default")
+		}
+	})
+
+	t.Run("pinning_with_identity", func(t *testing.T) {
+		cfg := DefaultConfig("127.0.0.1:9001")
+		testIdentity := make([]byte, 32)
+		for i := range testIdentity {
+			testIdentity[i] = byte(i)
+		}
+		cfg.ExpectedIdentity = testIdentity
+		cfg.ExpectedFingerprint = "ABCD1234"
+
+		if len(cfg.ExpectedIdentity) != 32 {
+			t.Errorf("Expected 32-byte identity, got %d", len(cfg.ExpectedIdentity))
+		}
+		if cfg.ExpectedFingerprint != "ABCD1234" {
+			t.Errorf("Expected fingerprint ABCD1234, got %s", cfg.ExpectedFingerprint)
+		}
+	})
+
+	t.Run("create_pinned_tls_config", func(t *testing.T) {
+		testIdentity := make([]byte, 32)
+		tlsCfg := createTorTLSConfigWithPinning(testIdentity, "TEST123")
+
+		if tlsCfg == nil {
+			t.Fatal("Expected non-nil TLS config")
+		}
+		if tlsCfg.MinVersion != tls.VersionTLS12 {
+			t.Errorf("Expected TLS 1.2 minimum, got %x", tlsCfg.MinVersion)
+		}
+		if tlsCfg.VerifyPeerCertificate == nil {
+			t.Error("Expected non-nil verification function")
+		}
+	})
+
+	t.Run("verify_identity_pinning_no_certs", func(t *testing.T) {
+		err := verifyRelayIdentityPinning(nil, make([]byte, 32), "TEST")
+		if err == nil {
+			t.Error("Expected error for nil certificates")
+		}
+	})
+
+	t.Run("verify_identity_pinning_invalid_cert", func(t *testing.T) {
+		err := verifyRelayIdentityPinning([][]byte{{0x00}}, make([]byte, 32), "TEST")
+		if err == nil {
+			t.Error("Expected error for invalid certificate")
+		}
+	})
+
+	t.Run("verify_identity_pinning_no_identity", func(t *testing.T) {
+		// Should succeed when no identity is set (no pinning)
+		err := verifyRelayIdentityPinning([][]byte{}, nil, "")
+		if err != nil {
+			t.Errorf("Expected no error when pinning disabled, got: %v", err)
+		}
+	})
 }

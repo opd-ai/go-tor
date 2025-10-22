@@ -418,6 +418,8 @@ func TestDescriptorCacheExpiration(t *testing.T) {
 }
 
 // TestOnionClient tests the onion service client
+// TestOnionClient tests basic onion client operations
+// AUDIT-003 FIX: Updated to expect proper errors when no HSDirs are available
 func TestOnionClient(t *testing.T) {
 	client := NewClient(nil)
 
@@ -428,29 +430,21 @@ func TestOnionClient(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Test descriptor fetching (currently returns mock descriptor)
+	// AUDIT-003: Without HSDirs, fetch should fail with proper error
 	desc, err := client.GetDescriptor(ctx, addr)
-	if err != nil {
-		t.Fatalf("Failed to get descriptor: %v", err)
+	if err == nil {
+		t.Fatal("Expected error when fetching without HSDirs, but got success")
+	}
+	if desc != nil {
+		t.Error("Expected nil descriptor on failure")
 	}
 
-	if desc == nil {
-		t.Fatal("Expected non-nil descriptor")
+	// Verify error message indicates no HSDirs available
+	if !strings.Contains(err.Error(), "no HSDirs available") && !strings.Contains(err.Error(), "failed to fetch") {
+		t.Errorf("Expected error about missing HSDirs, got: %v", err)
 	}
 
-	if desc.Version != 3 {
-		t.Errorf("Expected version 3, got %d", desc.Version)
-	}
-
-	// Second call should hit cache
-	desc2, err := client.GetDescriptor(ctx, addr)
-	if err != nil {
-		t.Fatalf("Failed to get cached descriptor: %v", err)
-	}
-
-	if desc2 != desc {
-		t.Error("Expected same descriptor instance from cache")
-	}
+	t.Logf("Correctly received error: %v", err)
 }
 
 // TestComputeBlindedPubkey tests blinded public key computation
@@ -942,6 +936,7 @@ func TestCompareBytes(t *testing.T) {
 }
 
 // TestHSDirFetchDescriptor tests descriptor fetching from HSDirs
+// AUDIT-003 FIX: Updated to expect proper errors instead of mock fallbacks
 func TestHSDirFetchDescriptor(t *testing.T) {
 	log := logger.NewDefault()
 	hsdir := NewHSDir(log)
@@ -952,41 +947,31 @@ func TestHSDirFetchDescriptor(t *testing.T) {
 		t.Fatalf("Failed to parse address: %v", err)
 	}
 
-	// Create mock HSDirs
+	// Create mock HSDirs (these won't respond)
 	hsdirs := []*HSDirectory{
 		{Fingerprint: "0000000000000000000000000000000000000001", Address: "10.0.0.1", ORPort: 9001, HSDir: true},
 		{Fingerprint: "0000000000000000000000000000000000000002", Address: "10.0.0.2", ORPort: 9001, HSDir: true},
 		{Fingerprint: "0000000000000000000000000000000000000003", Address: "10.0.0.3", ORPort: 9001, HSDir: true},
 	}
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
 
-	// Fetch descriptor
+	// AUDIT-003: Fetch should now fail with proper error instead of returning mock
 	desc, err := hsdir.FetchDescriptor(ctx, addr, hsdirs)
-	if err != nil {
-		t.Fatalf("Failed to fetch descriptor: %v", err)
+	if err == nil {
+		t.Fatal("Expected error when fetching from non-responsive HSDirs, but got success")
+	}
+	if desc != nil {
+		t.Error("Expected nil descriptor on failure")
 	}
 
-	// Verify descriptor properties
-	if desc.Version != 3 {
-		t.Errorf("Expected version 3, got %d", desc.Version)
+	// Verify error message contains expected information (context cancellation is valid error)
+	if !strings.Contains(err.Error(), "context") && !strings.Contains(err.Error(), "failed to fetch") {
+		t.Errorf("Expected error about fetch failure or context, got: %v", err)
 	}
 
-	if desc.Address == nil {
-		t.Error("Expected address to be set")
-	}
-
-	if len(desc.BlindedPubkey) == 0 {
-		t.Error("Expected blinded pubkey to be set")
-	}
-
-	if len(desc.DescriptorID) != 32 {
-		t.Errorf("Expected descriptor ID length 32, got %d", len(desc.DescriptorID))
-	}
-
-	if desc.Lifetime != 3*time.Hour {
-		t.Errorf("Expected lifetime 3h, got %v", desc.Lifetime)
-	}
+	t.Logf("Correctly received error: %v", err)
 }
 
 // TestClientUpdateHSDirs tests updating HSDir list in client
@@ -1013,6 +998,7 @@ func TestClientUpdateHSDirs(t *testing.T) {
 }
 
 // TestClientGetDescriptorWithHSDirs tests descriptor fetching with HSDirs available
+// AUDIT-003 FIX: Updated to expect proper errors instead of mock fallbacks
 func TestClientGetDescriptorWithHSDirs(t *testing.T) {
 	log := logger.NewDefault()
 	client := NewClient(log)
@@ -1023,7 +1009,7 @@ func TestClientGetDescriptorWithHSDirs(t *testing.T) {
 		t.Fatalf("Failed to parse address: %v", err)
 	}
 
-	// Update with HSDirs
+	// Update with HSDirs (these won't respond)
 	hsdirs := []*HSDirectory{
 		{Fingerprint: "0000000000000000000000000000000000000001", Address: "10.0.0.1", ORPort: 9001, HSDir: true},
 		{Fingerprint: "0000000000000000000000000000000000000002", Address: "10.0.0.2", ORPort: 9001, HSDir: true},
@@ -1031,28 +1017,24 @@ func TestClientGetDescriptorWithHSDirs(t *testing.T) {
 	}
 	client.UpdateHSDirs(hsdirs)
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
 
-	// First fetch - should use HSDir protocol and cache result
-	desc1, err := client.GetDescriptor(ctx, addr)
-	if err != nil {
-		t.Fatalf("Failed to get descriptor: %v", err)
+	// AUDIT-003: Fetch should now fail with proper error instead of returning mock
+	desc, err := client.GetDescriptor(ctx, addr)
+	if err == nil {
+		t.Fatal("Expected error when fetching from non-responsive HSDirs, but got success")
+	}
+	if desc != nil {
+		t.Error("Expected nil descriptor on failure")
 	}
 
-	if desc1 == nil {
-		t.Fatal("Expected descriptor to be returned")
+	// Verify error message contains expected information (context cancellation is valid error)
+	if !strings.Contains(err.Error(), "context") && !strings.Contains(err.Error(), "failed to fetch") {
+		t.Errorf("Expected error about fetch failure or context, got: %v", err)
 	}
 
-	// Second fetch - should hit cache
-	desc2, err := client.GetDescriptor(ctx, addr)
-	if err != nil {
-		t.Fatalf("Failed to get descriptor from cache: %v", err)
-	}
-
-	// Should be the same descriptor from cache
-	if desc1 != desc2 {
-		t.Error("Expected same descriptor instance from cache")
-	}
+	t.Logf("Correctly received error: %v", err)
 }
 
 // BenchmarkHSDirSelection benchmarks HSDir selection

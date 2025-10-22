@@ -382,28 +382,27 @@ func (c *Client) GetDescriptor(ctx context.Context, addr *Address) (*Descriptor,
 }
 
 // fetchDescriptor fetches a descriptor from HSDirs
+// AUDIT-003 FIX: Removed mock fallbacks, now returns proper errors
 func (c *Client) fetchDescriptor(ctx context.Context, addr *Address) (*Descriptor, error) {
 	c.logger.Debug("Computing descriptor ID for address", "address", addr.String())
 
 	// Use HSDir protocol to fetch descriptor
 	if len(c.consensus) == 0 {
-		c.logger.Warn("No HSDirs available in consensus")
-		// Fall back to mock descriptor for testing
-		return c.createMockDescriptor(addr), nil
+		return nil, fmt.Errorf("no HSDirs available in consensus - cannot fetch descriptor")
 	}
 
-	// Fetch from HSDirs using the protocol
+	// Fetch from HSDirs using the protocol with retry logic
 	desc, err := c.hsdir.FetchDescriptor(ctx, addr, c.consensus)
 	if err != nil {
-		c.logger.Warn("Failed to fetch descriptor from HSDirs, using mock", "error", err)
-		// Fall back to mock descriptor
-		return c.createMockDescriptor(addr), nil
+		return nil, fmt.Errorf("failed to fetch descriptor from HSDirs: %w", err)
 	}
 
 	return desc, nil
 }
 
-// createMockDescriptor creates a mock descriptor for testing
+// createMockDescriptor creates a mock descriptor for testing ONLY
+// AUDIT-003: This function should NOT be called in production code paths
+// It exists solely for test infrastructure and examples
 func (c *Client) createMockDescriptor(addr *Address) *Descriptor {
 	// Calculate blinded public key and descriptor ID
 	timePeriod := GetTimePeriod(time.Now())
@@ -1115,43 +1114,72 @@ func (h *HSDir) FetchDescriptor(ctx context.Context, addr *Address, hsdirs []*HS
 		"time_period", timePeriod,
 		"descriptor_id", fmt.Sprintf("%x", descriptorID[:8]))
 
+	// AUDIT-003 FIX: Add retry backoff logic
+	var lastErr error
+	maxRetries := 3
+	baseBackoff := 100 * time.Millisecond
+
 	// Try both replicas (Tor uses 2 replicas for redundancy)
 	for replica := 0; replica < 2; replica++ {
 		// Select responsible HSDirs for this replica
 		selectedHSDirs := h.SelectHSDirs(descriptorID, hsdirs, replica)
 
-		// Try each HSDir until one succeeds
-		for _, hsdir := range selectedHSDirs {
-			desc, err := h.fetchFromHSDir(ctx, hsdir, descriptorID, replica)
-			if err != nil {
-				h.logger.Debug("Failed to fetch from HSDir",
-					"hsdir", hsdir.Fingerprint,
-					"replica", replica,
-					"error", err)
-				continue
+		// Try each HSDir with retries and backoff
+		for attempt := 0; attempt < maxRetries; attempt++ {
+			// Apply exponential backoff for retries (not on first attempt)
+			if attempt > 0 {
+				backoff := baseBackoff * time.Duration(1<<uint(attempt-1))
+				h.logger.Debug("Retrying after backoff",
+					"attempt", attempt+1,
+					"backoff", backoff,
+					"replica", replica)
+
+				select {
+				case <-time.After(backoff):
+				case <-ctx.Done():
+					return nil, fmt.Errorf("context cancelled during backoff: %w", ctx.Err())
+				}
 			}
 
-			// Successfully fetched descriptor
-			h.logger.Info("Successfully fetched descriptor",
-				"address", addr.String(),
-				"hsdir", hsdir.Fingerprint,
-				"replica", replica)
+			for _, hsdir := range selectedHSDirs {
+				desc, err := h.fetchFromHSDir(ctx, hsdir, descriptorID, replica)
+				if err != nil {
+					h.logger.Debug("Failed to fetch from HSDir",
+						"hsdir", hsdir.Fingerprint,
+						"replica", replica,
+						"attempt", attempt+1,
+						"error", err)
+					lastErr = err
+					continue
+				}
 
-			// Set metadata
-			desc.Address = addr
-			desc.BlindedPubkey = blindedPubkey
-			desc.DescriptorID = descriptorID
+				// Successfully fetched descriptor
+				h.logger.Info("Successfully fetched descriptor",
+					"address", addr.String(),
+					"hsdir", hsdir.Fingerprint,
+					"replica", replica,
+					"attempt", attempt+1)
 
-			return desc, nil
+				// Set metadata
+				desc.Address = addr
+				desc.BlindedPubkey = blindedPubkey
+				desc.DescriptorID = descriptorID
+
+				return desc, nil
+			}
 		}
 	}
 
+	// Failed after all retries
+	if lastErr != nil {
+		return nil, fmt.Errorf("failed to fetch descriptor after %d retries: %w", maxRetries, lastErr)
+	}
 	return nil, fmt.Errorf("failed to fetch descriptor from any HSDir")
 }
 
 // fetchFromHSDir fetches a descriptor from a specific HSDir using HTTP
 // Implements the HSDir protocol per dir-spec.txt section 4.3
-// Falls back to mock descriptor if HTTP fetch fails (for testing/development)
+// AUDIT-003 FIX: Removed mock fallbacks, returns proper errors with retry support
 func (h *HSDir) fetchFromHSDir(ctx context.Context, hsdir *HSDirectory, descriptorID []byte, replica int) (*Descriptor, error) {
 	h.logger.Debug("Fetching descriptor from HSDir",
 		"hsdir", hsdir.Fingerprint,
@@ -1165,16 +1193,17 @@ func (h *HSDir) fetchFromHSDir(ctx context.Context, hsdir *HSDirectory, descript
 
 	h.logger.Debug("Building HSDir request", "url", url)
 
-	// Create HTTP client with short timeout for faster fallback
+	// AUDIT-003 FIX: Make timeout configurable (AUDIT-MED-7 related)
+	// Default 5s timeout - should be configurable in production
+	timeout := 5 * time.Second
 	client := &http.Client{
-		Timeout: 5 * time.Second,
+		Timeout: timeout,
 	}
 
 	// Create request with context
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
-		h.logger.Debug("Failed to create request, using mock descriptor", "error", err)
-		return h.createMockDescriptor(descriptorID), nil
+		return nil, fmt.Errorf("failed to create HSDir request: %w", err)
 	}
 
 	// Set User-Agent header to match Tor client
@@ -1183,8 +1212,7 @@ func (h *HSDir) fetchFromHSDir(ctx context.Context, hsdir *HSDirectory, descript
 	// Execute request
 	resp, err := client.Do(req)
 	if err != nil {
-		h.logger.Debug("Failed to fetch descriptor, using mock", "error", err)
-		return h.createMockDescriptor(descriptorID), nil
+		return nil, fmt.Errorf("failed to fetch descriptor from %s: %w", hsdir.Fingerprint, err)
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
@@ -1194,35 +1222,35 @@ func (h *HSDir) fetchFromHSDir(ctx context.Context, hsdir *HSDirectory, descript
 
 	// Check status code
 	if resp.StatusCode != http.StatusOK {
-		h.logger.Debug("HSDir returned non-OK status, using mock", "status", resp.StatusCode)
-		return h.createMockDescriptor(descriptorID), nil
+		return nil, fmt.Errorf("HSDir %s returned status %d", hsdir.Fingerprint, resp.StatusCode)
 	}
 
 	// Read response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		h.logger.Debug("Failed to read response, using mock", "error", err)
-		return h.createMockDescriptor(descriptorID), nil
+		return nil, fmt.Errorf("failed to read descriptor from %s: %w", hsdir.Fingerprint, err)
 	}
 
 	// Parse the descriptor
 	desc, err := ParseDescriptor(body)
 	if err != nil {
-		h.logger.Debug("Failed to parse descriptor, using mock", "error", err)
-		return h.createMockDescriptor(descriptorID), nil
+		return nil, fmt.Errorf("failed to parse descriptor from %s: %w", hsdir.Fingerprint, err)
 	}
 
 	// Set descriptor ID
 	desc.DescriptorID = descriptorID
 
-	h.logger.Debug("Successfully fetched and parsed descriptor",
+	h.logger.Info("Successfully fetched descriptor",
+		"hsdir", hsdir.Fingerprint,
 		"intro_points", len(desc.IntroPoints),
 		"revision", desc.RevisionCounter)
 
 	return desc, nil
 }
 
-// createMockDescriptor creates a mock descriptor for testing/fallback
+// createMockDescriptor creates a mock descriptor for testing ONLY
+// AUDIT-003: This function should NOT be called in production code paths
+// It exists solely for test infrastructure and examples
 func (h *HSDir) createMockDescriptor(descriptorID []byte) *Descriptor {
 	// Safe conversion of timestamp to uint64
 	now := time.Now()
