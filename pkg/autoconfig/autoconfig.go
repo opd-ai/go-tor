@@ -64,9 +64,9 @@ func EnsureDataDir(path string) error {
 		// Verify permissions on Unix systems
 		if runtime.GOOS != "windows" {
 			mode := info.Mode().Perm()
-			if mode != 0700 {
+			if mode != 0o700 {
 				// Fix permissions
-				if err := os.Chmod(path, 0700); err != nil {
+				if err := os.Chmod(path, 0o700); err != nil {
 					return fmt.Errorf("failed to set directory permissions: %w", err)
 				}
 			}
@@ -80,7 +80,7 @@ func EnsureDataDir(path string) error {
 	}
 
 	// Create directory with proper permissions
-	if err := os.MkdirAll(path, 0700); err != nil {
+	if err := os.MkdirAll(path, 0o700); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 

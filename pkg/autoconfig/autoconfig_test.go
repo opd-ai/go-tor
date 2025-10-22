@@ -64,7 +64,7 @@ func TestEnsureDataDir(t *testing.T) {
 	// Verify permissions on Unix systems
 	if runtime.GOOS != "windows" {
 		mode := info.Mode().Perm()
-		if mode != 0700 {
+		if mode != 0o700 {
 			t.Errorf("Expected permissions 0700, got %o", mode)
 		}
 	}

@@ -99,7 +99,7 @@ ExcludeNodes badnode1
 ExcludeExitNodes badexit1
 ConnLimit 2000
 `
-	if err := os.WriteFile(customConfigFile, []byte(customContent), 0644); err != nil {
+	if err := os.WriteFile(customConfigFile, []byte(customContent), 0o644); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create custom config: %v\n", err)
 		os.Exit(1)
 	}
@@ -143,7 +143,7 @@ ConnLimit 2000
 	invalidContent := `SocksPort 70000  # Invalid - port too high
 ControlPort 9051
 `
-	if err := os.WriteFile(invalidConfigFile, []byte(invalidContent), 0644); err != nil {
+	if err := os.WriteFile(invalidConfigFile, []byte(invalidContent), 0o644); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create invalid config: %v\n", err)
 		os.Exit(1)
 	}

@@ -46,7 +46,7 @@ func NewGuardManager(dataDir string, log *logger.Logger) (*GuardManager, error) 
 	}
 
 	// Ensure data directory exists
-	if err := os.MkdirAll(dataDir, 0700); err != nil {
+	if err := os.MkdirAll(dataDir, 0o700); err != nil {
 		return nil, fmt.Errorf("failed to create data directory: %w", err)
 	}
 
@@ -105,7 +105,7 @@ func (gm *GuardManager) Save() error {
 
 	// Write to temporary file first, then rename for atomic update
 	tmpFile := gm.stateFile + ".tmp"
-	if err := os.WriteFile(tmpFile, data, 0600); err != nil {
+	if err := os.WriteFile(tmpFile, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write guard state: %w", err)
 	}
 

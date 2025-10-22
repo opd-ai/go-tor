@@ -2137,7 +2137,7 @@ func TestEncryptIntroduce1Data(t *testing.T) {
 	}
 
 	// Compute public key using curve25519
-	var basePoint = [32]byte{9}
+	basePoint := [32]byte{9}
 	curve25519.ScalarMult(&introPointPublic, &introPointPrivate, &basePoint)
 
 	// Test encryption
@@ -2216,7 +2216,7 @@ func TestBuildEncryptedDataWithEncryption(t *testing.T) {
 	if _, err := rand.Read(introPointPrivate[:]); err != nil {
 		t.Fatalf("Failed to generate intro point key: %v", err)
 	}
-	var basePoint = [32]byte{9}
+	basePoint := [32]byte{9}
 	curve25519.ScalarMult(&introPointPublic, &introPointPrivate, &basePoint)
 
 	// Create test request
@@ -2406,7 +2406,7 @@ func TestEncryptionIntegration(t *testing.T) {
 	if _, err := rand.Read(introPointPrivate[:]); err != nil {
 		t.Fatalf("Failed to generate intro point key: %v", err)
 	}
-	var basePoint = [32]byte{9}
+	basePoint := [32]byte{9}
 	curve25519.ScalarMult(&introPointPublic, &introPointPrivate, &basePoint)
 
 	// Create valid request

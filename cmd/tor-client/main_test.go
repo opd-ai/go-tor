@@ -197,7 +197,7 @@ SocksPort 9050
 ControlPort 9051
 DataDirectory ` + tmpDir + `/tor-data
 `
-	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(configContent), 0o644); err != nil {
 		t.Fatalf("Failed to create test config file: %v", err)
 	}
 

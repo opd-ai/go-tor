@@ -1367,7 +1367,7 @@ func (ip *IntroductionProtocol) encryptIntroduce1Data(plaintext, introPointPubKe
 
 	// Compute public key from private key
 	// Uses curve25519 scalar multiplication with base point
-	var basePoint = [32]byte{9} // Curve25519 base point
+	basePoint := [32]byte{9} // Curve25519 base point
 	curve25519.ScalarMult(&clientPublic, &clientPrivate, &basePoint)
 
 	// Step 2: Perform Diffie-Hellman to get shared secret

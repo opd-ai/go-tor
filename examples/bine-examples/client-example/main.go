@@ -101,22 +101,22 @@ func makeHTTPRequest(client *bine.Client) error {
 func demonstrateUsage(client *bine.Client) {
 	fmt.Println("  The bine wrapper provides multiple interfaces:")
 	fmt.Println()
-	
+
 	fmt.Println("  1. Zero-Configuration HTTP Client:")
 	fmt.Println("     httpClient, _ := client.HTTPClient()")
 	fmt.Println("     resp, _ := httpClient.Get(\"https://example.com\")")
 	fmt.Println()
-	
+
 	fmt.Println("  2. SOCKS Proxy Address:")
 	fmt.Printf("     %s\n", client.ProxyAddr())
 	fmt.Println("     Use with curl: curl --socks5", client.ProxyAddr(), "https://example.com")
 	fmt.Println()
-	
+
 	fmt.Println("  3. Custom Dialer:")
 	fmt.Println("     dialer := client.Dialer()")
 	fmt.Println("     conn, _ := dialer.Dial(\"tcp\", \"example.com:80\")")
 	fmt.Println()
-	
+
 	fmt.Println("  4. Check Readiness:")
 	if client.IsReady() {
 		fmt.Println("     ✓ Client is ready")

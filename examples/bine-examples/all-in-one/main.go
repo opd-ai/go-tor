@@ -60,7 +60,7 @@ func main() {
 	// Step 2: Create hidden service with one function call
 	fmt.Println("Step 2: Creating hidden service...")
 	fmt.Println("  (This requires Tor binary to be installed)")
-	
+
 	service, err := createHiddenService(ctx, client)
 	if err != nil {
 		fmt.Printf("❌ Failed to create hidden service: %v\n", err)
@@ -74,7 +74,7 @@ func main() {
 		demonstrateClientOnly(client)
 	} else {
 		defer service.Close()
-		
+
 		onionAddr := service.OnionAddress()
 		fmt.Printf("✓ Hidden service created: http://%s\n", onionAddr)
 		fmt.Println()
@@ -82,7 +82,7 @@ func main() {
 		// Step 3: Access the hidden service through integrated proxy
 		fmt.Println("Step 3: Accessing hidden service through integrated SOCKS proxy...")
 		time.Sleep(5 * time.Second) // Give service time to be fully published
-		
+
 		if err := accessHiddenService(client, onionAddr); err != nil {
 			fmt.Printf("Note: Could not access service yet: %v\n", err)
 			fmt.Println("(Hidden services can take 2-3 minutes to be fully accessible)")

@@ -290,7 +290,6 @@ func TestWithSpan(t *testing.T) {
 		span.SetAttribute("test.key", "test.value")
 		return nil
 	})
-
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}

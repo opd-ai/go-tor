@@ -254,7 +254,7 @@ func GenerateNtorKeyPair() (*NtorKeyPair, error) {
 //   - sharedSecret: The derived shared secret for KDF
 //
 // Implements tor-spec.txt section 5.1.4
-func NtorClientHandshake(identityKey, ntorOnionKey []byte) (handshakeData []byte, sharedSecret []byte, err error) {
+func NtorClientHandshake(identityKey, ntorOnionKey []byte) (handshakeData, sharedSecret []byte, err error) {
 	if len(identityKey) != 32 {
 		return nil, nil, fmt.Errorf("invalid identity key length: %d", len(identityKey))
 	}
@@ -304,7 +304,7 @@ func NtorClientHandshake(identityKey, ntorOnionKey []byte) (handshakeData []byte
 //   - sharedSecret: The verified shared secret for key derivation
 //
 // Implements tor-spec.txt section 5.1.4
-func NtorProcessResponse(response []byte, clientPrivate, serverNtorKey, serverIdentity []byte) ([]byte, error) {
+func NtorProcessResponse(response, clientPrivate, serverNtorKey, serverIdentity []byte) ([]byte, error) {
 	// Expected response: Y (32 bytes) || AUTH (32 bytes)
 	if len(response) != 64 {
 		return nil, fmt.Errorf("invalid response length: %d, expected 64", len(response))

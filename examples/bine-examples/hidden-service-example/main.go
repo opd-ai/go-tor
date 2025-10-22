@@ -191,7 +191,7 @@ func createHTTPServer(onionAddr string) *http.Server {
     </div>
 </body>
 </html>`, onionAddr)
-		
+
 		w.Header().Set("Content-Type", "text/html")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(html))

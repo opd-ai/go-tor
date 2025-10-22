@@ -176,7 +176,7 @@ ControlPort 9051`,
 		t.Run(tt.name, func(t *testing.T) {
 			// Create test file
 			testFile := filepath.Join(tmpDir, tt.name+".conf")
-			if err := os.WriteFile(testFile, []byte(tt.content), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(tt.content), 0o644); err != nil {
 				t.Fatalf("Failed to create test file: %v", err)
 			}
 
@@ -207,7 +207,7 @@ func TestLoadFromFile_FileNotFound(t *testing.T) {
 func TestLoadFromFile_NilConfig(t *testing.T) {
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test.conf")
-	if err := os.WriteFile(testFile, []byte("SocksPort 9050"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("SocksPort 9050"), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -484,7 +484,7 @@ UseEntryGuards 1
 UseBridges 0
 ConnLimit 1000`
 
-	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(content), 0o644); err != nil {
 		b.Fatalf("Failed to create test file: %v", err)
 	}
 
