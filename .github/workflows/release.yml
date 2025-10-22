@@ -1,0 +1,207 @@
+name: Release
+
+on:
+  # Nightly builds
+  schedule:
+    - cron: '0 0 * * *'  # Daily at midnight UTC
+  
+  # Version tag releases (v1.0.0, v2.1.3, etc.)
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  
+  # Allow manual trigger
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      is_nightly: ${{ steps.check_type.outputs.is_nightly }}
+      version: ${{ steps.version.outputs.version }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for proper version detection
+
+    - name: Check release type
+      id: check_type
+      run: |
+        if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          echo "is_nightly=true" >> $GITHUB_OUTPUT
+          echo "Release type: Nightly"
+        else
+          echo "is_nightly=false" >> $GITHUB_OUTPUT
+          echo "Release type: Versioned"
+        fi
+
+    - name: Determine version
+      id: version
+      run: |
+        if [ "${{ steps.check_type.outputs.is_nightly }}" = "true" ]; then
+          echo "version=nightly" >> $GITHUB_OUTPUT
+        else
+          # Extract version from tag (e.g., v1.2.3 -> 1.2.3)
+          echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Delete existing nightly release
+      if: steps.check_type.outputs.is_nightly == 'true'
+      continue-on-error: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # Delete the release if it exists
+        gh release delete nightly --yes --cleanup-tag 2>/dev/null || true
+        
+        # Delete the tag if it exists
+        git push origin :refs/tags/nightly 2>/dev/null || true
+
+    - name: Create/update nightly tag
+      if: steps.check_type.outputs.is_nightly == 'true'
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git tag -f nightly
+        git push -f origin nightly
+
+    - name: Generate release notes
+      id: release_notes
+      run: |
+        if [ "${{ steps.check_type.outputs.is_nightly }}" = "true" ]; then
+          # For nightly, show recent commits
+          cat > release_notes.md << EOF
+        # Nightly Build
+        
+        Automated nightly build from the latest main branch.
+        
+        **Build Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+        **Commit:** ${{ github.sha }}
+        
+        ## Recent Changes
+        $(git log -10 --pretty=format:"- %s (%an)" --no-merges)
+        
+        ---
+        ⚠️ **Note:** This is a pre-release build. Use stable tagged releases for production.
+        EOF
+        else
+          # For versioned releases, generate from commits since last tag
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -n "$PREVIOUS_TAG" ]; then
+            cat > release_notes.md << EOF
+        # Release v${{ steps.version.outputs.version }}
+        
+        ## Changes Since ${PREVIOUS_TAG}
+        $(git log ${PREVIOUS_TAG}..HEAD --pretty=format:"- %s (%an)" --no-merges)
+        EOF
+          else
+            cat > release_notes.md << EOF
+        # Release v${{ steps.version.outputs.version }}
+        
+        Initial release of go-tor.
+        EOF
+          fi
+        fi
+        
+        cat release_notes.md
+
+    - name: Create Release
+      id: create_release
+      uses: softprops/action-gh-release@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.check_type.outputs.is_nightly == 'true' && 'nightly' || github.ref_name }}
+        name: ${{ steps.check_type.outputs.is_nightly == 'true' && 'Nightly Build' || format('Release {0}', github.ref_name) }}
+        body_path: release_notes.md
+        draft: false
+        prerelease: ${{ steps.check_type.outputs.is_nightly == 'true' }}
+
+  build-and-upload:
+    name: Build and Upload Assets
+    needs: release
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.22.x'
+
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Build binary
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+      run: |
+        if [ "${{ needs.release.outputs.is_nightly }}" = "true" ]; then
+          VERSION="nightly-$(date -u '+%Y%m%d')-${GITHUB_SHA::7}"
+        else
+          VERSION="v${{ needs.release.outputs.version }}"
+        fi
+        
+        BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S')
+        BINARY_NAME=tor-client-${VERSION}-${{ matrix.goos }}-${{ matrix.goarch }}
+        
+        if [ "${{ matrix.goos }}" = "windows" ]; then
+          BINARY_NAME="${BINARY_NAME}.exe"
+        fi
+        
+        echo "Building ${BINARY_NAME}"
+        mkdir -p dist
+        
+        go build -ldflags "-X main.version=${VERSION} -X main.buildTime=${BUILD_TIME}" \
+          -o dist/${BINARY_NAME} ./cmd/tor-client
+        
+        # Create checksum
+        cd dist
+        sha256sum ${BINARY_NAME} > ${BINARY_NAME}.sha256
+        cd ..
+        
+        ls -lh dist/
+
+    - name: Upload Release Assets
+      uses: softprops/action-gh-release@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ needs.release.outputs.is_nightly == 'true' && 'nightly' || github.ref_name }}
+        files: |
+          dist/tor-client-*

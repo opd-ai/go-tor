@@ -96,19 +96,19 @@ func NewHTTPClient(torClient TorClient, config *HTTPClientConfig) (*http.Client,
 				ctx, cancel = context.WithTimeout(ctx, config.DialTimeout)
 				defer cancel()
 			}
-			
+
 			// Use the SOCKS5 dialer with context-aware dialing
 			type result struct {
 				conn net.Conn
 				err  error
 			}
-			
+
 			ch := make(chan result, 1)
 			go func() {
 				conn, err := dialer.Dial(network, addr)
 				ch <- result{conn, err}
 			}()
-			
+
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
@@ -167,19 +167,19 @@ func NewHTTPTransport(torClient TorClient, config *HTTPClientConfig) (*http.Tran
 				ctx, cancel = context.WithTimeout(ctx, config.DialTimeout)
 				defer cancel()
 			}
-			
+
 			// Use the SOCKS5 dialer with context-aware dialing
 			type result struct {
 				conn net.Conn
 				err  error
 			}
-			
+
 			ch := make(chan result, 1)
 			go func() {
 				conn, err := dialer.Dial(network, addr)
 				ch <- result{conn, err}
 			}()
-			
+
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
@@ -226,13 +226,13 @@ func DialContext(torClient TorClient) func(ctx context.Context, network, addr st
 			conn net.Conn
 			err  error
 		}
-		
+
 		ch := make(chan result, 1)
 		go func() {
 			conn, err := dialer.Dial(network, addr)
 			ch <- result{conn, err}
 		}()
-		
+
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
