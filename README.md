@@ -5,7 +5,7 @@
 
 A production-ready Tor client implementation in pure Go, designed for embedded systems.
 
-**⚠️ Development Status**: This project is in active development. Core functionality is being implemented according to the roadmap below.
+**⚠️ Development Status**: This project is in active development. Core functionality is being implemented according to the roadmap below. THIS IS NOT PRODUCTION READY SOFTWARE AND YOU SHOULD NOT USE IT.
 
 ## Features
 
