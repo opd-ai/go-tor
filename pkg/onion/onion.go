@@ -159,16 +159,17 @@ func IsOnionAddress(addr string) bool {
 
 // Descriptor represents an onion service descriptor (v3)
 type Descriptor struct {
-	Version         int                 // Descriptor version (3)
-	Address         *Address            // Onion service address
-	IntroPoints     []IntroductionPoint // Introduction points
-	DescriptorID    []byte              // Descriptor identifier (32 bytes)
-	BlindedPubkey   []byte              // Blinded ed25519 public key (32 bytes)
-	RevisionCounter uint64              // Revision counter for freshness
-	Signature       []byte              // Descriptor signature
-	RawDescriptor   []byte              // Raw descriptor content
-	CreatedAt       time.Time           // When descriptor was created
-	Lifetime        time.Duration       // Descriptor validity lifetime
+	Version                  int                 // Descriptor version (3)
+	Address                  *Address            // Onion service address
+	IntroPoints              []IntroductionPoint // Introduction points
+	DescriptorID             []byte              // Descriptor identifier (32 bytes)
+	BlindedPubkey            []byte              // Blinded ed25519 public key (32 bytes)
+	RevisionCounter          uint64              // Revision counter for freshness
+	Signature                []byte              // Descriptor signature
+	DescriptorSigningKeyCert []byte              // Descriptor signing key certificate (AUDIT-002)
+	RawDescriptor            []byte              // Raw descriptor content
+	CreatedAt                time.Time           // When descriptor was created
+	Lifetime                 time.Duration       // Descriptor validity lifetime
 }
 
 // IntroductionPoint represents an introduction point
@@ -527,8 +528,35 @@ func ParseDescriptor(raw []byte) (*Descriptor, error) {
 			desc.Lifetime = time.Duration(lifetimeMinutes) * time.Minute
 
 		case "descriptor-signing-key-cert":
-			// Skip certificate parsing for now - it's a multi-line base64 block
-			// A full implementation would parse the Ed25519 certificate
+			// AUDIT-002 FIX: Parse the Ed25519 certificate
+			// Certificate is a multi-line base64 block following this keyword
+			// Format per cert-spec.txt:
+			// descriptor-signing-key-cert
+			// -----BEGIN ED25519 CERT-----
+			// <base64 data>
+			// -----END ED25519 CERT-----
+			certLines := make([]string, 0)
+			inCert := false
+			for j := i + 1; j < len(lines); j++ {
+				line := strings.TrimSpace(string(lines[j]))
+				if strings.HasPrefix(line, "-----BEGIN") {
+					inCert = true
+					continue
+				}
+				if strings.HasPrefix(line, "-----END") {
+					break
+				}
+				if inCert && line != "" {
+					certLines = append(certLines, line)
+				}
+			}
+			if len(certLines) > 0 {
+				certB64 := strings.Join(certLines, "")
+				certData, err := base64.StdEncoding.DecodeString(certB64)
+				if err == nil {
+					desc.DescriptorSigningKeyCert = certData
+				}
+			}
 
 		case "revision-counter":
 			// Parse revision counter
@@ -666,71 +694,150 @@ func VerifyDescriptorSignature(descriptor *Descriptor, address *Address) error {
 	// The signed message is everything up to (but not including) the signature line
 	signedMessage := raw[:signatureIdx]
 
-	// Verify the signature using Ed25519
-	// Per rend-spec-v3.txt section 2.1, the descriptor is signed with the descriptor signing key
-	// which is certified by the identity key (onion address public key)
-	//
-	// Simplified implementation: We verify directly with the identity key
-	// A full production implementation would:
+	// AUDIT-002 FIX: Implement full certificate chain validation
+	// Per rend-spec-v3.txt section 2.1:
 	// 1. Parse the descriptor-signing-key-cert from the descriptor
-	// 2. Verify certificate signature: Ed25519Verify(identityKey, certBody, certSig)
-	// 3. Extract signing key from certificate
-	// 4. Verify descriptor: Ed25519Verify(signingKey, signedMessage, descriptorSig)
-	//
-	// For now, we verify with the identity key which provides authentication
-	// (though not full certificate chain validation per spec)
+	// 2. Verify certificate signature with identity key (onion address public key)
+	// 3. Extract descriptor signing key from certificate
+	// 4. Verify descriptor signature with the extracted signing key
 
-	// Import the crypto package Ed25519 verification function
-	if !ed25519.Verify(ed25519.PublicKey(address.Pubkey), signedMessage, descriptor.Signature) {
-		return fmt.Errorf("descriptor signature verification failed: invalid signature")
+	// Step 1: Parse the certificate
+	if len(descriptor.DescriptorSigningKeyCert) == 0 {
+		return fmt.Errorf("descriptor has no signing key certificate")
+	}
+
+	cert, err := parseCertificate(descriptor.DescriptorSigningKeyCert)
+	if err != nil {
+		return fmt.Errorf("failed to parse descriptor signing key certificate: %w", err)
+	}
+
+	// Verify certificate type (should be type 4 for Ed25519 signing key signed with Ed25519 identity)
+	// Per cert-spec.txt section 2.1
+	if cert.CertType != 4 {
+		return fmt.Errorf("invalid certificate type: %d, expected 4 (Ed25519 signing key)", cert.CertType)
+	}
+
+	// Check certificate expiration
+	if time.Now().After(cert.ExpiresAt) {
+		return fmt.Errorf("certificate expired at %v", cert.ExpiresAt)
+	}
+
+	// Step 2: Verify certificate signature with identity key (onion address public key)
+	// The certificate's signature covers all fields before the signature field
+	if !ed25519.Verify(ed25519.PublicKey(address.Pubkey), cert.SignedData, cert.Signature) {
+		return fmt.Errorf("certificate signature verification failed: identity key did not sign certificate")
+	}
+
+	// Step 3: Extract the descriptor signing key from the certificate
+	// This is the certified_key field in the certificate
+	descriptorSigningKey := cert.SigningKey
+	if len(descriptorSigningKey) != 32 {
+		return fmt.Errorf("invalid descriptor signing key length in certificate: %d", len(descriptorSigningKey))
+	}
+
+	// Step 4: Verify descriptor signature with the extracted signing key
+	if !ed25519.Verify(ed25519.PublicKey(descriptorSigningKey), signedMessage, descriptor.Signature) {
+		return fmt.Errorf("descriptor signature verification failed: signing key did not sign descriptor")
 	}
 
 	return nil
 }
 
-// parseCertificate parses a Tor Ed25519 certificate
-// This is a simplified parser for basic certificate validation
-// A full implementation would handle all certificate types and extensions
-// Per cert-spec.txt (Tor certificate format specification)
+// parseCertificate parses a Tor Ed25519 certificate per cert-spec.txt
+// AUDIT-002 FIX: Full certificate parsing implementation
 func parseCertificate(certData []byte) (*Certificate, error) {
-	if len(certData) < 13 { // Minimum certificate size
+	if len(certData) < 40 { // Minimum: version(1) + type(1) + expiry(4) + key_type(1) + key(32) + n_ext(1)
 		return nil, fmt.Errorf("certificate too short: %d bytes", len(certData))
 	}
 
 	cert := &Certificate{}
+	offset := 0
 
-	// Certificate format (simplified):
 	// [1 byte] version (must be 1)
-	// [1 byte] cert_type
-	// [4 bytes] expiration_date (hours since epoch)
-	// [1 byte] cert_key_type
-	// [32 bytes] certified_key
-	// [1 byte] n_extensions
-	// [extensions]
-	// [64 bytes] signature
-
-	cert.Version = certData[0]
+	cert.Version = certData[offset]
 	if cert.Version != 1 {
 		return nil, fmt.Errorf("unsupported certificate version: %d", cert.Version)
 	}
+	offset++
 
-	cert.CertType = certData[1]
-	cert.SigningKey = certData[7:39] // Simplified: extract signing key
+	// [1 byte] cert_type
+	// Type 4 = Ed25519 signing key signed with Ed25519 identity key
+	// Type 5 = TLS link certificate signed with Ed25519 signing key
+	// Type 8 = Ed25519 identity key signed with RSA identity key
+	cert.CertType = certData[offset]
+	offset++
 
-	// Signature is last 64 bytes
-	if len(certData) >= 64 {
-		cert.Signature = certData[len(certData)-64:]
+	// [4 bytes] expiration_date (hours since epoch)
+	if offset+4 > len(certData) {
+		return nil, fmt.Errorf("certificate truncated at expiration field")
 	}
+	expiryHours := binary.BigEndian.Uint32(certData[offset : offset+4])
+	offset += 4
+	// Convert hours since epoch to time.Time
+	cert.ExpiresAt = time.Unix(int64(expiryHours)*3600, 0)
+
+	// [1 byte] cert_key_type (1 = Ed25519)
+	if offset >= len(certData) {
+		return nil, fmt.Errorf("certificate truncated at key_type field")
+	}
+	keyType := certData[offset]
+	offset++
+	if keyType != 1 { // Must be Ed25519
+		return nil, fmt.Errorf("unsupported key type: %d (expected 1 for Ed25519)", keyType)
+	}
+
+	// [32 bytes] certified_key (the Ed25519 public key being certified)
+	if offset+32 > len(certData) {
+		return nil, fmt.Errorf("certificate truncated at certified_key field")
+	}
+	cert.SigningKey = make([]byte, 32)
+	copy(cert.SigningKey, certData[offset:offset+32])
+	offset += 32
+
+	// [1 byte] n_extensions
+	if offset >= len(certData) {
+		return nil, fmt.Errorf("certificate truncated at n_extensions field")
+	}
+	nExtensions := certData[offset]
+	offset++
+
+	// Parse extensions (skip for now, but account for their size)
+	for i := uint8(0); i < nExtensions; i++ {
+		if offset+2 > len(certData) {
+			return nil, fmt.Errorf("certificate truncated in extension %d", i)
+		}
+		extLen := binary.BigEndian.Uint16(certData[offset : offset+2])
+		offset += 2
+		// Extension type (1 byte) + flags (1 byte) + data (extLen bytes)
+		if offset+2+int(extLen) > len(certData) {
+			return nil, fmt.Errorf("certificate truncated in extension %d data", i)
+		}
+		offset += 2 + int(extLen)
+	}
+
+	// [64 bytes] signature (Ed25519 signature of all preceding fields)
+	if offset+64 > len(certData) {
+		return nil, fmt.Errorf("certificate truncated at signature field")
+	}
+	cert.Signature = make([]byte, 64)
+	copy(cert.Signature, certData[offset:offset+64])
+
+	// Store the signed portion (everything before signature)
+	cert.SignedData = make([]byte, offset)
+	copy(cert.SignedData, certData[:offset])
 
 	return cert, nil
 }
 
-// Certificate represents a Tor Ed25519 certificate
+// Certificate represents a Tor Ed25519 certificate per cert-spec.txt
+// AUDIT-002 FIX: Complete certificate structure
 type Certificate struct {
-	Version    uint8
-	CertType   uint8
-	SigningKey []byte // The certified Ed25519 key
-	Signature  []byte // Ed25519 signature
+	Version    uint8     // Certificate version (must be 1)
+	CertType   uint8     // Certificate type (4 = signing key cert)
+	ExpiresAt  time.Time // Expiration time
+	SigningKey []byte    // The certified Ed25519 public key (32 bytes)
+	Signature  []byte    // Ed25519 signature (64 bytes)
+	SignedData []byte    // All data that was signed (for verification)
 }
 
 // VerifyDescriptorSignatureWithCertChain performs full certificate chain validation

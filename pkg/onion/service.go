@@ -7,6 +7,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/base32"
+	"encoding/binary"
 	"fmt"
 	"strings"
 	"sync"
@@ -404,33 +405,87 @@ func (s *Service) createDescriptor() error {
 
 // signDescriptor signs the descriptor with the service's identity key
 func (s *Service) signDescriptor(desc *Descriptor) error {
-	// In production, the signing process would be:
-	// 1. Create a descriptor signing key (short-term key)
+	// AUDIT-002 FIX: Implement proper certificate-based signing per cert-spec.txt and rend-spec-v3.txt
+	// 1. Create a descriptor signing key (ephemeral Ed25519 key for this descriptor)
 	// 2. Create a certificate signing the signing key with the identity key
 	// 3. Sign the descriptor with the signing key
-	// For Phase 7.4, we'll do simplified signing with identity key directly
 
-	// First encode without signature to get the content to sign
+	// Generate descriptor signing key (ephemeral, separate from identity key)
+	descriptorSigningPub, descriptorSigningPriv, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		return fmt.Errorf("failed to generate descriptor signing key: %w", err)
+	}
+
+	// Create a certificate for the descriptor signing key
+	// Certificate type 4 = Ed25519 signing key signed with Ed25519 identity key
+	// Per cert-spec.txt section 2.1
+	cert := &Certificate{
+		Version:    1,                             // Version must be 1
+		CertType:   4,                             // Type 4 = signing key signed with identity
+		ExpiresAt:  time.Now().Add(desc.Lifetime), // Expires with descriptor
+		SigningKey: descriptorSigningPub,          // The key being certified
+	}
+
+	// Build certificate content to sign per cert-spec.txt
+	// [1 byte] version
+	// [1 byte] cert_type
+	// [4 bytes] expiration (hours since epoch)
+	// [1 byte] cert_key_type (1 = Ed25519)
+	// [32 bytes] certified_key
+	// [1 byte] n_extensions (0 for now)
+	certContent := make([]byte, 0, 40)
+	certContent = append(certContent, cert.Version)
+	certContent = append(certContent, cert.CertType)
+
+	// Expiration in hours since epoch
+	expiryHours := uint32(cert.ExpiresAt.Unix() / 3600)
+	expiryBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(expiryBytes, expiryHours)
+	certContent = append(certContent, expiryBytes...)
+
+	// Key type (1 = Ed25519)
+	certContent = append(certContent, 1)
+
+	// Certified key (descriptor signing public key)
+	certContent = append(certContent, cert.SigningKey...)
+
+	// Number of extensions (0)
+	certContent = append(certContent, 0)
+
+	// Sign the certificate with identity key
+	cert.Signature = ed25519.Sign(s.identityKey, certContent)
+	cert.SignedData = certContent
+
+	// Build complete certificate (signed data + signature)
+	completeCert := make([]byte, 0, len(certContent)+64)
+	completeCert = append(completeCert, certContent...)
+	completeCert = append(completeCert, cert.Signature...)
+
+	// Store certificate in descriptor
+	desc.DescriptorSigningKeyCert = completeCert
+
+	// Now encode descriptor (without signature) to get content to sign
 	encoded, err := EncodeDescriptor(desc)
 	if err != nil {
 		return fmt.Errorf("failed to encode descriptor: %w", err)
 	}
 
-	// Sign the descriptor content (everything before the signature line)
-	// We need to sign everything up to where "signature " would appear
-	signature := ed25519.Sign(s.identityKey, encoded)
+	// Sign the descriptor with the descriptor signing key (not identity key)
+	signature := ed25519.Sign(descriptorSigningPriv, encoded)
 	desc.Signature = signature
 
-	// Now encode again with the signature to get the complete descriptor
+	// Encode again with signature to get complete descriptor
 	encoded, err = EncodeDescriptor(desc)
 	if err != nil {
 		return fmt.Errorf("failed to encode descriptor with signature: %w", err)
 	}
 
-	// Store the complete raw descriptor
+	// Store complete raw descriptor
 	desc.RawDescriptor = encoded
 
-	s.logger.Debug("Descriptor signed", "signature_len", len(signature))
+	s.logger.Debug("Descriptor signed with certificate chain",
+		"cert_expires", cert.ExpiresAt,
+		"signature_len", len(signature))
 
 	return nil
 }
