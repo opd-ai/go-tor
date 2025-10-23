@@ -25,7 +25,7 @@ func main() {
 	configFile := flag.String("config", "", "Path to configuration file (torrc format)")
 	socksPort := flag.Int("socks-port", 0, "SOCKS5 proxy port (default: auto-detect or 9050)")
 	controlPort := flag.Int("control-port", 0, "Control protocol port (default: 9051)")
-	metricsPort := flag.Int("metrics-port", 0, "HTTP metrics server port (default: 0 = disabled)")
+	metricsPort := flag.Int("metrics-port", 0, "HTTP metrics server port (automatically enables metrics when set)")
 	dataDir := flag.String("data-dir", "", "Data directory for persistent state (default: auto-detect)")
 	logLevel := flag.String("log-level", "info", "Log level (debug, info, warn, error)")
 	showVersion := flag.Bool("version", false, "Show version information")

@@ -143,6 +143,7 @@ The easiest way to get started - just run the binary with no arguments:
 ./bin/tor-client -config /etc/tor/torrc
 
 # With HTTP metrics enabled (Prometheus, JSON, HTML dashboard)
+# Note: Specifying -metrics-port automatically enables metrics
 ./bin/tor-client -metrics-port 9052
 
 # Show version
