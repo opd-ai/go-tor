@@ -14,6 +14,12 @@ const (
 	RelayData         byte = 2
 	RelayEnd          byte = 3
 	RelayConnected    byte = 4
+	RelaySendme       byte = 5  // SENDME cell for flow control
+	RelayExtend       byte = 6  // Legacy EXTEND (not used in v3+)
+	RelayExtended     byte = 7  // Legacy EXTENDED (not used in v3+)
+	RelayTruncate     byte = 8  // TRUNCATE cell
+	RelayTruncated    byte = 9  // TRUNCATED cell
+	RelayDrop         byte = 10 // DROP cell for testing
 	RelayResolve      byte = 11
 	RelayResolved     byte = 12
 	RelayBeginDir     byte = 13
@@ -128,6 +134,18 @@ func RelayCmdString(cmd byte) string {
 		return "RELAY_END"
 	case RelayConnected:
 		return "RELAY_CONNECTED"
+	case RelaySendme:
+		return "RELAY_SENDME"
+	case RelayExtend:
+		return "RELAY_EXTEND"
+	case RelayExtended:
+		return "RELAY_EXTENDED"
+	case RelayTruncate:
+		return "RELAY_TRUNCATE"
+	case RelayTruncated:
+		return "RELAY_TRUNCATED"
+	case RelayDrop:
+		return "RELAY_DROP"
 	case RelayResolve:
 		return "RELAY_RESOLVE"
 	case RelayResolved:

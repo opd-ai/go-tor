@@ -4,8 +4,10 @@ package circuit
 
 import (
 	"context"
+	"crypto/cipher"
 	"crypto/sha1" // #nosec G505 - SHA-1 required by Tor protocol (tor-spec.txt §6.1)
 	"crypto/subtle"
+	"encoding/binary"
 	"fmt"
 	"hash"
 	"io"
@@ -64,6 +66,11 @@ type Circuit struct {
 	// Stream protocol support
 	relayReceiveChan chan *cell.RelayCell // Channel for receiving relay cells
 	streamManager    interface{}          // Stream manager (interface{} to avoid circular import)
+	// Flow control per tor-spec.txt §7.4
+	packageWindow  int // Circuit-level package window (cells we can send)
+	deliverWindow  int // Circuit-level deliver window (cells we can receive)
+	sendmeReceived int // Count of DATA cells received (for sending SENDME)
+	sendmeSent     int // Count of SENDME cells sent
 }
 
 // Hop represents a single hop in a circuit (one relay)
@@ -72,6 +79,32 @@ type Hop struct {
 	Address     string // Router address (IP:port)
 	IsGuard     bool   // Whether this is a guard node
 	IsExit      bool   // Whether this is an exit node
+
+	// Cryptographic state for this hop (per tor-spec.txt §5.2)
+	// These are derived from the key material during circuit extension
+	ForwardCipher  cipher.Stream // AES-CTR cipher for encrypting cells (client→relay)
+	BackwardCipher cipher.Stream // AES-CTR cipher for decrypting cells (relay→client)
+	ForwardDigest  hash.Hash     // SHA-1 running digest for forward direction
+	BackwardDigest hash.Hash     // SHA-1 running digest for backward direction
+}
+
+// NewHop creates a new hop with the given parameters
+func NewHop(fingerprint, address string, isGuard, isExit bool) *Hop {
+	return &Hop{
+		Fingerprint: fingerprint,
+		Address:     address,
+		IsGuard:     isGuard,
+		IsExit:      isExit,
+	}
+}
+
+// SetCryptoState sets the cryptographic state for this hop
+// This should be called after circuit extension when key material is derived
+func (h *Hop) SetCryptoState(forwardCipher, backwardCipher cipher.Stream, forwardDigest, backwardDigest hash.Hash) {
+	h.ForwardCipher = forwardCipher
+	h.BackwardCipher = backwardCipher
+	h.ForwardDigest = forwardDigest
+	h.BackwardDigest = backwardDigest
 }
 
 // NewCircuit creates a new circuit with the given ID
@@ -92,6 +125,10 @@ func NewCircuit(id uint32) *Circuit {
 		backwardDigest:   sha1.New(),                     // CRYPTO-001: Initialize backward digest
 		relayReceiveChan: make(chan *cell.RelayCell, 32), // Buffer for incoming relay cells
 		streamManager:    nil,                            // Stream manager set later
+		packageWindow:    1000,                           // tor-spec.txt §7.4: Initial circuit window is 1000
+		deliverWindow:    1000,                           // tor-spec.txt §7.4: Initial circuit window is 1000
+		sendmeReceived:   0,                              // No DATA cells received yet
+		sendmeSent:       0,                              // No SENDME cells sent yet
 	}
 }
 
@@ -478,12 +515,232 @@ func (c *Circuit) SetStreamManager(mgr interface{}) {
 	c.streamManager = mgr
 }
 
+// encryptForward encrypts a relay cell payload with each hop's forward cipher
+// This implements the onion encryption per tor-spec.txt §6.1
+// The payload is encrypted in ORDER (guard -> middle -> exit) so the exit node decrypts last
+func (c *Circuit) encryptForward(payload []byte) []byte {
+	c.mu.RLock()
+	hops := c.Hops
+	c.mu.RUnlock()
+
+	// Make a copy to avoid modifying the original
+	encrypted := make([]byte, len(payload))
+	copy(encrypted, payload)
+
+	// Encrypt with each hop's cipher in forward order (guard -> middle -> exit)
+	// Each hop will decrypt one layer, like peeling an onion
+	for i := len(hops) - 1; i >= 0; i-- {
+		hop := hops[i]
+		if hop.ForwardCipher != nil {
+			// XOR with the cipher stream (AES-CTR encryption)
+			hop.ForwardCipher.XORKeyStream(encrypted, encrypted)
+		}
+	}
+
+	return encrypted
+}
+
+// decryptBackward decrypts a relay cell payload from the circuit
+// This implements the onion decryption per tor-spec.txt §6.1
+// The payload is decrypted in REVERSE order (exit -> middle -> guard)
+func (c *Circuit) decryptBackward(payload []byte) []byte {
+	c.mu.RLock()
+	hops := c.Hops
+	c.mu.RUnlock()
+
+	// Make a copy to avoid modifying the original
+	decrypted := make([]byte, len(payload))
+	copy(decrypted, payload)
+
+	// Decrypt with each hop's cipher in reverse order (exit -> middle -> guard)
+	// We receive the cell from the guard, which is the last to encrypt (first to decrypt)
+	for _, hop := range hops {
+		if hop.BackwardCipher != nil {
+			// XOR with the cipher stream (AES-CTR decryption)
+			hop.BackwardCipher.XORKeyStream(decrypted, decrypted)
+		}
+	}
+
+	return decrypted
+}
+
+// updateHopDigests updates the per-hop running digests for a relay cell
+// This is called after encryption/decryption to update each hop's digest state
+func (c *Circuit) updateHopDigests(direction Direction, payload []byte) error {
+	c.mu.RLock()
+	hops := c.Hops
+	c.mu.RUnlock()
+
+	if len(payload) < 11 {
+		return fmt.Errorf("relay cell data too short: %d < 11", len(payload))
+	}
+
+	// Create a copy with digest field zeroed (bytes 5-8)
+	cellCopy := make([]byte, len(payload))
+	copy(cellCopy, payload)
+	cellCopy[5] = 0
+	cellCopy[6] = 0
+	cellCopy[7] = 0
+	cellCopy[8] = 0
+
+	// Update the appropriate digest for each hop
+	if direction == DirectionForward {
+		// Forward: update each hop's forward digest
+		for _, hop := range hops {
+			if hop.ForwardDigest != nil {
+				if _, err := hop.ForwardDigest.Write(cellCopy); err != nil {
+					return fmt.Errorf("failed to update forward digest for hop: %w", err)
+				}
+			}
+		}
+	} else {
+		// Backward: update each hop's backward digest
+		for _, hop := range hops {
+			if hop.BackwardDigest != nil {
+				if _, err := hop.BackwardDigest.Write(cellCopy); err != nil {
+					return fmt.Errorf("failed to update backward digest for hop: %w", err)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// verifyRelayCellDigest verifies the digest of an incoming relay cell
+// Returns the hop index that recognized the cell, or -1 if unrecognized
+func (c *Circuit) verifyRelayCellDigest(payload []byte) (int, error) {
+	c.mu.RLock()
+	hops := c.Hops
+	c.mu.RUnlock()
+
+	if len(payload) < 11 {
+		return -1, fmt.Errorf("relay cell payload too short: %d < 11", len(payload))
+	}
+
+	// Extract the digest from the cell (bytes 5-8)
+	var cellDigest [4]byte
+	copy(cellDigest[:], payload[5:9])
+
+	// Check if this cell is recognized by any hop
+	// A cell is "recognized" if:
+	// 1. The digest matches the hop's running backward digest
+	// 2. The "recognized" field is zero (bytes 1-2)
+
+	recognized := binary.BigEndian.Uint16(payload[1:3])
+
+	// Try each hop to see which one recognizes this cell
+	for hopIdx, hop := range hops {
+		if hop.BackwardDigest == nil {
+			continue
+		}
+
+		// Compute expected digest for this hop
+		// Create a copy with digest zeroed
+		cellCopy := make([]byte, len(payload))
+		copy(cellCopy, payload)
+		cellCopy[5] = 0
+		cellCopy[6] = 0
+		cellCopy[7] = 0
+		cellCopy[8] = 0
+
+		// Get the current digest state (without modifying it)
+		expectedSum := hop.BackwardDigest.Sum(nil)
+		expected := [4]byte{expectedSum[0], expectedSum[1], expectedSum[2], expectedSum[3]}
+
+		// Check if digest matches AND recognized field is zero
+		if subtle.ConstantTimeCompare(expected[:], cellDigest[:]) == 1 && recognized == 0 {
+			// This hop recognizes the cell
+			// Now update the digest with this cell
+			if _, err := hop.BackwardDigest.Write(cellCopy); err != nil {
+				return -1, fmt.Errorf("failed to update backward digest: %w", err)
+			}
+			return hopIdx, nil
+		}
+	}
+
+	// No hop recognized this cell - might be for a stream we don't have
+	// or an error condition
+	return -1, nil
+}
+
+// decrementPackageWindow decrements the circuit-level package window
+// Returns an error if the window is exhausted
+func (c *Circuit) decrementPackageWindow() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.packageWindow <= 0 {
+		return fmt.Errorf("package window exhausted: cannot send more cells until SENDME received")
+	}
+
+	c.packageWindow--
+	return nil
+}
+
+// incrementPackageWindow increments the circuit-level package window
+// This is called when we receive a SENDME cell
+func (c *Circuit) incrementPackageWindow() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// Per tor-spec.txt §7.4, each SENDME increments the window by 100
+	c.packageWindow += 100
+}
+
+// decrementDeliverWindow decrements the circuit-level deliver window
+// Returns an error if the window is exhausted
+func (c *Circuit) decrementDeliverWindow() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.deliverWindow <= 0 {
+		return fmt.Errorf("deliver window exhausted: cannot receive more cells until SENDME sent")
+	}
+
+	c.deliverWindow--
+	c.sendmeReceived++
+
+	return nil
+}
+
+// shouldSendCircuitSendme checks if we should send a circuit-level SENDME
+// Per tor-spec.txt §7.4, send SENDME every 100 cells received
+func (c *Circuit) shouldSendCircuitSendme() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return c.sendmeReceived >= 100
+}
+
+// sendCircuitSendme sends a circuit-level SENDME cell
+func (c *Circuit) sendCircuitSendme() error {
+	c.mu.Lock()
+	c.sendmeReceived = 0
+	c.sendmeSent++
+	c.deliverWindow += 100 // Increment our deliver window
+	c.mu.Unlock()
+
+	// Send SENDME cell (stream ID 0 indicates circuit-level)
+	sendmeCell := cell.NewRelayCell(0, cell.RelaySendme, []byte{})
+	return c.SendRelayCell(sendmeCell)
+}
+
 // SendRelayCell sends a relay cell through the circuit
-// This encrypts the relay cell and sends it through the underlying connection
+// This encrypts the relay cell with per-hop cryptography and sends it through the connection
 func (c *Circuit) SendRelayCell(relayCell *cell.RelayCell) error {
+	// Check flow control for DATA cells
+	// Per tor-spec.txt §7.4, only DATA cells count against the package window
+	if relayCell.Command == cell.RelayData {
+		if err := c.decrementPackageWindow(); err != nil {
+			return fmt.Errorf("flow control: %w", err)
+		}
+	}
+
 	c.mu.Lock()
 	conn := c.conn
 	state := c.State
+	hops := c.Hops
 	c.mu.Unlock()
 
 	if state != StateOpen {
@@ -494,39 +751,48 @@ func (c *Circuit) SendRelayCell(relayCell *cell.RelayCell) error {
 		return fmt.Errorf("circuit has no connection")
 	}
 
-	// Encode the relay cell
+	// Encode the relay cell (digest field will be zeroed initially)
 	payload, err := relayCell.Encode()
 	if err != nil {
 		return fmt.Errorf("failed to encode relay cell: %w", err)
 	}
 
-	// Update forward digest before encrypting
-	// The digest is computed over the relay cell with zeroed digest field
-	if err := c.UpdateDigest(DirectionForward, payload); err != nil {
-		return fmt.Errorf("failed to update digest: %w", err)
+	// Compute the digest for the exit hop (last hop in the circuit)
+	// Per tor-spec.txt §6.1, each hop maintains its own running digest
+	if len(hops) > 0 {
+		exitHop := hops[len(hops)-1]
+		if exitHop.ForwardDigest != nil {
+			// Create a copy with digest zeroed for digest computation
+			cellCopy := make([]byte, len(payload))
+			copy(cellCopy, payload)
+			cellCopy[5] = 0
+			cellCopy[6] = 0
+			cellCopy[7] = 0
+			cellCopy[8] = 0
+
+			// Update the exit hop's forward digest
+			if _, err := exitHop.ForwardDigest.Write(cellCopy); err != nil {
+				return fmt.Errorf("failed to update forward digest: %w", err)
+			}
+
+			// Get the digest and set it in the payload
+			digestSum := exitHop.ForwardDigest.Sum(nil)
+			payload[5] = digestSum[0]
+			payload[6] = digestSum[1]
+			payload[7] = digestSum[2]
+			payload[8] = digestSum[3]
+		}
 	}
 
-	// Get the updated digest and set it in the relay cell
-	c.mu.RLock()
-	digestSum := c.forwardDigest.Sum(nil)
-	c.mu.RUnlock()
-	copy(relayCell.Digest[:], digestSum[:4])
+	// Encrypt the payload with per-hop cryptography (onion encryption)
+	// Each hop will decrypt one layer
+	encryptedPayload := c.encryptForward(payload)
 
-	// Re-encode with updated digest
-	payload, err = relayCell.Encode()
-	if err != nil {
-		return fmt.Errorf("failed to encode relay cell with digest: %w", err)
-	}
-
-	// TODO: Encrypt the relay cell with per-hop cryptography
-	// For now, we send it unencrypted (this will need to be implemented)
-	// encryptedPayload := c.encryptForward(payload)
-
-	// Create a RELAY cell with the payload
+	// Create a RELAY cell with the encrypted payload
 	cellToSend := &cell.Cell{
 		CircID:  c.ID,
 		Command: cell.CmdRelay,
-		Payload: payload,
+		Payload: encryptedPayload,
 	}
 
 	// Send through connection (type assert to interface with SendCell method)
@@ -567,35 +833,71 @@ func (c *Circuit) ReceiveRelayCellTimeout(timeout time.Duration) (*cell.RelayCel
 }
 
 // DeliverRelayCell delivers a relay cell to this circuit (called by connection layer)
-// This decrypts the cell and pushes it to the receive channel
+// This decrypts the cell, verifies the digest, handles flow control, and pushes it to the receive channel
 func (c *Circuit) DeliverRelayCell(cellData *cell.Cell) error {
 	if cellData.CircID != c.ID {
 		return fmt.Errorf("circuit ID mismatch: expected %d, got %d", c.ID, cellData.CircID)
 	}
 
-	// TODO: Decrypt the relay cell with per-hop cryptography
-	// For now, we decode it directly (unencrypted)
-	// decryptedPayload := c.decryptBackward(cellData.Payload)
+	// Decrypt the relay cell with per-hop cryptography (onion decryption)
+	// Each hop decrypts one layer
+	decryptedPayload := c.decryptBackward(cellData.Payload)
+
+	// Verify which hop recognizes this cell
+	hopIdx, err := c.verifyRelayCellDigest(decryptedPayload)
+	if err != nil {
+		return fmt.Errorf("failed to verify relay cell digest: %w", err)
+	}
+
+	if hopIdx < 0 {
+		// Cell not recognized by any hop
+		// This might be a cell for a different stream or an error
+		// Per tor-spec.txt §6.1, unrecognized cells should be dropped
+		// Silently drop unrecognized cells
+		return nil
+	}
 
 	// Decode the relay cell
-	relayCell, err := cell.DecodeRelayCell(cellData.Payload)
+	relayCell, err := cell.DecodeRelayCell(decryptedPayload)
 	if err != nil {
 		return fmt.Errorf("failed to decode relay cell: %w", err)
 	}
 
-	// Verify backward digest
-	// TODO: Implement proper digest verification
-	// For now, we skip verification to get basic functionality working
+	// Handle flow control per tor-spec.txt §7.4
+	switch relayCell.Command {
+	case cell.RelayData:
+		// DATA cells count against our deliver window
+		if err := c.decrementDeliverWindow(); err != nil {
+			return fmt.Errorf("flow control: %w", err)
+		}
 
-	// Update backward digest
-	if err := c.UpdateDigest(DirectionBackward, cellData.Payload); err != nil {
-		return fmt.Errorf("failed to update backward digest: %w", err)
+		// Check if we should send a SENDME
+		if c.shouldSendCircuitSendme() {
+			// Send SENDME in background to avoid blocking
+			go func() {
+				if err := c.sendCircuitSendme(); err != nil {
+					// Log error but don't fail the delivery
+					// (in production, should have proper logging)
+				}
+			}()
+		}
+
+	case cell.RelaySendme:
+		// SENDME cell increments our package window
+		if relayCell.StreamID == 0 {
+			// Circuit-level SENDME
+			c.incrementPackageWindow()
+			// Don't deliver SENDME cells to the application layer
+			return nil
+		}
+		// Stream-level SENDME - deliver to stream manager
+		// (handled below)
 	}
 
 	// Record activity
 	c.RecordActivity()
 
-	// Deliver to receive channel (non-blocking with error on full)
+	// Deliver to receive channel (non-blocking with timeout)
 	select {
 	case c.relayReceiveChan <- relayCell:
 		return nil
