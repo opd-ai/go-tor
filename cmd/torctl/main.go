@@ -59,24 +59,22 @@ func printUsage() {
 	fmt.Println("  circuits            List active circuits")
 	fmt.Println("  streams             List active streams")
 	fmt.Println("  info                Show detailed client information")
-	fmt.Println("  config <key>        Get configuration value")
 	fmt.Println("  signal <signal>     Send signal to client (SHUTDOWN, RELOAD, etc.)")
 	fmt.Println("  version             Show client version")
+	fmt.Println()
+	fmt.Println("Note: Configuration querying (GETCONF) is currently limited.")
+	fmt.Println("Use 'info' command to see commonly used configuration values.")
 	fmt.Println()
 	fmt.Println("Examples:")
 	fmt.Println("  torctl status")
 	fmt.Println("  torctl circuits")
+	fmt.Println("  torctl info")
 	fmt.Println("  torctl signal SHUTDOWN")
-	fmt.Println("  torctl config SocksPort")
 }
 
 func executeCommand(command, controlAddr string, args []string) error {
 	// Validate arguments before connecting
 	switch strings.ToLower(command) {
-	case "config":
-		if len(args) == 0 {
-			return fmt.Errorf("config command requires a key argument")
-		}
 	case "signal":
 		if len(args) == 0 {
 			return fmt.Errorf("signal command requires a signal name")
@@ -109,8 +107,6 @@ func executeCommand(command, controlAddr string, args []string) error {
 		return listStreams(conn)
 	case "info":
 		return showInfo(conn)
-	case "config":
-		return getConfig(conn, args[0])
 	case "signal":
 		return sendSignal(conn, args[0])
 	case "version":
@@ -358,6 +354,9 @@ func showInfo(conn net.Conn) error {
 	return nil
 }
 
+// getConfig is disabled - GETCONF currently returns empty values from control server
+// TODO: Implement full GETCONF support in pkg/control/control.go
+/*
 func getConfig(conn net.Conn, key string) error {
 	response, err := sendCommand(conn, fmt.Sprintf("GETCONF %s", key))
 	if err != nil {
@@ -377,6 +376,7 @@ func getConfig(conn net.Conn, key string) error {
 
 	return nil
 }
+*/
 
 func sendSignal(conn net.Conn, signal string) error {
 	signal = strings.ToUpper(signal)

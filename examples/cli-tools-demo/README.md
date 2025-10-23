@@ -29,14 +29,14 @@ torctl streams
 # Show detailed information
 torctl info
 
-# Get configuration value
-torctl config SocksPort
-
 # Send signal to client
 torctl signal SHUTDOWN
 
 # Use custom control port
 torctl -control 127.0.0.1:9051 status
+
+# Note: Configuration querying (config command) is currently limited
+# Use 'info' command to see commonly used configuration values
 ```
 
 ### 2. tor-config-validator - Configuration Tool
@@ -140,9 +140,10 @@ fi
 | circuits | List active circuits | `torctl circuits` |
 | streams | List active streams | `torctl streams` |
 | info | Show detailed information | `torctl info` |
-| config | Get configuration value | `torctl config SocksPort` |
 | signal | Send control signal | `torctl signal SHUTDOWN` |
 | version | Show client version | `torctl version` |
+
+**Note**: Configuration querying (GETCONF) is currently limited. Use `info` command to see commonly used configuration values.
 
 ### tor-config-validator Options
 

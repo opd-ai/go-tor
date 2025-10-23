@@ -326,6 +326,8 @@ func (s *Server) getInfoValue(key string, stats StatsProvider) (string, bool) {
 }
 
 // handleGetConf handles GETCONF command
+// TODO: Currently returns empty values. Full implementation requires access to client configuration.
+// To complete: pass Config reference to Server and return actual values like "250-SocksPort=9050"
 func (s *Server) handleGetConf(conn *connection, args []string) {
 	if !conn.authenticated {
 		conn.writeReply(514, "Authentication required")
