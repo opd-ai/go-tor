@@ -119,7 +119,11 @@ func CleanupTempFiles(dataDir string) error {
 }
 
 // FindAvailablePort finds an available port starting from the preferred port.
-// Returns the preferred port if available, otherwise finds the next available port.
+// Returns the preferred port if available, otherwise searches up to 100 ports higher.
+// If no port is available in the search range, returns the preferred port
+// (which will fail later with a clear "address already in use" error).
+// This function is used by DefaultConfig() to enable true zero-configuration
+// port selection when default Tor ports (9050, 9051) are already in use.
 func FindAvailablePort(preferredPort int) int {
 	// Try preferred port first
 	if isPortAvailable(preferredPort) {

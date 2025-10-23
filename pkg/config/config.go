@@ -79,11 +79,19 @@ func DefaultConfig() *Config {
 		dataDir = "./go-tor-data"
 	}
 
-	// AUDIT-005: Use fixed default ports for predictability
-	// Port availability will be checked and handled at startup, not config creation
+	// Auto-select available ports for true zero-configuration
+	// If default ports (9050, 9051) are in use, find alternatives
+	socksPort := autoconfig.FindAvailablePort(9050)    // Standard Tor SOCKS port
+	controlPort := autoconfig.FindAvailablePort(9051)  // Standard Tor control port
+	
+	// Ensure SocksPort and ControlPort are different
+	if controlPort == socksPort {
+		controlPort = autoconfig.FindAvailablePort(controlPort + 1)
+	}
+
 	return &Config{
-		SocksPort:           9050, // Standard Tor SOCKS port
-		ControlPort:         9051, // Standard Tor control port
+		SocksPort:           socksPort,
+		ControlPort:         controlPort,
 		DataDirectory:       dataDir,
 		CircuitBuildTimeout: 60 * time.Second,
 		MaxCircuitDirtiness: 10 * time.Minute,
