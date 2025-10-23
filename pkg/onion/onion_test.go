@@ -2122,8 +2122,8 @@ func TestEncryptIntroduce1Data(t *testing.T) {
 	basePoint := [32]byte{9}
 	curve25519.ScalarMult(&introPointPublic, &introPointPrivate, &basePoint)
 
-	// Test encryption
-	encrypted, clientPubKey, err := ip.encryptIntroduce1Data(plaintext, introPointPublic[:])
+	// Test encryption - AUDIT-006: Now returns 4 values including private key
+	encrypted, clientPubKey, clientPrivKey, err := ip.encryptIntroduce1Data(plaintext, introPointPublic[:])
 	if err != nil {
 		t.Fatalf("Encryption failed: %v", err)
 	}
@@ -2136,6 +2136,11 @@ func TestEncryptIntroduce1Data(t *testing.T) {
 	// Verify client public key is 32 bytes
 	if len(clientPubKey) != 32 {
 		t.Errorf("Client public key length = %d, want 32", len(clientPubKey))
+	}
+
+	// AUDIT-006: Verify client private key is 32 bytes
+	if len(clientPrivKey) != 32 {
+		t.Errorf("Client private key length = %d, want 32", len(clientPrivKey))
 	}
 
 	// Verify encrypted data has same length as plaintext (CTR mode)
@@ -2176,13 +2181,17 @@ func TestEncryptIntroduce1DataInvalidKey(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			key := make([]byte, tt.keyLen)
-			_, _, err := ip.encryptIntroduce1Data(plaintext, key)
+			// AUDIT-006: Now returns 4 values including private key
+			_, _, clientPrivKey, err := ip.encryptIntroduce1Data(plaintext, key)
 
 			if tt.wantErr && err == nil {
 				t.Error("Expected error for invalid key, got nil")
 			}
 			if !tt.wantErr && err != nil {
 				t.Errorf("Unexpected error: %v", err)
+			}
+			if !tt.wantErr && len(clientPrivKey) != 32 {
+				t.Errorf("Expected 32-byte private key, got %d bytes", len(clientPrivKey))
 			}
 		})
 	}
