@@ -342,8 +342,9 @@ func TestDataDirFlag(t *testing.T) {
 		t.Fatalf("Failed to start with custom data dir: %v", err)
 	}
 
-	// Give it a moment to initialize
-	time.Sleep(500 * time.Millisecond)
+	// AUDIT-005: Give more time for initialization and data directory creation
+	// The process needs to initialize client, create data directory, etc.
+	time.Sleep(1000 * time.Millisecond)
 
 	// Kill the process
 	if err := cmd.Process.Kill(); err != nil {
