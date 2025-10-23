@@ -81,9 +81,9 @@ func DefaultConfig() *Config {
 
 	// Auto-select available ports for true zero-configuration
 	// If default ports (9050, 9051) are in use, find alternatives
-	socksPort := autoconfig.FindAvailablePort(9050)    // Standard Tor SOCKS port
-	controlPort := autoconfig.FindAvailablePort(9051)  // Standard Tor control port
-	
+	socksPort := autoconfig.FindAvailablePort(9050)   // Standard Tor SOCKS port
+	controlPort := autoconfig.FindAvailablePort(9051) // Standard Tor control port
+
 	// Ensure SocksPort and ControlPort are different
 	if controlPort == socksPort {
 		controlPort = autoconfig.FindAvailablePort(controlPort + 1)
