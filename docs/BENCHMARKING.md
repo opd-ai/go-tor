@@ -319,9 +319,11 @@ func (s *Suite) BenchmarkCustomFeature(ctx context.Context) error {
 
 | Benchmark | Target | Actual | Status |
 |-----------|--------|--------|--------|
-| Circuit Build (p95) | < 5s | ~1.1s | ✓ PASS |
+| Circuit Build (p95) | < 5s | ~1.1s (simulated) | ✓ PASS |
 | Memory Usage | < 50 MB | ~175 KiB | ✓ PASS |
 | Concurrent Streams | 100+ | 100 | ✓ PASS |
+
+**Note**: Circuit build benchmark uses mock data without real Tor network access. Actual production performance will vary based on network conditions, relay selection, and geographic distribution.
 
 ## Troubleshooting
 

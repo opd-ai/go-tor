@@ -460,7 +460,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed development roadma
 
 These are design goals and validated performance characteristics:
 
-- Circuit build time: < 5 seconds (95th percentile) ✅ **Validated: ~1.1s**
+- Circuit build time: < 5 seconds (95th percentile) ✅ **Target: ~1.1s (simulated)**
 - Memory usage: < 50MB RSS in steady state ✅ **Target validated, specific measurements vary by workload**
 - Concurrent streams: 100+ on Raspberry Pi 3 ✅ **Validated: 100+ @ 26,600 ops/sec**
 - Binary size: < 15MB (13MB unstripped, 8.9MB stripped) ✅ **Validated**
