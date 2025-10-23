@@ -1,6 +1,26 @@
 # go-tor Tutorial: Getting Started
 
-This tutorial will guide you through setting up and using go-tor, from installation to creating your first Tor-enabled application.
+## ⚠️ CRITICAL SAFETY WARNING
+
+**STOP! READ THIS BEFORE PROCEEDING:**
+
+This is **UNOFFICIAL, EXPERIMENTAL SOFTWARE** that has been developed without the supervision or endorsement of [The Tor Project](https://www.torproject.org/).
+
+**DO NOT USE THIS SOFTWARE FOR:**
+- Personal safety or anonymity
+- Protection from surveillance or persecution
+- Accessing sensitive or confidential information
+- Any situation where your privacy or security matters
+- Any production use case
+
+**For actual anonymity and privacy, use official Tor software:**
+- **Users**: [Tor Browser](https://www.torproject.org/download/) - the ONLY safe way to browse anonymously
+- **Developers**: [Arti](https://gitlab.torproject.org/tpo/core/arti) - official Tor implementation in Rust
+- **All users**: [Official Tor software](https://www.torproject.org/) from The Tor Project
+
+This tutorial is **for educational and research purposes only**. Following this tutorial will help you learn about Tor protocols, but the resulting software should never be used when your safety depends on anonymity.
+
+---
 
 ## Table of Contents
 
@@ -609,10 +629,18 @@ Now that you have go-tor running, you can:
 
 ## Additional Resources
 
+**For learning about Tor (educational purposes):**
 - [Official Tor Specifications](https://spec.torproject.org/)
-- [Tor Project](https://www.torproject.org/)
-- [go-tor GitHub Repository](https://github.com/opd-ai/go-tor)
+- [go-tor GitHub Repository](https://github.com/opd-ai/go-tor) (this experimental project)
 - [Go Documentation](https://golang.org/doc/)
+
+**For actual Tor usage (when privacy matters):**
+- [Tor Project](https://www.torproject.org/) - Official Tor software and information
+- [Tor Browser Download](https://www.torproject.org/download/) - Safe anonymous browsing
+- [Arti](https://gitlab.torproject.org/tpo/core/arti) - Official next-gen Tor in Rust
+- [Tor Support](https://support.torproject.org/) - Help using official Tor software
+
+**Remember**: This tutorial covers experimental software. For real anonymity needs, always use official Tor software from The Tor Project.
 
 ---
 

@@ -3,9 +3,29 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/opd-ai/go-tor)](https://goreportcard.com/report/github.com/opd-ai/go-tor)
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
 
-A production-ready Tor client implementation in pure Go, designed for embedded systems.
+A pure Go Tor client implementation for educational and research purposes.
 
-**⚠️ Development Status**: This project is in active development. Core functionality is being implemented according to the roadmap below. THIS IS NOT PRODUCTION READY SOFTWARE AND YOU SHOULD NOT USE IT.
+## ⚠️ IMPORTANT SAFETY NOTICE
+
+**THIS IS UNOFFICIAL SOFTWARE** that has been developed without the supervision or endorsement of [The Tor Project](https://www.torproject.org/). This software should **NOT** be considered safe or production-ready.
+
+**For actual privacy and anonymity needs, please use official Tor software:**
+
+- **For users**: Use [Tor Browser](https://www.torproject.org/download/) - the only recommended way to safely browse anonymously
+- **For developers**: Use [Arti](https://gitlab.torproject.org/tpo/core/arti) - the official Tor implementation in Rust, or the [reference C implementation](https://github.com/torproject/tor)
+
+**Do not rely on this software for:**
+- Personal safety or anonymity
+- Protection from surveillance
+- Accessing sensitive information
+- Any production use case
+- Any situation where your safety depends on anonymity
+
+This project is an **experimental implementation** for learning and research purposes only.
+
+---
+
+**⚠️ Development Status**: This project is in active development. Core functionality is being implemented according to the roadmap below. THIS IS NOT PRODUCTION READY SOFTWARE AND YOU SHOULD NOT USE IT FOR ANONYMITY OR SECURITY.
 
 ## Features
 
@@ -470,16 +490,22 @@ See [docs/BENCHMARKING.md](docs/BENCHMARKING.md) for comprehensive benchmark res
 
 ## Security
 
-This implementation follows Tor protocol specifications for security:
+⚠️ **CRITICAL WARNING**: This is an unofficial, experimental implementation that has **NOT** been audited or approved by The Tor Project. 
+
+**DO NOT USE THIS SOFTWARE when your safety, privacy, or anonymity is at stake.**
+
+This implementation attempts to follow Tor protocol specifications:
 
 - Constant-time cryptographic operations
 - Explicit memory zeroing for sensitive data
 - Circuit padding for traffic analysis resistance
 - Error handling without information leakage
 
-⚠️ **Security Notice**: This is pre-production software. Do not rely on it for anonymity until security audit is complete.
+However, security is extremely complex and this software **has not undergone the rigorous review and testing** that the official Tor software receives.
 
-See [AUDIT.md](AUDIT.md) for comprehensive security audit results and considerations.
+**For any real privacy needs, use [Tor Browser](https://www.torproject.org/download/) or [official Tor software](https://www.torproject.org/).**
+
+See [AUDIT.md](AUDIT.md) for internal security audit results. Note that even a passing internal audit does not make this software safe for real-world anonymity use.
 
 ## Documentation
 
@@ -541,9 +567,17 @@ BSD 3-Clause License. See [LICENSE](LICENSE) for details.
 
 ## Acknowledgments
 
-This project implements the Tor protocol as specified by the Tor Project. It is not affiliated with or endorsed by the Tor Project.
+This project implements the Tor protocol as specified by the Tor Project. **It is not affiliated with or endorsed by the Tor Project.**
+
+This is an **unofficial, experimental implementation** for educational and research purposes. The Tor Project develops and maintains the official Tor software that you should actually use:
+
+- [Tor Browser](https://www.torproject.org/download/) - for safe, anonymous browsing
+- [Tor Project](https://www.torproject.org/) - official anonymity software and resources
+- [Arti](https://gitlab.torproject.org/tpo/core/arti) - official next-generation Tor implementation in Rust
 
 ## Contact
 
 - GitHub Issues: [github.com/opd-ai/go-tor/issues](https://github.com/opd-ai/go-tor/issues)
 - Project URL: [github.com/opd-ai/go-tor](https://github.com/opd-ai/go-tor)
+
+**For actual Tor support and security issues**: Please contact [The Tor Project](https://www.torproject.org/contact/) directly.

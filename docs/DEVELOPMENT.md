@@ -1,5 +1,24 @@
 # Development Guide
 
+## ⚠️ Important Notice for Contributors
+
+This is an **unofficial, experimental project** developed without the supervision or endorsement of [The Tor Project](https://www.torproject.org/). This software is **not safe for production use** and should not be relied upon for anonymity or privacy.
+
+**If you want to contribute to Tor:**
+
+We encourage developers interested in Tor to contribute to the **official Tor projects** instead:
+
+- **[Arti](https://gitlab.torproject.org/tpo/core/arti)** - The next-generation Tor implementation in Rust (actively seeking contributors)
+- **[Tor (C implementation)](https://gitlab.torproject.org/tpo/core/tor)** - The reference Tor implementation
+- **[Tor Browser](https://gitlab.torproject.org/tpo/applications/tor-browser)** - The official anonymous browser
+- **[The Tor Project](https://www.torproject.org/contact/)** - See how to get involved
+
+Contributing to official Tor projects helps **real users stay safe** and advances **actual privacy technology**.
+
+This go-tor project is primarily an **educational exercise** for learning about Tor protocols. Contributions are welcome for learning purposes, but understand that this software should never be used when privacy or security matters.
+
+---
+
 ## Getting Started
 
 ### Prerequisites

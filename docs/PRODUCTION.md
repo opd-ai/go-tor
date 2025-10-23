@@ -1,8 +1,25 @@
 # Phase 6: Production Hardening - Deployment Guide
 
+## ⚠️ CRITICAL WARNING - DO NOT USE IN PRODUCTION
+
+**THIS IS UNOFFICIAL SOFTWARE** developed without the supervision or endorsement of [The Tor Project](https://www.torproject.org/).
+
+**THIS SOFTWARE SHOULD NOT BE USED IN PRODUCTION OR FOR ANY REAL ANONYMITY NEEDS.**
+
+**For actual privacy and security:**
+- **Users**: Use [Tor Browser](https://www.torproject.org/download/) - the only safe way to browse anonymously
+- **Developers**: Use [Arti](https://gitlab.torproject.org/tpo/core/arti) - the official Tor implementation in Rust
+- **Server operators**: Use the [official Tor software](https://www.torproject.org/)
+
+This document describes deployment configurations **for testing and development purposes only**. Do not deploy this software in any environment where safety, privacy, or anonymity is required.
+
+---
+
 ## Overview
 
-This guide covers deploying and operating the go-tor client in production environments. Phase 6 introduced critical production hardening features including TLS certificate validation, guard node persistence, and connection retry logic.
+This guide covers deploying and operating the go-tor client **in test/development environments only**. Phase 6 introduced critical production hardening features including TLS certificate validation, guard node persistence, and connection retry logic.
+
+**Remember**: Even with these hardening features, this software is not safe for production use.
 
 ## Production Features (Phase 6)
 
@@ -427,10 +444,19 @@ Planned production features:
 
 ## Support and Resources
 
+**For this experimental software:**
 - Project repository: https://github.com/opd-ai/go-tor
-- Tor specifications: https://spec.torproject.org/
 - Issue tracker: https://github.com/opd-ai/go-tor/issues
+
+**For actual Tor usage and support:**
+- Tor Project: https://www.torproject.org/
+- Tor Browser: https://www.torproject.org/download/
+- Arti (official Rust implementation): https://gitlab.torproject.org/tpo/core/arti
+- Tor specifications: https://spec.torproject.org/
+- Tor support: https://support.torproject.org/
 
 ## License
 
 BSD 3-Clause License - See LICENSE file for details.
+
+**Disclaimer**: This license covers the software code only. It does not imply that this software is safe, secure, or suitable for any particular purpose. The Tor trademark and name are property of The Tor Project, Inc.

@@ -1,8 +1,22 @@
 # go-tor Architecture
 
+## ⚠️ Important Notice
+
+This document describes an **unofficial, experimental Tor client implementation** developed for educational and research purposes. This software has been developed **without the supervision or endorsement of The Tor Project**.
+
+**This software should NOT be used for any real anonymity or privacy needs.**
+
+For actual Tor usage:
+- **Users**: Use [Tor Browser](https://www.torproject.org/download/)
+- **Developers**: Use [Arti](https://gitlab.torproject.org/tpo/core/arti) (official Rust implementation) or the [C reference implementation](https://github.com/torproject/tor)
+
+---
+
 ## Overview
 
-go-tor is a pure Go implementation of a Tor client designed for embedded systems. This document provides an architectural overview of the system.
+go-tor is a pure Go implementation of a Tor client designed for embedded systems **as an educational project**. This document provides an architectural overview of the system.
+
+**Note**: While this implementation attempts to follow Tor specifications, it has not undergone the extensive security review and testing that official Tor software receives.
 
 ## Design Principles
 
@@ -11,6 +25,7 @@ go-tor is a pure Go implementation of a Tor client designed for embedded systems
 3. **Embedded-Optimized**: Low memory footprint and efficient resource usage
 4. **Modular**: Clean separation of concerns between packages
 5. **Testable**: Comprehensive unit and integration tests
+6. **Educational**: Designed for learning about Tor protocols (NOT for real anonymity)
 
 ## System Architecture
 

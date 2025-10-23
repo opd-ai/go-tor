@@ -1,6 +1,23 @@
 # go-tor API Reference
 
-This document provides comprehensive API documentation for the go-tor library. It covers all major packages and their public interfaces with examples.
+## ⚠️ CRITICAL WARNING
+
+**THIS IS UNOFFICIAL, EXPERIMENTAL SOFTWARE** developed without the supervision or endorsement of [The Tor Project](https://www.torproject.org/).
+
+**DO NOT USE THIS API FOR:**
+- Real anonymity or privacy needs
+- Personal safety or security
+- Production applications
+- Any situation where privacy matters
+
+**For actual Tor integration in your applications:**
+- **Users**: Use [Tor Browser](https://www.torproject.org/download/)
+- **Developers**: Use [Arti](https://gitlab.torproject.org/tpo/core/arti) - the official Tor implementation in Rust with a proper API
+- **All developers**: See [official Tor documentation](https://www.torproject.org/download/) for proper integration methods
+
+This API documentation is **for educational and research purposes only**. Code written using this API should never be deployed in situations where anonymity or security is required.
+
+---
 
 ## Table of Contents
 
