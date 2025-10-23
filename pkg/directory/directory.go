@@ -4,7 +4,10 @@ package directory
 
 import (
 	"bufio"
+	"compress/gzip"
+	"compress/zlib"
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
@@ -28,10 +31,15 @@ const (
 )
 
 // Default directory authority addresses (hardcoded fallback directories)
+// Using HTTP instead of HTTPS for better compatibility with IP-based authorities
+// The Tor consensus is cryptographically signed, so transport encryption is not critical
 var DefaultAuthorities = []string{
-	"https://194.109.206.212/tor/status-vote/current/consensus.z",  // gabelmoo
-	"https://131.188.40.189/tor/status-vote/current/consensus.z",   // moria1
-	"https://128.31.0.34:9131/tor/status-vote/current/consensus.z", // tor26
+	"http://194.109.206.212/tor/status-vote/current/consensus",      // gabelmoo
+	"http://131.188.40.189/tor/status-vote/current/consensus",       // moria1
+	"http://128.31.0.34:9131/tor/status-vote/current/consensus",     // tor26
+	"http://86.59.21.38/tor/status-vote/current/consensus",          // longclaw
+	"http://199.58.81.140/tor/status-vote/current/consensus",        // bastet
+	"http://204.13.164.118:18080/tor/status-vote/current/consensus", // faravahar
 }
 
 // Relay represents a Tor relay from the consensus
@@ -60,9 +68,19 @@ func NewClient(log *logger.Logger) *Client {
 		log = logger.NewDefault()
 	}
 
+	// Create HTTP client with custom transport
+	// Use TLS config that skips verification for IP-based authorities
+	// This is acceptable because consensus documents are cryptographically signed
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true, // Required for IP-based directory authorities
+		},
+	}
+
 	return &Client{
 		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout:   10 * time.Second, // Reduced timeout for faster fallback
+			Transport: transport,
 		},
 		logger:      log.Component("directory"),
 		authorities: DefaultAuthorities,
@@ -111,8 +129,36 @@ func (c *Client) fetchFromAuthority(ctx context.Context, authorityURL string) ([
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
+	// Handle compressed response
+	var reader io.Reader = resp.Body
+	switch resp.Header.Get("Content-Encoding") {
+	case "gzip":
+		gzReader, err := gzip.NewReader(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create gzip reader: %w", err)
+		}
+		defer func() {
+			if err := gzReader.Close(); err != nil {
+				c.logger.Error("Failed to close gzip reader", "function", "fetchFromAuthority", "error", err)
+			}
+		}()
+		reader = gzReader
+	case "deflate":
+		// Try zlib format first (deflate with wrapper)
+		zlibReader, err := zlib.NewReader(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create zlib reader: %w", err)
+		}
+		defer func() {
+			if err := zlibReader.Close(); err != nil {
+				c.logger.Error("Failed to close zlib reader", "function", "fetchFromAuthority", "error", err)
+			}
+		}()
+		reader = zlibReader
+	}
+
 	// Parse the consensus document
-	relays, err := c.parseConsensus(resp.Body)
+	relays, err := c.parseConsensus(reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse consensus: %w", err)
 	}
