@@ -7,6 +7,16 @@ A production-ready Tor client implementation in pure Go, designed for embedded s
 
 **⚠️ Development Status**: This project is in active development. Core functionality is being implemented according to the roadmap below. THIS IS NOT PRODUCTION READY SOFTWARE AND YOU SHOULD NOT USE IT.
 
+## ⚠️ CRITICAL: SOCKS5 Proxy Non-Functional
+
+**The SOCKS5 proxy cannot currently relay connections through Tor.** While circuits are built and the SOCKS5 server accepts connections, the stream protocol layer (RELAY_BEGIN/RELAY_DATA/RELAY_END cells) is not yet implemented. 
+
+**All SOCKS5 connection attempts will fail** until the stream protocol is completed.
+
+See [docs/STREAM_IMPLEMENTATION_REQUIRED.md](docs/STREAM_IMPLEMENTATION_REQUIRED.md) for detailed technical requirements and implementation plan.
+
+**Previous Security Issue:** A temporary implementation that made direct TCP connections (bypassing Tor entirely) has been removed as it exposed users' real IP addresses.
+
 ## Features
 
 ### Current (Phase 1-6.5 Complete + Phase 7 Control Protocol + Phase 7.3-7.4 Onion Services + Phase 8.1-8.6)

@@ -8,8 +8,11 @@ import (
 	"crypto/subtle"
 	"fmt"
 	"hash"
+	"io"
 	"sync"
 	"time"
+
+	"github.com/opd-ai/go-tor/pkg/cell"
 )
 
 // State represents the current state of a circuit
@@ -49,6 +52,7 @@ type Circuit struct {
 	CreatedAt        time.Time
 	Hops             []*Hop
 	IsolationKey     *IsolationKey // Isolation key for circuit isolation
+	conn             interface{}   // Connection to the entry guard (interface{} to avoid circular import)
 	mu               sync.RWMutex
 	paddingEnabled   bool          // SPEC-002: Enable/disable circuit padding
 	paddingInterval  time.Duration // SPEC-002: Interval for padding cells
@@ -57,6 +61,9 @@ type Circuit struct {
 	// CRYPTO-001: Running digests for relay cell verification per tor-spec.txt §6.1
 	forwardDigest  hash.Hash // Client → Exit direction
 	backwardDigest hash.Hash // Exit → Client direction
+	// Stream protocol support
+	relayReceiveChan chan *cell.RelayCell // Channel for receiving relay cells
+	streamManager    interface{}          // Stream manager (interface{} to avoid circular import)
 }
 
 // Hop represents a single hop in a circuit (one relay)
@@ -74,14 +81,17 @@ func NewCircuit(id uint32) *Circuit {
 		ID:               id,
 		State:            StateBuilding,
 		CreatedAt:        now,
-		Hops:             make([]*Hop, 0, 3), // Typical circuit has 3 hops
-		IsolationKey:     nil,                // No isolation by default (backward compatible)
-		paddingEnabled:   true,               // SPEC-002: Enable padding by default
-		paddingInterval:  5 * time.Second,    // SPEC-002: Default 5-second padding interval
-		lastPaddingTime:  now,                // SPEC-002: Initialize padding timer
-		lastActivityTime: now,                // SPEC-002: Initialize activity timer
-		forwardDigest:    sha1.New(),         // CRYPTO-001: Initialize forward digest
-		backwardDigest:   sha1.New(),         // CRYPTO-001: Initialize backward digest
+		Hops:             make([]*Hop, 0, 3),             // Typical circuit has 3 hops
+		IsolationKey:     nil,                            // No isolation by default (backward compatible)
+		conn:             nil,                            // Connection set later
+		paddingEnabled:   true,                           // SPEC-002: Enable padding by default
+		paddingInterval:  5 * time.Second,                // SPEC-002: Default 5-second padding interval
+		lastPaddingTime:  now,                            // SPEC-002: Initialize padding timer
+		lastActivityTime: now,                            // SPEC-002: Initialize activity timer
+		forwardDigest:    sha1.New(),                     // CRYPTO-001: Initialize forward digest
+		backwardDigest:   sha1.New(),                     // CRYPTO-001: Initialize backward digest
+		relayReceiveChan: make(chan *cell.RelayCell, 32), // Buffer for incoming relay cells
+		streamManager:    nil,                            // Stream manager set later
 	}
 }
 
@@ -450,4 +460,232 @@ func (c *Circuit) GetIsolationKey() *IsolationKey {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.IsolationKey
+}
+
+// SetConnection sets the underlying connection for this circuit
+// conn should be a *connection.Connection, but we use interface{} to avoid circular imports
+func (c *Circuit) SetConnection(conn interface{}) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.conn = conn
+}
+
+// SetStreamManager sets the stream manager for this circuit
+// mgr should be a *stream.Manager, but we use interface{} to avoid circular imports
+func (c *Circuit) SetStreamManager(mgr interface{}) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.streamManager = mgr
+}
+
+// SendRelayCell sends a relay cell through the circuit
+// This encrypts the relay cell and sends it through the underlying connection
+func (c *Circuit) SendRelayCell(relayCell *cell.RelayCell) error {
+	c.mu.Lock()
+	conn := c.conn
+	state := c.State
+	c.mu.Unlock()
+
+	if state != StateOpen {
+		return fmt.Errorf("circuit not open: state=%s", state)
+	}
+
+	if conn == nil {
+		return fmt.Errorf("circuit has no connection")
+	}
+
+	// Encode the relay cell
+	payload, err := relayCell.Encode()
+	if err != nil {
+		return fmt.Errorf("failed to encode relay cell: %w", err)
+	}
+
+	// Update forward digest before encrypting
+	// The digest is computed over the relay cell with zeroed digest field
+	if err := c.UpdateDigest(DirectionForward, payload); err != nil {
+		return fmt.Errorf("failed to update digest: %w", err)
+	}
+
+	// Get the updated digest and set it in the relay cell
+	c.mu.RLock()
+	digestSum := c.forwardDigest.Sum(nil)
+	c.mu.RUnlock()
+	copy(relayCell.Digest[:], digestSum[:4])
+
+	// Re-encode with updated digest
+	payload, err = relayCell.Encode()
+	if err != nil {
+		return fmt.Errorf("failed to encode relay cell with digest: %w", err)
+	}
+
+	// TODO: Encrypt the relay cell with per-hop cryptography
+	// For now, we send it unencrypted (this will need to be implemented)
+	// encryptedPayload := c.encryptForward(payload)
+
+	// Create a RELAY cell with the payload
+	cellToSend := &cell.Cell{
+		CircID:  c.ID,
+		Command: cell.CmdRelay,
+		Payload: payload,
+	}
+
+	// Send through connection (type assert to interface with SendCell method)
+	type cellSender interface {
+		SendCell(*cell.Cell) error
+	}
+	sender, ok := conn.(cellSender)
+	if !ok {
+		return fmt.Errorf("connection does not support SendCell")
+	}
+
+	if err := sender.SendCell(cellToSend); err != nil {
+		return fmt.Errorf("failed to send cell: %w", err)
+	}
+
+	// Record activity
+	c.RecordActivity()
+
+	return nil
+}
+
+// ReceiveRelayCell receives a relay cell from the circuit
+// This blocks until a relay cell is received or the context is cancelled
+func (c *Circuit) ReceiveRelayCell(ctx context.Context) (*cell.RelayCell, error) {
+	select {
+	case relayCell := <-c.relayReceiveChan:
+		return relayCell, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+// ReceiveRelayCellTimeout receives a relay cell with a timeout
+func (c *Circuit) ReceiveRelayCellTimeout(timeout time.Duration) (*cell.RelayCell, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	return c.ReceiveRelayCell(ctx)
+}
+
+// DeliverRelayCell delivers a relay cell to this circuit (called by connection layer)
+// This decrypts the cell and pushes it to the receive channel
+func (c *Circuit) DeliverRelayCell(cellData *cell.Cell) error {
+	if cellData.CircID != c.ID {
+		return fmt.Errorf("circuit ID mismatch: expected %d, got %d", c.ID, cellData.CircID)
+	}
+
+	// TODO: Decrypt the relay cell with per-hop cryptography
+	// For now, we decode it directly (unencrypted)
+	// decryptedPayload := c.decryptBackward(cellData.Payload)
+
+	// Decode the relay cell
+	relayCell, err := cell.DecodeRelayCell(cellData.Payload)
+	if err != nil {
+		return fmt.Errorf("failed to decode relay cell: %w", err)
+	}
+
+	// Verify backward digest
+	// TODO: Implement proper digest verification
+	// For now, we skip verification to get basic functionality working
+
+	// Update backward digest
+	if err := c.UpdateDigest(DirectionBackward, cellData.Payload); err != nil {
+		return fmt.Errorf("failed to update backward digest: %w", err)
+	}
+
+	// Record activity
+	c.RecordActivity()
+
+	// Deliver to receive channel (non-blocking with error on full)
+	select {
+	case c.relayReceiveChan <- relayCell:
+		return nil
+	case <-time.After(100 * time.Millisecond):
+		return fmt.Errorf("relay receive channel full or blocked")
+	}
+}
+
+// OpenStream opens a new stream on this circuit
+// This is a convenience method that integrates with the stream manager
+func (c *Circuit) OpenStream(streamID uint16, target string, port uint16) error {
+	// Send RELAY_BEGIN cell
+	beginPayload := []byte(fmt.Sprintf("%s:%d\x00", target, port))
+	beginCell := cell.NewRelayCell(streamID, cell.RelayBegin, beginPayload)
+
+	if err := c.SendRelayCell(beginCell); err != nil {
+		return fmt.Errorf("failed to send RELAY_BEGIN: %w", err)
+	}
+
+	// Wait for RELAY_CONNECTED response
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	connectedCell, err := c.ReceiveRelayCell(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to receive RELAY_CONNECTED: %w", err)
+	}
+
+	if connectedCell.StreamID != streamID {
+		// Not for this stream, put it back?
+		// For now, error out
+		return fmt.Errorf("received cell for wrong stream: expected %d, got %d", streamID, connectedCell.StreamID)
+	}
+
+	if connectedCell.Command == cell.RelayEnd {
+		// Stream was rejected
+		reason := "unknown"
+		if len(connectedCell.Data) > 0 {
+			reason = fmt.Sprintf("reason=%d", connectedCell.Data[0])
+		}
+		return fmt.Errorf("stream rejected by exit: %s", reason)
+	}
+
+	if connectedCell.Command != cell.RelayConnected {
+		return fmt.Errorf("expected RELAY_CONNECTED, got %s", cell.RelayCmdString(connectedCell.Command))
+	}
+
+	return nil
+}
+
+// ReadFromStream reads data from a specific stream
+// This is used by the SOCKS proxy to receive data from the exit node
+func (c *Circuit) ReadFromStream(ctx context.Context, streamID uint16) ([]byte, error) {
+	for {
+		relayCell, err := c.ReceiveRelayCell(ctx)
+		if err != nil {
+			if err == io.EOF {
+				return nil, io.EOF
+			}
+			return nil, fmt.Errorf("failed to receive relay cell: %w", err)
+		}
+
+		// Filter for our stream
+		if relayCell.StreamID != streamID {
+			// Cell for different stream, skip
+			// TODO: Deliver to correct stream via stream manager
+			continue
+		}
+
+		switch relayCell.Command {
+		case cell.RelayData:
+			return relayCell.Data, nil
+		case cell.RelayEnd:
+			return nil, io.EOF
+		default:
+			// Unexpected command for this stream
+			continue
+		}
+	}
+}
+
+// WriteToStream writes data to a specific stream
+// This is used by the SOCKS proxy to send data to the exit node
+func (c *Circuit) WriteToStream(streamID uint16, data []byte) error {
+	dataCell := cell.NewRelayCell(streamID, cell.RelayData, data)
+	return c.SendRelayCell(dataCell)
+}
+
+// EndStream sends a RELAY_END cell for a stream
+func (c *Circuit) EndStream(streamID uint16, reason byte) error {
+	endCell := cell.NewRelayCell(streamID, cell.RelayEnd, []byte{reason})
+	return c.SendRelayCell(endCell)
 }

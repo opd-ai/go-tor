@@ -16,6 +16,7 @@ import (
 	"github.com/opd-ai/go-tor/pkg/logger"
 	"github.com/opd-ai/go-tor/pkg/onion"
 	"github.com/opd-ai/go-tor/pkg/pool"
+	"github.com/opd-ai/go-tor/pkg/stream"
 )
 
 const (
@@ -84,6 +85,7 @@ type Server struct {
 	listener      net.Listener
 	circuitMgr    *circuit.Manager
 	circuitPool   *pool.CircuitPool // Optional: for circuit isolation support
+	streamMgr     *stream.Manager   // Stream manager for multiplexing
 	onionClient   *onion.Client
 	logger        *logger.Logger
 	config        *Config // SEC-L006: Configurable server settings
@@ -114,6 +116,7 @@ func NewServerWithConfig(address string, circuitMgr *circuit.Manager, log *logge
 	return &Server{
 		address:       address,
 		circuitMgr:    circuitMgr,
+		streamMgr:     stream.NewManager(log),
 		onionClient:   onion.NewClient(log),
 		logger:        log.Component("socks5"),
 		config:        cfg,
@@ -309,11 +312,13 @@ func (s *Server) handleConnection(ctx context.Context, conn net.Conn) {
 	}
 
 	// If circuit pool is available, request an isolated circuit
+	var circ *circuit.Circuit
 	if circuitPool != nil && isolationKey != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		circ, err := circuitPool.GetWithIsolation(ctx, isolationKey)
+		var err error
+		circ, err = circuitPool.GetWithIsolation(ctx, isolationKey)
 		if err != nil {
 			s.logger.Error("Failed to get isolated circuit", "error", err, "isolation_key", isolationKey)
 			s.sendReply(conn, replyGeneralFailure, nil)
@@ -327,16 +332,65 @@ func (s *Server) handleConnection(ctx context.Context, conn net.Conn) {
 
 		// Return circuit to pool when done
 		defer circuitPool.Put(circ)
+	} else {
+		// No circuit pool or no isolation - get any available circuit
+		// For now, we'll require a circuit pool
+		s.logger.Error("No circuit pool available for connection")
+		s.sendReply(conn, replyGeneralFailure, nil)
+		return
 	}
 
-	// Send success reply
+	// Parse target address and port
+	hostStr, portStr, err := net.SplitHostPort(targetAddr)
+	if err != nil {
+		s.logger.Error("Failed to parse target address", "target", targetAddr, "error", err)
+		s.sendReply(conn, replyGeneralFailure, nil)
+		return
+	}
+
+	var port uint16
+	if _, err := fmt.Sscanf(portStr, "%d", &port); err != nil {
+		s.logger.Error("Failed to parse port", "port", portStr, "error", err)
+		s.sendReply(conn, replyGeneralFailure, nil)
+		return
+	}
+
+	// Create a stream
+	strm, err := s.streamMgr.CreateStream(circ.ID, hostStr, port)
+	if err != nil {
+		s.logger.Error("Failed to create stream", "error", err)
+		s.sendReply(conn, replyGeneralFailure, nil)
+		return
+	}
+	defer s.streamMgr.RemoveStream(strm.ID)
+
+	s.logger.Info("Created stream",
+		"stream_id", strm.ID,
+		"circuit_id", circ.ID,
+		"target", targetAddr)
+
+	// Update stream state
+	strm.SetState(stream.StateConnecting)
+
+	// Open the stream on the circuit (sends RELAY_BEGIN and waits for RELAY_CONNECTED)
+	if err := circ.OpenStream(strm.ID, hostStr, port); err != nil {
+		s.logger.Error("Failed to open stream", "stream_id", strm.ID, "error", err)
+		s.sendReply(conn, replyHostUnreachable, nil)
+		return
+	}
+
+	// Stream is now connected
+	strm.SetState(stream.StateConnected)
+
+	s.logger.Info("Stream connected",
+		"stream_id", strm.ID,
+		"target", targetAddr)
+
+	// Send SOCKS5 success reply
 	s.sendReply(conn, replySuccess, conn.LocalAddr())
 
-	s.logger.Info("Connection established", "target", targetAddr, "username", username, "isolation", isolationKey)
-
-	// Relay data (simplified - just close for now)
-	// In production: relay between conn and circuit stream using the isolated circuit
-	time.Sleep(100 * time.Millisecond)
+	// Relay data bidirectionally between SOCKS client and Tor circuit
+	s.relayDataThroughCircuit(ctx, conn, circ, strm)
 }
 
 // handshake performs SOCKS5 handshake and returns optional username for isolation
@@ -574,6 +628,101 @@ func (s *Server) sendReply(conn net.Conn, reply byte, bindAddr net.Addr) error {
 	}
 
 	return nil
+}
+
+// relayDataThroughCircuit relays data bidirectionally between SOCKS client and Tor circuit
+// This implements the core stream protocol: reading from the SOCKS connection and sending
+// RELAY_DATA cells to the circuit, and vice versa.
+func (s *Server) relayDataThroughCircuit(ctx context.Context, socksConn net.Conn, circ *circuit.Circuit, strm *stream.Stream) {
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	// SOCKS client -> Tor circuit (RELAY_DATA cells)
+	// Read data from the SOCKS connection and send it through the circuit
+	go func() {
+		defer wg.Done()
+
+		// Maximum relay cell data size (509 bytes payload - 11 bytes relay header)
+		maxDataSize := 498
+		buf := make([]byte, maxDataSize)
+
+		for {
+			// Set read deadline to detect idle connections
+			if err := socksConn.SetReadDeadline(time.Now().Add(5 * time.Minute)); err != nil {
+				s.logger.Debug("Failed to set read deadline", "error", err)
+			}
+
+			n, err := socksConn.Read(buf)
+			if err != nil {
+				if err != io.EOF {
+					s.logger.Debug("SOCKS read error", "stream_id", strm.ID, "error", err)
+				}
+				// Send RELAY_END to exit node
+				endReason := byte(6) // REASON_DONE
+				if err := circ.EndStream(strm.ID, endReason); err != nil {
+					s.logger.Debug("Failed to send RELAY_END", "stream_id", strm.ID, "error", err)
+				}
+				return
+			}
+
+			if n == 0 {
+				continue
+			}
+
+			// Send data as RELAY_DATA cell
+			if err := circ.WriteToStream(strm.ID, buf[:n]); err != nil {
+				s.logger.Error("Failed to send RELAY_DATA", "stream_id", strm.ID, "error", err)
+				return
+			}
+
+			s.logger.Debug("Sent data to circuit",
+				"stream_id", strm.ID,
+				"bytes", n)
+		}
+	}()
+
+	// Tor circuit -> SOCKS client (RELAY_DATA cells)
+	// Read relay cells from the circuit and write data to the SOCKS connection
+	go func() {
+		defer wg.Done()
+
+		for {
+			// Read data from circuit for this stream
+			data, err := circ.ReadFromStream(ctx, strm.ID)
+			if err != nil {
+				if err == io.EOF {
+					s.logger.Debug("Circuit closed", "stream_id", strm.ID)
+				} else {
+					s.logger.Debug("Circuit receive error", "stream_id", strm.ID, "error", err)
+				}
+				// Close SOCKS connection
+				if err := socksConn.Close(); err != nil {
+					s.logger.Debug("Failed to close SOCKS connection", "stream_id", strm.ID, "error", err)
+				}
+				return
+			}
+
+			// Write to SOCKS client
+			if _, err := socksConn.Write(data); err != nil {
+				s.logger.Error("Failed to write to SOCKS client", "stream_id", strm.ID, "error", err)
+				// Send RELAY_END to exit node
+				endReason := byte(6) // REASON_DONE
+				if err := circ.EndStream(strm.ID, endReason); err != nil {
+					s.logger.Debug("Failed to send RELAY_END", "stream_id", strm.ID, "error", err)
+				}
+				return
+			}
+
+			s.logger.Debug("Sent data to SOCKS client",
+				"stream_id", strm.ID,
+				"bytes", len(data))
+		}
+	}()
+
+	// Wait for both goroutines to finish
+	wg.Wait()
+
+	s.logger.Info("Data relay finished", "stream_id", strm.ID)
 }
 
 // Shutdown gracefully shuts down the server
