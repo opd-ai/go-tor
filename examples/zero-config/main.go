@@ -24,7 +24,7 @@ func main() {
 	// - Builds initial circuits
 	// - Starts the SOCKS5 proxy
 	fmt.Println("Connecting to Tor network...")
-	fmt.Println("(This may take 30-60 seconds on first run)")
+	fmt.Println("(This may take up to 90 seconds on first run)")
 	fmt.Println()
 
 	torClient, err := client.Connect()

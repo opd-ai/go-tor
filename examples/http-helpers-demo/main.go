@@ -24,8 +24,8 @@ func main() {
 	}
 	defer torClient.Close()
 
-	// Wait for Tor to be ready (first connection may take 30-60 seconds)
-	fmt.Println("2. Waiting for Tor to bootstrap (this may take 30-60 seconds)...")
+	// Wait for Tor to be ready (first connection may take up to 90 seconds)
+	fmt.Println("2. Waiting for Tor to bootstrap (this may take up to 90 seconds)...")
 	if err := torClient.WaitUntilReady(90 * time.Second); err != nil {
 		log.Fatalf("Tor failed to become ready: %v", err)
 	}

@@ -41,7 +41,7 @@ func main() {
 	defer cancel()
 
 	// Step 1: Connect with bine enabled
-	fmt.Println("Step 1: Connecting with bine enabled (this may take 30-60 seconds)...")
+	fmt.Println("Step 1: Connecting with bine enabled (this may take up to 90 seconds)...")
 	client, err := bine.ConnectWithOptions(&bine.Options{
 		EnableBine:     true, // Required for hidden services
 		StartupTimeout: 120 * time.Second,

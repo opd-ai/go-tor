@@ -155,7 +155,7 @@ The easiest way to get started - just run the binary with no arguments:
 - Connects to Tor network and builds circuits
 - Starts SOCKS5 proxy without any setup
 
-First connection takes 30-60 seconds. Subsequent starts are faster.
+First connection takes up to 90 seconds (consensus download + circuit building). Subsequent starts are faster.
 
 ## Usage
 

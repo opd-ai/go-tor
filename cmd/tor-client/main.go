@@ -124,7 +124,7 @@ func run(ctx context.Context, cfg *config.Config, log *logger.Logger) error {
 
 	// Display bootstrapping message
 	log.Info("Bootstrapping Tor network connection...")
-	log.Info("This may take 30-60 seconds on first run")
+	log.Info("This may take up to 90 seconds on first run (consensus download + circuits)")
 
 	// Start the client
 	startTime := time.Now()

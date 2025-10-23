@@ -34,7 +34,7 @@ That's it! The client will:
 time=2025-10-19T... level=INFO msg="Starting go-tor" version=... 
 time=2025-10-19T... level=INFO msg="Initializing Tor client..."
 time=2025-10-19T... level=INFO msg="Bootstrapping Tor network connection..."
-time=2025-10-19T... level=INFO msg="This may take 30-60 seconds on first run"
+time=2025-10-19T... level=INFO msg="This may take up to 90 seconds on first run (consensus download + circuits)"
 time=2025-10-19T... level=INFO msg="✓ Connected to Tor network" bootstrap_time=45s active_circuits=3
 time=2025-10-19T... level=INFO msg="✓ SOCKS proxy available" address="127.0.0.1:9050"
 
@@ -176,11 +176,11 @@ All directories are created with secure permissions (700 on Unix systems).
 ## What Happens on First Run?
 
 1. **Directory Creation**: Auto-detects and creates data directory
-2. **Network Bootstrap**: Fetches consensus documents (~5-10 seconds)
-3. **Circuit Building**: Establishes 3 circuits (~20-40 seconds)
+2. **Network Bootstrap**: Fetches consensus documents (~5-15 seconds)
+3. **Circuit Building**: Establishes 3 circuits (~30-60 seconds)
 4. **Ready**: SOCKS5 proxy available for use
 
-Total time: 30-60 seconds on first run, faster on subsequent runs.
+Total time: Up to 90 seconds on first run (consensus download + circuit building), faster on subsequent runs.
 
 ## Checking Connection
 

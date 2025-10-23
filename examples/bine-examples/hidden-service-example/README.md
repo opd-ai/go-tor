@@ -60,7 +60,7 @@ The onion service will host a simple HTTP server.
 Checking for Tor binary...
 ✓ Tor binary found
 
-Step 1: Starting Tor (this may take 30-60 seconds)...
+Step 1: Starting Tor (this may take up to 90 seconds)...
 ✓ Tor started successfully
 
 Step 2: Creating v3 onion service...
@@ -343,7 +343,7 @@ Bine automatically selects a local port. If you see errors:
 
 ## Performance Notes
 
-- **Startup time**: 30-60 seconds for Tor, 2-3 minutes for service
+- **Startup time**: Up to 90 seconds for Tor, 2-3 minutes for service publication
 - **Latency**: Higher than clearnet (6-8 hops total)
 - **Bandwidth**: Slower than direct connections
 - **Reliability**: Depends on Tor network health
