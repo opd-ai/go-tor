@@ -95,8 +95,9 @@ func DefaultConfig(address string) *Config {
 func createTorTLSConfig() *tls.Config {
 	return &tls.Config{
 		// Tor relays use self-signed certificates, so we can't verify against root CAs
-		// However, we still want to verify the certificate is well-formed and properly signed
-		InsecureSkipVerify: false,
+		// We use InsecureSkipVerify=true to bypass the default CA verification,
+		// but we still perform custom verification via VerifyPeerCertificate
+		InsecureSkipVerify: true,
 		// Custom verification function for Tor-specific certificate handling
 		VerifyPeerCertificate: verifyTorRelayCertificate,
 		// Require TLS 1.2 minimum for security
