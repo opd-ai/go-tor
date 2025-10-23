@@ -15,10 +15,10 @@ import (
 func TestPortSelectionGap(t *testing.T) {
 	// AUDIT-005: Use dynamic port allocation in tests to avoid conflicts
 	// Don't try to bind to standard Tor ports which may be in use
-	
+
 	// Test FindAvailablePort with a high port number that's likely free
 	testPort := 19050 // Use non-standard port for testing
-	
+
 	// Reserve this test port to simulate it being in use
 	listener, err := net.Listen("tcp", "127.0.0.1:"+fmt.Sprintf("%d", testPort))
 	if err != nil {
