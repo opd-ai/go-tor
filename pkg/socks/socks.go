@@ -978,9 +978,27 @@ func (s *Server) handleResolvePTR(ctx context.Context, conn net.Conn, ipAddr str
 
 	// For RESOLVE_PTR, we send back the hostname as an address
 	// The SOCKS5 protocol extension uses the same format but with domain type
-	s.sendDNSReplyHostname(conn, replySuccess, result.Hostname)
+	s.sendDNSReplyHostname(conn, replySuccess, result.Hostname, result.TTL)
 }
 
+// sendDNSReplyHostname sends a DNS resolution reply for a hostname (for RESOLVE_PTR)
+// Format: [version][status][reserved][address_type][address][ttl]
+func (s *Server) sendDNSReplyHostname(conn net.Conn, status byte, hostname string, ttl uint32) error {
+	// SOCKS5 reply format for hostname:
+	// [version][status][reserved][address_type][address][ttl]
+	buf := make([]byte, 0, 4+1+len(hostname)+4)
+	buf = append(buf, socks5Version)
+	buf = append(buf, status)
+	buf = append(buf, 0x00) // Reserved
+	buf = append(buf, addrTypeDomain)
+	buf = append(buf, byte(len(hostname)))
+	buf = append(buf, []byte(hostname)...)
+	ttlBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(ttlBytes, ttl)
+	buf = append(buf, ttlBytes...)
+	_, err := conn.Write(buf)
+	return err
+}
 // sendDNSReply sends a DNS resolution reply (for RESOLVE/RESOLVE_PTR)
 // Format: [version][status][reserved][address_type][address][ttl]
 //
