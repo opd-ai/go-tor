@@ -89,8 +89,8 @@ type Config struct {
 func DefaultConfig() *Config {
 	return &Config{
 		MaxConnections:      defaultMaxConnections,
-		EnableDNSResolution: true,         // DNS leak prevention enabled by default
-		DNSTimeout:          30 * time.Second, // Standard DNS timeout
+		EnableDNSResolution: true,                  // DNS leak prevention enabled by default
+		DNSTimeout:          30 * time.Second,      // Standard DNS timeout
 		IsolationLevel:      circuit.IsolationNone, // Backward compatible default
 		IsolateDestinations: false,
 		IsolateSOCKSAuth:    false,
@@ -841,7 +841,7 @@ func (s *Server) handleResolve(ctx context.Context, conn net.Conn, hostname stri
 	// For now, we'll use a simplified approach:
 	// Create a temporary stream through a circuit and request DNS resolution
 	// In a full implementation, this would use Tor's RELAY_RESOLVE cell type
-	
+
 	// Get or create a circuit for the resolution
 	s.mu.Lock()
 	circuitPool := s.circuitPool
@@ -865,15 +865,15 @@ func (s *Server) handleResolve(ctx context.Context, conn net.Conn, hostname stri
 	// 1. Send a RELAY_RESOLVE cell through the circuit
 	// 2. Wait for RELAY_RESOLVED response
 	// 3. Parse the IP addresses from the response
-	
+
 	// Since we don't have direct RELAY_RESOLVE cell support yet,
 	// this is a placeholder implementation that accepts the command
 	// but returns an error until RELAY_RESOLVE cells are implemented
-	
+
 	s.logger.Warn("DNS RESOLVE accepted but RELAY_RESOLVE cells not yet implemented",
 		"hostname", hostname,
 		"circuit_id", circ.ID)
-	
+
 	// Send error response indicating feature is not fully implemented
 	s.sendDNSReply(conn, replyGeneralFailure, nil)
 	s.logger.Info("DNS RESOLVE completed with error (RELAY_RESOLVE cells needed)")
@@ -919,11 +919,11 @@ func (s *Server) handleResolvePTR(ctx context.Context, conn net.Conn, ipAddr str
 	// 1. Send a RELAY_RESOLVE cell with PTR flag through the circuit
 	// 2. Wait for RELAY_RESOLVED response with hostname
 	// 3. Parse the hostname from the response
-	
+
 	s.logger.Warn("DNS RESOLVE_PTR accepted but RELAY_RESOLVE cells not yet implemented",
 		"ip", ipAddr,
 		"circuit_id", circ.ID)
-	
+
 	// Send error response indicating feature is not fully implemented
 	s.sendDNSReply(conn, replyGeneralFailure, nil)
 	s.logger.Info("DNS RESOLVE_PTR completed with error (RELAY_RESOLVE cells needed)")
@@ -931,6 +931,10 @@ func (s *Server) handleResolvePTR(ctx context.Context, conn net.Conn, ipAddr str
 
 // sendDNSReply sends a DNS resolution reply (for RESOLVE/RESOLVE_PTR)
 // Format: [version][status][reserved][address_type][address][ttl]
+//
+// Note: Currently returns only the first address from the addresses slice.
+// The Tor SOCKS5 extension for DNS does not have a standard way to return
+// multiple addresses. Applications should make multiple RESOLVE requests if needed.
 func (s *Server) sendDNSReply(conn net.Conn, status byte, addresses []net.IP) error {
 	// Build basic reply header
 	response := make([]byte, 4)

@@ -675,7 +675,7 @@ func TestRequestInfoStructure(t *testing.T) {
 // TestSendDNSReply tests DNS reply formatting
 func TestSendDNSReply(t *testing.T) {
 	t.Skip("Skipping sendDNSReply test - requires full integration test setup")
-	
+
 	// This test would require a proper mock connection setup
 	// For now, we verify the basic structure through unit tests
 }
