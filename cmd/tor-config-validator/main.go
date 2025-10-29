@@ -2,6 +2,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -20,6 +21,9 @@ func main() {
 	// Parse command-line flags
 	configFile := flag.String("config", "", "Path to configuration file to validate")
 	generateSample := flag.Bool("generate", false, "Generate sample configuration file")
+	generateSchema := flag.Bool("schema", false, "Generate JSON schema for configuration")
+	listTemplates := flag.Bool("list-templates", false, "List available configuration templates")
+	template := flag.String("template", "", "Generate config from template (minimal, production, development, high-security)")
 	outputFile := flag.String("output", "", "Output file for generated configuration (default: stdout)")
 	showVersion := flag.Bool("version", false, "Show version information")
 	verbose := flag.Bool("verbose", false, "Verbose output")
@@ -28,6 +32,30 @@ func main() {
 	if *showVersion {
 		fmt.Printf("tor-config-validator version %s (built %s)\n", version, buildTime)
 		fmt.Println("Configuration validation and generation tool for go-tor")
+		os.Exit(0)
+	}
+
+	// Generate JSON schema if requested
+	if *generateSchema {
+		if err := generateJSONSchema(*outputFile, *verbose); err != nil {
+			fmt.Fprintf(os.Stderr, "Error generating schema: %v\n", err)
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
+
+	// List templates if requested
+	if *listTemplates {
+		listConfigTemplates(*verbose)
+		os.Exit(0)
+	}
+
+	// Generate from template if requested
+	if *template != "" {
+		if err := generateFromTemplate(*template, *outputFile, *verbose); err != nil {
+			fmt.Fprintf(os.Stderr, "Error generating from template: %v\n", err)
+			os.Exit(1)
+		}
 		os.Exit(0)
 	}
 
@@ -62,24 +90,43 @@ func printUsage() {
 	fmt.Println("  tor-config-validator [options]")
 	fmt.Println()
 	fmt.Println("Options:")
-	fmt.Println("  -config <file>     Validate configuration file")
-	fmt.Println("  -generate          Generate sample configuration file")
-	fmt.Println("  -output <file>     Output file for generated config (default: stdout)")
-	fmt.Println("  -verbose           Show detailed validation information")
-	fmt.Println("  -version           Show version information")
+	fmt.Println("  -config <file>           Validate configuration file")
+	fmt.Println("  -generate                Generate sample configuration file")
+	fmt.Println("  -schema                  Generate JSON schema for configuration")
+	fmt.Println("  -list-templates          List available configuration templates")
+	fmt.Println("  -template <name>         Generate config from template")
+	fmt.Println("                           (minimal, production, development, high-security)")
+	fmt.Println("  -output <file>           Output file for generated config (default: stdout)")
+	fmt.Println("  -verbose                 Show detailed validation information")
+	fmt.Println("  -version                 Show version information")
 	fmt.Println()
 	fmt.Println("Examples:")
 	fmt.Println("  # Validate existing configuration")
 	fmt.Println("  tor-config-validator -config /etc/tor/torrc")
 	fmt.Println()
+	fmt.Println("  # Validate with detailed feedback")
+	fmt.Println("  tor-config-validator -config myconfig.conf -verbose")
+	fmt.Println()
 	fmt.Println("  # Generate sample configuration to stdout")
 	fmt.Println("  tor-config-validator -generate")
 	fmt.Println()
-	fmt.Println("  # Generate sample configuration to file")
-	fmt.Println("  tor-config-validator -generate -output /tmp/sample-torrc")
+	fmt.Println("  # Generate JSON schema for IDE autocomplete")
+	fmt.Println("  tor-config-validator -schema -output config-schema.json")
 	fmt.Println()
-	fmt.Println("  # Validate with verbose output")
-	fmt.Println("  tor-config-validator -config myconfig.conf -verbose")
+	fmt.Println("  # List available templates")
+	fmt.Println("  tor-config-validator -list-templates")
+	fmt.Println()
+	fmt.Println("  # Generate minimal config")
+	fmt.Println("  tor-config-validator -template minimal -output torrc")
+	fmt.Println()
+	fmt.Println("  # Generate production config")
+	fmt.Println("  tor-config-validator -template production -output torrc.prod")
+	fmt.Println()
+	fmt.Println("Templates:")
+	fmt.Println("  minimal        - Simplest working configuration")
+	fmt.Println("  production     - Production-ready with monitoring and tuning")
+	fmt.Println("  development    - Development config with debug logging")
+	fmt.Println("  high-security  - Privacy-focused with strict isolation")
 }
 
 func validateConfigFile(path string, verbose bool) error {
@@ -105,14 +152,218 @@ func validateConfigFile(path string, verbose bool) error {
 		printConfigSummary(cfg)
 	}
 
-	// Validate configuration
-	if err := cfg.Validate(); err != nil {
-		return fmt.Errorf("validation error: %w", err)
-	}
+	// Perform detailed validation
+	result := cfg.ValidateDetailed()
 
 	if verbose {
 		fmt.Println()
-		fmt.Println("All validation checks passed")
+		printValidationResult(result)
+	}
+
+	if !result.Valid {
+		return fmt.Errorf("configuration has %d error(s)", len(result.Errors))
+	}
+
+	if verbose && len(result.Warnings) > 0 {
+		fmt.Printf("\n⚠  Configuration has %d warning(s) but is valid\n", len(result.Warnings))
+	}
+
+	return nil
+}
+
+func printValidationResult(result *config.ValidationResult) {
+	if len(result.Errors) > 0 {
+		fmt.Println("Errors:")
+		fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		for _, err := range result.Errors {
+			fmt.Printf("✗ %s\n", err.Message)
+			if err.Suggestion != "" {
+				fmt.Printf("  → %s\n", err.Suggestion)
+			}
+		}
+		fmt.Println()
+	}
+
+	if len(result.Warnings) > 0 {
+		fmt.Println("Warnings:")
+		fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		for _, warn := range result.Warnings {
+			fmt.Printf("⚠  %s\n", warn.Message)
+			if warn.Suggestion != "" {
+				fmt.Printf("  → %s\n", warn.Suggestion)
+			}
+		}
+		fmt.Println()
+	}
+
+	if result.Valid && len(result.Errors) == 0 {
+		fmt.Println("✓ All validation checks passed")
+	}
+}
+
+func generateJSONSchema(outputPath string, verbose bool) error {
+	if verbose {
+		fmt.Println("Generating JSON schema...")
+	}
+
+	schema, err := config.GenerateJSONSchema()
+	if err != nil {
+		return fmt.Errorf("failed to generate schema: %w", err)
+	}
+
+	jsonData, err := schema.ToJSON()
+	if err != nil {
+		return fmt.Errorf("failed to convert schema to JSON: %w", err)
+	}
+
+	// Write to file or stdout
+	if outputPath != "" {
+		// Create directory if it doesn't exist
+		dir := filepath.Dir(outputPath)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return fmt.Errorf("failed to create directory: %w", err)
+		}
+
+		// Write file
+		if err := os.WriteFile(outputPath, jsonData, 0o644); err != nil {
+			return fmt.Errorf("failed to write file: %w", err)
+		}
+
+		if verbose {
+			fmt.Printf("JSON schema written to: %s\n", outputPath)
+			fmt.Println()
+			fmt.Println("Use this schema with your IDE for autocomplete and validation.")
+			fmt.Println()
+			fmt.Println("For VS Code, add to .vscode/settings.json:")
+			
+			// Create a proper JSON example using a map
+			exampleSettings := map[string]interface{}{
+				"json.schemas": []map[string]interface{}{
+					{
+						"fileMatch": []string{"torrc", "*.torrc"},
+						"url":       "./" + filepath.Base(outputPath),
+					},
+				},
+			}
+			
+			exampleJSON, _ := json.MarshalIndent(exampleSettings, "", "  ")
+			fmt.Println(string(exampleJSON))
+		} else {
+			fmt.Printf("JSON schema created: %s\n", outputPath)
+		}
+	} else {
+		// Write to stdout
+		fmt.Println(string(jsonData))
+	}
+
+	return nil
+}
+
+func listConfigTemplates(verbose bool) {
+	templates := []struct {
+		name        string
+		file        string
+		description string
+	}{
+		{
+			name:        "minimal",
+			file:        "configs/templates/minimal.torrc",
+			description: "Simplest working configuration - just the essentials",
+		},
+		{
+			name:        "production",
+			file:        "configs/templates/production.torrc",
+			description: "Production-ready with monitoring, performance tuning, and best practices",
+		},
+		{
+			name:        "development",
+			file:        "configs/templates/development.torrc",
+			description: "Development config with debug logging, metrics, and relaxed timeouts",
+		},
+		{
+			name:        "high-security",
+			file:        "configs/templates/high-security.torrc",
+			description: "Privacy-focused with strict circuit isolation and conservative settings",
+		},
+	}
+
+	fmt.Println("Available Configuration Templates:")
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Println()
+
+	for _, tmpl := range templates {
+		fmt.Printf("  %s\n", tmpl.name)
+		if verbose {
+			fmt.Printf("    File: %s\n", tmpl.file)
+		}
+		fmt.Printf("    %s\n", tmpl.description)
+		fmt.Println()
+	}
+
+	if !verbose {
+		fmt.Println("Use -verbose to see template file paths")
+	}
+
+	fmt.Println("Generate a template:")
+	fmt.Println("  tor-config-validator -template <name> -output torrc")
+	fmt.Println()
+	fmt.Println("Example:")
+	fmt.Println("  tor-config-validator -template production -output /etc/tor/torrc")
+}
+
+func generateFromTemplate(templateName, outputPath string, verbose bool) error {
+	// Map template names to files
+	templateFiles := map[string]string{
+		"minimal":       "configs/templates/minimal.torrc",
+		"production":    "configs/templates/production.torrc",
+		"development":   "configs/templates/development.torrc",
+		"high-security": "configs/templates/high-security.torrc",
+	}
+
+	templateFile, ok := templateFiles[templateName]
+	if !ok {
+		return fmt.Errorf("unknown template: %s (available: minimal, production, development, high-security)", templateName)
+	}
+
+	if verbose {
+		fmt.Printf("Generating configuration from template: %s\n", templateName)
+	}
+
+	// Read template file
+	content, err := os.ReadFile(templateFile)
+	if err != nil {
+		return fmt.Errorf("failed to read template: %w", err)
+	}
+
+	// Write to file or stdout
+	if outputPath != "" {
+		// Create directory if it doesn't exist
+		dir := filepath.Dir(outputPath)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return fmt.Errorf("failed to create directory: %w", err)
+		}
+
+		// Write file
+		if err := os.WriteFile(outputPath, content, 0o644); err != nil {
+			return fmt.Errorf("failed to write file: %w", err)
+		}
+
+		if verbose {
+			fmt.Printf("Configuration written to: %s\n", outputPath)
+			fmt.Println()
+			fmt.Printf("Template: %s\n", templateName)
+			fmt.Printf("Size: %d bytes\n", len(content))
+			fmt.Println()
+			fmt.Println("Next steps:")
+			fmt.Println("  1. Review and customize the configuration")
+			fmt.Println("  2. Validate: tor-config-validator -config " + outputPath)
+			fmt.Println("  3. Run: tor-client -config " + outputPath)
+		} else {
+			fmt.Printf("Configuration file created: %s (template: %s)\n", outputPath, templateName)
+		}
+	} else {
+		// Write to stdout
+		fmt.Print(string(content))
 	}
 
 	return nil

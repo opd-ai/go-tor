@@ -1,0 +1,176 @@
+# Production Tor Configuration
+# Recommended settings for production deployments
+# Balances performance, reliability, and resource usage
+
+# ============================================================================
+# NETWORK SETTINGS
+# ============================================================================
+
+# SOCKS5 proxy port for applications
+SocksPort 9050
+
+# Control protocol port for management
+ControlPort 9051
+
+# HTTP metrics endpoint (Prometheus, JSON, HTML dashboard)
+# Uncomment to enable metrics on port 9052
+# EnableMetrics true
+# MetricsPort 9052
+
+# ============================================================================
+# DATA STORAGE
+# ============================================================================
+
+# Directory for persistent state (guards, descriptors, keys)
+# Default: platform-specific (Linux: ~/.local/share/go-tor, etc.)
+# DataDirectory /var/lib/go-tor
+
+# ============================================================================
+# LOGGING
+# ============================================================================
+
+# Log level: debug, info, warn, error
+# Production recommendation: info or warn
+LogLevel info
+
+# ============================================================================
+# CIRCUIT CONFIGURATION
+# ============================================================================
+
+# Number of entry guards (recommended: 3 for security/availability balance)
+NumEntryGuards 3
+
+# Enable entry guards (required for anonymity)
+UseEntryGuards true
+
+# Maximum time to build a circuit
+# Production: 60s for normal networks, 90-120s for slow/censored networks
+CircuitBuildTimeout 60s
+
+# Maximum time to use a circuit before rotation
+# Balances privacy (shorter) vs. performance (longer)
+# Production: 10-30 minutes
+MaxCircuitDirtiness 10m
+
+# How often to rotate circuits proactively
+# Production: 30s-2m depending on load
+NewCircuitPeriod 30s
+
+# ============================================================================
+# CONNECTION SETTINGS
+# ============================================================================
+
+# Maximum concurrent connections to Tor relays
+# Adjust based on expected load and file descriptor limits
+ConnLimit 1000
+
+# Time before entering dormant mode (low-activity state)
+DormantTimeout 24h
+
+# ============================================================================
+# PERFORMANCE TUNING
+# ============================================================================
+
+# Connection Pooling
+# Reuses TCP connections to relays for better performance
+EnableConnectionPooling true
+ConnectionPoolMaxIdle 5
+ConnectionPoolMaxLife 10m
+
+# Circuit Prebuilding
+# Maintains a pool of ready circuits for instant availability
+EnableCircuitPrebuilding true
+CircuitPoolMinSize 2
+CircuitPoolMaxSize 10
+
+# Buffer Pooling
+# Reduces GC pressure by pooling cell buffers
+EnableBufferPooling true
+
+# ============================================================================
+# CIRCUIT ISOLATION
+# ============================================================================
+
+# Isolation level: none, destination, credential, port, session
+# - none: share circuits across all connections (better performance)
+# - destination: isolate by destination host:port (better privacy)
+# - credential: isolate by SOCKS username (app separation)
+# - port: isolate by client port
+# - session: isolate by session ID
+#
+# Production: "none" for performance, "destination" for privacy
+IsolationLevel none
+
+# Granular isolation controls (when IsolationLevel != none)
+# IsolateDestinations false
+# IsolateSOCKSAuth false
+# IsolateClientPort false
+# IsolateClientProtocol false
+
+# ============================================================================
+# PATH SELECTION
+# ============================================================================
+
+# Use bridges for censored networks (requires BridgeAddresses)
+UseBridges false
+# BridgeAddresses obfs4 192.0.2.1:443, obfs4 192.0.2.2:443
+
+# Exclude specific nodes from path selection
+# Use fingerprints ($FINGERPRINT) or nicknames
+# ExcludeNodes $BADRELAY1, $BADRELAY2
+# ExcludeExitNodes $BADEXIT1, $BADEXIT2
+
+# ============================================================================
+# ONION SERVICES (Hidden Services)
+# ============================================================================
+
+# Uncomment to host onion services
+# Multiple services can be configured by repeating the block
+
+# [[OnionServices]]
+# ServiceDir /var/lib/go-tor/hidden_service
+# VirtualPort 80
+# TargetAddr localhost:8080
+# MaxStreams 0
+
+# [[OnionServices]]
+# ServiceDir /var/lib/go-tor/another_service
+# VirtualPort 443
+# TargetAddr localhost:8443
+# MaxStreams 100
+
+# ============================================================================
+# PRODUCTION RECOMMENDATIONS
+# ============================================================================
+
+# 1. Resource Limits:
+#    - Set ConnLimit based on `ulimit -n` (file descriptors)
+#    - Monitor memory usage and adjust pool sizes if needed
+#    - On low-memory systems, reduce CircuitPoolMaxSize
+#
+# 2. Monitoring:
+#    - Enable metrics (MetricsPort 9052) and monitor with Prometheus
+#    - Set up alerts for circuit build failures and connection issues
+#    - Monitor health endpoint: http://localhost:9052/health
+#
+# 3. Security:
+#    - Run as non-root user with minimal privileges
+#    - Use firewall rules to restrict access to ControlPort
+#    - Keep DataDirectory secure (mode 0700)
+#    - Rotate logs and monitor for anomalies
+#
+# 4. High Availability:
+#    - Use circuit prebuilding (already enabled)
+#    - Increase CircuitPoolMinSize for high-traffic scenarios
+#    - Consider multiple instances with load balancing
+#
+# 5. Performance:
+#    - Enable all pooling options (already enabled)
+#    - Tune CircuitBuildTimeout for your network conditions
+#    - Use IsolationLevel "none" unless privacy requirements mandate isolation
+#
+# 6. Troubleshooting:
+#    - Set LogLevel to "debug" temporarily for issues
+#    - Check metrics at http://localhost:9052/metrics
+#    - Review health status at http://localhost:9052/health
+#    - Use torctl CLI tool for runtime inspection
