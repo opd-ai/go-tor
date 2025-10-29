@@ -908,8 +908,13 @@ func (s *Server) handleResolvePTR(ctx context.Context, conn net.Conn, ipAddr str
 	}
 
 	circ, err := circuitPool.Get(resolveCtx)
-	if err != nil || circ == nil {
+	if err != nil {
 		s.logger.Error("Failed to get circuit for reverse DNS", "error", err)
+		s.sendDNSReply(conn, replyGeneralFailure, nil)
+		return
+	}
+	if circ == nil {
+		s.logger.Error("Failed to get circuit for reverse DNS: circuit is nil")
 		s.sendDNSReply(conn, replyGeneralFailure, nil)
 		return
 	}
