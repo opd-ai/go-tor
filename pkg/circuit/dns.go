@@ -159,6 +159,12 @@ func (c *Circuit) ResolveIP(ctx context.Context, ipAddr net.IP) (*DNSResult, err
 //   - LENGTH (1 byte): length of answer
 //   - VALUE (variable): depends on type
 //   - TTL (4 bytes): time to live in seconds
+//
+// Note: While the protocol supports multiple DNS records in a single response,
+// this implementation currently returns only the first valid record found.
+// This matches typical DNS resolver behavior where the first address is used.
+// Applications requiring multiple addresses should make multiple RESOLVE requests
+// or use the circuit API directly with custom parsing logic.
 func parseResolvedCell(data []byte) (*DNSResult, error) {
 	if len(data) == 0 {
 		return nil, fmt.Errorf("empty RELAY_RESOLVED data")

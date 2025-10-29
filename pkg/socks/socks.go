@@ -859,14 +859,14 @@ func (s *Server) handleResolve(ctx context.Context, conn net.Conn, hostname stri
 
 	if circuitPool == nil {
 		s.logger.Error("No circuit pool available for DNS resolution")
-		s.sendDNSReply(conn, replyGeneralFailure, nil)
+		s.sendDNSReply(conn, replyGeneralFailure, nil, 0)
 		return
 	}
 
 	circ, err := circuitPool.Get(resolveCtx)
 	if err != nil || circ == nil {
 		s.logger.Error("Failed to get circuit for DNS resolution", "error", err)
-		s.sendDNSReply(conn, replyGeneralFailure, nil)
+		s.sendDNSReply(conn, replyGeneralFailure, nil, 0)
 		return
 	}
 	defer circuitPool.Put(circ)
@@ -882,7 +882,7 @@ func (s *Server) handleResolve(ctx context.Context, conn net.Conn, hostname stri
 			"hostname", hostname,
 			"circuit_id", circ.ID,
 			"error", err)
-		s.sendDNSReply(conn, replyHostUnreachable, nil)
+		s.sendDNSReply(conn, replyHostUnreachable, nil, 0)
 		return
 	}
 
@@ -891,7 +891,7 @@ func (s *Server) handleResolve(ctx context.Context, conn net.Conn, hostname stri
 		s.logger.Warn("DNS resolution returned no addresses",
 			"hostname", hostname,
 			"circuit_id", circ.ID)
-		s.sendDNSReply(conn, replyHostUnreachable, nil)
+		s.sendDNSReply(conn, replyHostUnreachable, nil, 0)
 		return
 	}
 
@@ -902,7 +902,7 @@ func (s *Server) handleResolve(ctx context.Context, conn net.Conn, hostname stri
 		"circuit_id", circ.ID)
 
 	// Send success response with resolved IP addresses
-	s.sendDNSReply(conn, replySuccess, result.Addresses)
+	s.sendDNSReply(conn, replySuccess, result.Addresses, result.TTL)
 }
 
 // handleResolvePTR handles SOCKS5 RESOLVE_PTR command (0xF1)
@@ -918,7 +918,7 @@ func (s *Server) handleResolvePTR(ctx context.Context, conn net.Conn, ipAddr str
 	ip := net.ParseIP(ipAddr)
 	if ip == nil {
 		s.logger.Error("Invalid IP address for RESOLVE_PTR", "ip", ipAddr)
-		s.sendDNSReply(conn, replyAddressNotSupported, nil)
+		s.sendDNSReply(conn, replyAddressNotSupported, nil, 0)
 		return
 	}
 
@@ -929,19 +929,19 @@ func (s *Server) handleResolvePTR(ctx context.Context, conn net.Conn, ipAddr str
 
 	if circuitPool == nil {
 		s.logger.Error("No circuit pool available for reverse DNS")
-		s.sendDNSReply(conn, replyGeneralFailure, nil)
+		s.sendDNSReply(conn, replyGeneralFailure, nil, 0)
 		return
 	}
 
 	circ, err := circuitPool.Get(resolveCtx)
 	if err != nil {
 		s.logger.Error("Failed to get circuit for reverse DNS", "error", err)
-		s.sendDNSReply(conn, replyGeneralFailure, nil)
+		s.sendDNSReply(conn, replyGeneralFailure, nil, 0)
 		return
 	}
 	if circ == nil {
 		s.logger.Error("Failed to get circuit for reverse DNS: circuit is nil")
-		s.sendDNSReply(conn, replyGeneralFailure, nil)
+		s.sendDNSReply(conn, replyGeneralFailure, nil, 0)
 		return
 	}
 	defer circuitPool.Put(circ)
@@ -957,7 +957,7 @@ func (s *Server) handleResolvePTR(ctx context.Context, conn net.Conn, ipAddr str
 			"ip", ipAddr,
 			"circuit_id", circ.ID,
 			"error", err)
-		s.sendDNSReply(conn, replyHostUnreachable, nil)
+		s.sendDNSReply(conn, replyHostUnreachable, nil, 0)
 		return
 	}
 
@@ -966,7 +966,7 @@ func (s *Server) handleResolvePTR(ctx context.Context, conn net.Conn, ipAddr str
 		s.logger.Warn("Reverse DNS lookup returned no hostname",
 			"ip", ipAddr,
 			"circuit_id", circ.ID)
-		s.sendDNSReply(conn, replyHostUnreachable, nil)
+		s.sendDNSReply(conn, replyHostUnreachable, nil, 0)
 		return
 	}
 
@@ -981,31 +981,13 @@ func (s *Server) handleResolvePTR(ctx context.Context, conn net.Conn, ipAddr str
 	s.sendDNSReplyHostname(conn, replySuccess, result.Hostname, result.TTL)
 }
 
-// sendDNSReplyHostname sends a DNS resolution reply for a hostname (for RESOLVE_PTR)
-// Format: [version][status][reserved][address_type][address][ttl]
-func (s *Server) sendDNSReplyHostname(conn net.Conn, status byte, hostname string, ttl uint32) error {
-	// SOCKS5 reply format for hostname:
-	// [version][status][reserved][address_type][address][ttl]
-	buf := make([]byte, 0, 4+1+len(hostname)+4)
-	buf = append(buf, socks5Version)
-	buf = append(buf, status)
-	buf = append(buf, 0x00) // Reserved
-	buf = append(buf, addrTypeDomain)
-	buf = append(buf, byte(len(hostname)))
-	buf = append(buf, []byte(hostname)...)
-	ttlBytes := make([]byte, 4)
-	binary.BigEndian.PutUint32(ttlBytes, ttl)
-	buf = append(buf, ttlBytes...)
-	_, err := conn.Write(buf)
-	return err
-}
 // sendDNSReply sends a DNS resolution reply (for RESOLVE/RESOLVE_PTR)
 // Format: [version][status][reserved][address_type][address][ttl]
 //
 // Note: Currently returns only the first address from the addresses slice.
 // The Tor SOCKS5 extension for DNS does not have a standard way to return
 // multiple addresses. Applications should make multiple RESOLVE requests if needed.
-func (s *Server) sendDNSReply(conn net.Conn, status byte, addresses []net.IP) error {
+func (s *Server) sendDNSReply(conn net.Conn, status byte, addresses []net.IP, ttl uint32) error {
 	// Build basic reply header
 	response := make([]byte, 4)
 	response[0] = socks5Version
@@ -1028,8 +1010,7 @@ func (s *Server) sendDNSReply(conn net.Conn, status byte, addresses []net.IP) er
 			response[3] = addrIPv6
 			response = append(response, ip...)
 		}
-		// Add TTL (4 bytes, big endian) - use 3600 seconds (1 hour) as default
-		ttl := uint32(3600)
+		// Add TTL (4 bytes, big endian) from the DNS response
 		ttlBytes := make([]byte, 4)
 		binary.BigEndian.PutUint32(ttlBytes, ttl)
 		response = append(response, ttlBytes...)
@@ -1041,7 +1022,7 @@ func (s *Server) sendDNSReply(conn net.Conn, status byte, addresses []net.IP) er
 
 // sendDNSReplyHostname sends a DNS PTR (reverse) resolution reply with hostname
 // Format: [version][status][reserved][address_type=0x03][hostname_length][hostname][ttl]
-func (s *Server) sendDNSReplyHostname(conn net.Conn, status byte, hostname string) error {
+func (s *Server) sendDNSReplyHostname(conn net.Conn, status byte, hostname string, ttl uint32) error {
 	// Build basic reply header
 	response := make([]byte, 4)
 	response[0] = socks5Version
@@ -1056,11 +1037,26 @@ func (s *Server) sendDNSReplyHostname(conn net.Conn, status byte, hostname strin
 	} else {
 		// Success response with hostname
 		hostnameBytes := []byte(hostname)
+		
+		// Validate hostname length doesn't exceed 255 bytes (SOCKS5 protocol limit)
+		if len(hostnameBytes) > 255 {
+			s.logger.Error("Hostname too long for SOCKS5 protocol",
+				"hostname", hostname,
+				"length", len(hostnameBytes))
+			// Send error response
+			response[1] = replyGeneralFailure
+			response = append(response, 0) // Length = 0
+			response = append(response, 0, 0, 0, 0) // TTL = 0
+			if _, writeErr := conn.Write(response); writeErr != nil {
+				return fmt.Errorf("hostname length %d exceeds 255 byte limit: write error: %w", len(hostnameBytes), writeErr)
+			}
+			return fmt.Errorf("hostname length %d exceeds 255 byte limit", len(hostnameBytes))
+		}
+		
 		response = append(response, byte(len(hostnameBytes)))
 		response = append(response, hostnameBytes...)
 		
-		// Add TTL (4 bytes, big endian) - use 3600 seconds (1 hour) as default
-		ttl := uint32(3600)
+		// Add TTL (4 bytes, big endian) from the DNS response
 		ttlBytes := make([]byte, 4)
 		binary.BigEndian.PutUint32(ttlBytes, ttl)
 		response = append(response, ttlBytes...)
