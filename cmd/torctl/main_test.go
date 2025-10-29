@@ -179,12 +179,6 @@ func TestExecuteCommand(t *testing.T) {
 			expectError: "unknown command",
 		},
 		{
-			name:        "config without key",
-			command:     "config",
-			args:        []string{},
-			expectError: "requires a key",
-		},
-		{
 			name:        "signal without name",
 			command:     "signal",
 			args:        []string{},

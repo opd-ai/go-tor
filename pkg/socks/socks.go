@@ -350,30 +350,44 @@ func (s *Server) handleConnection(ctx context.Context, conn net.Conn) {
 		}
 	}
 
-	// If circuit pool is available, request an isolated circuit
+	// If circuit pool is available, request a circuit (isolated or not)
 	var circ *circuit.Circuit
-	if circuitPool != nil && isolationKey != nil {
+	if circuitPool != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
 		var err error
-		circ, err = circuitPool.GetWithIsolation(ctx, isolationKey)
-		if err != nil {
-			s.logger.Error("Failed to get isolated circuit", "error", err, "isolation_key", isolationKey)
-			s.sendReply(conn, replyGeneralFailure, nil)
-			return
-		}
+		// Use isolated circuit if isolation key is present, otherwise get any circuit
+		if isolationKey != nil {
+			circ, err = circuitPool.GetWithIsolation(ctx, isolationKey)
+			if err != nil {
+				s.logger.Error("Failed to get isolated circuit", "error", err, "isolation_key", isolationKey)
+				s.sendReply(conn, replyGeneralFailure, nil)
+				return
+			}
 
-		s.logger.Info("Using isolated circuit",
-			"circuit_id", circ.ID,
-			"isolation_key", isolationKey.String(),
-			"target", targetAddr)
+			s.logger.Info("Using isolated circuit",
+				"circuit_id", circ.ID,
+				"isolation_key", isolationKey.String(),
+				"target", targetAddr)
+		} else {
+			// No isolation - get any available circuit from the pool
+			circ, err = circuitPool.Get(ctx)
+			if err != nil {
+				s.logger.Error("Failed to get circuit from pool", "error", err)
+				s.sendReply(conn, replyGeneralFailure, nil)
+				return
+			}
+
+			s.logger.Info("Using non-isolated circuit",
+				"circuit_id", circ.ID,
+				"target", targetAddr)
+		}
 
 		// Return circuit to pool when done
 		defer circuitPool.Put(circ)
 	} else {
-		// No circuit pool or no isolation - get any available circuit
-		// For now, we'll require a circuit pool
+		// No circuit pool available - cannot proceed
 		s.logger.Error("No circuit pool available for connection")
 		s.sendReply(conn, replyGeneralFailure, nil)
 		return
