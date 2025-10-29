@@ -418,16 +418,20 @@ docker run -d --name tor-client \
 
 ### Environment-Based Configuration
 
-Create wrapper script for environment-based config:
+Pass configuration via command-line arguments (distroless has no shell):
 
 ```bash
-#!/bin/sh
-exec /usr/local/bin/tor-client \
-  -socks-port ${SOCKS_PORT:-9050} \
-  -control-port ${CONTROL_PORT:-9051} \
-  -metrics-port ${METRICS_PORT:-9052} \
-  -log-level ${LOG_LEVEL:-info} \
-  -data-dir ${DATA_DIR:-/home/nonroot/.tor}
+# Configure via docker run arguments
+docker run -d --name tor-client \
+  -e SOCKS_PORT=9050 \
+  -e LOG_LEVEL=debug \
+  -p 9050:9050 \
+  go-tor:latest \
+  -socks-port 9050 \
+  -log-level debug
+
+# Or use docker-compose environment variables
+# See docker-compose.yml for examples
 ```
 
 ### Multi-Architecture Builds
@@ -563,9 +567,9 @@ Recommended resources by workload:
 
 ### Optimization Tips
 
-1. **Persistent volumes**: Use persistent storage for faster startup
-2. **Guard persistence**: Maintains stable guard nodes across restarts
-3. **Circuit pooling**: Enabled by default in Phase 9.4
+1. **Persistent volumes**: Use persistent storage for faster startup (guard nodes cached)
+2. **Guard persistence**: Maintains stable guard nodes across restarts (already implemented)
+3. **Circuit pooling**: Pre-built circuit pool for instant availability (enabled by default)
 4. **Resource limits**: Set appropriate limits to prevent resource exhaustion
 
 ## Security Considerations

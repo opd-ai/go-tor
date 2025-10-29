@@ -41,17 +41,18 @@ services:
       - "-log-level"
       - "info"
     
-    # Health check configuration (uses SOCKS5 port availability)
-    # Note: For HTTP health checks, you'd need a tool in the image
+    # Health check configuration
+    # Note: Docker health checks require a command in the container
     # distroless doesn't include curl/wget, so we rely on orchestration health checks
-    # For Kubernetes, use: httpGet on port 9052 path /health
-    # For simple check, we test if SOCKS port is listening
-    healthcheck:
-      test: ["NONE"]
-      interval: 30s
-      timeout: 10s
-      start_period: 90s
-      retries: 3
+    # For Docker Compose, you can add a sidecar container with curl for health checks
+    # For Kubernetes, use httpGet probes on port 9052 path /health (see K8s examples above)
+    # Uncomment below if using a different base image with health check tools:
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:9052/health"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   start_period: 90s
+    #   retries: 3
     
     # Restart policy
     restart: unless-stopped
