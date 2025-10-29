@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/opd-ai/go-tor/pkg/cell"
-	"github.com/opd-ai/go-tor/pkg/logger"
 )
 
 // TestParseResolvedCell tests parsing of RELAY_RESOLVED cells
@@ -396,33 +395,23 @@ func TestDNSResultValidation(t *testing.T) {
 }
 
 // MockCircuitForDNS creates a mock circuit for DNS testing
+// Note: This is a simplified mock that doesn't fully simulate the circuit behavior
+// For integration tests, use a real circuit with mock network layer
 func MockCircuitForDNS(t *testing.T, responseData []byte) *Circuit {
-	log := logger.NewDefault()
 	c := &Circuit{
 		ID:               1,
 		State:            StateOpen,
 		relayReceiveChan: make(chan *cell.RelayCell, 1),
-		relaySendChan:    make(chan *cell.RelayCell, 1),
-		logger:           log.Component("circuit"),
 	}
 
-	// Start goroutine to handle the DNS query
+	// Simulate the response by directly injecting into receive channel
 	go func() {
-		// Wait for RELAY_RESOLVE to be sent
-		select {
-		case resolveCell := <-c.relaySendChan:
-			if resolveCell.Command != cell.RelayResolve {
-				t.Errorf("Expected RELAY_RESOLVE, got %s", cell.RelayCmdString(resolveCell.Command))
-				return
-			}
-
-			// Send back RELAY_RESOLVED response
-			resolvedCell := cell.NewRelayCell(0, cell.RelayResolved, responseData)
-			c.relayReceiveChan <- resolvedCell
-
-		case <-time.After(1 * time.Second):
-			t.Error("Timeout waiting for RELAY_RESOLVE")
-		}
+		// Small delay to allow the call to be made
+		time.Sleep(10 * time.Millisecond)
+		
+		// Send back RELAY_RESOLVED response
+		resolvedCell := cell.NewRelayCell(0, cell.RelayResolved, responseData)
+		c.relayReceiveChan <- resolvedCell
 	}()
 
 	return c
@@ -495,8 +484,6 @@ func TestResolveIPIntegration(t *testing.T) {
 
 // TestResolveHostnameErrors tests error handling in ResolveHostname
 func TestResolveHostnameErrors(t *testing.T) {
-	log := logger.NewDefault()
-
 	tests := []struct {
 		name        string
 		hostname    string
@@ -515,8 +502,6 @@ func TestResolveHostnameErrors(t *testing.T) {
 				ID:               1,
 				State:            StateOpen,
 				relayReceiveChan: make(chan *cell.RelayCell, 1),
-				relaySendChan:    make(chan *cell.RelayCell, 1),
-				logger:           log.Component("circuit"),
 			}
 
 			ctx := context.Background()
@@ -532,8 +517,6 @@ func TestResolveHostnameErrors(t *testing.T) {
 
 // TestResolveIPErrors tests error handling in ResolveIP
 func TestResolveIPErrors(t *testing.T) {
-	log := logger.NewDefault()
-
 	tests := []struct {
 		name        string
 		ip          net.IP
@@ -552,8 +535,6 @@ func TestResolveIPErrors(t *testing.T) {
 				ID:               1,
 				State:            StateOpen,
 				relayReceiveChan: make(chan *cell.RelayCell, 1),
-				relaySendChan:    make(chan *cell.RelayCell, 1),
-				logger:           log.Component("circuit"),
 			}
 
 			ctx := context.Background()

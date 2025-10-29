@@ -92,10 +92,6 @@ func (c *Circuit) ResolveHostname(ctx context.Context, hostname string) (*DNSRes
 
 // ResolveIP performs reverse DNS lookup (PTR query) through the circuit
 func (c *Circuit) ResolveIP(ctx context.Context, ipAddr net.IP) (*DNSResult, error) {
-	c.logger.Info("Reverse DNS lookup through Tor circuit",
-		"circuit_id", c.ID,
-		"ip", ipAddr)
-
 	// Validate IP address
 	if ipAddr == nil {
 		return nil, fmt.Errorf("IP address cannot be nil")
@@ -125,16 +121,8 @@ func (c *Circuit) ResolveIP(ctx context.Context, ipAddr net.IP) (*DNSResult, err
 
 	// Send RELAY_RESOLVE cell
 	if err := c.SendRelayCell(resolveCell); err != nil {
-		c.logger.Error("Failed to send RELAY_RESOLVE cell for PTR",
-			"circuit_id", c.ID,
-			"ip", ipAddr,
-			"error", err)
 		return nil, fmt.Errorf("failed to send RELAY_RESOLVE: %w", err)
 	}
-
-	c.logger.Debug("RELAY_RESOLVE cell sent for PTR, waiting for response",
-		"circuit_id", c.ID,
-		"ip", ipAddr)
 
 	// Wait for RELAY_RESOLVED response
 	resolveCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
@@ -142,52 +130,24 @@ func (c *Circuit) ResolveIP(ctx context.Context, ipAddr net.IP) (*DNSResult, err
 
 	resolvedCell, err := c.ReceiveRelayCell(resolveCtx)
 	if err != nil {
-		c.logger.Error("Failed to receive RELAY_RESOLVED cell for PTR",
-			"circuit_id", c.ID,
-			"ip", ipAddr,
-			"error", err)
 		return nil, fmt.Errorf("failed to receive RELAY_RESOLVED: %w", err)
 	}
 
 	// Verify this is a RELAY_RESOLVED cell
 	if resolvedCell.Command != cell.RelayResolved {
-		c.logger.Error("Unexpected cell type in PTR response",
-			"circuit_id", c.ID,
-			"ip", ipAddr,
-			"expected", "RELAY_RESOLVED",
-			"got", cell.RelayCmdString(resolvedCell.Command))
 		return nil, fmt.Errorf("expected RELAY_RESOLVED, got %s", cell.RelayCmdString(resolvedCell.Command))
 	}
-
-	c.logger.Debug("RELAY_RESOLVED cell received for PTR",
-		"circuit_id", c.ID,
-		"ip", ipAddr,
-		"data_len", len(resolvedCell.Data))
 
 	// Parse RELAY_RESOLVED response
 	result, err := parseResolvedCell(resolvedCell.Data)
 	if err != nil {
-		c.logger.Error("Failed to parse RELAY_RESOLVED cell for PTR",
-			"circuit_id", c.ID,
-			"ip", ipAddr,
-			"error", err)
 		return nil, fmt.Errorf("failed to parse RELAY_RESOLVED: %w", err)
 	}
 
 	// Check for errors
 	if result.Type == DNSTypeError || result.Type == DNSTypeErrorTTL {
-		c.logger.Warn("Reverse DNS lookup failed",
-			"circuit_id", c.ID,
-			"ip", ipAddr,
-			"error_code", result.Error)
 		return result, fmt.Errorf("reverse DNS lookup failed: error code %d", result.Error)
 	}
-
-	c.logger.Info("Reverse DNS lookup completed successfully",
-		"circuit_id", c.ID,
-		"ip", ipAddr,
-		"hostname", result.Hostname,
-		"ttl", result.TTL)
 
 	return result, nil
 }
@@ -242,6 +202,7 @@ func parseResolvedCell(data []byte) (*DNSResult, error) {
 			result.Type = DNSTypeHostname
 			result.Hostname = hostname
 			result.TTL = ttl
+			return result, nil // Return immediately for hostname
 
 		case DNSTypeIPv4:
 			// IPv4 address (4 bytes)
@@ -252,6 +213,7 @@ func parseResolvedCell(data []byte) (*DNSResult, error) {
 			result.Type = DNSTypeIPv4
 			result.Addresses = append(result.Addresses, ip)
 			result.TTL = ttl
+			return result, nil // Return immediately for IPv4
 
 		case DNSTypeIPv6:
 			// IPv6 address (16 bytes)
@@ -263,6 +225,7 @@ func parseResolvedCell(data []byte) (*DNSResult, error) {
 			result.Type = DNSTypeIPv6
 			result.Addresses = append(result.Addresses, ip)
 			result.TTL = ttl
+			return result, nil // Return immediately for IPv6
 
 		case DNSTypeError, DNSTypeErrorTTL:
 			// Error response (1 byte error code)
@@ -278,17 +241,7 @@ func parseResolvedCell(data []byte) (*DNSResult, error) {
 			// Unknown record type - skip it
 			continue
 		}
-
-		// For most queries, we only expect one answer
-		// But the spec allows multiple, so we keep the first one
-		if result.Type != 0 {
-			break
-		}
 	}
 
-	if result.Type == 0 {
-		return nil, fmt.Errorf("no valid DNS records found in RELAY_RESOLVED")
-	}
-
-	return result, nil
+	return nil, fmt.Errorf("no valid DNS records found in RELAY_RESOLVED")
 }
