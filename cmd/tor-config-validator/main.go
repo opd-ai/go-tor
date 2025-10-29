@@ -2,6 +2,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -232,11 +233,21 @@ func generateJSONSchema(outputPath string, verbose bool) error {
 			fmt.Printf("JSON schema written to: %s\n", outputPath)
 			fmt.Println()
 			fmt.Println("Use this schema with your IDE for autocomplete and validation.")
-			fmt.Println("For VS Code, add to your settings:")
-			fmt.Println("  \"json.schemas\": [{")
-			fmt.Printf("    \"fileMatch\": [\"torrc\", \"*.torrc\"],\n")
-			fmt.Printf("    \"url\": \"./%s\"\n", outputPath)
-			fmt.Println("  }]")
+			fmt.Println()
+			fmt.Println("For VS Code, add to .vscode/settings.json:")
+			
+			// Create a proper JSON example using a map
+			exampleSettings := map[string]interface{}{
+				"json.schemas": []map[string]interface{}{
+					{
+						"fileMatch": []string{"torrc", "*.torrc"},
+						"url":       "./" + filepath.Base(outputPath),
+					},
+				},
+			}
+			
+			exampleJSON, _ := json.MarshalIndent(exampleSettings, "", "  ")
+			fmt.Println(string(exampleJSON))
 		} else {
 			fmt.Printf("JSON schema created: %s\n", outputPath)
 		}

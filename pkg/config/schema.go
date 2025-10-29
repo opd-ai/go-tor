@@ -52,6 +52,8 @@ func GenerateJSONSchema() (*JSONSchema, error) {
 	minGuards := 1
 	minConnLimit := 1
 	minPoolSize := 0
+	minPortPositive := 1  // For ports that must be > 0
+	minStreamCount := 0   // For stream/connection counts
 	
 	schema := &JSONSchema{
 		Schema:      "http://json-schema.org/draft-07/schema#",
@@ -270,7 +272,7 @@ func GenerateJSONSchema() (*JSONSchema, error) {
 					"VirtualPort": {
 						Type:        "integer",
 						Description: "Virtual port for the onion service (advertised port)",
-						Minimum:     &minGuards,
+						Minimum:     &minPortPositive, // Port minimum is 1 (must be valid port)
 						Maximum:     &maxPort,
 						Examples:    []interface{}{80, 443, 8080},
 					},
@@ -284,7 +286,7 @@ func GenerateJSONSchema() (*JSONSchema, error) {
 						Type:        "integer",
 						Description: "Maximum concurrent streams (0 = unlimited)",
 						Default:     0,
-						Minimum:     &minPoolSize,
+						Minimum:     &minStreamCount, // Zero or positive stream count
 					},
 					"ClientAuth": {
 						Type:        "object",
