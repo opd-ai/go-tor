@@ -38,6 +38,11 @@ const (
 	cmdBind    = 0x02
 	cmdUDP     = 0x03
 
+	// Tor-specific commands for DNS leak prevention (RFC 1928 extensions)
+	// These commands allow DNS queries to be routed through Tor circuits
+	cmdResolve    = 0xF0 // RESOLVE: DNS hostname to IP address
+	cmdResolvePTR = 0xF1 // RESOLVE_PTR: Reverse DNS (IP to hostname)
+
 	// Reply codes
 	replySuccess              = 0x00
 	replyGeneralFailure       = 0x01
@@ -53,12 +58,25 @@ const (
 	defaultMaxConnections = 1000
 )
 
+// requestInfo contains parsed SOCKS5 request information
+type requestInfo struct {
+	cmd        byte   // Command: CONNECT, RESOLVE, or RESOLVE_PTR
+	targetAddr string // Target address (host:port for CONNECT, hostname for RESOLVE, IP for RESOLVE_PTR)
+}
+
 // Config holds configuration for the SOCKS5 server
 type Config struct {
 	// MaxConnections limits concurrent SOCKS5 connections
 	// SEC-L006: Configurable for resource-constrained embedded systems
 	// Set to 0 for unlimited (not recommended for production)
 	MaxConnections int
+
+	// DNS leak prevention (ROADMAP Phase 1.2)
+	// EnableDNSResolution allows DNS queries through SOCKS5 RESOLVE/RESOLVE_PTR
+	// When enabled, clients can perform DNS lookups through Tor circuits
+	EnableDNSResolution bool
+	// DNSTimeout specifies the timeout for DNS resolution operations
+	DNSTimeout time.Duration
 
 	// Circuit isolation configuration
 	IsolationLevel      circuit.IsolationLevel // Isolation level to use
@@ -71,6 +89,8 @@ type Config struct {
 func DefaultConfig() *Config {
 	return &Config{
 		MaxConnections:      defaultMaxConnections,
+		EnableDNSResolution: true,         // DNS leak prevention enabled by default
+		DNSTimeout:          30 * time.Second, // Standard DNS timeout
 		IsolationLevel:      circuit.IsolationNone, // Backward compatible default
 		IsolateDestinations: false,
 		IsolateSOCKSAuth:    false,
@@ -224,13 +244,32 @@ func (s *Server) handleConnection(ctx context.Context, conn net.Conn) {
 	}
 
 	// Read request
-	targetAddr, err := s.readRequest(conn)
+	request, err := s.readRequest(conn)
 	if err != nil {
 		s.logger.Error("Failed to read request", "error", err, "remote", conn.RemoteAddr())
 		return
 	}
 
-	s.logger.Info("SOCKS5 request", "target", targetAddr, "remote", conn.RemoteAddr(), "username", username)
+	s.logger.Info("SOCKS5 request", "command", fmt.Sprintf("0x%02X", request.cmd), "target", request.targetAddr, "remote", conn.RemoteAddr(), "username", username)
+
+	// Handle DNS resolution commands
+	switch request.cmd {
+	case cmdResolve:
+		s.handleResolve(ctx, conn, request.targetAddr)
+		return
+	case cmdResolvePTR:
+		s.handleResolvePTR(ctx, conn, request.targetAddr)
+		return
+	case cmdConnect:
+		// Continue with normal CONNECT handling below
+	default:
+		s.logger.Error("Unsupported command", "command", fmt.Sprintf("0x%02X", request.cmd))
+		s.sendReply(conn, replyCommandNotSupported, nil)
+		return
+	}
+
+	// CONNECT command handling
+	targetAddr := request.targetAddr
 
 	// Extract hostname from targetAddr (format: "host:port")
 	host := targetAddr
@@ -508,12 +547,12 @@ func (s *Server) authenticatePassword(conn net.Conn) (string, error) {
 	return string(username), nil
 }
 
-// readRequest reads a SOCKS5 request
-func (s *Server) readRequest(conn net.Conn) (string, error) {
+// readRequest reads a SOCKS5 request and returns command type and target
+func (s *Server) readRequest(conn net.Conn) (*requestInfo, error) {
 	// Read request header
 	header := make([]byte, 4)
 	if _, err := io.ReadFull(conn, header); err != nil {
-		return "", fmt.Errorf("failed to read request header: %w", err)
+		return nil, fmt.Errorf("failed to read request header: %w", err)
 	}
 
 	version := header[0]
@@ -523,12 +562,26 @@ func (s *Server) readRequest(conn net.Conn) (string, error) {
 
 	if version != socks5Version {
 		s.sendReply(conn, replyGeneralFailure, nil)
-		return "", fmt.Errorf("unsupported SOCKS version: %d", version)
+		return nil, fmt.Errorf("unsupported SOCKS version: %d", version)
 	}
 
-	if cmd != cmdConnect {
+	// Validate command
+	switch cmd {
+	case cmdConnect:
+		// Always supported
+	case cmdResolve, cmdResolvePTR:
+		// DNS resolution commands - check if enabled
+		if !s.config.EnableDNSResolution {
+			s.sendReply(conn, replyCommandNotSupported, nil)
+			return nil, fmt.Errorf("DNS resolution disabled (command: 0x%02X)", cmd)
+		}
+	case cmdBind, cmdUDP:
+		// Not supported
 		s.sendReply(conn, replyCommandNotSupported, nil)
-		return "", fmt.Errorf("unsupported command: %d", cmd)
+		return nil, fmt.Errorf("unsupported command: 0x%02X", cmd)
+	default:
+		s.sendReply(conn, replyCommandNotSupported, nil)
+		return nil, fmt.Errorf("unknown command: 0x%02X", cmd)
 	}
 
 	// Read address
@@ -538,7 +591,7 @@ func (s *Server) readRequest(conn net.Conn) (string, error) {
 		ip := make([]byte, 4)
 		if _, err := io.ReadFull(conn, ip); err != nil {
 			s.sendReply(conn, replyGeneralFailure, nil)
-			return "", fmt.Errorf("failed to read IPv4 address: %w", err)
+			return nil, fmt.Errorf("failed to read IPv4 address: %w", err)
 		}
 		addr = net.IP(ip).String()
 
@@ -546,13 +599,13 @@ func (s *Server) readRequest(conn net.Conn) (string, error) {
 		domainLen := make([]byte, 1)
 		if _, err := io.ReadFull(conn, domainLen); err != nil {
 			s.sendReply(conn, replyGeneralFailure, nil)
-			return "", fmt.Errorf("failed to read domain length: %w", err)
+			return nil, fmt.Errorf("failed to read domain length: %w", err)
 		}
 
 		domain := make([]byte, domainLen[0])
 		if _, err := io.ReadFull(conn, domain); err != nil {
 			s.sendReply(conn, replyGeneralFailure, nil)
-			return "", fmt.Errorf("failed to read domain: %w", err)
+			return nil, fmt.Errorf("failed to read domain: %w", err)
 		}
 		addr = string(domain)
 
@@ -560,24 +613,40 @@ func (s *Server) readRequest(conn net.Conn) (string, error) {
 		ip := make([]byte, 16)
 		if _, err := io.ReadFull(conn, ip); err != nil {
 			s.sendReply(conn, replyGeneralFailure, nil)
-			return "", fmt.Errorf("failed to read IPv6 address: %w", err)
+			return nil, fmt.Errorf("failed to read IPv6 address: %w", err)
 		}
 		addr = net.IP(ip).String()
 
 	default:
 		s.sendReply(conn, replyAddressNotSupported, nil)
-		return "", fmt.Errorf("unsupported address type: %d", addrType)
+		return nil, fmt.Errorf("unsupported address type: %d", addrType)
 	}
 
 	// Read port
 	portBytes := make([]byte, 2)
 	if _, err := io.ReadFull(conn, portBytes); err != nil {
 		s.sendReply(conn, replyGeneralFailure, nil)
-		return "", fmt.Errorf("failed to read port: %w", err)
+		return nil, fmt.Errorf("failed to read port: %w", err)
 	}
 	port := binary.BigEndian.Uint16(portBytes)
 
-	return fmt.Sprintf("%s:%d", addr, port), nil
+	// Format target address based on command
+	var targetAddr string
+	if cmd == cmdResolve {
+		// For RESOLVE, we only need the hostname (port is ignored but must be read)
+		targetAddr = addr
+	} else if cmd == cmdResolvePTR {
+		// For RESOLVE_PTR, we need the IP address (port is ignored)
+		targetAddr = addr
+	} else {
+		// For CONNECT and other commands, include port
+		targetAddr = fmt.Sprintf("%s:%d", addr, port)
+	}
+
+	return &requestInfo{
+		cmd:        cmd,
+		targetAddr: targetAddr,
+	}, nil
 }
 
 // sendReply sends a SOCKS5 reply
@@ -758,6 +827,142 @@ func (s *Server) Shutdown(ctx context.Context) error {
 // Address returns the server address
 func (s *Server) Address() string {
 	return s.address
+}
+
+// handleResolve handles SOCKS5 RESOLVE command (0xF0)
+// Resolves a hostname to IP address(es) through the Tor network
+func (s *Server) handleResolve(ctx context.Context, conn net.Conn, hostname string) {
+	s.logger.Info("DNS RESOLVE request", "hostname", hostname)
+
+	// Set timeout for DNS resolution
+	resolveCtx, cancel := context.WithTimeout(ctx, s.config.DNSTimeout)
+	defer cancel()
+
+	// For now, we'll use a simplified approach:
+	// Create a temporary stream through a circuit and request DNS resolution
+	// In a full implementation, this would use Tor's RELAY_RESOLVE cell type
+	
+	// Get or create a circuit for the resolution
+	s.mu.Lock()
+	circuitPool := s.circuitPool
+	s.mu.Unlock()
+
+	if circuitPool == nil {
+		s.logger.Error("No circuit pool available for DNS resolution")
+		s.sendDNSReply(conn, replyGeneralFailure, nil)
+		return
+	}
+
+	circ, err := circuitPool.Get(resolveCtx)
+	if err != nil || circ == nil {
+		s.logger.Error("Failed to get circuit for DNS resolution", "error", err)
+		s.sendDNSReply(conn, replyGeneralFailure, nil)
+		return
+	}
+	defer circuitPool.Put(circ)
+
+	// For DNS resolution through Tor, we would normally:
+	// 1. Send a RELAY_RESOLVE cell through the circuit
+	// 2. Wait for RELAY_RESOLVED response
+	// 3. Parse the IP addresses from the response
+	
+	// Since we don't have direct RELAY_RESOLVE cell support yet,
+	// this is a placeholder implementation that accepts the command
+	// but returns an error until RELAY_RESOLVE cells are implemented
+	
+	s.logger.Warn("DNS RESOLVE accepted but RELAY_RESOLVE cells not yet implemented",
+		"hostname", hostname,
+		"circuit_id", circ.ID)
+	
+	// Send error response indicating feature is not fully implemented
+	s.sendDNSReply(conn, replyGeneralFailure, nil)
+	s.logger.Info("DNS RESOLVE completed with error (RELAY_RESOLVE cells needed)")
+}
+
+// handleResolvePTR handles SOCKS5 RESOLVE_PTR command (0xF1)
+// Performs reverse DNS lookup (IP to hostname) through the Tor network
+func (s *Server) handleResolvePTR(ctx context.Context, conn net.Conn, ipAddr string) {
+	s.logger.Info("DNS RESOLVE_PTR request", "ip", ipAddr)
+
+	// Set timeout for DNS resolution
+	resolveCtx, cancel := context.WithTimeout(ctx, s.config.DNSTimeout)
+	defer cancel()
+
+	// Validate IP address
+	ip := net.ParseIP(ipAddr)
+	if ip == nil {
+		s.logger.Error("Invalid IP address for RESOLVE_PTR", "ip", ipAddr)
+		s.sendDNSReply(conn, replyAddressNotSupported, nil)
+		return
+	}
+
+	// Get or create a circuit for the resolution
+	s.mu.Lock()
+	circuitPool := s.circuitPool
+	s.mu.Unlock()
+
+	if circuitPool == nil {
+		s.logger.Error("No circuit pool available for reverse DNS")
+		s.sendDNSReply(conn, replyGeneralFailure, nil)
+		return
+	}
+
+	circ, err := circuitPool.Get(resolveCtx)
+	if err != nil || circ == nil {
+		s.logger.Error("Failed to get circuit for reverse DNS", "error", err)
+		s.sendDNSReply(conn, replyGeneralFailure, nil)
+		return
+	}
+	defer circuitPool.Put(circ)
+
+	// For reverse DNS through Tor, we would normally:
+	// 1. Send a RELAY_RESOLVE cell with PTR flag through the circuit
+	// 2. Wait for RELAY_RESOLVED response with hostname
+	// 3. Parse the hostname from the response
+	
+	s.logger.Warn("DNS RESOLVE_PTR accepted but RELAY_RESOLVE cells not yet implemented",
+		"ip", ipAddr,
+		"circuit_id", circ.ID)
+	
+	// Send error response indicating feature is not fully implemented
+	s.sendDNSReply(conn, replyGeneralFailure, nil)
+	s.logger.Info("DNS RESOLVE_PTR completed with error (RELAY_RESOLVE cells needed)")
+}
+
+// sendDNSReply sends a DNS resolution reply (for RESOLVE/RESOLVE_PTR)
+// Format: [version][status][reserved][address_type][address][ttl]
+func (s *Server) sendDNSReply(conn net.Conn, status byte, addresses []net.IP) error {
+	// Build basic reply header
+	response := make([]byte, 4)
+	response[0] = socks5Version
+	response[1] = status
+	response[2] = 0x00 // Reserved
+
+	if status != replySuccess || len(addresses) == 0 {
+		// Error response - no address
+		response[3] = addrIPv4
+		response = append(response, 0, 0, 0, 0) // Null IPv4
+		response = append(response, 0, 0, 0, 0) // TTL = 0
+	} else {
+		// Success response with first address
+		// (Multiple addresses would require extensions)
+		ip := addresses[0]
+		if ip4 := ip.To4(); ip4 != nil {
+			response[3] = addrIPv4
+			response = append(response, ip4...)
+		} else {
+			response[3] = addrIPv6
+			response = append(response, ip...)
+		}
+		// Add TTL (4 bytes, big endian) - use 3600 seconds (1 hour) as default
+		ttl := uint32(3600)
+		ttlBytes := make([]byte, 4)
+		binary.BigEndian.PutUint32(ttlBytes, ttl)
+		response = append(response, ttlBytes...)
+	}
+
+	_, err := conn.Write(response)
+	return err
 }
 
 // ListenerAddr returns the actual listener address once the server is ready.
