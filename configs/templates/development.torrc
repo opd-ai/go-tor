@@ -1,0 +1,113 @@
+# Development Tor Configuration
+# Optimized for local development and debugging
+# Faster circuit builds, verbose logging, and relaxed timeouts
+
+# ============================================================================
+# NETWORK SETTINGS
+# ============================================================================
+
+# Use alternative ports to avoid conflicts with system Tor
+SocksPort 9150
+ControlPort 9151
+
+# Enable metrics for development monitoring
+EnableMetrics true
+MetricsPort 9152
+
+# ============================================================================
+# DATA STORAGE
+# ============================================================================
+
+# Use local directory for easy inspection
+DataDirectory ./dev-tor-data
+
+# ============================================================================
+# LOGGING
+# ============================================================================
+
+# Verbose logging for debugging
+LogLevel debug
+
+# ============================================================================
+# CIRCUIT CONFIGURATION (Relaxed for Development)
+# ============================================================================
+
+# Fewer guards for faster startup
+NumEntryGuards 1
+
+# Shorter timeouts for faster iteration
+CircuitBuildTimeout 45s
+MaxCircuitDirtiness 5m
+NewCircuitPeriod 15s
+
+# ============================================================================
+# CONNECTION SETTINGS
+# ============================================================================
+
+# Lower limits for development
+ConnLimit 100
+DormantTimeout 1h
+
+# ============================================================================
+# PERFORMANCE TUNING (Optimized for Development)
+# ============================================================================
+
+# Enable all pooling for faster development cycles
+EnableConnectionPooling true
+ConnectionPoolMaxIdle 3
+ConnectionPoolMaxLife 5m
+
+# Small circuit pool for quick availability
+EnableCircuitPrebuilding true
+CircuitPoolMinSize 1
+CircuitPoolMaxSize 3
+
+EnableBufferPooling true
+
+# ============================================================================
+# CIRCUIT ISOLATION (Disabled for Simplicity)
+# ============================================================================
+
+# No isolation in development for faster circuit reuse
+IsolationLevel none
+
+# ============================================================================
+# DEVELOPMENT TIPS
+# ============================================================================
+
+# 1. Monitoring:
+#    - Metrics: http://localhost:9152/metrics (Prometheus format)
+#    - JSON: http://localhost:9152/metrics/json
+#    - Dashboard: http://localhost:9152/dashboard
+#    - Health: http://localhost:9152/health
+#
+# 2. Debugging:
+#    - Watch logs in real-time for circuit building
+#    - Use torctl to inspect circuits: torctl -port 9151 circuits
+#    - Check connection status: torctl -port 9151 status
+#
+# 3. Testing:
+#    - Test SOCKS proxy: curl --socks5 localhost:9150 https://check.torproject.org
+#    - Test circuit building time with metrics
+#    - Inspect guard selection in dev-tor-data/state
+#
+# 4. Quick Iteration:
+#    - Small circuit pool means faster restarts
+#    - Debug logging shows all protocol details
+#    - Metrics help identify bottlenecks quickly
+#
+# 5. Common Development Scenarios:
+#    
+#    # Test onion service locally:
+#    # [[OnionServices]]
+#    # ServiceDir ./dev-tor-data/test_service
+#    # VirtualPort 80
+#    # TargetAddr localhost:8080
+#    
+#    # Test with bridges:
+#    # UseBridges true
+#    # BridgeAddresses obfs4 192.0.2.1:443
+#    
+#    # Test circuit isolation:
+#    # IsolationLevel destination
+#    # IsolateDestinations true

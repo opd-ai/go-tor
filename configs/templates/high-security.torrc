@@ -1,0 +1,211 @@
+# High Security Tor Configuration
+# Privacy-focused configuration with strict isolation and conservative settings
+# Prioritizes anonymity over performance
+
+# ============================================================================
+# NETWORK SETTINGS
+# ============================================================================
+
+SocksPort 9050
+ControlPort 9051
+
+# Disable metrics in high-security mode to minimize information leakage
+EnableMetrics false
+# MetricsPort 0
+
+# ============================================================================
+# DATA STORAGE
+# ============================================================================
+
+# Use secure directory with restricted permissions (mode 0700)
+# DataDirectory ~/.tor-secure
+
+# ============================================================================
+# LOGGING
+# ============================================================================
+
+# Minimal logging to reduce information exposure
+# Consider "warn" or "error" for production high-security deployments
+LogLevel info
+
+# ============================================================================
+# CIRCUIT CONFIGURATION (Conservative for Privacy)
+# ============================================================================
+
+# More entry guards for better security/reliability
+NumEntryGuards 5
+
+# Always use entry guards (critical for anonymity)
+UseEntryGuards true
+
+# Longer timeout to ensure successful builds even on slow networks
+CircuitBuildTimeout 120s
+
+# Shorter circuit lifetime for better forward secrecy
+MaxCircuitDirtiness 5m
+
+# Rotate circuits more frequently
+NewCircuitPeriod 15s
+
+# ============================================================================
+# CONNECTION SETTINGS
+# ============================================================================
+
+# Conservative connection limit
+ConnLimit 500
+
+# Shorter dormant timeout to avoid long-lived connections
+DormantTimeout 12h
+
+# ============================================================================
+# PERFORMANCE TUNING (Privacy Over Performance)
+# ============================================================================
+
+# Enable connection pooling but with conservative limits
+EnableConnectionPooling true
+ConnectionPoolMaxIdle 2
+ConnectionPoolMaxLife 5m
+
+# Small circuit pool to limit resource fingerprinting
+EnableCircuitPrebuilding true
+CircuitPoolMinSize 1
+CircuitPoolMaxSize 3
+
+EnableBufferPooling true
+
+# ============================================================================
+# CIRCUIT ISOLATION (Strict Privacy)
+# ============================================================================
+
+# Strict isolation: separate circuits for every destination
+IsolationLevel destination
+
+# Enable all isolation mechanisms
+IsolateDestinations true
+IsolateSOCKSAuth true
+IsolateClientPort true
+IsolateClientProtocol true
+
+# ============================================================================
+# PATH SELECTION (Conservative)
+# ============================================================================
+
+# Use bridges if on a censored network
+# UseBridges false
+# BridgeAddresses obfs4 192.0.2.1:443
+
+# Exclude nodes you don't trust (example - configure as needed)
+# ExcludeNodes $FINGERPRINT1, $FINGERPRINT2
+# ExcludeExitNodes $FINGERPRINT3, $FINGERPRINT4
+
+# Consider excluding nodes in certain jurisdictions
+# This is a PRIVACY vs ANONYMITY tradeoff - excluding too many nodes
+# can make you stand out. Consult Tor documentation before using.
+# ExcludeNodes {us}, {gb}, {au}, {ca}, {nz}  # Five Eyes example
+# ExcludeExitNodes {cn}, {ru}, {ir}, {kp}     # Adversarial states example
+
+# ============================================================================
+# ONION SERVICES (if needed)
+# ============================================================================
+
+# Use separate service directories with strict permissions (mode 0700)
+# [[OnionServices]]
+# ServiceDir ~/.tor-secure/hidden_service
+# VirtualPort 80
+# TargetAddr localhost:8080
+# MaxStreams 10  # Limit concurrent streams
+
+# ============================================================================
+# HIGH SECURITY RECOMMENDATIONS
+# ============================================================================
+
+# 1. System Hardening:
+#    - Run as dedicated user with minimal privileges
+#    - Use AppArmor/SELinux profiles
+#    - Restrict file permissions (chmod 0700 DataDirectory)
+#    - Disable core dumps
+#    - Use encrypted filesystem for DataDirectory
+#
+# 2. Network Isolation:
+#    - Use network namespace or VM isolation
+#    - Firewall rules: only allow outbound Tor connections
+#    - No DNS queries outside Tor
+#    - Consider running in a container or VM
+#
+# 3. Anonymity Practices:
+#    - Never mix Tor and non-Tor traffic from same identity
+#    - Use separate identities for different activities
+#    - Don't log personally identifiable information
+#    - Rotate circuits frequently (already configured)
+#    - Use bridges if under surveillance
+#
+# 4. Monitoring & Alerts:
+#    - DO NOT enable metrics endpoint in production (information leak)
+#    - Monitor logs for circuit build failures (may indicate attacks)
+#    - Alert on guard changes (may indicate compromise)
+#    - Watch for unusual connection patterns
+#
+# 5. Additional Security Measures:
+#    - Disable JavaScript in Tor Browser
+#    - Don't resize Tor Browser window (fingerprinting)
+#    - Never torrent over Tor
+#    - Don't open documents downloaded via Tor while online
+#    - Use onion services instead of exit nodes when possible
+#    - Consider using Whonix or Tails for maximum security
+#
+# 6. Circuit Isolation Strategy:
+#    - IsolationLevel "destination" creates separate circuits per dest
+#    - IsolateSOCKSAuth allows app-level isolation via SOCKS username
+#    - IsolateClientPort provides automatic per-app isolation
+#    - More isolation = more circuits = potentially more fingerprinting
+#    - Balance based on your threat model
+#
+# 7. Threat Model Considerations:
+#    - This config protects against network surveillance
+#    - Does NOT protect against: malware, browser exploits, user errors
+#    - Does NOT protect against: global passive adversaries
+#    - Always use official Tor Browser for web browsing
+#    - This is an EDUCATIONAL IMPLEMENTATION - use official Tor for real privacy
+#
+# 8. Limitations of go-tor:
+#    ⚠️  This is an unofficial, experimental implementation
+#    ⚠️  NOT recommended for situations where your safety depends on anonymity
+#    ⚠️  Has NOT been audited by Tor Project security experts
+#    ⚠️  May have unknown vulnerabilities
+#    ⚠️  For real anonymity needs: use Tor Browser or official Tor software
+#
+# 9. When to Use Official Tor Instead:
+#    - Personal safety or anonymity is at stake
+#    - Protection from surveillance or censorship
+#    - Accessing sensitive information
+#    - Whistleblowing or journalism
+#    - Any production use case
+#    - Situations where discovery could cause harm
+#
+# 10. Acceptable Use Cases for go-tor:
+#     - Educational purposes and learning
+#     - Research and development
+#     - Testing and integration
+#     - Non-critical applications
+#     - Never for real anonymity needs
+
+# ============================================================================
+# IMPORTANT SECURITY NOTICE
+# ============================================================================
+#
+# ⚠️ THIS IS UNOFFICIAL SOFTWARE ⚠️
+#
+# This software has been developed WITHOUT the supervision or endorsement
+# of The Tor Project. It should NOT be considered safe or production-ready.
+#
+# For actual privacy and anonymity needs, please use official Tor software:
+# - Tor Browser: https://www.torproject.org/download/
+# - Official Tor: https://www.torproject.org/
+#
+# Do not rely on this software for:
+# - Personal safety or anonymity
+# - Protection from surveillance
+# - Accessing sensitive information  
+# - Any situation where your safety depends on anonymity
+#
+# ============================================================================

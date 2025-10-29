@@ -1,0 +1,23 @@
+# Minimal Tor Configuration
+# This is the simplest working configuration for go-tor
+# All other settings will use sensible defaults
+
+# Network Settings
+SocksPort 9050
+ControlPort 9051
+
+# Data Directory
+# DataDirectory ./go-tor-data
+
+# That's it! This minimal config is sufficient for most use cases.
+# The client will automatically:
+# - Select and maintain entry guards
+# - Build circuits as needed
+# - Connect to the Tor directory authorities
+# - Enable connection and circuit pooling
+# - Use reasonable performance defaults
+
+# For more options, see:
+# - production.torrc - production-ready configuration
+# - development.torrc - development configuration with debugging
+# - high-security.torrc - privacy-focused configuration
