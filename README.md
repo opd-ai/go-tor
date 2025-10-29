@@ -145,6 +145,26 @@ cd go-tor
 make build
 ```
 
+### Running with Docker (Recommended)
+
+The easiest way to run go-tor is with Docker:
+
+```bash
+# Build the image
+docker build -t go-tor:latest .
+
+# Run with SOCKS proxy on port 9050
+docker run -d --name tor-client -p 9050:9050 go-tor:latest
+
+# Or use docker-compose
+docker-compose up -d
+
+# Test the connection
+curl --socks5 127.0.0.1:9050 https://check.torproject.org
+```
+
+See [docs/CONTAINERIZATION.md](docs/CONTAINERIZATION.md) for detailed Docker and Kubernetes deployment guides.
+
 ### Running (Zero Configuration)
 
 The easiest way to get started - just run the binary with no arguments:
@@ -515,6 +535,7 @@ Comprehensive documentation is available in the [docs/](docs/) directory:
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture and design
 - [API.md](docs/API.md) - API reference and usage
 - [TUTORIAL.md](docs/TUTORIAL.md) - Getting started tutorial
+- [CONTAINERIZATION.md](docs/CONTAINERIZATION.md) - Docker and Kubernetes deployment
 
 ### Operations & Deployment
 - [PRODUCTION.md](docs/PRODUCTION.md) - Production deployment guide

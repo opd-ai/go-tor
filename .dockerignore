@@ -1,0 +1,45 @@
+# Git files
+.git
+.gitignore
+.github
+
+# Build artifacts
+bin/
+*.out
+*.test
+*.prof
+coverage.html
+coverage.out
+
+# Documentation
+docs/
+*.md
+!README.md
+LICENSE
+
+# Examples and testing
+examples/
+benchmark/
+pkg/testing/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Temporary files
+tmp/
+*.tmp
+*.log
+
+# CI/CD
+.github/workflows/
+
+# Scripts (not needed in image)
+scripts/
+
+# Test data
+testdata/

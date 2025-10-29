@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  tor-client:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VERSION: ${VERSION:-dev}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+    image: go-tor:${VERSION:-latest}
+    container_name: go-tor-client
+    
+    # Port mappings
+    ports:
+      - "9050:9050"  # SOCKS5 proxy
+      - "9051:9051"  # Control protocol
+      - "9052:9052"  # HTTP metrics (optional)
+    
+    # Volume for persistent Tor data
+    volumes:
+      - tor-data:/home/nonroot/.tor
+      # Optional: mount custom config
+      # - ./torrc:/home/nonroot/.tor/torrc:ro
+    
+    # Environment variables for configuration
+    environment:
+      # TZ for proper timezone handling
+      - TZ=UTC
+    
+    # Command with metrics enabled
+    command:
+      - "-data-dir"
+      - "/home/nonroot/.tor"
+      - "-socks-port"
+      - "9050"
+      - "-control-port"
+      - "9051"
+      - "-metrics-port"
+      - "9052"
+      - "-log-level"
+      - "info"
+    
+    # Health check configuration
+    # Note: Docker health checks require a command in the container
+    # distroless doesn't include curl/wget, so we rely on orchestration health checks
+    # For Docker Compose, you can add a sidecar container with curl for health checks
+    # For Kubernetes, use httpGet probes on port 9052 path /health (see K8s examples above)
+    # Uncomment below if using a different base image with health check tools:
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:9052/health"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   start_period: 90s
+    #   retries: 3
+    
+    # Restart policy
+    restart: unless-stopped
+    
+    # Resource limits (adjust based on needs)
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.5'
+        reservations:
+          memory: 64M
+          cpus: '0.25'
+    
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    
+    # Read-only root filesystem (data dir is volume)
+    read_only: true
+    
+    # Temporary filesystem for /tmp
+    tmpfs:
+      - /tmp:size=10M,mode=1777
+
+volumes:
+  tor-data:
+    driver: local
