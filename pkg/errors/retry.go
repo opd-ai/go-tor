@@ -6,7 +6,14 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"sync"
 	"time"
+)
+
+// Thread-safe random source for jitter calculation
+var (
+	rngMu sync.Mutex
+	rng   = rand.New(rand.NewSource(time.Now().UnixNano()))
 )
 
 // RetryPolicy defines how retry attempts should be executed
@@ -160,7 +167,9 @@ func (p *RetryPolicy) shouldRetry(err error) bool {
 	return false
 }
 
-// calculateDelay calculates the delay for a given attempt with exponential backoff and jitter
+// calculateDelay calculates the delay for a given attempt with exponential backoff and jitter.
+// Uses math/rand (not crypto/rand) intentionally for performance - cryptographic security
+// is not required for jitter in retry logic, only randomness to prevent thundering herd.
 func (p *RetryPolicy) calculateDelay(attempt int) time.Duration {
 	// Calculate base delay with exponential backoff
 	delay := float64(p.InitialDelay) * math.Pow(p.Multiplier, float64(attempt))
@@ -173,8 +182,13 @@ func (p *RetryPolicy) calculateDelay(attempt int) time.Duration {
 	// Apply jitter if configured
 	if p.Jitter > 0 {
 		// Add random jitter: delay * (1 ± jitter)
+		// Use thread-safe random source
+		rngMu.Lock()
+		jitterFactor := rng.Float64()*2 - 1
+		rngMu.Unlock()
+
 		jitterAmount := delay * p.Jitter
-		delay = delay + (rand.Float64()*2-1)*jitterAmount
+		delay = delay + jitterFactor*jitterAmount
 
 		// Ensure delay is not negative
 		if delay < 0 {
