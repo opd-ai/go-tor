@@ -84,17 +84,17 @@ func TestJSONSchemaToJSON(t *testing.T) {
 
 func TestValidateDetailed(t *testing.T) {
 	tests := []struct {
-		name        string
-		config      *Config
-		wantValid   bool
-		wantErrors  int
+		name         string
+		config       *Config
+		wantValid    bool
+		wantErrors   int
 		wantWarnings int
 	}{
 		{
-			name:        "valid config",
-			config:      DefaultConfig(),
-			wantValid:   true,
-			wantErrors:  0,
+			name:         "valid config",
+			config:       DefaultConfig(),
+			wantValid:    true,
+			wantErrors:   0,
 			wantWarnings: 0,
 		},
 		{
