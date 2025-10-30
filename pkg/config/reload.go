@@ -261,51 +261,23 @@ func (rc *ReloadableConfig) mergeReloadableFields(oldConfig, newConfig *Config) 
 	merged := *oldConfig
 
 	// Update only reloadable fields from new config
-	if ReloadableFields["LogLevel"] {
-		merged.LogLevel = newConfig.LogLevel
-	}
-	if ReloadableFields["MaxCircuitDirtiness"] {
-		merged.MaxCircuitDirtiness = newConfig.MaxCircuitDirtiness
-	}
-	if ReloadableFields["NewCircuitPeriod"] {
-		merged.NewCircuitPeriod = newConfig.NewCircuitPeriod
-	}
-	if ReloadableFields["CircuitBuildTimeout"] {
-		merged.CircuitBuildTimeout = newConfig.CircuitBuildTimeout
-	}
-	if ReloadableFields["CircuitPoolMinSize"] {
-		merged.CircuitPoolMinSize = newConfig.CircuitPoolMinSize
-	}
-	if ReloadableFields["CircuitPoolMaxSize"] {
-		merged.CircuitPoolMaxSize = newConfig.CircuitPoolMaxSize
-	}
-	if ReloadableFields["EnableCircuitPrebuilding"] {
-		merged.EnableCircuitPrebuilding = newConfig.EnableCircuitPrebuilding
-	}
-	if ReloadableFields["ConnectionPoolMaxIdle"] {
-		merged.ConnectionPoolMaxIdle = newConfig.ConnectionPoolMaxIdle
-	}
-	if ReloadableFields["ConnectionPoolMaxLife"] {
-		merged.ConnectionPoolMaxLife = newConfig.ConnectionPoolMaxLife
-	}
-	if ReloadableFields["EnableConnectionPooling"] {
-		merged.EnableConnectionPooling = newConfig.EnableConnectionPooling
-	}
-	if ReloadableFields["EnableBufferPooling"] {
-		merged.EnableBufferPooling = newConfig.EnableBufferPooling
-	}
-	if ReloadableFields["IsolateDestinations"] {
-		merged.IsolateDestinations = newConfig.IsolateDestinations
-	}
-	if ReloadableFields["IsolateSOCKSAuth"] {
-		merged.IsolateSOCKSAuth = newConfig.IsolateSOCKSAuth
-	}
-	if ReloadableFields["IsolateClientPort"] {
-		merged.IsolateClientPort = newConfig.IsolateClientPort
-	}
-	if ReloadableFields["IsolateClientProtocol"] {
-		merged.IsolateClientProtocol = newConfig.IsolateClientProtocol
-	}
+	// Since ReloadableFields is a static map with all values true,
+	// we directly assign the fields without checking the map
+	merged.LogLevel = newConfig.LogLevel
+	merged.MaxCircuitDirtiness = newConfig.MaxCircuitDirtiness
+	merged.NewCircuitPeriod = newConfig.NewCircuitPeriod
+	merged.CircuitBuildTimeout = newConfig.CircuitBuildTimeout
+	merged.CircuitPoolMinSize = newConfig.CircuitPoolMinSize
+	merged.CircuitPoolMaxSize = newConfig.CircuitPoolMaxSize
+	merged.EnableCircuitPrebuilding = newConfig.EnableCircuitPrebuilding
+	merged.ConnectionPoolMaxIdle = newConfig.ConnectionPoolMaxIdle
+	merged.ConnectionPoolMaxLife = newConfig.ConnectionPoolMaxLife
+	merged.EnableConnectionPooling = newConfig.EnableConnectionPooling
+	merged.EnableBufferPooling = newConfig.EnableBufferPooling
+	merged.IsolateDestinations = newConfig.IsolateDestinations
+	merged.IsolateSOCKSAuth = newConfig.IsolateSOCKSAuth
+	merged.IsolateClientPort = newConfig.IsolateClientPort
+	merged.IsolateClientProtocol = newConfig.IsolateClientProtocol
 
 	return &merged
 }
