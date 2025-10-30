@@ -10,38 +10,38 @@ import (
 // JSONSchema represents the JSON Schema v7 for the Tor configuration.
 // This enables IDE autocomplete, validation, and documentation.
 type JSONSchema struct {
-	Schema      string                       `json:"$schema"`
-	Title       string                       `json:"title"`
-	Description string                       `json:"description"`
-	Type        string                       `json:"type"`
-	Properties  map[string]PropertySchema    `json:"properties"`
-	Required    []string                     `json:"required,omitempty"`
-	Definitions map[string]DefinitionSchema  `json:"definitions,omitempty"`
+	Schema      string                      `json:"$schema"`
+	Title       string                      `json:"title"`
+	Description string                      `json:"description"`
+	Type        string                      `json:"type"`
+	Properties  map[string]PropertySchema   `json:"properties"`
+	Required    []string                    `json:"required,omitempty"`
+	Definitions map[string]DefinitionSchema `json:"definitions,omitempty"`
 }
 
 // PropertySchema represents a property in the JSON schema
 type PropertySchema struct {
-	Type        string                      `json:"type,omitempty"`
-	Description string                      `json:"description,omitempty"`
-	Default     interface{}                 `json:"default,omitempty"`
-	Minimum     *int                        `json:"minimum,omitempty"`
-	Maximum     *int                        `json:"maximum,omitempty"`
-	Enum        []string                    `json:"enum,omitempty"`
-	Items       *PropertySchema             `json:"items,omitempty"`
-	Properties  map[string]PropertySchema   `json:"properties,omitempty"`
-	Ref         string                      `json:"$ref,omitempty"`
-	Format      string                      `json:"format,omitempty"`
-	Pattern     string                      `json:"pattern,omitempty"`
-	MinLength   *int                        `json:"minLength,omitempty"`
-	Examples    []interface{}               `json:"examples,omitempty"`
+	Type        string                    `json:"type,omitempty"`
+	Description string                    `json:"description,omitempty"`
+	Default     interface{}               `json:"default,omitempty"`
+	Minimum     *int                      `json:"minimum,omitempty"`
+	Maximum     *int                      `json:"maximum,omitempty"`
+	Enum        []string                  `json:"enum,omitempty"`
+	Items       *PropertySchema           `json:"items,omitempty"`
+	Properties  map[string]PropertySchema `json:"properties,omitempty"`
+	Ref         string                    `json:"$ref,omitempty"`
+	Format      string                    `json:"format,omitempty"`
+	Pattern     string                    `json:"pattern,omitempty"`
+	MinLength   *int                      `json:"minLength,omitempty"`
+	Examples    []interface{}             `json:"examples,omitempty"`
 }
 
 // DefinitionSchema represents a reusable definition in the JSON schema
 type DefinitionSchema struct {
-	Type        string                      `json:"type"`
-	Description string                      `json:"description,omitempty"`
-	Properties  map[string]PropertySchema   `json:"properties,omitempty"`
-	Required    []string                    `json:"required,omitempty"`
+	Type        string                    `json:"type"`
+	Description string                    `json:"description,omitempty"`
+	Properties  map[string]PropertySchema `json:"properties,omitempty"`
+	Required    []string                  `json:"required,omitempty"`
 }
 
 // GenerateJSONSchema creates a JSON Schema v7 for the Config structure.
@@ -52,9 +52,9 @@ func GenerateJSONSchema() (*JSONSchema, error) {
 	minGuards := 1
 	minConnLimit := 1
 	minPoolSize := 0
-	minPortPositive := 1  // For ports that must be > 0
-	minStreamCount := 0   // For stream/connection counts
-	
+	minPortPositive := 1 // For ports that must be > 0
+	minStreamCount := 0  // For stream/connection counts
+
 	schema := &JSONSchema{
 		Schema:      "http://json-schema.org/draft-07/schema#",
 		Title:       "go-tor Configuration",
@@ -124,7 +124,7 @@ func GenerateJSONSchema() (*JSONSchema, error) {
 				Type:        "array",
 				Description: "Bridge addresses if UseBridges is true (format: IP:PORT or transport IP:PORT)",
 				Items: &PropertySchema{
-					Type: "string",
+					Type:    "string",
 					Pattern: "^([a-zA-Z0-9]+\\s+)?([0-9]{1,3}\\.){3}[0-9]{1,3}:[0-9]{1,5}$",
 				},
 				Examples: []interface{}{
@@ -308,11 +308,11 @@ func (s *JSONSchema) ToJSON() ([]byte, error) {
 
 // ValidationError represents a configuration validation error with context
 type ValidationError struct {
-	Field       string      // Field name that failed validation
-	Value       interface{} // Actual value provided
-	Message     string      // Human-readable error message
-	Suggestion  string      // Suggested fix
-	Severity    string      // "error", "warning", "info"
+	Field      string      // Field name that failed validation
+	Value      interface{} // Actual value provided
+	Message    string      // Human-readable error message
+	Suggestion string      // Suggested fix
+	Severity   string      // "error", "warning", "info"
 }
 
 // Error implements the error interface
@@ -325,16 +325,16 @@ func (v *ValidationError) Error() string {
 
 // ValidationResult contains the results of configuration validation
 type ValidationResult struct {
-	Valid   bool
-	Errors  []ValidationError
+	Valid    bool
+	Errors   []ValidationError
 	Warnings []ValidationError
 }
 
 // ValidateDetailed performs comprehensive validation with detailed feedback
 func (c *Config) ValidateDetailed() *ValidationResult {
 	result := &ValidationResult{
-		Valid:   true,
-		Errors:  []ValidationError{},
+		Valid:    true,
+		Errors:   []ValidationError{},
 		Warnings: []ValidationError{},
 	}
 
