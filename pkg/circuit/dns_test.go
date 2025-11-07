@@ -394,9 +394,14 @@ func TestDNSResultValidation(t *testing.T) {
 	}
 }
 
-// mockConnection is a minimal mock connection for testing
+// mockConnection is a minimal mock connection for DNS testing that implements
+// the cellSender interface required by Circuit.SendRelayCell. It accepts cells
+// but doesn't actually send them, allowing tests to verify DNS resolution logic
+// without requiring a real network connection.
 type mockConnection struct{}
 
+// SendCell implements the cellSender interface for mockConnection.
+// It accepts cells but doesn't send them, returning nil to indicate success.
 func (m *mockConnection) SendCell(c *cell.Cell) error {
 	// Mock connection that accepts cells but doesn't do anything
 	return nil
