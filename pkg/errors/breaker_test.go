@@ -3,6 +3,7 @@ package errors
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 )
@@ -236,11 +237,14 @@ func TestCircuitBreaker_ForceOpen(t *testing.T) {
 
 func TestCircuitBreaker_StateChangeCallback(t *testing.T) {
 	var transitions []string
+	var mu sync.Mutex
 	config := DefaultCircuitBreakerConfig()
 	config.MaxFailures = 2
 	config.Timeout = 100 * time.Millisecond
 	config.OnStateChange = func(from, to CircuitState) {
+		mu.Lock()
 		transitions = append(transitions, fmt.Sprintf("%s->%s", from, to))
+		mu.Unlock()
 	}
 
 	cb := NewCircuitBreaker(config)
@@ -264,8 +268,14 @@ func TestCircuitBreaker_StateChangeCallback(t *testing.T) {
 	// Give callbacks time to execute
 	time.Sleep(50 * time.Millisecond)
 
-	if len(transitions) < 2 {
-		t.Errorf("Expected at least 2 state transitions, got %d: %v", len(transitions), transitions)
+	mu.Lock()
+	numTransitions := len(transitions)
+	transitionsCopy := make([]string, len(transitions))
+	copy(transitionsCopy, transitions)
+	mu.Unlock()
+
+	if numTransitions < 2 {
+		t.Errorf("Expected at least 2 state transitions, got %d: %v", numTransitions, transitionsCopy)
 	}
 }
 

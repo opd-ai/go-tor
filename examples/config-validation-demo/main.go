@@ -104,7 +104,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to export schema: %v", err)
 	}
-	
+
 	// Write to temporary file for demonstration
 	tmpFile := "/tmp/config-schema-demo.json"
 	if err := os.WriteFile(tmpFile, jsonData, 0644); err != nil {

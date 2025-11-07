@@ -132,8 +132,8 @@ func TestParseResolvedCell(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			name: "Truncated data",
-			data: []byte{0x04, 0x04, 0x01}, // Too short
+			name:      "Truncated data",
+			data:      []byte{0x04, 0x04, 0x01}, // Too short
 			expectErr: true,
 		},
 	}
@@ -394,6 +394,19 @@ func TestDNSResultValidation(t *testing.T) {
 	}
 }
 
+// mockConnection is a minimal mock connection for DNS testing that implements
+// the cellSender interface required by Circuit.SendRelayCell. It accepts cells
+// but doesn't actually send them, allowing tests to verify DNS resolution logic
+// without requiring a real network connection.
+type mockConnection struct{}
+
+// SendCell implements the cellSender interface for mockConnection.
+// It accepts cells but doesn't send them, returning nil to indicate success.
+func (m *mockConnection) SendCell(c *cell.Cell) error {
+	// Mock connection that accepts cells but doesn't do anything
+	return nil
+}
+
 // MockCircuitForDNS creates a mock circuit for DNS testing
 // Note: This is a simplified mock that doesn't fully simulate the circuit behavior
 // For integration tests, use a real circuit with mock network layer
@@ -402,13 +415,14 @@ func MockCircuitForDNS(t *testing.T, responseData []byte) *Circuit {
 		ID:               1,
 		State:            StateOpen,
 		relayReceiveChan: make(chan *cell.RelayCell, 1),
+		conn:             &mockConnection{},
 	}
 
 	// Simulate the response by directly injecting into receive channel
 	go func() {
 		// Small delay to allow the call to be made
 		time.Sleep(10 * time.Millisecond)
-		
+
 		// Send back RELAY_RESOLVED response
 		resolvedCell := cell.NewRelayCell(0, cell.RelayResolved, responseData)
 		c.relayReceiveChan <- resolvedCell

@@ -1027,17 +1027,17 @@ func (s *Server) sendDNSReplyHostname(conn net.Conn, status byte, hostname strin
 	response := make([]byte, 4)
 	response[0] = socks5Version
 	response[1] = status
-	response[2] = 0x00 // Reserved
+	response[2] = 0x00       // Reserved
 	response[3] = addrDomain // Address type = domain name
 
 	if status != replySuccess || hostname == "" {
 		// Error response - empty hostname
-		response = append(response, 0) // Length = 0
+		response = append(response, 0)          // Length = 0
 		response = append(response, 0, 0, 0, 0) // TTL = 0
 	} else {
 		// Success response with hostname
 		hostnameBytes := []byte(hostname)
-		
+
 		// Validate hostname length doesn't exceed 255 bytes (SOCKS5 protocol limit)
 		if len(hostnameBytes) > 255 {
 			s.logger.Error("Hostname too long for SOCKS5 protocol",
@@ -1045,17 +1045,17 @@ func (s *Server) sendDNSReplyHostname(conn net.Conn, status byte, hostname strin
 				"length", len(hostnameBytes))
 			// Send error response
 			response[1] = replyGeneralFailure
-			response = append(response, 0) // Length = 0
+			response = append(response, 0)          // Length = 0
 			response = append(response, 0, 0, 0, 0) // TTL = 0
 			if _, writeErr := conn.Write(response); writeErr != nil {
 				return fmt.Errorf("hostname length %d exceeds 255 byte limit: write error: %w", len(hostnameBytes), writeErr)
 			}
 			return fmt.Errorf("hostname length %d exceeds 255 byte limit", len(hostnameBytes))
 		}
-		
+
 		response = append(response, byte(len(hostnameBytes)))
 		response = append(response, hostnameBytes...)
-		
+
 		// Add TTL (4 bytes, big endian) from the DNS response
 		ttlBytes := make([]byte, 4)
 		binary.BigEndian.PutUint32(ttlBytes, ttl)

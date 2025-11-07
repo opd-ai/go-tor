@@ -235,7 +235,7 @@ func generateJSONSchema(outputPath string, verbose bool) error {
 			fmt.Println("Use this schema with your IDE for autocomplete and validation.")
 			fmt.Println()
 			fmt.Println("For VS Code, add to .vscode/settings.json:")
-			
+
 			// Create a proper JSON example using a map
 			exampleSettings := map[string]interface{}{
 				"json.schemas": []map[string]interface{}{
@@ -245,7 +245,7 @@ func generateJSONSchema(outputPath string, verbose bool) error {
 					},
 				},
 			}
-			
+
 			exampleJSON, _ := json.MarshalIndent(exampleSettings, "", "  ")
 			fmt.Println(string(exampleJSON))
 		} else {
