@@ -23,23 +23,23 @@ const (
 
 // DNS error codes (tor-spec.txt section 6.4)
 const (
-	DNSErrorNone              = 0x00 // No error
-	DNSErrorFormat            = 0x01 // Format error
-	DNSErrorServerFailure     = 0x02 // Server failure
-	DNSErrorNotExist          = 0x03 // Name does not exist
-	DNSErrorNotImplemented    = 0x04 // Not implemented
-	DNSErrorRefused           = 0x05 // Query refused
-	DNSErrorTransientFailure  = 0xF0 // Transient failure
+	DNSErrorNone                = 0x00 // No error
+	DNSErrorFormat              = 0x01 // Format error
+	DNSErrorServerFailure       = 0x02 // Server failure
+	DNSErrorNotExist            = 0x03 // Name does not exist
+	DNSErrorNotImplemented      = 0x04 // Not implemented
+	DNSErrorRefused             = 0x05 // Query refused
+	DNSErrorTransientFailure    = 0xF0 // Transient failure
 	DNSErrorNonTransientFailure = 0xF1 // Non-transient failure
 )
 
 // DNSResult represents the result of a DNS query
 type DNSResult struct {
-	Type     byte          // DNS record type
-	TTL      uint32        // Time to live in seconds
-	Addresses []net.IP     // Resolved IP addresses
-	Hostname string        // Resolved hostname (for PTR queries)
-	Error    byte          // Error code (if Type is DNSTypeError)
+	Type      byte     // DNS record type
+	TTL       uint32   // Time to live in seconds
+	Addresses []net.IP // Resolved IP addresses
+	Hostname  string   // Resolved hostname (for PTR queries)
+	Error     byte     // Error code (if Type is DNSTypeError)
 }
 
 // ResolveHostname resolves a hostname to IP addresses through the circuit
