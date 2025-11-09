@@ -408,8 +408,12 @@ func TestNtorConstantTimeComparison(t *testing.T) {
 func BenchmarkNtorHandshake(b *testing.B) {
 	serverIdentity := make([]byte, 32)
 	serverNtorKey := make([]byte, 32)
-	rand.Read(serverIdentity)
-	rand.Read(serverNtorKey)
+	if _, err := rand.Read(serverIdentity); err != nil {
+		b.Fatal(err)
+	}
+	if _, err := rand.Read(serverNtorKey); err != nil {
+		b.Fatal(err)
+	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -428,10 +432,18 @@ func BenchmarkNtorProcessResponse(b *testing.B) {
 	clientPrivate := make([]byte, 32)
 	response := make([]byte, 64)
 	
-	rand.Read(serverIdentity)
-	rand.Read(serverNtorKey)
-	rand.Read(clientPrivate)
-	rand.Read(response) // Will fail auth, but we're benchmarking the computation
+	if _, err := rand.Read(serverIdentity); err != nil {
+		b.Fatal(err)
+	}
+	if _, err := rand.Read(serverNtorKey); err != nil {
+		b.Fatal(err)
+	}
+	if _, err := rand.Read(clientPrivate); err != nil {
+		b.Fatal(err)
+	}
+	if _, err := rand.Read(response); err != nil {
+		b.Fatal(err)
+	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
