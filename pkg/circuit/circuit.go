@@ -848,13 +848,9 @@ func (c *Circuit) DeliverRelayCell(cellData *cell.Cell) error {
 
 	// SECURITY-001: Validate against replay attacks before processing
 	// We check the decrypted payload to ensure the same cell content isn't replayed
+	// Using ValidateAndTrackAuto for atomic sequence generation and validation
 	if c.replayProtection != nil {
-		// Get next sequence for backward direction
-		c.mu.Lock()
-		seqNum := c.replayProtection.GetNextSequence(cell.ReplayBackward)
-		err := c.replayProtection.ValidateAndTrack(cell.ReplayBackward, seqNum, decryptedPayload)
-		c.mu.Unlock()
-		if err != nil {
+		if err := c.replayProtection.ValidateAndTrackAuto(cell.ReplayBackward, decryptedPayload); err != nil {
 			return fmt.Errorf("replay protection: %w", err)
 		}
 	}
@@ -1036,19 +1032,18 @@ func (c *Circuit) GetReplayAttempts() uint64 {
 // ValidateCellForReplay validates a cell against replay attacks.
 // This is called during cell processing to detect replayed cells.
 // direction: cell.ReplayForward for outgoing, cell.ReplayBackward for incoming
+// Uses atomic sequence generation and validation to prevent race conditions.
 func (c *Circuit) ValidateCellForReplay(direction cell.ReplayDirection, cellData []byte) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	rp := c.replayProtection
+	c.mu.RUnlock()
 
-	if c.replayProtection == nil {
+	if rp == nil {
 		return nil // Replay protection not initialized (shouldn't happen)
 	}
 
-	// Get the next sequence number for this direction
-	seqNum := c.replayProtection.GetNextSequence(direction)
-
-	// Validate and track the cell
-	return c.replayProtection.ValidateAndTrack(direction, seqNum, cellData)
+	// Use atomic validation method that generates sequence and validates together
+	return rp.ValidateAndTrackAuto(direction, cellData)
 }
 
 // ResetReplayProtection resets the replay protection state.

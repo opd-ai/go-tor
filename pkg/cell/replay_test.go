@@ -435,3 +435,128 @@ func BenchmarkStats(b *testing.B) {
 		_ = rp.Stats()
 	}
 }
+
+// Tests for ValidateAndTrackAuto (atomic sequence generation and validation)
+
+func TestValidateAndTrackAuto_NormalFlow(t *testing.T) {
+	rp := NewReplayProtection()
+
+	// Send cells - sequence numbers are generated automatically
+	for i := 0; i < 10; i++ {
+		cellData := []byte(fmt.Sprintf("auto cell %d", i))
+		err := rp.ValidateAndTrackAuto(ReplayForward, cellData)
+		if err != nil {
+			t.Errorf("ValidateAndTrackAuto() iteration %d error = %v", i, err)
+		}
+	}
+
+	stats := rp.Stats()
+	if stats.ForwardSequence != 10 {
+		t.Errorf("ForwardSequence = %d, want 10", stats.ForwardSequence)
+	}
+}
+
+func TestValidateAndTrackAuto_DuplicateDetection(t *testing.T) {
+	rp := NewReplayProtection()
+
+	cellData := []byte("unique auto cell data")
+
+	// First cell should pass
+	err := rp.ValidateAndTrackAuto(ReplayForward, cellData)
+	if err != nil {
+		t.Fatalf("First ValidateAndTrackAuto error = %v", err)
+	}
+
+	// Same cell content should fail (replay attempt)
+	err = rp.ValidateAndTrackAuto(ReplayForward, cellData)
+	if err == nil {
+		t.Error("Expected error for duplicate cell, got nil")
+	}
+
+	attempts := rp.TotalReplayAttempts()
+	if attempts != 1 {
+		t.Errorf("TotalReplayAttempts = %d, want 1", attempts)
+	}
+}
+
+func TestValidateAndTrackAuto_BothDirections(t *testing.T) {
+	rp := NewReplayProtection()
+
+	// Forward direction
+	for i := 0; i < 5; i++ {
+		cellData := []byte(fmt.Sprintf("auto forward %d", i))
+		err := rp.ValidateAndTrackAuto(ReplayForward, cellData)
+		if err != nil {
+			t.Errorf("Forward ValidateAndTrackAuto(%d) error = %v", i, err)
+		}
+	}
+
+	// Backward direction
+	for i := 0; i < 3; i++ {
+		cellData := []byte(fmt.Sprintf("auto backward %d", i))
+		err := rp.ValidateAndTrackAuto(ReplayBackward, cellData)
+		if err != nil {
+			t.Errorf("Backward ValidateAndTrackAuto(%d) error = %v", i, err)
+		}
+	}
+
+	stats := rp.Stats()
+	if stats.ForwardSequence != 5 {
+		t.Errorf("ForwardSequence = %d, want 5", stats.ForwardSequence)
+	}
+	if stats.BackwardSequence != 3 {
+		t.Errorf("BackwardSequence = %d, want 3", stats.BackwardSequence)
+	}
+}
+
+func TestValidateAndTrackAuto_EmptyData(t *testing.T) {
+	rp := NewReplayProtection()
+
+	err := rp.ValidateAndTrackAuto(ReplayForward, []byte{})
+	if err == nil {
+		t.Error("Expected error for empty cell data, got nil")
+	}
+
+	err = rp.ValidateAndTrackAuto(ReplayForward, nil)
+	if err == nil {
+		t.Error("Expected error for nil cell data, got nil")
+	}
+}
+
+func TestValidateAndTrackAuto_ConcurrentAccess(t *testing.T) {
+	rp := NewReplayProtection()
+	var wg sync.WaitGroup
+
+	// Launch multiple goroutines using ValidateAndTrackAuto
+	for g := 0; g < 10; g++ {
+		wg.Add(1)
+		go func(gid int) {
+			defer wg.Done()
+			for i := 0; i < 100; i++ {
+				cellData := []byte(fmt.Sprintf("auto goroutine %d cell %d", gid, i))
+
+				direction := ReplayForward
+				if gid%2 == 0 {
+					direction = ReplayBackward
+				}
+
+				// We don't care about errors here, just checking for races
+				rp.ValidateAndTrackAuto(direction, cellData)
+			}
+		}(g)
+	}
+
+	wg.Wait()
+}
+
+func BenchmarkValidateAndTrackAuto(b *testing.B) {
+	rp := NewReplayProtection()
+	cellData := []byte("benchmark auto cell data that represents a typical relay cell payload")
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		// Create unique data by appending iteration
+		data := append(cellData, byte(i), byte(i>>8), byte(i>>16), byte(i>>24))
+		rp.ValidateAndTrackAuto(ReplayForward, data)
+	}
+}

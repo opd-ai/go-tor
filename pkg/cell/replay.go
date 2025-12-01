@@ -283,6 +283,7 @@ func (r *ReplayProtection) Reset() {
 
 // GetNextSequence returns the next sequence number to use for a direction.
 // This is used by the sending side to assign sequence numbers to cells.
+// DEPRECATED: Use ValidateAndTrackAuto for atomic sequence generation and validation.
 func (r *ReplayProtection) GetNextSequence(direction ReplayDirection) uint64 {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -296,6 +297,103 @@ func (r *ReplayProtection) GetNextSequence(direction ReplayDirection) uint64 {
 	seq := r.backwardSeq
 	r.backwardSeq++
 	return seq
+}
+
+// ValidateAndTrackAuto validates a cell and automatically assigns a sequence number.
+// This is the preferred method as it atomically combines sequence generation and validation,
+// preventing race conditions where a sequence number could be consumed but validation fails.
+//
+// Returns an error if the cell appears to be replayed or is otherwise invalid.
+func (r *ReplayProtection) ValidateAndTrackAuto(direction ReplayDirection, cellData []byte) error {
+	if len(cellData) == 0 {
+		return fmt.Errorf("empty cell data")
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Compute truncated digest (first 16 bytes of SHA-256)
+	fullDigest := sha256.Sum256(cellData)
+	var digest [16]byte
+	copy(digest[:], fullDigest[:16])
+
+	// Get next sequence number atomically with validation
+	var seqNum uint64
+	if direction == ReplayForward {
+		seqNum = r.forwardSeq
+		// Validate first, only increment if successful
+		if err := r.validateForwardLocked(seqNum, digest); err != nil {
+			return err
+		}
+		r.forwardSeq++
+	} else {
+		seqNum = r.backwardSeq
+		// Validate first, only increment if successful
+		if err := r.validateBackwardLocked(seqNum, digest); err != nil {
+			return err
+		}
+		r.backwardSeq++
+	}
+
+	return nil
+}
+
+// validateForwardLocked validates and tracks a forward cell (must hold lock).
+func (r *ReplayProtection) validateForwardLocked(seqNum uint64, digest [16]byte) error {
+	// Check for duplicate digest
+	if prevSeq, exists := r.forwardDigests[digest]; exists {
+		r.replayAttemptsForward++
+		return fmt.Errorf("replay detected: duplicate cell digest (original seq: %d, replay seq: %d)", prevSeq, seqNum)
+	}
+
+	// Check sequence number validity
+	if err := r.validateSequence(seqNum, r.forwardSeq, r.forwardWindow, ReplayForward); err != nil {
+		r.replayAttemptsForward++
+		return err
+	}
+
+	// Track this cell
+	r.forwardWindow[seqNum] = struct{}{}
+	r.forwardDigests[digest] = seqNum
+
+	// Track out-of-order cells
+	if seqNum < r.forwardSeq {
+		r.outOfOrderForward++
+	}
+
+	// Cleanup old entries outside the window
+	r.cleanupWindow(ReplayForward)
+
+	return nil
+}
+
+// validateBackwardLocked validates and tracks a backward cell (must hold lock).
+func (r *ReplayProtection) validateBackwardLocked(seqNum uint64, digest [16]byte) error {
+	// Check for duplicate digest
+	if prevSeq, exists := r.backwardDigests[digest]; exists {
+		r.replayAttemptsBackward++
+		return fmt.Errorf("replay detected: duplicate cell digest (original seq: %d, replay seq: %d)", prevSeq, seqNum)
+	}
+
+	// Check sequence number validity
+	if err := r.validateSequence(seqNum, r.backwardSeq, r.backwardWindow, ReplayBackward); err != nil {
+		r.replayAttemptsBackward++
+		return err
+	}
+
+	// Track this cell
+	r.backwardWindow[seqNum] = struct{}{}
+	r.backwardDigests[digest] = seqNum
+
+	// Track out-of-order cells
+	if seqNum < r.backwardSeq {
+		r.outOfOrderBackward++
+	}
+
+	// Cleanup old entries outside the window
+	r.cleanupWindow(ReplayBackward)
+
+	return nil
 }
 
 // TotalReplayAttempts returns the total number of detected replay attempts.
