@@ -2442,3 +2442,750 @@ func TestEncryptionIntegration(t *testing.T) {
 
 	t.Logf("Successfully created encrypted INTRODUCE1 cell of %d bytes", len(introduce1Cell))
 }
+
+// ============================================================================
+// Descriptor Signature Verification Tests (AUDIT-002, Phase 1.4)
+// ============================================================================
+
+// TestVerifyDescriptorSignatureNilDescriptor tests handling of nil descriptor
+func TestVerifyDescriptorSignatureNilDescriptor(t *testing.T) {
+	addr := &Address{
+		Version: V3,
+		Pubkey:  make([]byte, 32),
+	}
+
+	err := VerifyDescriptorSignature(nil, addr)
+	if err == nil {
+		t.Error("Expected error for nil descriptor")
+	}
+	if !strings.Contains(err.Error(), "nil descriptor") {
+		t.Errorf("Expected 'nil descriptor' error, got: %v", err)
+	}
+}
+
+// TestVerifyDescriptorSignatureNilAddress tests handling of nil address
+func TestVerifyDescriptorSignatureNilAddress(t *testing.T) {
+	desc := &Descriptor{
+		Signature: make([]byte, 64),
+	}
+
+	err := VerifyDescriptorSignature(desc, nil)
+	if err == nil {
+		t.Error("Expected error for nil address")
+	}
+	if !strings.Contains(err.Error(), "nil address") {
+		t.Errorf("Expected 'nil address' error, got: %v", err)
+	}
+}
+
+// TestVerifyDescriptorSignatureInvalidPubkeyLength tests handling of invalid public key length
+func TestVerifyDescriptorSignatureInvalidPubkeyLength(t *testing.T) {
+	tests := []struct {
+		name      string
+		pubkeyLen int
+	}{
+		{"too short", 16},
+		{"too long", 64},
+		{"empty", 0},
+		{"31 bytes", 31},
+		{"33 bytes", 33},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			addr := &Address{
+				Version: V3,
+				Pubkey:  make([]byte, tt.pubkeyLen),
+			}
+			desc := &Descriptor{
+				Signature: make([]byte, 64),
+			}
+
+			err := VerifyDescriptorSignature(desc, addr)
+			if err == nil {
+				t.Error("Expected error for invalid public key length")
+			}
+			if !strings.Contains(err.Error(), "invalid public key length") {
+				t.Errorf("Expected 'invalid public key length' error, got: %v", err)
+			}
+		})
+	}
+}
+
+// TestVerifyDescriptorSignatureMissingSignature tests handling of missing signature
+func TestVerifyDescriptorSignatureMissingSignature(t *testing.T) {
+	addr := &Address{
+		Version: V3,
+		Pubkey:  make([]byte, 32),
+	}
+	desc := &Descriptor{
+		Signature: nil,
+	}
+
+	err := VerifyDescriptorSignature(desc, addr)
+	if err == nil {
+		t.Error("Expected error for missing signature")
+	}
+	if !strings.Contains(err.Error(), "no signature") {
+		t.Errorf("Expected 'no signature' error, got: %v", err)
+	}
+}
+
+// TestVerifyDescriptorSignatureInvalidSignatureLength tests handling of invalid signature length
+func TestVerifyDescriptorSignatureInvalidSignatureLength(t *testing.T) {
+	tests := []struct {
+		name   string
+		sigLen int
+	}{
+		{"too short - 32 bytes", 32},
+		{"too long - 128 bytes", 128},
+		{"wrong - 63 bytes", 63},
+		{"wrong - 65 bytes", 65},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			addr := &Address{
+				Version: V3,
+				Pubkey:  make([]byte, 32),
+			}
+			desc := &Descriptor{
+				Signature: make([]byte, tt.sigLen),
+			}
+
+			err := VerifyDescriptorSignature(desc, addr)
+			if err == nil {
+				t.Error("Expected error for invalid signature length")
+			}
+			if !strings.Contains(err.Error(), "invalid signature length") {
+				t.Errorf("Expected 'invalid signature length' error, got: %v", err)
+			}
+		})
+	}
+}
+
+// TestVerifyDescriptorSignatureMissingRawDescriptor tests handling of missing raw descriptor
+func TestVerifyDescriptorSignatureMissingRawDescriptor(t *testing.T) {
+	addr := &Address{
+		Version: V3,
+		Pubkey:  make([]byte, 32),
+	}
+	desc := &Descriptor{
+		Signature:     make([]byte, 64),
+		RawDescriptor: nil,
+	}
+
+	err := VerifyDescriptorSignature(desc, addr)
+	if err == nil {
+		t.Error("Expected error for missing raw descriptor")
+	}
+	if !strings.Contains(err.Error(), "no raw data") {
+		t.Errorf("Expected 'no raw data' error, got: %v", err)
+	}
+}
+
+// TestVerifyDescriptorSignatureMissingSignatureLine tests handling of missing signature line in raw descriptor
+func TestVerifyDescriptorSignatureMissingSignatureLine(t *testing.T) {
+	addr := &Address{
+		Version: V3,
+		Pubkey:  make([]byte, 32),
+	}
+	// Raw descriptor without "signature " marker
+	desc := &Descriptor{
+		Signature:     make([]byte, 64),
+		RawDescriptor: []byte("hs-descriptor 3\ndescriptor-lifetime 180\n"),
+	}
+
+	err := VerifyDescriptorSignature(desc, addr)
+	if err == nil {
+		t.Error("Expected error for missing signature line")
+	}
+	if !strings.Contains(err.Error(), "signature line not found") {
+		t.Errorf("Expected 'signature line not found' error, got: %v", err)
+	}
+}
+
+// TestVerifyDescriptorSignatureMissingCertificate tests handling of missing signing key certificate
+func TestVerifyDescriptorSignatureMissingCertificate(t *testing.T) {
+	addr := &Address{
+		Version: V3,
+		Pubkey:  make([]byte, 32),
+	}
+	desc := &Descriptor{
+		Signature:                make([]byte, 64),
+		RawDescriptor:            []byte("hs-descriptor 3\nsignature ABC"),
+		DescriptorSigningKeyCert: nil,
+	}
+
+	err := VerifyDescriptorSignature(desc, addr)
+	if err == nil {
+		t.Error("Expected error for missing certificate")
+	}
+	if !strings.Contains(err.Error(), "no signing key certificate") {
+		t.Errorf("Expected 'no signing key certificate' error, got: %v", err)
+	}
+}
+
+// TestVerifyDescriptorSignatureCertificateTooShort tests handling of certificate too short
+func TestVerifyDescriptorSignatureCertificateTooShort(t *testing.T) {
+	addr := &Address{
+		Version: V3,
+		Pubkey:  make([]byte, 32),
+	}
+	desc := &Descriptor{
+		Signature:                make([]byte, 64),
+		RawDescriptor:            []byte("hs-descriptor 3\nsignature ABC"),
+		DescriptorSigningKeyCert: make([]byte, 10), // Too short
+	}
+
+	err := VerifyDescriptorSignature(desc, addr)
+	if err == nil {
+		t.Error("Expected error for certificate too short")
+	}
+	if !strings.Contains(err.Error(), "certificate too short") {
+		t.Errorf("Expected 'certificate too short' error, got: %v", err)
+	}
+}
+
+// TestVerifyDescriptorSignatureCertificateInvalidVersion tests handling of invalid certificate version
+func TestVerifyDescriptorSignatureCertificateInvalidVersion(t *testing.T) {
+	addr := &Address{
+		Version: V3,
+		Pubkey:  make([]byte, 32),
+	}
+	// Create certificate with invalid version (0 instead of 1)
+	certData := make([]byte, 104) // Minimum size for valid certificate
+	certData[0] = 0               // Invalid version
+
+	desc := &Descriptor{
+		Signature:                make([]byte, 64),
+		RawDescriptor:            []byte("hs-descriptor 3\nsignature ABC"),
+		DescriptorSigningKeyCert: certData,
+	}
+
+	err := VerifyDescriptorSignature(desc, addr)
+	if err == nil {
+		t.Error("Expected error for invalid certificate version")
+	}
+	if !strings.Contains(err.Error(), "unsupported certificate version") {
+		t.Errorf("Expected 'unsupported certificate version' error, got: %v", err)
+	}
+}
+
+// TestVerifyDescriptorSignatureCertificateInvalidType tests handling of invalid certificate type
+func TestVerifyDescriptorSignatureCertificateInvalidType(t *testing.T) {
+	addr := &Address{
+		Version: V3,
+		Pubkey:  make([]byte, 32),
+	}
+	// Create certificate with invalid type (not 4)
+	certData := make([]byte, 104)
+	certData[0] = 1 // Valid version
+	certData[1] = 5 // Invalid type (should be 4 for signing key cert)
+	// Add expiration (4 bytes), key_type (1 byte), certified_key (32 bytes), n_ext (1 byte), signature (64 bytes)
+	// Set expiration to future (hours since epoch)
+	futureHours := uint32((time.Now().Add(24 * time.Hour).Unix()) / 3600)
+	certData[2] = byte(futureHours >> 24)
+	certData[3] = byte(futureHours >> 16)
+	certData[4] = byte(futureHours >> 8)
+	certData[5] = byte(futureHours)
+	certData[6] = 1 // Key type = Ed25519
+	// Next 32 bytes are certified_key (signing key)
+	// Then n_extensions = 0
+	certData[39] = 0
+	// Then 64 bytes of signature
+
+	desc := &Descriptor{
+		Signature:                make([]byte, 64),
+		RawDescriptor:            []byte("hs-descriptor 3\nsignature ABC"),
+		DescriptorSigningKeyCert: certData,
+	}
+
+	err := VerifyDescriptorSignature(desc, addr)
+	if err == nil {
+		t.Error("Expected error for invalid certificate type")
+	}
+	if !strings.Contains(err.Error(), "invalid certificate type") {
+		t.Errorf("Expected 'invalid certificate type' error, got: %v", err)
+	}
+}
+
+// TestVerifyDescriptorSignatureCertificateExpired tests handling of expired certificate
+func TestVerifyDescriptorSignatureCertificateExpired(t *testing.T) {
+	addr := &Address{
+		Version: V3,
+		Pubkey:  make([]byte, 32),
+	}
+	// Create certificate with expired time
+	certData := make([]byte, 104)
+	certData[0] = 1 // Valid version
+	certData[1] = 4 // Valid type (signing key cert)
+	// Set expiration to past (hours since epoch - year 2000)
+	pastHours := uint32(1) // Very old
+	certData[2] = byte(pastHours >> 24)
+	certData[3] = byte(pastHours >> 16)
+	certData[4] = byte(pastHours >> 8)
+	certData[5] = byte(pastHours)
+	certData[6] = 1 // Key type = Ed25519
+	// Next 32 bytes are certified_key
+	// Then n_extensions = 0
+	certData[39] = 0
+	// Then 64 bytes of signature
+
+	desc := &Descriptor{
+		Signature:                make([]byte, 64),
+		RawDescriptor:            []byte("hs-descriptor 3\nsignature ABC"),
+		DescriptorSigningKeyCert: certData,
+	}
+
+	err := VerifyDescriptorSignature(desc, addr)
+	if err == nil {
+		t.Error("Expected error for expired certificate")
+	}
+	if !strings.Contains(err.Error(), "expired") {
+		t.Errorf("Expected 'expired' error, got: %v", err)
+	}
+}
+
+// TestVerifyDescriptorSignatureCertificateSignatureFailed tests certificate signature verification failure
+func TestVerifyDescriptorSignatureCertificateSignatureFailed(t *testing.T) {
+	// Generate a real identity key pair
+	identityPub, _, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate identity key: %v", err)
+	}
+
+	addr := &Address{
+		Version: V3,
+		Pubkey:  identityPub,
+	}
+
+	// Create certificate with wrong signature
+	certData := make([]byte, 104)
+	certData[0] = 1 // Valid version
+	certData[1] = 4 // Valid type
+	// Set expiration to future
+	futureHours := uint32((time.Now().Add(24 * time.Hour).Unix()) / 3600)
+	certData[2] = byte(futureHours >> 24)
+	certData[3] = byte(futureHours >> 16)
+	certData[4] = byte(futureHours >> 8)
+	certData[5] = byte(futureHours)
+	certData[6] = 1 // Key type = Ed25519
+	// Next 32 bytes are certified_key (random)
+	rand.Read(certData[7:39])
+	// n_extensions = 0
+	certData[39] = 0
+	// 64 bytes of wrong signature (random)
+	rand.Read(certData[40:104])
+
+	desc := &Descriptor{
+		Signature:                make([]byte, 64),
+		RawDescriptor:            []byte("hs-descriptor 3\nsignature ABC"),
+		DescriptorSigningKeyCert: certData,
+	}
+
+	err = VerifyDescriptorSignature(desc, addr)
+	if err == nil {
+		t.Error("Expected error for certificate signature verification failure")
+	}
+	if !strings.Contains(err.Error(), "certificate signature verification failed") {
+		t.Errorf("Expected 'certificate signature verification failed' error, got: %v", err)
+	}
+}
+
+// TestVerifyDescriptorSignatureDescriptorSignatureFailed tests descriptor signature verification failure
+func TestVerifyDescriptorSignatureDescriptorSignatureFailed(t *testing.T) {
+	// Generate identity key pair
+	identityPub, identityPriv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate identity key: %v", err)
+	}
+
+	// Generate signing key pair
+	signingPub, _, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate signing key: %v", err)
+	}
+
+	addr := &Address{
+		Version: V3,
+		Pubkey:  identityPub,
+	}
+
+	// Build a valid certificate signed by the identity key
+	certData := make([]byte, 104)
+	certData[0] = 1 // Version
+	certData[1] = 4 // Type
+	// Set expiration to future
+	futureHours := uint32((time.Now().Add(24 * time.Hour).Unix()) / 3600)
+	certData[2] = byte(futureHours >> 24)
+	certData[3] = byte(futureHours >> 16)
+	certData[4] = byte(futureHours >> 8)
+	certData[5] = byte(futureHours)
+	certData[6] = 1 // Key type = Ed25519
+	// Copy signing public key as certified_key
+	copy(certData[7:39], signingPub)
+	// n_extensions = 0
+	certData[39] = 0
+
+	// Sign the certificate data with identity key
+	signedPortion := certData[:40]
+	certSig := ed25519.Sign(identityPriv, signedPortion)
+	copy(certData[40:104], certSig)
+
+	// Create raw descriptor with signature line
+	rawDesc := []byte("hs-descriptor 3\ndescriptor-lifetime 180\nsignature ABC")
+
+	// Create descriptor with wrong signature
+	wrongSignature := make([]byte, 64)
+	rand.Read(wrongSignature)
+
+	desc := &Descriptor{
+		Signature:                wrongSignature,
+		RawDescriptor:            rawDesc,
+		DescriptorSigningKeyCert: certData,
+	}
+
+	err = VerifyDescriptorSignature(desc, addr)
+	if err == nil {
+		t.Error("Expected error for descriptor signature verification failure")
+	}
+	if !strings.Contains(err.Error(), "descriptor signature verification failed") {
+		t.Errorf("Expected 'descriptor signature verification failed' error, got: %v", err)
+	}
+}
+
+// TestVerifyDescriptorSignatureSuccess tests successful signature verification
+func TestVerifyDescriptorSignatureSuccess(t *testing.T) {
+	// Generate identity key pair
+	identityPub, identityPriv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate identity key: %v", err)
+	}
+
+	// Generate signing key pair
+	signingPub, signingPriv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate signing key: %v", err)
+	}
+
+	addr := &Address{
+		Version: V3,
+		Pubkey:  identityPub,
+	}
+
+	// Build a valid certificate signed by the identity key
+	certData := make([]byte, 104)
+	certData[0] = 1 // Version
+	certData[1] = 4 // Type
+	// Set expiration to future
+	futureHours := uint32((time.Now().Add(24 * time.Hour).Unix()) / 3600)
+	certData[2] = byte(futureHours >> 24)
+	certData[3] = byte(futureHours >> 16)
+	certData[4] = byte(futureHours >> 8)
+	certData[5] = byte(futureHours)
+	certData[6] = 1 // Key type = Ed25519
+	// Copy signing public key as certified_key
+	copy(certData[7:39], signingPub)
+	// n_extensions = 0
+	certData[39] = 0
+
+	// Sign the certificate data with identity key
+	signedPortion := certData[:40]
+	certSig := ed25519.Sign(identityPriv, signedPortion)
+	copy(certData[40:104], certSig)
+
+	// Create raw descriptor content before signature line
+	descriptorContent := "hs-descriptor 3\ndescriptor-lifetime 180\n"
+
+	// Sign the descriptor content with the signing key
+	descriptorSig := ed25519.Sign(signingPriv, []byte(descriptorContent))
+
+	// Create full raw descriptor with signature line
+	rawDesc := descriptorContent + "signature " + base64.StdEncoding.EncodeToString(descriptorSig)
+
+	desc := &Descriptor{
+		Signature:                descriptorSig,
+		RawDescriptor:            []byte(rawDesc),
+		DescriptorSigningKeyCert: certData,
+	}
+
+	err = VerifyDescriptorSignature(desc, addr)
+	if err != nil {
+		t.Errorf("Expected successful verification, got error: %v", err)
+	}
+}
+
+// TestVerifyDescriptorSignatureWithCertChain tests the wrapper function
+func TestVerifyDescriptorSignatureWithCertChain(t *testing.T) {
+	// Generate identity key pair
+	identityPub, identityPriv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate identity key: %v", err)
+	}
+
+	// Generate signing key pair
+	signingPub, signingPriv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate signing key: %v", err)
+	}
+
+	addr := &Address{
+		Version: V3,
+		Pubkey:  identityPub,
+	}
+
+	// Build a valid certificate
+	certData := make([]byte, 104)
+	certData[0] = 1 // Version
+	certData[1] = 4 // Type
+	futureHours := uint32((time.Now().Add(24 * time.Hour).Unix()) / 3600)
+	certData[2] = byte(futureHours >> 24)
+	certData[3] = byte(futureHours >> 16)
+	certData[4] = byte(futureHours >> 8)
+	certData[5] = byte(futureHours)
+	certData[6] = 1
+	copy(certData[7:39], signingPub)
+	certData[39] = 0
+	certSig := ed25519.Sign(identityPriv, certData[:40])
+	copy(certData[40:104], certSig)
+
+	descriptorContent := "hs-descriptor 3\n"
+	descriptorSig := ed25519.Sign(signingPriv, []byte(descriptorContent))
+	rawDesc := descriptorContent + "signature test"
+
+	desc := &Descriptor{
+		Signature:                descriptorSig,
+		RawDescriptor:            []byte(rawDesc),
+		DescriptorSigningKeyCert: certData,
+	}
+
+	err = VerifyDescriptorSignatureWithCertChain(desc, addr)
+	if err != nil {
+		t.Errorf("Expected successful verification, got error: %v", err)
+	}
+}
+
+// TestParseCertificateValid tests valid certificate parsing
+func TestParseCertificateValid(t *testing.T) {
+	// Generate signing key
+	signingPub, _, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate key: %v", err)
+	}
+
+	// Build a valid certificate
+	certData := make([]byte, 104)
+	certData[0] = 1 // Version
+	certData[1] = 4 // Type
+	futureHours := uint32((time.Now().Add(48 * time.Hour).Unix()) / 3600)
+	certData[2] = byte(futureHours >> 24)
+	certData[3] = byte(futureHours >> 16)
+	certData[4] = byte(futureHours >> 8)
+	certData[5] = byte(futureHours)
+	certData[6] = 1 // Key type = Ed25519
+	copy(certData[7:39], signingPub)
+	certData[39] = 0 // No extensions
+	// Random signature (for this test we just need parsing)
+	rand.Read(certData[40:104])
+
+	cert, err := parseCertificate(certData)
+	if err != nil {
+		t.Fatalf("Failed to parse certificate: %v", err)
+	}
+
+	if cert.Version != 1 {
+		t.Errorf("Expected version 1, got %d", cert.Version)
+	}
+	if cert.CertType != 4 {
+		t.Errorf("Expected cert type 4, got %d", cert.CertType)
+	}
+	if len(cert.SigningKey) != 32 {
+		t.Errorf("Expected signing key length 32, got %d", len(cert.SigningKey))
+	}
+	if !bytes.Equal(cert.SigningKey, signingPub) {
+		t.Error("Signing key mismatch")
+	}
+	if len(cert.Signature) != 64 {
+		t.Errorf("Expected signature length 64, got %d", len(cert.Signature))
+	}
+	if len(cert.SignedData) != 40 {
+		t.Errorf("Expected signed data length 40, got %d", len(cert.SignedData))
+	}
+}
+
+// TestParseCertificateWithExtensions tests certificate parsing with extensions
+func TestParseCertificateWithExtensions(t *testing.T) {
+	// Build a certificate with one extension
+	// Base: version(1) + type(1) + expiry(4) + key_type(1) + key(32) + n_ext(1) = 40 bytes
+	// Extension: length(2) + type(1) + flags(1) + data(4) = 8 bytes
+	// Signature: 64 bytes
+	// Total: 112 bytes
+	certData := make([]byte, 112)
+	certData[0] = 1 // Version
+	certData[1] = 4 // Type
+	futureHours := uint32((time.Now().Add(24 * time.Hour).Unix()) / 3600)
+	certData[2] = byte(futureHours >> 24)
+	certData[3] = byte(futureHours >> 16)
+	certData[4] = byte(futureHours >> 8)
+	certData[5] = byte(futureHours)
+	certData[6] = 1 // Key type = Ed25519
+	rand.Read(certData[7:39])
+	certData[39] = 1 // 1 extension
+	// Extension: length = 4 (data only)
+	certData[40] = 0
+	certData[41] = 4
+	// Extension type and flags
+	certData[42] = 1 // Type
+	certData[43] = 0 // Flags
+	// Extension data (4 bytes)
+	certData[44] = 0xDE
+	certData[45] = 0xAD
+	certData[46] = 0xBE
+	certData[47] = 0xEF
+	// Signature at offset 48
+	rand.Read(certData[48:112])
+
+	cert, err := parseCertificate(certData)
+	if err != nil {
+		t.Fatalf("Failed to parse certificate with extension: %v", err)
+	}
+
+	if cert.Version != 1 {
+		t.Errorf("Expected version 1, got %d", cert.Version)
+	}
+	// The signed data should be everything before the signature
+	if len(cert.SignedData) != 48 {
+		t.Errorf("Expected signed data length 48, got %d", len(cert.SignedData))
+	}
+}
+
+// TestParseCertificateInvalidKeyType tests handling of invalid key type
+func TestParseCertificateInvalidKeyType(t *testing.T) {
+	certData := make([]byte, 104)
+	certData[0] = 1 // Version
+	certData[1] = 4 // Type
+	futureHours := uint32((time.Now().Add(24 * time.Hour).Unix()) / 3600)
+	certData[2] = byte(futureHours >> 24)
+	certData[3] = byte(futureHours >> 16)
+	certData[4] = byte(futureHours >> 8)
+	certData[5] = byte(futureHours)
+	certData[6] = 2 // Invalid key type (not 1 for Ed25519)
+
+	_, err := parseCertificate(certData)
+	if err == nil {
+		t.Error("Expected error for invalid key type")
+	}
+	if !strings.Contains(err.Error(), "unsupported key type") {
+		t.Errorf("Expected 'unsupported key type' error, got: %v", err)
+	}
+}
+
+// TestParseCertificateTruncated tests handling of truncated certificates
+func TestParseCertificateTruncated(t *testing.T) {
+	tests := []struct {
+		name     string
+		dataLen  int
+		errMatch string
+	}{
+		{"too short for header", 5, "too short"},
+		{"too short for key_type", 6, "too short"},
+		{"too short for certified_key", 20, "too short"},
+		{"too short for n_extensions", 39, "too short"},
+		{"truncated at signature", 50, "truncated"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			certData := make([]byte, tt.dataLen)
+			certData[0] = 1 // Version
+			certData[1] = 4 // Type
+			// Set some expiry bytes if we have room
+			if tt.dataLen > 5 {
+				certData[2] = 0xFF
+				certData[3] = 0xFF
+				certData[4] = 0xFF
+				certData[5] = 0xFF
+			}
+			if tt.dataLen > 6 {
+				certData[6] = 1 // Key type
+			}
+			if tt.dataLen > 39 {
+				certData[39] = 0 // No extensions
+			}
+
+			_, err := parseCertificate(certData)
+			if err == nil {
+				t.Error("Expected error for truncated certificate")
+			}
+			if !strings.Contains(err.Error(), tt.errMatch) {
+				t.Errorf("Expected '%s' in error, got: %v", tt.errMatch, err)
+			}
+		})
+	}
+}
+
+// BenchmarkVerifyDescriptorSignature benchmarks signature verification
+func BenchmarkVerifyDescriptorSignature(b *testing.B) {
+	// Generate keys
+	identityPub, identityPriv, _ := ed25519.GenerateKey(rand.Reader)
+	signingPub, signingPriv, _ := ed25519.GenerateKey(rand.Reader)
+
+	addr := &Address{
+		Version: V3,
+		Pubkey:  identityPub,
+	}
+
+	// Build certificate
+	certData := make([]byte, 104)
+	certData[0] = 1
+	certData[1] = 4
+	futureHours := uint32((time.Now().Add(24 * time.Hour).Unix()) / 3600)
+	certData[2] = byte(futureHours >> 24)
+	certData[3] = byte(futureHours >> 16)
+	certData[4] = byte(futureHours >> 8)
+	certData[5] = byte(futureHours)
+	certData[6] = 1
+	copy(certData[7:39], signingPub)
+	certData[39] = 0
+	certSig := ed25519.Sign(identityPriv, certData[:40])
+	copy(certData[40:104], certSig)
+
+	descriptorContent := "hs-descriptor 3\ndescriptor-lifetime 180\n"
+	descriptorSig := ed25519.Sign(signingPriv, []byte(descriptorContent))
+	rawDesc := descriptorContent + "signature test"
+
+	desc := &Descriptor{
+		Signature:                descriptorSig,
+		RawDescriptor:            []byte(rawDesc),
+		DescriptorSigningKeyCert: certData,
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		VerifyDescriptorSignature(desc, addr)
+	}
+}
+
+// BenchmarkParseCertificate benchmarks certificate parsing
+func BenchmarkParseCertificate(b *testing.B) {
+	signingPub, _, _ := ed25519.GenerateKey(rand.Reader)
+
+	certData := make([]byte, 104)
+	certData[0] = 1
+	certData[1] = 4
+	futureHours := uint32((time.Now().Add(24 * time.Hour).Unix()) / 3600)
+	certData[2] = byte(futureHours >> 24)
+	certData[3] = byte(futureHours >> 16)
+	certData[4] = byte(futureHours >> 8)
+	certData[5] = byte(futureHours)
+	certData[6] = 1
+	copy(certData[7:39], signingPub)
+	certData[39] = 0
+	rand.Read(certData[40:104])
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		parseCertificate(certData)
+	}
+}
