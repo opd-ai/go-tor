@@ -320,7 +320,7 @@ func TestTotalReplayAttempts(t *testing.T) {
 	rp.ValidateAndTrack(ReplayBackward, 0, []byte("back cell 0"))
 
 	// Replay attempts
-	rp.ValidateAndTrack(ReplayForward, 0, []byte("cell 0"))   // Replay
+	rp.ValidateAndTrack(ReplayForward, 0, []byte("cell 0"))       // Replay
 	rp.ValidateAndTrack(ReplayBackward, 0, []byte("back cell 0")) // Replay
 
 	total := rp.TotalReplayAttempts()
