@@ -2,8 +2,11 @@ package circuit
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
+
+	"github.com/opd-ai/go-tor/pkg/cell"
 )
 
 func TestStateString(t *testing.T) {
@@ -608,6 +611,166 @@ func TestDigestConcurrency(t *testing.T) {
 
 	// Wait for all goroutines
 	for i := 0; i < 10; i++ {
+		<-done
+	}
+}
+
+// SECURITY-001: Tests for circuit-level replay protection
+
+func TestCircuitReplayProtectionInitialization(t *testing.T) {
+	c := NewCircuit(1)
+
+	// Replay protection should be initialized
+	if c.replayProtection == nil {
+		t.Error("Replay protection not initialized")
+	}
+
+	// Stats should be zeroed
+	stats := c.GetReplayStats()
+	if stats.ForwardSequence != 0 {
+		t.Errorf("Initial forward sequence = %d, want 0", stats.ForwardSequence)
+	}
+	if stats.BackwardSequence != 0 {
+		t.Errorf("Initial backward sequence = %d, want 0", stats.BackwardSequence)
+	}
+}
+
+func TestCircuitGetReplayAttempts(t *testing.T) {
+	c := NewCircuit(1)
+
+	// Initially should be 0
+	attempts := c.GetReplayAttempts()
+	if attempts != 0 {
+		t.Errorf("Initial replay attempts = %d, want 0", attempts)
+	}
+}
+
+func TestCircuitValidateCellForReplay_Normal(t *testing.T) {
+	c := NewCircuit(1)
+
+	// Normal cells should pass
+	for i := 0; i < 10; i++ {
+		cellData := []byte(fmt.Sprintf("test cell %d", i))
+		err := c.ValidateCellForReplay(cell.ReplayForward, cellData)
+		if err != nil {
+			t.Errorf("ValidateCellForReplay(%d) error = %v", i, err)
+		}
+	}
+
+	stats := c.GetReplayStats()
+	if stats.ForwardSequence != 10 {
+		t.Errorf("Forward sequence = %d, want 10", stats.ForwardSequence)
+	}
+}
+
+func TestCircuitValidateCellForReplay_DuplicateDetection(t *testing.T) {
+	c := NewCircuit(1)
+
+	cellData := []byte("unique cell data")
+
+	// First cell should pass
+	err := c.ValidateCellForReplay(cell.ReplayForward, cellData)
+	if err != nil {
+		t.Fatalf("First ValidateCellForReplay error = %v", err)
+	}
+
+	// Same cell content should fail (replay attempt)
+	err = c.ValidateCellForReplay(cell.ReplayForward, cellData)
+	if err == nil {
+		t.Error("Expected error for duplicate cell, got nil")
+	}
+
+	attempts := c.GetReplayAttempts()
+	if attempts != 1 {
+		t.Errorf("Replay attempts = %d, want 1", attempts)
+	}
+}
+
+func TestCircuitValidateCellForReplay_BothDirections(t *testing.T) {
+	c := NewCircuit(1)
+
+	// Forward direction
+	for i := 0; i < 5; i++ {
+		cellData := []byte(fmt.Sprintf("forward cell %d", i))
+		err := c.ValidateCellForReplay(cell.ReplayForward, cellData)
+		if err != nil {
+			t.Errorf("Forward ValidateCellForReplay(%d) error = %v", i, err)
+		}
+	}
+
+	// Backward direction
+	for i := 0; i < 3; i++ {
+		cellData := []byte(fmt.Sprintf("backward cell %d", i))
+		err := c.ValidateCellForReplay(cell.ReplayBackward, cellData)
+		if err != nil {
+			t.Errorf("Backward ValidateCellForReplay(%d) error = %v", i, err)
+		}
+	}
+
+	stats := c.GetReplayStats()
+	if stats.ForwardSequence != 5 {
+		t.Errorf("Forward sequence = %d, want 5", stats.ForwardSequence)
+	}
+	if stats.BackwardSequence != 3 {
+		t.Errorf("Backward sequence = %d, want 3", stats.BackwardSequence)
+	}
+}
+
+func TestCircuitResetReplayProtection(t *testing.T) {
+	c := NewCircuit(1)
+
+	// Add some cells
+	for i := 0; i < 10; i++ {
+		c.ValidateCellForReplay(cell.ReplayForward, []byte(fmt.Sprintf("cell %d", i)))
+	}
+
+	// Reset
+	c.ResetReplayProtection()
+
+	stats := c.GetReplayStats()
+	if stats.ForwardSequence != 0 {
+		t.Errorf("After reset ForwardSequence = %d, want 0", stats.ForwardSequence)
+	}
+	if stats.ForwardWindowSize != 0 {
+		t.Errorf("After reset ForwardWindowSize = %d, want 0", stats.ForwardWindowSize)
+	}
+}
+
+func TestCircuitReplayProtectionConcurrency(t *testing.T) {
+	c := NewCircuit(1)
+	c.SetState(StateOpen)
+
+	done := make(chan bool, 20)
+
+	// Multiple goroutines validating cells concurrently
+	for g := 0; g < 10; g++ {
+		go func(gid int) {
+			for i := 0; i < 50; i++ {
+				cellData := []byte(fmt.Sprintf("goroutine %d cell %d", gid, i))
+				direction := cell.ReplayForward
+				if gid%2 == 0 {
+					direction = cell.ReplayBackward
+				}
+				// We don't care about errors here, just checking for races
+				c.ValidateCellForReplay(direction, cellData)
+			}
+			done <- true
+		}(g)
+	}
+
+	// Also test concurrent stats reading
+	for g := 0; g < 10; g++ {
+		go func() {
+			for i := 0; i < 50; i++ {
+				_ = c.GetReplayStats()
+				_ = c.GetReplayAttempts()
+			}
+			done <- true
+		}()
+	}
+
+	// Wait for all goroutines
+	for i := 0; i < 20; i++ {
 		<-done
 	}
 }

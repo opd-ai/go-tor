@@ -48,6 +48,12 @@ type Metrics struct {
 	IsolationHits    *Counter // Circuit reused from isolated pool
 	IsolationMisses  *Counter // New circuit built for isolation
 
+	// Replay protection metrics (SECURITY-001)
+	ReplayAttemptsDetected *Counter // Total replay attempts detected
+	ReplayForwardAttempts  *Counter // Replay attempts in forward direction
+	ReplayBackwardAttempts *Counter // Replay attempts in backward direction
+	OutOfOrderCells        *Counter // Cells received out of order (not replays)
+
 	// System metrics
 	Uptime      *Gauge
 	startTime   time.Time
@@ -95,6 +101,12 @@ func New() *Metrics {
 		IsolationHits:    NewCounter(),
 		IsolationMisses:  NewCounter(),
 
+		// Replay protection metrics (SECURITY-001)
+		ReplayAttemptsDetected: NewCounter(),
+		ReplayForwardAttempts:  NewCounter(),
+		ReplayBackwardAttempts: NewCounter(),
+		OutOfOrderCells:        NewCounter(),
+
 		// System metrics
 		Uptime:    NewGauge(),
 		startTime: now,
@@ -126,6 +138,22 @@ func (m *Metrics) RecordConnection(success bool, retries int64) {
 // RecordTLSHandshake records TLS handshake duration
 func (m *Metrics) RecordTLSHandshake(duration time.Duration) {
 	m.TLSHandshakeTime.Observe(duration)
+}
+
+// RecordReplayAttempt records a detected replay attempt
+// isForward: true for client→exit direction, false for exit→client
+func (m *Metrics) RecordReplayAttempt(isForward bool) {
+	m.ReplayAttemptsDetected.Inc()
+	if isForward {
+		m.ReplayForwardAttempts.Inc()
+	} else {
+		m.ReplayBackwardAttempts.Inc()
+	}
+}
+
+// RecordOutOfOrderCell records a cell received out of order
+func (m *Metrics) RecordOutOfOrderCell() {
+	m.OutOfOrderCells.Inc()
 }
 
 // UpdateUptime updates the uptime metric
@@ -178,6 +206,12 @@ func (m *Metrics) Snapshot() *Snapshot {
 		IsolationHits:    m.IsolationHits.Value(),
 		IsolationMisses:  m.IsolationMisses.Value(),
 
+		// Replay protection metrics (SECURITY-001)
+		ReplayAttemptsDetected: m.ReplayAttemptsDetected.Value(),
+		ReplayForwardAttempts:  m.ReplayForwardAttempts.Value(),
+		ReplayBackwardAttempts: m.ReplayBackwardAttempts.Value(),
+		OutOfOrderCells:        m.OutOfOrderCells.Value(),
+
 		// System metrics
 		UptimeSeconds: m.Uptime.Value(),
 	}
@@ -223,6 +257,12 @@ type Snapshot struct {
 	IsolationKeys    int64
 	IsolationHits    int64
 	IsolationMisses  int64
+
+	// Replay protection metrics (SECURITY-001)
+	ReplayAttemptsDetected int64 // Total replay attempts detected
+	ReplayForwardAttempts  int64 // Replay attempts in forward direction
+	ReplayBackwardAttempts int64 // Replay attempts in backward direction
+	OutOfOrderCells        int64 // Cells received out of order
 
 	// System metrics
 	UptimeSeconds int64

@@ -71,6 +71,8 @@ type Circuit struct {
 	deliverWindow  int // Circuit-level deliver window (cells we can receive)
 	sendmeReceived int // Count of DATA cells received (for sending SENDME)
 	sendmeSent     int // Count of SENDME cells sent
+	// SECURITY-001: Replay protection per tor-spec.txt
+	replayProtection *cell.ReplayProtection // Replay protection for cells
 }
 
 // Hop represents a single hop in a circuit (one relay)
@@ -129,6 +131,7 @@ func NewCircuit(id uint32) *Circuit {
 		deliverWindow:    1000,                           // tor-spec.txt §7.4: Initial circuit window is 1000
 		sendmeReceived:   0,                              // No DATA cells received yet
 		sendmeSent:       0,                              // No SENDME cells sent yet
+		replayProtection: cell.NewReplayProtection(),     // SECURITY-001: Initialize replay protection
 	}
 }
 
@@ -843,6 +846,19 @@ func (c *Circuit) DeliverRelayCell(cellData *cell.Cell) error {
 	// Each hop decrypts one layer
 	decryptedPayload := c.decryptBackward(cellData.Payload)
 
+	// SECURITY-001: Validate against replay attacks before processing
+	// We check the decrypted payload to ensure the same cell content isn't replayed
+	if c.replayProtection != nil {
+		// Get next sequence for backward direction
+		c.mu.Lock()
+		seqNum := c.replayProtection.GetNextSequence(cell.ReplayBackward)
+		err := c.replayProtection.ValidateAndTrack(cell.ReplayBackward, seqNum, decryptedPayload)
+		c.mu.Unlock()
+		if err != nil {
+			return fmt.Errorf("replay protection: %w", err)
+		}
+	}
+
 	// Verify which hop recognizes this cell
 	hopIdx, err := c.verifyRelayCellDigest(decryptedPayload)
 	if err != nil {
@@ -990,4 +1006,59 @@ func (c *Circuit) WriteToStream(streamID uint16, data []byte) error {
 func (c *Circuit) EndStream(streamID uint16, reason byte) error {
 	endCell := cell.NewRelayCell(streamID, cell.RelayEnd, []byte{reason})
 	return c.SendRelayCell(endCell)
+}
+
+// SECURITY-001: Replay protection methods
+
+// GetReplayStats returns replay protection statistics for this circuit.
+// This is useful for monitoring and debugging replay detection.
+func (c *Circuit) GetReplayStats() cell.Stats {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if c.replayProtection == nil {
+		return cell.Stats{}
+	}
+	return c.replayProtection.Stats()
+}
+
+// GetReplayAttempts returns the total number of detected replay attempts.
+func (c *Circuit) GetReplayAttempts() uint64 {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if c.replayProtection == nil {
+		return 0
+	}
+	return c.replayProtection.TotalReplayAttempts()
+}
+
+// ValidateCellForReplay validates a cell against replay attacks.
+// This is called during cell processing to detect replayed cells.
+// direction: cell.ReplayForward for outgoing, cell.ReplayBackward for incoming
+func (c *Circuit) ValidateCellForReplay(direction cell.ReplayDirection, cellData []byte) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.replayProtection == nil {
+		return nil // Replay protection not initialized (shouldn't happen)
+	}
+
+	// Get the next sequence number for this direction
+	seqNum := c.replayProtection.GetNextSequence(direction)
+
+	// Validate and track the cell
+	return c.replayProtection.ValidateAndTrack(direction, seqNum, cellData)
+}
+
+// ResetReplayProtection resets the replay protection state.
+// This should be called when the circuit is torn down or when
+// a new circuit is established on the same Circuit object.
+func (c *Circuit) ResetReplayProtection() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.replayProtection != nil {
+		c.replayProtection.Reset()
+	}
 }
