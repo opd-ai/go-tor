@@ -5,9 +5,9 @@ import (
 	"crypto/rand"
 	"testing"
 
+	"crypto/sha256"
 	"golang.org/x/crypto/curve25519"
 	"golang.org/x/crypto/hkdf"
-	"crypto/sha256"
 	"io"
 )
 
@@ -77,7 +77,7 @@ func TestNtorHandshakeEndToEnd(t *testing.T) {
 	var sharedXB [32]byte
 	var clientPubKey [32]byte
 	copy(clientPubKey[:], clientPublic)
-	
+
 	curve25519.ScalarMult(&sharedXY, &serverEphemeralPrivate, &clientPubKey)
 	curve25519.ScalarMult(&sharedXB, &serverNtorPrivate, &clientPubKey)
 
@@ -209,7 +209,7 @@ func TestNtorHandshakeWithMatchingKeys(t *testing.T) {
 
 	// Extract keys per tor-spec.txt section 5.2
 	// Df (20 bytes) - forward digest key
-	// Db (20 bytes) - backward digest key  
+	// Db (20 bytes) - backward digest key
 	// Kf (16 bytes) - forward cipher key
 	// Kb (16 bytes) - backward cipher key
 	Df := clientKeyMaterial[0:20]
@@ -280,9 +280,9 @@ func TestNtorInvalidResponseLength(t *testing.T) {
 	clientPrivate := make([]byte, 32)
 
 	testCases := []struct {
-		name     string
-		respLen  int
-		wantErr  bool
+		name    string
+		respLen int
+		wantErr bool
 	}{
 		{"Empty response", 0, true},
 		{"Too short", 32, true},
@@ -295,7 +295,7 @@ func TestNtorInvalidResponseLength(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			response := make([]byte, tc.respLen)
 			_, err := NtorProcessResponse(response, clientPrivate, serverNtorKey, serverIdentity)
-			
+
 			if tc.wantErr && err == nil {
 				t.Errorf("Expected error for response length %d", tc.respLen)
 			}
@@ -431,7 +431,7 @@ func BenchmarkNtorProcessResponse(b *testing.B) {
 	serverNtorKey := make([]byte, 32)
 	clientPrivate := make([]byte, 32)
 	response := make([]byte, 64)
-	
+
 	if _, err := rand.Read(serverIdentity); err != nil {
 		b.Fatal(err)
 	}
