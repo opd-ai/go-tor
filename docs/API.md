@@ -1,26 +1,18 @@
 # go-tor API Reference
-
 ## ⚠️ CRITICAL WARNING
-
 **THIS IS UNOFFICIAL, EXPERIMENTAL SOFTWARE** developed without the supervision or endorsement of [The Tor Project](https://www.torproject.org/).
-
 **DO NOT USE THIS API FOR:**
 - Real anonymity or privacy needs
 - Personal safety or security
 - Production applications
 - Any situation where privacy matters
-
 **For actual Tor integration in your applications:**
 - **Users**: Use [Tor Browser](https://www.torproject.org/download/)
 - **Developers**: Use [Arti](https://gitlab.torproject.org/tpo/core/arti) - the official Tor implementation in Rust with a proper API
 - **All developers**: See [official Tor documentation](https://www.torproject.org/download/) for proper integration methods
-
 This API documentation is **for educational and research purposes only**. Code written using this API should never be deployed in situations where anonymity or security is required.
-
 ---
-
 ## Table of Contents
-
 - [Client API](#client-api)
 - [Circuit Management](#circuit-management)
 - [SOCKS5 Proxy](#socks5-proxy)
@@ -29,20 +21,15 @@ This API documentation is **for educational and research purposes only**. Code w
 - [Metrics & Observability](#metrics--observability)
 - [Error Handling](#error-handling)
 - [Resource Pooling](#resource-pooling)
-
 ---
-
 ## Client API
-
 The client package provides the high-level orchestration for the Tor client.
-
 ### Creating a Client
-
 ```go
 import (
     "log/slog"
     "os"
-    
+
     "github.com/opd-ai/go-tor/pkg/client"
     "github.com/opd-ai/go-tor/pkg/config"
     "github.com/opd-ai/go-tor/pkg/logger"
@@ -65,9 +52,7 @@ if err != nil {
     log.Fatal("Failed to create client", "error", err)
 }
 ```
-
 ### Starting and Stopping
-
 ```go
 // Start the client
 ctx := context.Background()
@@ -85,9 +70,7 @@ if err := torClient.Stop(); err != nil {
     log.Warn("Error during shutdown", "error", err)
 }
 ```
-
 ### Client Statistics
-
 ```go
 type Stats struct {
     ActiveCircuits int
@@ -98,15 +81,10 @@ type Stats struct {
 
 stats := torClient.GetStats()
 ```
-
 ---
-
 ## Circuit Management
-
 The circuit package handles circuit creation, extension, and lifecycle management.
-
 ### Circuit States
-
 ```go
 const (
     StateBuilding   State = iota  // Circuit is being built
@@ -115,9 +93,7 @@ const (
     StateFailed                    // Circuit build failed
 )
 ```
-
 ### Creating Circuits
-
 ```go
 import "github.com/opd-ai/go-tor/pkg/circuit"
 
@@ -127,9 +103,7 @@ manager := circuit.NewManager()
 // Circuit building happens automatically through the client
 // or via the circuit pool for better performance
 ```
-
 ### Circuit Information
-
 ```go
 type Circuit struct {
     ID        uint32
@@ -143,15 +117,10 @@ state := circuit.GetState()
 // Set circuit state (internal use)
 circuit.SetState(circuit.StateOpen)
 ```
-
 ---
-
 ## SOCKS5 Proxy
-
 The socks package implements a RFC 1928 compliant SOCKS5 proxy server with .onion support.
-
 ### Creating a SOCKS Server
-
 ```go
 import "github.com/opd-ai/go-tor/pkg/socks"
 
@@ -170,11 +139,7 @@ if err := socksServer.Stop(); err != nil {
     log.Warn("Error stopping SOCKS server", "error", err)
 }
 ```
-
 ### SOCKS5 Usage
-
-Configure your application to use the SOCKS5 proxy:
-
 ```bash
 # Using curl
 curl --socks5 127.0.0.1:9050 https://check.torproject.org
@@ -183,24 +148,16 @@ curl --socks5 127.0.0.1:9050 https://check.torproject.org
 # Settings → Network Settings → Manual proxy configuration
 # SOCKS Host: 127.0.0.1  Port: 9050  SOCKS v5
 ```
-
 ### Onion Services
-
 The SOCKS5 server automatically handles .onion addresses:
-
 ```go
 // Connect to onion service (v3)
 // http://example.onion will be automatically routed through Tor
 ```
-
 ---
-
 ## Configuration
-
 The config package manages application configuration with torrc compatibility.
-
 ### Default Configuration
-
 ```go
 import "github.com/opd-ai/go-tor/pkg/config"
 
@@ -211,9 +168,7 @@ cfg := config.DefaultConfig()
 // - DataDirectory: /var/lib/tor
 // - LogLevel: info
 ```
-
 ### Loading from File
-
 ```go
 // Create base config
 cfg := config.DefaultConfig()
@@ -226,43 +181,34 @@ if err := config.LoadFromFile("/etc/tor/torrc", cfg); err != nil {
 // Command-line flags override file settings
 cfg.SocksPort = 9150  // Override
 ```
-
 ### Configuration Options
-
 ```go
 type Config struct {
     SocksPort         int
     ControlPort       int
     DataDirectory     string
     LogLevel          string
-    
+
     // Circuit options
     MaxCircuitDirtiness time.Duration
     CircuitBuildTimeout time.Duration
-    
+
     // Performance tuning
     PrebuiltCircuits    int
     MaxIdleCircuits     int
     ConnectionPoolSize  int
 }
 ```
-
 ### Validation
-
 ```go
 if err := cfg.Validate(); err != nil {
     log.Fatal("Invalid configuration", "error", err)
 }
 ```
-
 ---
-
 ## Control Protocol
-
 The control package implements a subset of the Tor control protocol for monitoring and management.
-
 ### Creating a Control Server
-
 ```go
 import "github.com/opd-ai/go-tor/pkg/control"
 
@@ -276,16 +222,11 @@ if err := server.Start(ctx); err != nil {
     log.Fatal("Failed to start control server", "error", err)
 }
 ```
-
 ### Control Commands
-
-Supported commands:
 - `GETINFO` - Get information about the Tor client
 - `SETEVENTS` - Subscribe to events
 - `SIGNAL` - Send signals (SHUTDOWN, RELOAD, etc.)
-
 ### Event Types
-
 ```go
 const (
     EventCirc    EventType = "CIRC"     // Circuit status changes
@@ -297,9 +238,7 @@ const (
     EventNS      EventType = "NS"       // Network status changes
 )
 ```
-
 ### Connecting to Control Port
-
 ```bash
 # Using telnet
 telnet 127.0.0.1 9051
@@ -309,23 +248,16 @@ GETINFO version
 SETEVENTS CIRC STREAM BW
 SIGNAL SHUTDOWN
 ```
-
 ---
-
 ## Metrics & Observability
-
 The metrics package provides comprehensive metrics collection and reporting.
-
 ### Creating Metrics
-
 ```go
 import "github.com/opd-ai/go-tor/pkg/metrics"
 
 m := metrics.New()
 ```
-
 ### Recording Metrics
-
 ```go
 // Record circuit build
 m.RecordCircuitBuild(duration, success)
@@ -336,9 +268,7 @@ m.RecordStream(opened, closed)
 // Record bandwidth usage
 m.RecordBandwidth(bytesRead, bytesWritten)
 ```
-
 ### Getting Metrics Snapshot
-
 ```go
 snapshot := m.Snapshot()
 
@@ -348,9 +278,7 @@ fmt.Printf("Failed circuits: %d\n", snapshot.FailedCircuits)
 fmt.Printf("Avg build time: %v\n", snapshot.AvgCircuitBuildTime)
 fmt.Printf("Total bandwidth: %d bytes\n", snapshot.TotalBytesRead + snapshot.TotalBytesWritten)
 ```
-
 ### Health Checks
-
 ```go
 import "github.com/opd-ai/go-tor/pkg/health"
 
@@ -369,15 +297,10 @@ if status.Healthy {
     fmt.Printf("Health issues: %v\n", status.Failures)
 }
 ```
-
 ---
-
 ## Error Handling
-
 The errors package provides structured error types with categories and severity levels.
-
 ### Error Types
-
 ```go
 import "github.com/opd-ai/go-tor/pkg/errors"
 
@@ -399,9 +322,7 @@ const (
     SeverityCritical Severity = "critical"
 )
 ```
-
 ### Creating Errors
-
 ```go
 // Create a new error
 err := errors.New(
@@ -419,9 +340,7 @@ err = errors.Wrap(
     "circuit build failed",
 )
 ```
-
 ### Error Handling Pattern
-
 ```go
 if err != nil {
     if torErr, ok := err.(*errors.TorError); ok {
@@ -430,7 +349,7 @@ if err != nil {
             "severity", torErr.Severity,
             "message", torErr.Message,
         )
-        
+
         if torErr.Severity == errors.SeverityCritical {
             // Take immediate action
             panic(torErr)
@@ -439,15 +358,10 @@ if err != nil {
     return err
 }
 ```
-
 ---
-
 ## Resource Pooling
-
 The pool package provides resource pooling for performance optimization.
-
 ### Buffer Pools
-
 ```go
 import "github.com/opd-ai/go-tor/pkg/pool"
 
@@ -466,9 +380,7 @@ customPool := pool.NewBufferPool(2048)
 buf := customPool.Get()
 defer customPool.Put(buf)
 ```
-
 ### Circuit Pool
-
 ```go
 // Create circuit pool with prebuilding
 cfg := &pool.CircuitPoolConfig{
@@ -500,9 +412,7 @@ stats := pool.Stats()
 fmt.Printf("Total circuits: %d\n", stats.Total)
 fmt.Printf("Open circuits: %d\n", stats.Open)
 ```
-
 ### Connection Pool
-
 ```go
 // Create connection pool
 poolCfg := pool.DefaultConnectionPoolConfig()
@@ -524,18 +434,13 @@ connPool.CleanupExpired()
 
 // Get stats
 stats := connPool.Stats()
-fmt.Printf("Total: %d, In Use: %d, Idle: %d\n", 
+fmt.Printf("Total: %d, In Use: %d, Idle: %d\n",
     stats.Total, stats.InUse, stats.Idle)
 ```
-
 ---
-
 ## Logger API
-
 The logger package provides structured logging with log/slog.
-
 ### Creating a Logger
-
 ```go
 import "github.com/opd-ai/go-tor/pkg/logger"
 
@@ -545,9 +450,7 @@ log := logger.New(logger.LevelInfo, os.Stdout)
 // Create component-specific logger
 clientLog := log.Component("client")
 ```
-
 ### Log Levels
-
 ```go
 const (
     LevelDebug Level = iota
@@ -556,12 +459,10 @@ const (
     LevelError
 )
 ```
-
 ### Logging
-
 ```go
 // Structured logging
-log.Info("Circuit opened", 
+log.Info("Circuit opened",
     "circuit_id", 123,
     "path_length", 3,
     "build_time_ms", 2500,
@@ -576,13 +477,9 @@ log.Error("Connection failed",
 ctx = logger.WithContext(ctx, log)
 logFromCtx := logger.FromContext(ctx)
 ```
-
 ---
-
 ## Examples
-
 ### Complete Example: Basic Tor Client
-
 ```go
 package main
 
@@ -603,32 +500,32 @@ func main() {
     cfg := config.DefaultConfig()
     cfg.SocksPort = 9050
     cfg.ControlPort = 9051
-    
+
     // Create logger
     log := logger.New(logger.LevelInfo, os.Stdout)
-    
+
     // Create and start client
     torClient, err := client.New(cfg, log)
     if err != nil {
         log.Error("Failed to create client", "error", err)
         os.Exit(1)
     }
-    
+
     ctx := context.Background()
     if err := torClient.Start(ctx); err != nil {
         log.Error("Failed to start client", "error", err)
         os.Exit(1)
     }
-    
+
     // Display status
     stats := torClient.GetStats()
     fmt.Printf("Tor client running on port %d\n", stats.SocksPort)
-    
+
     // Wait for interrupt signal
     sigChan := make(chan os.Signal, 1)
     signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
     <-sigChan
-    
+
     // Graceful shutdown
     fmt.Println("Shutting down...")
     if err := torClient.Stop(); err != nil {
@@ -636,9 +533,7 @@ func main() {
     }
 }
 ```
-
 ### Example: Using SOCKS5 Proxy
-
 ```go
 package main
 
@@ -656,9 +551,9 @@ func main() {
     transport := &http.Transport{
         Proxy: http.ProxyURL(proxyURL),
     }
-    
+
     client := &http.Client{Transport: transport}
-    
+
     // Make request through Tor
     resp, err := client.Get("https://check.torproject.org")
     if err != nil {
@@ -666,30 +561,21 @@ func main() {
         os.Exit(1)
     }
     defer resp.Body.Close()
-    
+
     body, _ := io.ReadAll(resp.Body)
     fmt.Println(string(body))
 }
 ```
-
 ---
-
 ## Best Practices
-
 ### 1. Resource Management
-
 Always close resources properly:
-
 ```go
 defer torClient.Stop()
 defer pool.Close()
 defer server.Stop()
 ```
-
 ### 2. Error Handling
-
-Use structured errors for better diagnostics:
-
 ```go
 if err != nil {
     if torErr, ok := err.(*errors.TorError); ok {
@@ -702,21 +588,13 @@ if err != nil {
     return err
 }
 ```
-
 ### 3. Performance Optimization
-
-Enable circuit prebuilding for better performance:
-
 ```go
 cfg := config.DefaultConfig()
 cfg.PrebuiltCircuits = 3
 cfg.MaxIdleCircuits = 10
 ```
-
 ### 4. Monitoring
-
-Use metrics and health checks:
-
 ```go
 // Periodic health check
 ticker := time.NewTicker(30 * time.Second)
@@ -727,11 +605,7 @@ for range ticker.C {
     }
 }
 ```
-
 ### 5. Graceful Shutdown
-
-Implement proper shutdown handling:
-
 ```go
 ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 defer cancel()
@@ -747,11 +621,8 @@ default:
     log.Info("Shutdown complete")
 }
 ```
-
 ---
-
 ## Support
-
 - GitHub Issues: [github.com/opd-ai/go-tor/issues](https://github.com/opd-ai/go-tor/issues)
 - Documentation: [github.com/opd-ai/go-tor/docs](https://github.com/opd-ai/go-tor/tree/main/docs)
 - Tor Specifications: [spec.torproject.org](https://spec.torproject.org/)
