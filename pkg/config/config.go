@@ -59,13 +59,13 @@ type Config struct {
 	IsolateClientProtocol bool   // Isolate circuits by protocol (default: false)
 
 	// Circuit padding for traffic analysis resistance (Phase 2.1)
-	EnableCircuitPadding  bool          // Enable circuit padding (default: true)
-	PaddingStrategy       string        // Padding strategy: "none", "fixed", "random", "adaptive" (default: "random")
-	PaddingMinInterval    time.Duration // Minimum interval between padding cells (default: 3s)
-	PaddingMaxInterval    time.Duration // Maximum interval between padding cells (default: 10s)
-	PaddingIdleTimeout    time.Duration // Time circuit must be idle before padding (default: 1s)
-	PaddingDummyTraffic   bool          // Use dummy RELAY_DATA instead of PADDING cells (default: false)
-	PaddingBurstSize      int           // Number of padding cells per burst (default: 1)
+	EnableCircuitPadding bool          // Enable circuit padding (default: true)
+	PaddingStrategy      string        // Padding strategy: "none", "fixed", "random", "adaptive" (default: "random")
+	PaddingMinInterval   time.Duration // Minimum interval between padding cells (default: 3s)
+	PaddingMaxInterval   time.Duration // Maximum interval between padding cells (default: 10s)
+	PaddingIdleTimeout   time.Duration // Time circuit must be idle before padding (default: 1s)
+	PaddingDummyTraffic  bool          // Use dummy RELAY_DATA instead of PADDING cells (default: false)
+	PaddingBurstSize     int           // Number of padding cells per burst (default: 1)
 }
 
 // OnionServiceConfig represents configuration for a single onion service

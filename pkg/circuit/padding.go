@@ -9,12 +9,19 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/opd-ai/go-tor/pkg/cell"
 )
+
+// CellSender is implemented by types that can send Tor cells.
+// This interface is used by PaddingMachine to send padding cells.
+type CellSender interface {
+	SendCell(*cell.Cell) error
+}
 
 // PaddingStrategy defines the padding behavior for a circuit.
 type PaddingStrategy int
@@ -280,7 +287,17 @@ func (pm *PaddingMachine) calculateNextDelay() time.Duration {
 		if pm.trafficBursts > 0 {
 			// Recent real traffic - reduce padding
 			pm.trafficBursts--
-			return pm.randomDuration(config.MaxInterval, config.MaxInterval*2)
+			// Cap maximum delay at 5 minutes to prevent effectively disabling padding
+			maxCap := 5 * time.Minute
+			minDelay := config.MaxInterval
+			maxDelay := config.MaxInterval * 2
+			if maxDelay > maxCap {
+				maxDelay = maxCap
+			}
+			if minDelay > maxCap {
+				minDelay = maxCap
+			}
+			return pm.randomDuration(minDelay, maxDelay)
 		}
 		// Quiet period - more aggressive padding
 		return pm.randomDuration(config.MinInterval, config.MinInterval*2)
@@ -376,11 +393,8 @@ func (pm *PaddingMachine) sendPaddingCell() error {
 		return errors.New("circuit has no connection")
 	}
 
-	// Type assert to cell sender interface
-	type cellSender interface {
-		SendCell(*cell.Cell) error
-	}
-	sender, ok := conn.(cellSender)
+	// Type assert to CellSender interface (defined at package level)
+	sender, ok := conn.(CellSender)
 	if !ok {
 		return errors.New("connection does not support SendCell")
 	}
@@ -396,6 +410,13 @@ func (pm *PaddingMachine) sendPaddingCell() error {
 
 // sendDummyData sends a dummy RELAY_DATA cell on the circuit.
 // This is harder to distinguish from real traffic than PADDING cells.
+//
+// WARNING: This uses stream ID 0 which is typically reserved for circuit-level
+// control traffic. The exit relay should recognize and drop these cells since
+// they don't correspond to any real stream. However, use with caution as this
+// may cause confusion with circuit control messages in some implementations.
+// For production use, consider using standard PADDING cells instead by setting
+// DummyTrafficEnabled to false in PaddingConfig.
 func (pm *PaddingMachine) sendDummyData() error {
 	// Generate random dummy payload
 	dummyData := make([]byte, 498) // Max RELAY_DATA payload size
@@ -404,7 +425,9 @@ func (pm *PaddingMachine) sendDummyData() error {
 	}
 
 	// Create a RELAY_DATA cell with stream ID 0 (circuit-level)
-	// Note: Stream ID 0 indicates padding/control data
+	// Stream ID 0 is typically used for circuit-level control/padding.
+	// Exit relays should drop DATA cells with stream ID 0 since they
+	// don't correspond to any established stream.
 	dummyCell := cell.NewRelayCell(0, cell.RelayData, dummyData)
 
 	// Send through circuit
@@ -433,7 +456,10 @@ func (pm *PaddingMachine) RecordTrafficBurst() {
 func NewPaddingCell(circuitID uint32) *cell.Cell {
 	// Create random padding payload
 	payload := make([]byte, cell.PayloadLen)
-	_, _ = rand.Read(payload) // Ignore error; zeros are acceptable
+	if _, err := rand.Read(payload); err != nil {
+		// Log warning but continue with zeros - padding still provides some benefit
+		slog.Warn("crypto/rand failure in padding cell generation", "error", err)
+	}
 
 	return &cell.Cell{
 		CircID:  circuitID,

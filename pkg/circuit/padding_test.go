@@ -662,3 +662,24 @@ func TestPaddingMachineAdaptiveStrategy(t *testing.T) {
 		t.Errorf("Adaptive delay without bursts = %v, should be < %v", delay, config.MaxInterval)
 	}
 }
+
+func TestPaddingMachineAdaptiveStrategyCap(t *testing.T) {
+	circuit := NewCircuit(1)
+	// Use very large MaxInterval to test the 5 minute cap
+	config := &PaddingConfig{
+		Strategy:    PaddingStrategyAdaptive,
+		MinInterval: time.Minute,
+		MaxInterval: 10 * time.Minute, // Very large to exceed 5 minute cap
+	}
+	pm, _ := NewPaddingMachine(circuit, config)
+
+	// Record traffic bursts
+	pm.RecordTrafficBurst()
+
+	// With bursts and large MaxInterval, delay should be capped at 5 minutes
+	delay := pm.calculateNextDelay()
+	maxCap := 5 * time.Minute
+	if delay > maxCap {
+		t.Errorf("Adaptive delay with large MaxInterval = %v, should be <= %v", delay, maxCap)
+	}
+}
