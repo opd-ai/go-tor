@@ -83,11 +83,6 @@ func newTestServer(metricsProvider MetricsProvider, healthProvider HealthProvide
 	return server
 }
 
-// newTestServerWithMocks creates a server with default mock providers for fast tests.
-func newTestServerWithMocks() *Server {
-	return newTestServer(&mockMetricsProvider{}, &mockHealthProvider{})
-}
-
 func TestNewServer(t *testing.T) {
 	log := logger.NewDefault()
 	metricsProvider := &mockMetricsProvider{}
@@ -547,4 +542,42 @@ func TestGracefulShutdownWithZeroDrain(t *testing.T) {
 	if elapsed > 100*time.Millisecond {
 		t.Errorf("Shutdown took too long without drain period: %v", elapsed)
 	}
+}
+
+func TestStopWithoutStart(t *testing.T) {
+	metricsProvider := &mockMetricsProvider{}
+	healthProvider := &mockHealthProvider{}
+
+	server := newTestServer(metricsProvider, healthProvider)
+
+	// Stop without Start should not panic or cause nil pointer dereference
+	// The server.server field is initialized in NewServer, so Shutdown should work
+	err := server.Stop()
+	if err != nil {
+		t.Errorf("Stop without Start returned error: %v", err)
+	}
+}
+
+func TestStopCalledMultipleTimes(t *testing.T) {
+	metricsProvider := &mockMetricsProvider{}
+	healthProvider := &mockHealthProvider{}
+
+	server := newTestServer(metricsProvider, healthProvider)
+
+	if err := server.Start(); err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+
+	// First Stop should succeed
+	if err := server.Stop(); err != nil {
+		t.Errorf("First Stop returned error: %v", err)
+	}
+
+	// Second Stop should also complete without panic
+	// Note: Calling Stop multiple times is safe because:
+	// - cancel() is safe to call multiple times
+	// - http.Server.Shutdown() is safe to call on already closed server
+	// - sync.WaitGroup.Wait() is safe when counter is already 0
+	// Second stop may return an error (server already closed) but should not panic
+	_ = server.Stop()
 }

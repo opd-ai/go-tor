@@ -6,6 +6,7 @@ package httpmetrics
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"net"
@@ -133,14 +134,14 @@ func (s *Server) Stop() error {
 	defer cancel()
 
 	if err := s.server.Shutdown(ctx); err != nil {
-		shutdownDuration := time.Since(shutdownStart)
-		if err == context.DeadlineExceeded {
+		gracefulShutdownDuration := time.Since(shutdownStart)
+		if errors.Is(err, context.DeadlineExceeded) {
 			s.logger.Warn("HTTP server shutdown timeout exceeded, forcing closure",
 				"error", err,
-				"shutdown_duration", shutdownDuration,
+				"graceful_shutdown_duration", gracefulShutdownDuration,
 				"timeout", s.shutdownTimeout)
 		} else {
-			s.logger.Warn("HTTP server shutdown error", "error", err, "shutdown_duration", shutdownDuration)
+			s.logger.Warn("HTTP server shutdown error", "error", err, "graceful_shutdown_duration", gracefulShutdownDuration)
 		}
 		return err
 	}
@@ -148,7 +149,7 @@ func (s *Server) Stop() error {
 	// Wait for goroutines
 	s.wg.Wait()
 
-	s.logger.Info("HTTP metrics server stopped gracefully", "shutdown_duration", time.Since(shutdownStart))
+	s.logger.Info("HTTP metrics server stopped gracefully", "graceful_shutdown_duration", time.Since(shutdownStart))
 	return nil
 }
 
@@ -161,7 +162,7 @@ func (s *Server) GetAddress() string {
 }
 
 // SetShutdownTimeout configures the maximum time to wait for graceful shutdown.
-// This should be called before Start().
+// This method is not thread-safe and should only be called before Start().
 func (s *Server) SetShutdownTimeout(timeout time.Duration) {
 	if timeout <= 0 {
 		timeout = DefaultShutdownTimeout
@@ -170,7 +171,7 @@ func (s *Server) SetShutdownTimeout(timeout time.Duration) {
 }
 
 // SetDrainPeriod configures the time to wait for connections to drain before shutdown.
-// This should be called before Start().
+// This method is not thread-safe and should only be called before Start().
 func (s *Server) SetDrainPeriod(period time.Duration) {
 	if period < 0 {
 		period = DefaultDrainPeriod
@@ -179,11 +180,13 @@ func (s *Server) SetDrainPeriod(period time.Duration) {
 }
 
 // GetShutdownTimeout returns the current shutdown timeout configuration.
+// This method is not thread-safe and should only be called before Start() or after Stop().
 func (s *Server) GetShutdownTimeout() time.Duration {
 	return s.shutdownTimeout
 }
 
 // GetDrainPeriod returns the current drain period configuration.
+// This method is not thread-safe and should only be called before Start() or after Stop().
 func (s *Server) GetDrainPeriod() time.Duration {
 	return s.drainPeriod
 }
