@@ -57,6 +57,15 @@ type Config struct {
 	IsolateSOCKSAuth      bool   // Isolate circuits by SOCKS5 username (default: false)
 	IsolateClientPort     bool   // Isolate circuits by client source port (default: false)
 	IsolateClientProtocol bool   // Isolate circuits by protocol (default: false)
+
+	// Circuit padding for traffic analysis resistance (Phase 2.1)
+	EnableCircuitPadding  bool          // Enable circuit padding (default: true)
+	PaddingStrategy       string        // Padding strategy: "none", "fixed", "random", "adaptive" (default: "random")
+	PaddingMinInterval    time.Duration // Minimum interval between padding cells (default: 3s)
+	PaddingMaxInterval    time.Duration // Maximum interval between padding cells (default: 10s)
+	PaddingIdleTimeout    time.Duration // Time circuit must be idle before padding (default: 1s)
+	PaddingDummyTraffic   bool          // Use dummy RELAY_DATA instead of PADDING cells (default: false)
+	PaddingBurstSize      int           // Number of padding cells per burst (default: 1)
 }
 
 // OnionServiceConfig represents configuration for a single onion service
@@ -123,6 +132,14 @@ func DefaultConfig() *Config {
 		IsolateSOCKSAuth:      false,
 		IsolateClientPort:     false,
 		IsolateClientProtocol: false,
+		// Circuit padding defaults (Phase 2.1 - enabled by default for traffic analysis resistance)
+		EnableCircuitPadding: true,
+		PaddingStrategy:      "random",
+		PaddingMinInterval:   3 * time.Second,
+		PaddingMaxInterval:   10 * time.Second,
+		PaddingIdleTimeout:   time.Second,
+		PaddingDummyTraffic:  false,
+		PaddingBurstSize:     1,
 	}
 }
 
@@ -225,6 +242,32 @@ func (c *Config) Validate() error {
 	}
 	if !validIsolationLevels[c.IsolationLevel] {
 		return fmt.Errorf("invalid IsolationLevel: %s (must be none, destination, credential, port, or session)", c.IsolationLevel)
+	}
+
+	// Validate padding configuration (Phase 2.1)
+	validPaddingStrategies := map[string]bool{
+		"none":     true,
+		"fixed":    true,
+		"random":   true,
+		"adaptive": true,
+	}
+	if !validPaddingStrategies[c.PaddingStrategy] {
+		return fmt.Errorf("invalid PaddingStrategy: %s (must be none, fixed, random, or adaptive)", c.PaddingStrategy)
+	}
+	if c.PaddingMinInterval < 0 {
+		return fmt.Errorf("PaddingMinInterval must be non-negative")
+	}
+	if c.PaddingMaxInterval < 0 {
+		return fmt.Errorf("PaddingMaxInterval must be non-negative")
+	}
+	if c.PaddingMaxInterval > 0 && c.PaddingMaxInterval < c.PaddingMinInterval {
+		return fmt.Errorf("PaddingMaxInterval must be >= PaddingMinInterval")
+	}
+	if c.PaddingIdleTimeout < 0 {
+		return fmt.Errorf("PaddingIdleTimeout must be non-negative")
+	}
+	if c.PaddingBurstSize < 0 {
+		return fmt.Errorf("PaddingBurstSize must be non-negative")
 	}
 
 	return nil
