@@ -75,6 +75,19 @@ func (m *mockHealthProvider) Check(ctx context.Context) health.OverallHealth {
 	return m.health
 }
 
+// newTestServer creates a server configured for fast tests with zero drain period.
+func newTestServer(metricsProvider MetricsProvider, healthProvider HealthProvider) *Server {
+	log := logger.NewDefault()
+	server := NewServer("127.0.0.1:0", metricsProvider, healthProvider, log)
+	server.SetDrainPeriod(0) // Fast shutdown for tests
+	return server
+}
+
+// newTestServerWithMocks creates a server with default mock providers for fast tests.
+func newTestServerWithMocks() *Server {
+	return newTestServer(&mockMetricsProvider{}, &mockHealthProvider{})
+}
+
 func TestNewServer(t *testing.T) {
 	log := logger.NewDefault()
 	metricsProvider := &mockMetricsProvider{}
@@ -99,11 +112,10 @@ func TestNewServer(t *testing.T) {
 }
 
 func TestServerStartStop(t *testing.T) {
-	log := logger.NewDefault()
 	metricsProvider := &mockMetricsProvider{}
 	healthProvider := &mockHealthProvider{}
 
-	server := NewServer("127.0.0.1:0", metricsProvider, healthProvider, log)
+	server := newTestServer(metricsProvider, healthProvider)
 
 	// Start server
 	if err := server.Start(); err != nil {
@@ -123,11 +135,10 @@ func TestServerStartStop(t *testing.T) {
 }
 
 func TestPrometheusMetricsEndpoint(t *testing.T) {
-	log := logger.NewDefault()
 	metricsProvider := &mockMetricsProvider{}
 	healthProvider := &mockHealthProvider{}
 
-	server := NewServer("127.0.0.1:0", metricsProvider, healthProvider, log)
+	server := newTestServer(metricsProvider, healthProvider)
 	if err := server.Start(); err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -183,11 +194,10 @@ func TestPrometheusMetricsEndpoint(t *testing.T) {
 }
 
 func TestJSONMetricsEndpoint(t *testing.T) {
-	log := logger.NewDefault()
 	metricsProvider := &mockMetricsProvider{}
 	healthProvider := &mockHealthProvider{}
 
-	server := NewServer("127.0.0.1:0", metricsProvider, healthProvider, log)
+	server := newTestServer(metricsProvider, healthProvider)
 	if err := server.Start(); err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -228,11 +238,10 @@ func TestJSONMetricsEndpoint(t *testing.T) {
 }
 
 func TestHealthEndpoint(t *testing.T) {
-	log := logger.NewDefault()
 	metricsProvider := &mockMetricsProvider{}
 	healthProvider := &mockHealthProvider{}
 
-	server := NewServer("127.0.0.1:0", metricsProvider, healthProvider, log)
+	server := newTestServer(metricsProvider, healthProvider)
 	if err := server.Start(); err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -266,7 +275,6 @@ func TestHealthEndpoint(t *testing.T) {
 }
 
 func TestHealthEndpointUnhealthy(t *testing.T) {
-	log := logger.NewDefault()
 	metricsProvider := &mockMetricsProvider{}
 	healthProvider := &mockHealthProvider{
 		health: health.OverallHealth{
@@ -282,7 +290,7 @@ func TestHealthEndpointUnhealthy(t *testing.T) {
 		},
 	}
 
-	server := NewServer("127.0.0.1:0", metricsProvider, healthProvider, log)
+	server := newTestServer(metricsProvider, healthProvider)
 	if err := server.Start(); err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -302,11 +310,10 @@ func TestHealthEndpointUnhealthy(t *testing.T) {
 }
 
 func TestDashboardEndpoint(t *testing.T) {
-	log := logger.NewDefault()
 	metricsProvider := &mockMetricsProvider{}
 	healthProvider := &mockHealthProvider{}
 
-	server := NewServer("127.0.0.1:0", metricsProvider, healthProvider, log)
+	server := newTestServer(metricsProvider, healthProvider)
 	if err := server.Start(); err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -349,11 +356,10 @@ func TestDashboardEndpoint(t *testing.T) {
 }
 
 func TestIndexEndpoint(t *testing.T) {
-	log := logger.NewDefault()
 	metricsProvider := &mockMetricsProvider{}
 	healthProvider := &mockHealthProvider{}
 
-	server := NewServer("127.0.0.1:0", metricsProvider, healthProvider, log)
+	server := newTestServer(metricsProvider, healthProvider)
 	if err := server.Start(); err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -394,11 +400,10 @@ func TestIndexEndpoint(t *testing.T) {
 }
 
 func TestMethodNotAllowed(t *testing.T) {
-	log := logger.NewDefault()
 	metricsProvider := &mockMetricsProvider{}
 	healthProvider := &mockHealthProvider{}
 
-	server := NewServer("127.0.0.1:0", metricsProvider, healthProvider, log)
+	server := newTestServer(metricsProvider, healthProvider)
 	if err := server.Start(); err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -418,11 +423,10 @@ func TestMethodNotAllowed(t *testing.T) {
 }
 
 func TestNotFound(t *testing.T) {
-	log := logger.NewDefault()
 	metricsProvider := &mockMetricsProvider{}
 	healthProvider := &mockHealthProvider{}
 
-	server := NewServer("127.0.0.1:0", metricsProvider, healthProvider, log)
+	server := newTestServer(metricsProvider, healthProvider)
 	if err := server.Start(); err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -438,5 +442,109 @@ func TestNotFound(t *testing.T) {
 
 	if resp.StatusCode != http.StatusNotFound {
 		t.Errorf("Expected status 404, got %d", resp.StatusCode)
+	}
+}
+
+func TestShutdownTimeoutConfiguration(t *testing.T) {
+	log := logger.NewDefault()
+	metricsProvider := &mockMetricsProvider{}
+	healthProvider := &mockHealthProvider{}
+
+	server := NewServer("127.0.0.1:0", metricsProvider, healthProvider, log)
+
+	// Verify default values
+	if server.GetShutdownTimeout() != DefaultShutdownTimeout {
+		t.Errorf("Expected default shutdown timeout %v, got %v", DefaultShutdownTimeout, server.GetShutdownTimeout())
+	}
+	if server.GetDrainPeriod() != DefaultDrainPeriod {
+		t.Errorf("Expected default drain period %v, got %v", DefaultDrainPeriod, server.GetDrainPeriod())
+	}
+
+	// Test setting custom values
+	customTimeout := 30 * time.Second
+	customDrain := 5 * time.Second
+	server.SetShutdownTimeout(customTimeout)
+	server.SetDrainPeriod(customDrain)
+
+	if server.GetShutdownTimeout() != customTimeout {
+		t.Errorf("Expected shutdown timeout %v, got %v", customTimeout, server.GetShutdownTimeout())
+	}
+	if server.GetDrainPeriod() != customDrain {
+		t.Errorf("Expected drain period %v, got %v", customDrain, server.GetDrainPeriod())
+	}
+}
+
+func TestShutdownTimeoutZeroValue(t *testing.T) {
+	log := logger.NewDefault()
+	metricsProvider := &mockMetricsProvider{}
+	healthProvider := &mockHealthProvider{}
+
+	server := NewServer("127.0.0.1:0", metricsProvider, healthProvider, log)
+
+	// Setting zero should reset to default
+	server.SetShutdownTimeout(0)
+	if server.GetShutdownTimeout() != DefaultShutdownTimeout {
+		t.Errorf("Expected default timeout after setting 0, got %v", server.GetShutdownTimeout())
+	}
+
+	// Setting negative should reset to default
+	server.SetShutdownTimeout(-5 * time.Second)
+	if server.GetShutdownTimeout() != DefaultShutdownTimeout {
+		t.Errorf("Expected default timeout after setting negative, got %v", server.GetShutdownTimeout())
+	}
+}
+
+func TestDrainPeriodNegativeValue(t *testing.T) {
+	log := logger.NewDefault()
+	metricsProvider := &mockMetricsProvider{}
+	healthProvider := &mockHealthProvider{}
+
+	server := NewServer("127.0.0.1:0", metricsProvider, healthProvider, log)
+
+	// Setting negative should reset to default
+	server.SetDrainPeriod(-5 * time.Second)
+	if server.GetDrainPeriod() != DefaultDrainPeriod {
+		t.Errorf("Expected default drain period after setting negative, got %v", server.GetDrainPeriod())
+	}
+
+	// Setting zero should be allowed (no drain)
+	server.SetDrainPeriod(0)
+	if server.GetDrainPeriod() != 0 {
+		t.Errorf("Expected zero drain period, got %v", server.GetDrainPeriod())
+	}
+}
+
+func TestGracefulShutdownWithZeroDrain(t *testing.T) {
+	log := logger.NewDefault()
+	metricsProvider := &mockMetricsProvider{}
+	healthProvider := &mockHealthProvider{}
+
+	server := NewServer("127.0.0.1:0", metricsProvider, healthProvider, log)
+
+	// Set drain period to 0 for fast tests
+	server.SetDrainPeriod(0)
+
+	if err := server.Start(); err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+
+	// Verify server is working
+	url := "http://" + server.GetAddress() + "/health"
+	resp, err := http.Get(url)
+	if err != nil {
+		t.Fatalf("Failed to GET /health: %v", err)
+	}
+	resp.Body.Close()
+
+	// Stop should be fast with 0 drain period
+	start := time.Now()
+	if err := server.Stop(); err != nil {
+		t.Errorf("Failed to stop server: %v", err)
+	}
+	elapsed := time.Since(start)
+
+	// Without drain period, shutdown should be very fast (under 100ms)
+	if elapsed > 100*time.Millisecond {
+		t.Errorf("Shutdown took too long without drain period: %v", elapsed)
 	}
 }

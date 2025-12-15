@@ -28,6 +28,13 @@ type HealthProvider interface {
 	Check(ctx context.Context) health.OverallHealth
 }
 
+// DefaultShutdownTimeout is the default timeout for graceful shutdown.
+const DefaultShutdownTimeout = 10 * time.Second
+
+// DefaultDrainPeriod is the default period to wait for connections to drain
+// before starting graceful shutdown.
+const DefaultDrainPeriod = 1 * time.Second
+
 // Server provides HTTP-based metrics exposition
 type Server struct {
 	address         string
@@ -37,6 +44,10 @@ type Server struct {
 	server          *http.Server
 	listener        net.Listener
 	mux             *http.ServeMux
+
+	// Shutdown configuration
+	shutdownTimeout time.Duration // Max time to wait for graceful shutdown
+	drainPeriod     time.Duration // Time to wait for connections to drain
 
 	// Lifecycle
 	ctx    context.Context
@@ -57,6 +68,8 @@ func NewServer(address string, metricsProvider MetricsProvider, healthProvider H
 		mux:             mux,
 		ctx:             ctx,
 		cancel:          cancel,
+		shutdownTimeout: DefaultShutdownTimeout,
+		drainPeriod:     DefaultDrainPeriod,
 	}
 
 	// Register handlers
@@ -101,24 +114,41 @@ func (s *Server) Start() error {
 
 // Stop gracefully stops the HTTP metrics server
 func (s *Server) Stop() error {
-	s.logger.Info("Stopping HTTP metrics server")
+	s.logger.Info("Stopping HTTP metrics server", "shutdown_timeout", s.shutdownTimeout, "drain_period", s.drainPeriod)
 
-	// Cancel context
+	// Cancel context to signal shutdown intent
 	s.cancel()
 
-	// Shutdown server with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	// Wait for drain period to allow load balancers to stop sending traffic.
+	// This is intentionally a fixed wait to give external systems time to react.
+	// The actual request draining is handled by http.Server.Shutdown() below.
+	if s.drainPeriod > 0 {
+		s.logger.Debug("Waiting for connection drain period", "duration", s.drainPeriod)
+		time.Sleep(s.drainPeriod)
+	}
+
+	// Shutdown server with configurable timeout - this waits for in-flight requests
+	shutdownStart := time.Now()
+	ctx, cancel := context.WithTimeout(context.Background(), s.shutdownTimeout)
 	defer cancel()
 
 	if err := s.server.Shutdown(ctx); err != nil {
-		s.logger.Warn("HTTP server shutdown error", "error", err)
+		shutdownDuration := time.Since(shutdownStart)
+		if err == context.DeadlineExceeded {
+			s.logger.Warn("HTTP server shutdown timeout exceeded, forcing closure",
+				"error", err,
+				"shutdown_duration", shutdownDuration,
+				"timeout", s.shutdownTimeout)
+		} else {
+			s.logger.Warn("HTTP server shutdown error", "error", err, "shutdown_duration", shutdownDuration)
+		}
 		return err
 	}
 
 	// Wait for goroutines
 	s.wg.Wait()
 
-	s.logger.Info("HTTP metrics server stopped")
+	s.logger.Info("HTTP metrics server stopped gracefully", "shutdown_duration", time.Since(shutdownStart))
 	return nil
 }
 
@@ -128,6 +158,34 @@ func (s *Server) GetAddress() string {
 		return s.listener.Addr().String()
 	}
 	return s.address
+}
+
+// SetShutdownTimeout configures the maximum time to wait for graceful shutdown.
+// This should be called before Start().
+func (s *Server) SetShutdownTimeout(timeout time.Duration) {
+	if timeout <= 0 {
+		timeout = DefaultShutdownTimeout
+	}
+	s.shutdownTimeout = timeout
+}
+
+// SetDrainPeriod configures the time to wait for connections to drain before shutdown.
+// This should be called before Start().
+func (s *Server) SetDrainPeriod(period time.Duration) {
+	if period < 0 {
+		period = DefaultDrainPeriod
+	}
+	s.drainPeriod = period
+}
+
+// GetShutdownTimeout returns the current shutdown timeout configuration.
+func (s *Server) GetShutdownTimeout() time.Duration {
+	return s.shutdownTimeout
+}
+
+// GetDrainPeriod returns the current drain period configuration.
+func (s *Server) GetDrainPeriod() time.Duration {
+	return s.drainPeriod
 }
 
 // handlePrometheusMetrics serves metrics in Prometheus text format
