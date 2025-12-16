@@ -67,6 +67,8 @@ type PaddingConfig struct {
 
 	// MaxInterval is the maximum time between padding cells.
 	// For fixed strategy, only MinInterval is used.
+	// NOTE: For adaptive strategy, delays are internally capped at 5 minutes
+	// regardless of this setting to prevent effectively disabling padding.
 	MaxInterval time.Duration
 
 	// IdleTimeout is how long a circuit must be idle before padding begins.
@@ -75,6 +77,13 @@ type PaddingConfig struct {
 
 	// DummyTrafficEnabled enables dummy RELAY_DATA cells (vs PADDING cells).
 	// Dummy traffic is harder to distinguish from real traffic.
+	//
+	// WARNING: This feature uses stream ID 0 for dummy RELAY_DATA cells.
+	// Not all relay implementations handle this correctly. Some may forward
+	// these cells incorrectly or cause unexpected behavior. This feature
+	// should only be enabled after testing with your specific relay versions.
+	// For production use, standard PADDING cells (DummyTrafficEnabled=false)
+	// are recommended as they are universally supported.
 	DummyTrafficEnabled bool
 
 	// BurstSize is the number of padding cells to send in quick succession.
@@ -104,8 +113,9 @@ func (c *PaddingConfig) Validate() error {
 	if c.MaxInterval < 0 {
 		return errors.New("MaxInterval must be non-negative")
 	}
-	if c.MaxInterval > 0 && c.MaxInterval < c.MinInterval {
-		return errors.New("MaxInterval must be >= MinInterval")
+	// MaxInterval must be >= MinInterval, or both must be zero
+	if (c.MaxInterval == 0 && c.MinInterval > 0) || (c.MaxInterval > 0 && c.MaxInterval < c.MinInterval) {
+		return errors.New("MaxInterval must be >= MinInterval (or both zero)")
 	}
 	if c.IdleTimeout < 0 {
 		return errors.New("IdleTimeout must be non-negative")
@@ -247,6 +257,11 @@ func (pm *PaddingMachine) run(ctx context.Context) {
 	delay := pm.calculateNextDelay()
 
 	for {
+		// Check running status atomically to avoid race with Stop()
+		if !pm.running.Load() {
+			return
+		}
+
 		pm.mu.RLock()
 		stopChan := pm.stopChan
 		pm.mu.RUnlock()
@@ -308,21 +323,34 @@ func (pm *PaddingMachine) calculateNextDelay() time.Duration {
 }
 
 // randomDuration returns a cryptographically random duration between min and max.
+// Uses rejection sampling to avoid modulo bias for security-critical timing.
 func (pm *PaddingMachine) randomDuration(min, max time.Duration) time.Duration {
 	if min >= max {
 		return min
 	}
 
-	var buf [8]byte
-	if _, err := rand.Read(buf[:]); err != nil {
-		// Fall back to min on error
+	rangeSize := uint64(max - min)
+	if rangeSize == 0 {
 		return min
 	}
 
-	// Convert to uint64 and scale to range
-	n := binary.BigEndian.Uint64(buf[:])
-	rangeSize := uint64(max - min)
-	return min + time.Duration(n%rangeSize)
+	// Use rejection sampling to avoid modulo bias
+	maxVal := ^uint64(0)
+	limit := maxVal - (maxVal % rangeSize)
+
+	for {
+		var buf [8]byte
+		if _, err := rand.Read(buf[:]); err != nil {
+			// Fall back to min on error
+			return min
+		}
+
+		n := binary.BigEndian.Uint64(buf[:])
+		if n < limit {
+			return min + time.Duration(n%rangeSize)
+		}
+		// Retry if we got a value that would cause bias
+	}
 }
 
 // shouldSendPadding checks if padding should be sent now.
@@ -477,19 +505,35 @@ func HandlePaddingCell(_ *cell.Cell) {
 
 // AddRandomTimingDelay adds a random delay before sending a cell.
 // This helps defeat timing correlation attacks.
+// Uses rejection sampling to avoid modulo bias for security-critical timing.
 func AddRandomTimingDelay(minDelay, maxDelay time.Duration) {
 	if minDelay >= maxDelay || maxDelay <= 0 {
 		return
 	}
 
-	var buf [8]byte
-	if _, err := rand.Read(buf[:]); err != nil {
+	rangeSize := uint64(maxDelay - minDelay)
+	if rangeSize == 0 {
+		time.Sleep(minDelay)
 		return
 	}
 
-	n := binary.BigEndian.Uint64(buf[:])
-	rangeSize := uint64(maxDelay - minDelay)
-	delay := minDelay + time.Duration(n%rangeSize)
+	var delay time.Duration
+	// Use rejection sampling to avoid modulo bias
+	maxVal := ^uint64(0)
+	limit := maxVal - (maxVal % rangeSize)
+
+	for {
+		var buf [8]byte
+		if _, err := rand.Read(buf[:]); err != nil {
+			return
+		}
+		n := binary.BigEndian.Uint64(buf[:])
+		if n < limit {
+			delay = minDelay + time.Duration(n%rangeSize)
+			break
+		}
+		// Retry if we got a value that would cause bias
+	}
 
 	time.Sleep(delay)
 }

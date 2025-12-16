@@ -2,6 +2,7 @@ package circuit
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -76,6 +77,17 @@ func TestPaddingConfigValidate(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "valid_none_strategy_with_nonzero_intervals",
+			config: &PaddingConfig{
+				Strategy:    PaddingStrategyNone,
+				MinInterval: 5 * time.Second,
+				MaxInterval: 10 * time.Second,
+				IdleTimeout: time.Second,
+				BurstSize:   1,
+			},
+			wantErr: false,
+		},
+		{
 			name: "invalid_negative_min_interval",
 			config: &PaddingConfig{
 				Strategy:    PaddingStrategyFixed,
@@ -98,6 +110,15 @@ func TestPaddingConfigValidate(t *testing.T) {
 				Strategy:    PaddingStrategyRandom,
 				MinInterval: 10 * time.Second,
 				MaxInterval: 5 * time.Second,
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid_max_zero_min_positive",
+			config: &PaddingConfig{
+				Strategy:    PaddingStrategyRandom,
+				MinInterval: 5 * time.Second,
+				MaxInterval: 0,
 			},
 			wantErr: true,
 		},
@@ -210,6 +231,7 @@ func TestPaddingMachineStartStop(t *testing.T) {
 	config := &PaddingConfig{
 		Strategy:    PaddingStrategyNone, // Disabled to avoid sending
 		MinInterval: time.Hour,           // Long interval
+		MaxInterval: time.Hour,           // Must be >= MinInterval
 	}
 
 	pm, err := NewPaddingMachine(circuit, config)
@@ -228,9 +250,12 @@ func TestPaddingMachineStartStop(t *testing.T) {
 		t.Error("IsRunning() = false after Start()")
 	}
 
-	// Starting again should fail
-	if err := pm.Start(ctx); err == nil {
+	// Starting again should fail with specific error message
+	err = pm.Start(ctx)
+	if err == nil {
 		t.Error("Start() again should return error")
+	} else if err.Error() != "padding machine already running" {
+		t.Errorf("Start() error = %q, want %q", err.Error(), "padding machine already running")
 	}
 
 	// Stop
@@ -509,6 +534,7 @@ func TestPaddingMachineCalculateNextDelay(t *testing.T) {
 			name:     "none_strategy",
 			strategy: PaddingStrategyNone,
 			minDelay: time.Hour, // Returns long delay when disabled
+			maxDelay: time.Hour, // Must be >= minDelay
 		},
 		{
 			name:     "fixed_strategy",
@@ -609,6 +635,7 @@ func TestPaddingMachineContextCancellation(t *testing.T) {
 	config := &PaddingConfig{
 		Strategy:    PaddingStrategyFixed,
 		MinInterval: time.Hour, // Long interval
+		MaxInterval: time.Hour, // Must be >= MinInterval
 	}
 	pm, _ := NewPaddingMachine(circuit, config)
 
@@ -681,5 +708,166 @@ func TestPaddingMachineAdaptiveStrategyCap(t *testing.T) {
 	maxCap := 5 * time.Minute
 	if delay > maxCap {
 		t.Errorf("Adaptive delay with large MaxInterval = %v, should be <= %v", delay, maxCap)
+	}
+}
+
+// mockCellSender is a mock implementation of CellSender for testing.
+type mockCellSender struct {
+	sentCells []*cell.Cell
+	mu        sync.Mutex
+	failNext  bool
+}
+
+func (m *mockCellSender) SendCell(c *cell.Cell) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.failNext {
+		m.failNext = false
+		return errors.New("mock send error")
+	}
+	m.sentCells = append(m.sentCells, c)
+	return nil
+}
+
+func (m *mockCellSender) getSentCells() []*cell.Cell {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	result := make([]*cell.Cell, len(m.sentCells))
+	copy(result, m.sentCells)
+	return result
+}
+
+func (m *mockCellSender) setFailNext() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.failNext = true
+}
+
+// TestPaddingMachineCellSenderIntegration verifies that the PaddingMachine
+// correctly sends padding cells through the CellSender interface.
+func TestPaddingMachineCellSenderIntegration(t *testing.T) {
+	circuit := NewCircuit(1)
+	circuit.SetState(StateOpen)
+
+	// Set up mock connection
+	mockSender := &mockCellSender{}
+	circuit.SetConnection(mockSender)
+
+	// Set activity time in the past so padding can be sent
+	circuit.mu.Lock()
+	circuit.lastActivityTime = time.Now().Add(-5 * time.Second)
+	circuit.mu.Unlock()
+
+	config := &PaddingConfig{
+		Strategy:            PaddingStrategyFixed,
+		MinInterval:         10 * time.Millisecond,
+		MaxInterval:         10 * time.Millisecond,
+		IdleTimeout:         time.Millisecond,
+		DummyTrafficEnabled: false,
+		BurstSize:           1,
+	}
+	pm, err := NewPaddingMachine(circuit, config)
+	if err != nil {
+		t.Fatalf("NewPaddingMachine() error = %v", err)
+	}
+
+	// Manually trigger sendPadding to verify cell is sent
+	pm.sendPadding()
+
+	sentCells := mockSender.getSentCells()
+	if len(sentCells) != 1 {
+		t.Fatalf("Expected 1 sent cell, got %d", len(sentCells))
+	}
+
+	if sentCells[0].Command != cell.CmdPadding {
+		t.Errorf("Sent cell command = %v, want %v", sentCells[0].Command, cell.CmdPadding)
+	}
+	if sentCells[0].CircID != circuit.ID {
+		t.Errorf("Sent cell CircID = %d, want %d", sentCells[0].CircID, circuit.ID)
+	}
+
+	// Verify stats are updated
+	stats := pm.Stats()
+	if stats.PaddingsSent != 1 {
+		t.Errorf("PaddingsSent = %d, want 1", stats.PaddingsSent)
+	}
+}
+
+// TestPaddingMachineCellSenderFailure verifies that the PaddingMachine
+// correctly handles send failures.
+func TestPaddingMachineCellSenderFailure(t *testing.T) {
+	circuit := NewCircuit(1)
+	circuit.SetState(StateOpen)
+
+	// Set up mock connection that will fail
+	mockSender := &mockCellSender{}
+	mockSender.setFailNext()
+	circuit.SetConnection(mockSender)
+
+	// Set activity time in the past so padding can be sent
+	circuit.mu.Lock()
+	circuit.lastActivityTime = time.Now().Add(-5 * time.Second)
+	circuit.mu.Unlock()
+
+	config := &PaddingConfig{
+		Strategy:            PaddingStrategyFixed,
+		MinInterval:         10 * time.Millisecond,
+		MaxInterval:         10 * time.Millisecond,
+		IdleTimeout:         time.Millisecond,
+		DummyTrafficEnabled: false,
+		BurstSize:           1,
+	}
+	pm, err := NewPaddingMachine(circuit, config)
+	if err != nil {
+		t.Fatalf("NewPaddingMachine() error = %v", err)
+	}
+
+	// Trigger sendPadding which should fail
+	pm.sendPadding()
+
+	// Verify no cells were sent (mock fails first attempt)
+	sentCells := mockSender.getSentCells()
+	if len(sentCells) != 0 {
+		t.Errorf("Expected 0 sent cells after failure, got %d", len(sentCells))
+	}
+
+	// Verify failed padding count is updated
+	stats := pm.Stats()
+	if stats.FailedPaddings != 1 {
+		t.Errorf("FailedPaddings = %d, want 1", stats.FailedPaddings)
+	}
+}
+
+// TestPaddingMachineNoConnection verifies error handling when circuit has no connection.
+func TestPaddingMachineNoConnection(t *testing.T) {
+	circuit := NewCircuit(1)
+	circuit.SetState(StateOpen)
+	// Intentionally do NOT set connection
+
+	// Set activity time in the past so padding can be sent
+	circuit.mu.Lock()
+	circuit.lastActivityTime = time.Now().Add(-5 * time.Second)
+	circuit.mu.Unlock()
+
+	config := &PaddingConfig{
+		Strategy:            PaddingStrategyFixed,
+		MinInterval:         10 * time.Millisecond,
+		MaxInterval:         10 * time.Millisecond,
+		IdleTimeout:         time.Millisecond,
+		DummyTrafficEnabled: false,
+		BurstSize:           1,
+	}
+	pm, err := NewPaddingMachine(circuit, config)
+	if err != nil {
+		t.Fatalf("NewPaddingMachine() error = %v", err)
+	}
+
+	// Trigger sendPadding which should fail due to no connection
+	pm.sendPadding()
+
+	// Verify failed padding count is updated
+	stats := pm.Stats()
+	if stats.FailedPaddings != 1 {
+		t.Errorf("FailedPaddings = %d, want 1", stats.FailedPaddings)
 	}
 }

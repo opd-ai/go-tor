@@ -260,8 +260,9 @@ func (c *Config) Validate() error {
 	if c.PaddingMaxInterval < 0 {
 		return fmt.Errorf("PaddingMaxInterval must be non-negative")
 	}
-	if c.PaddingMaxInterval > 0 && c.PaddingMaxInterval < c.PaddingMinInterval {
-		return fmt.Errorf("PaddingMaxInterval must be >= PaddingMinInterval")
+	// PaddingMaxInterval must be >= PaddingMinInterval, or both must be zero
+	if (c.PaddingMaxInterval == 0 && c.PaddingMinInterval > 0) || (c.PaddingMaxInterval > 0 && c.PaddingMaxInterval < c.PaddingMinInterval) {
+		return fmt.Errorf("PaddingMaxInterval must be >= PaddingMinInterval (or both zero)")
 	}
 	if c.PaddingIdleTimeout < 0 {
 		return fmt.Errorf("PaddingIdleTimeout must be non-negative")
