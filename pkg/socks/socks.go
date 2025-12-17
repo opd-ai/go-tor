@@ -83,38 +83,48 @@ type Config struct {
 	IsolateDestinations bool                   // Isolate by destination
 	IsolateSOCKSAuth    bool                   // Isolate by SOCKS5 credentials
 	IsolateClientPort   bool                   // Isolate by client port
+
+	// Stream isolation enforcement (ROADMAP Phase 2.2)
+	// IsolationMode controls how isolation violations are handled.
+	// Options: "off" (default), "warn" (log violations), "strict" (reject violations)
+	IsolationMode string
+	// EnforceOnExistingCircuits checks isolation when reusing circuits
+	EnforceOnExistingCircuits bool
 }
 
 // DefaultConfig returns default SOCKS5 server configuration
 func DefaultConfig() *Config {
 	return &Config{
-		MaxConnections:      defaultMaxConnections,
-		EnableDNSResolution: true,                  // DNS leak prevention enabled by default
-		DNSTimeout:          30 * time.Second,      // Standard DNS timeout
-		IsolationLevel:      circuit.IsolationNone, // Backward compatible default
-		IsolateDestinations: false,
-		IsolateSOCKSAuth:    false,
-		IsolateClientPort:   false,
+		MaxConnections:            defaultMaxConnections,
+		EnableDNSResolution:       true,                  // DNS leak prevention enabled by default
+		DNSTimeout:                30 * time.Second,      // Standard DNS timeout
+		IsolationLevel:            circuit.IsolationNone, // Backward compatible default
+		IsolateDestinations:       false,
+		IsolateSOCKSAuth:          false,
+		IsolateClientPort:         false,
+		IsolationMode:             "off", // Default: no enforcement for backward compatibility
+		EnforceOnExistingCircuits: true,
 	}
 }
 
 // Server is a SOCKS5 proxy server
 // SEC-M001/MED-004: Circuit isolation for different SOCKS5 connections
 type Server struct {
-	address       string
-	listener      net.Listener
-	circuitMgr    *circuit.Manager
-	circuitPool   *pool.CircuitPool // Optional: for circuit isolation support
-	streamMgr     *stream.Manager   // Stream manager for multiplexing
-	onionClient   *onion.Client
-	logger        *logger.Logger
-	config        *Config // SEC-L006: Configurable server settings
-	mu            sync.Mutex
-	activeConns   map[net.Conn]struct{}
-	shutdown      chan struct{}
-	shutdownOnce  sync.Once
-	closeListener sync.Once
-	listenerReady chan struct{} // Signals when listener is ready
+	address           string
+	listener          net.Listener
+	circuitMgr        *circuit.Manager
+	circuitPool       *pool.CircuitPool         // Optional: for circuit isolation support
+	streamMgr         *stream.Manager           // Stream manager for multiplexing
+	isolationEnforcer *stream.IsolationEnforcer // Stream isolation enforcement (ROADMAP 2.2)
+	onionClient       *onion.Client
+	logger            *logger.Logger
+	config            *Config // SEC-L006: Configurable server settings
+	mu                sync.Mutex
+	activeConns       map[net.Conn]struct{}
+	shutdown          chan struct{}
+	shutdownOnce      sync.Once
+	closeListener     sync.Once
+	listenerReady     chan struct{} // Signals when listener is ready
 }
 
 // NewServer creates a new SOCKS5 proxy server
@@ -133,16 +143,38 @@ func NewServerWithConfig(address string, circuitMgr *circuit.Manager, log *logge
 		cfg = DefaultConfig()
 	}
 
+	// Create isolation policy from configuration (ROADMAP Phase 2.2)
+	isolationPolicy := buildIsolationPolicy(cfg)
+	isolationEnforcer := stream.NewIsolationEnforcer(isolationPolicy, log)
+
 	return &Server{
-		address:       address,
-		circuitMgr:    circuitMgr,
-		streamMgr:     stream.NewManager(log),
-		onionClient:   onion.NewClient(log),
-		logger:        log.Component("socks5"),
-		config:        cfg,
-		activeConns:   make(map[net.Conn]struct{}),
-		shutdown:      make(chan struct{}),
-		listenerReady: make(chan struct{}),
+		address:           address,
+		circuitMgr:        circuitMgr,
+		streamMgr:         stream.NewManager(log),
+		isolationEnforcer: isolationEnforcer,
+		onionClient:       onion.NewClient(log),
+		logger:            log.Component("socks5"),
+		config:            cfg,
+		activeConns:       make(map[net.Conn]struct{}),
+		shutdown:          make(chan struct{}),
+		listenerReady:     make(chan struct{}),
+	}
+}
+
+// buildIsolationPolicy creates an isolation policy from SOCKS server config.
+func buildIsolationPolicy(cfg *Config) *stream.IsolationPolicy {
+	mode, err := stream.ParseIsolationMode(cfg.IsolationMode)
+	if err != nil {
+		mode = stream.IsolationModeOff
+	}
+
+	return &stream.IsolationPolicy{
+		Mode:                      mode,
+		IsolateBySOCKSAuth:        cfg.IsolateSOCKSAuth,
+		IsolateByDestination:      cfg.IsolateDestinations,
+		IsolateBySourcePort:       cfg.IsolateClientPort,
+		IsolateBySession:          false, // Session tokens are set programmatically
+		EnforceOnExistingCircuits: cfg.EnforceOnExistingCircuits,
 	}
 }
 
@@ -313,42 +345,36 @@ func (s *Server) handleConnection(ctx context.Context, conn net.Conn) {
 	}
 
 	// For regular addresses, use circuit isolation if configured
-	// Create isolation key based on configuration
-	var isolationKey *circuit.IsolationKey
+	// Use isolation enforcer to validate and build isolation key (ROADMAP Phase 2.2)
 	s.mu.Lock()
-	isolationCfg := s.config
 	circuitPool := s.circuitPool
 	s.mu.Unlock()
 
-	// Build isolation key based on configured isolation level
-	if isolationCfg.IsolationLevel != circuit.IsolationNone {
-		isolationKey = circuit.NewIsolationKey(isolationCfg.IsolationLevel)
-
-		switch isolationCfg.IsolationLevel {
-		case circuit.IsolationDestination:
-			if isolationCfg.IsolateDestinations {
-				isolationKey = isolationKey.WithDestination(targetAddr)
-			}
-		case circuit.IsolationCredential:
-			if isolationCfg.IsolateSOCKSAuth && username != "" {
-				isolationKey = isolationKey.WithCredentials(username)
-			}
-		case circuit.IsolationPort:
-			if isolationCfg.IsolateClientPort {
-				if tcpAddr, ok := conn.RemoteAddr().(*net.TCPAddr); ok {
-					isolationKey = isolationKey.WithSourcePort(uint16(tcpAddr.Port))
-				}
-			}
-		}
-
-		// Validate the isolation key
-		if err := isolationKey.Validate(); err != nil {
-			s.logger.Warn("Invalid isolation key, falling back to no isolation",
-				"error", err,
-				"level", isolationCfg.IsolationLevel)
-			isolationKey = nil
-		}
+	// Build stream request for isolation validation
+	streamReq := &stream.StreamRequest{
+		Target:        targetAddr,
+		SourceAddr:    conn.RemoteAddr(),
+		SOCKSUsername: username,
 	}
+
+	// Validate stream request with isolation enforcer
+	isolationResult := s.isolationEnforcer.ValidateStreamRequest(streamReq)
+	if !isolationResult.Allowed {
+		s.logger.Error("Stream isolation violation",
+			"reason", isolationResult.Reason,
+			"target", targetAddr,
+			"username", username,
+			"remote", conn.RemoteAddr())
+		s.sendReply(conn, replyConnectionNotAllowed, nil)
+		return
+	}
+
+	// Log any warnings from isolation validation
+	for _, warning := range isolationResult.Warnings {
+		s.logger.Warn("Stream isolation warning", "warning", warning)
+	}
+
+	isolationKey := isolationResult.Key
 
 	// If circuit pool is available, request a circuit (isolated or not)
 	var circ *circuit.Circuit
@@ -365,6 +391,21 @@ func (s *Server) handleConnection(ctx context.Context, conn net.Conn) {
 				s.sendReply(conn, replyGeneralFailure, nil)
 				return
 			}
+
+			// Verify circuit compatibility with isolation enforcer (ROADMAP Phase 2.2)
+			compatible, reason := s.isolationEnforcer.CheckCircuitCompatibility(circ.ID, isolationKey)
+			if !compatible {
+				s.logger.Error("Circuit isolation incompatibility",
+					"circuit_id", circ.ID,
+					"isolation_key", isolationKey.String(),
+					"reason", reason)
+				circuitPool.Put(circ) // Return incompatible circuit
+				s.sendReply(conn, replyConnectionNotAllowed, nil)
+				return
+			}
+
+			// Register circuit with enforcer for tracking
+			s.isolationEnforcer.RegisterCircuit(circ.ID, isolationKey)
 
 			s.logger.Info("Using isolated circuit",
 				"circuit_id", circ.ID,
@@ -416,6 +457,13 @@ func (s *Server) handleConnection(ctx context.Context, conn net.Conn) {
 		return
 	}
 	defer s.streamMgr.RemoveStream(strm.ID)
+
+	// Set isolation key on stream and register with enforcer (ROADMAP Phase 2.2)
+	if isolationKey != nil {
+		strm.SetIsolationKey(isolationKey)
+		s.isolationEnforcer.RegisterStream(circ.ID, strm.ID)
+		defer s.isolationEnforcer.UnregisterStream(circ.ID, strm.ID)
+	}
 
 	s.logger.Info("Created stream",
 		"stream_id", strm.ID,
