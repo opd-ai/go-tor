@@ -191,8 +191,9 @@ func (e *IsolationEnforcer) ValidateStreamRequest(req *StreamRequest) *Isolation
 				return result
 			}
 			result.Warnings = append(result.Warnings, "credential isolation requested but no username provided")
+		} else {
+			key.WithCredentials(req.SOCKSUsername)
 		}
-		key.WithCredentials(req.SOCKSUsername)
 
 	case circuit.IsolationPort:
 		port := e.extractSourcePort(req.SourceAddr)
@@ -209,8 +210,9 @@ func (e *IsolationEnforcer) ValidateStreamRequest(req *StreamRequest) *Isolation
 				return result
 			}
 			result.Warnings = append(result.Warnings, "session isolation requested but no token provided")
+		} else {
+			key.WithSessionToken(req.SessionToken)
 		}
-		key.WithSessionToken(req.SessionToken)
 	}
 
 	// Validate the key
@@ -320,9 +322,20 @@ func (e *IsolationEnforcer) CheckCircuitCompatibility(
 }
 
 // RegisterCircuit registers a circuit with its isolation key.
+// If the circuit is already registered, this is a no-op to preserve existing stream tracking.
+// The original isolation key is preserved when re-registering to maintain consistency.
 func (e *IsolationEnforcer) RegisterCircuit(circuitID uint32, key *circuit.IsolationKey) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+
+	// Check if circuit already exists to preserve stream tracking
+	if existingKey, exists := e.circuitKeys[circuitID]; exists {
+		e.logger.Debug("Circuit already registered, preserving existing key and streams",
+			"circuit_id", circuitID,
+			"existing_key", existingKey,
+			"attempted_key", key)
+		return
+	}
 
 	e.circuitKeys[circuitID] = key
 	e.circuitStreams[circuitID] = make([]uint16, 0)
@@ -380,11 +393,11 @@ func (e *IsolationEnforcer) GetCircuitIsolationKey(circuitID uint32) *circuit.Is
 	return e.circuitKeys[circuitID]
 }
 
-// Stats returns statistics about tracked circuits and streams.
+// IsolationStats contains statistics about tracked circuits and streams.
 type IsolationStats struct {
-	TrackedCircuits int
-	TrackedStreams  int
-	IsolatedCount   int
+	TrackedCircuits  int
+	TrackedStreams   int
+	IsolatedCircuits int // Number of circuits that have isolation enabled
 }
 
 // Stats returns current isolation tracking statistics.
@@ -393,18 +406,18 @@ func (e *IsolationEnforcer) Stats() IsolationStats {
 	defer e.mu.RUnlock()
 
 	totalStreams := 0
-	isolatedCount := 0
+	isolatedCircuits := 0
 	for circuitID, streams := range e.circuitStreams {
 		totalStreams += len(streams)
 		if key, exists := e.circuitKeys[circuitID]; exists && key != nil && key.Level != circuit.IsolationNone {
-			isolatedCount++
+			isolatedCircuits++
 		}
 	}
 
 	return IsolationStats{
-		TrackedCircuits: len(e.circuitKeys),
-		TrackedStreams:  totalStreams,
-		IsolatedCount:   isolatedCount,
+		TrackedCircuits:  len(e.circuitKeys),
+		TrackedStreams:   totalStreams,
+		IsolatedCircuits: isolatedCircuits,
 	}
 }
 

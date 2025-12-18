@@ -144,7 +144,7 @@ func NewServerWithConfig(address string, circuitMgr *circuit.Manager, log *logge
 	}
 
 	// Create isolation policy from configuration (ROADMAP Phase 2.2)
-	isolationPolicy := buildIsolationPolicy(cfg)
+	isolationPolicy := buildIsolationPolicy(cfg, log)
 	isolationEnforcer := stream.NewIsolationEnforcer(isolationPolicy, log)
 
 	return &Server{
@@ -162,9 +162,12 @@ func NewServerWithConfig(address string, circuitMgr *circuit.Manager, log *logge
 }
 
 // buildIsolationPolicy creates an isolation policy from SOCKS server config.
-func buildIsolationPolicy(cfg *Config) *stream.IsolationPolicy {
+func buildIsolationPolicy(cfg *Config, log *logger.Logger) *stream.IsolationPolicy {
 	mode, err := stream.ParseIsolationMode(cfg.IsolationMode)
 	if err != nil {
+		log.Warn("Invalid isolation mode in configuration, defaulting to 'off'",
+			"configured_mode", cfg.IsolationMode,
+			"error", err)
 		mode = stream.IsolationModeOff
 	}
 

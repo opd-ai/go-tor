@@ -430,8 +430,8 @@ func TestIsolationEnforcer_CircuitRegistration(t *testing.T) {
 	if stats.TrackedStreams != 2 {
 		t.Errorf("TrackedStreams = %d, want 2", stats.TrackedStreams)
 	}
-	if stats.IsolatedCount != 1 {
-		t.Errorf("IsolatedCount = %d, want 1", stats.IsolatedCount)
+	if stats.IsolatedCircuits != 1 {
+		t.Errorf("IsolatedCircuits = %d, want 1", stats.IsolatedCircuits)
 	}
 
 	// Unregister stream
@@ -450,6 +450,44 @@ func TestIsolationEnforcer_CircuitRegistration(t *testing.T) {
 	stats = enforcer.Stats()
 	if stats.TrackedCircuits != 0 {
 		t.Errorf("TrackedCircuits after unregister = %d, want 0", stats.TrackedCircuits)
+	}
+}
+
+func TestIsolationEnforcer_RegisterCircuit_Idempotent(t *testing.T) {
+	policy := DefaultIsolationPolicy()
+	enforcer := NewIsolationEnforcer(policy, nil)
+
+	circuitID := uint32(1)
+	key := circuit.NewIsolationKey(circuit.IsolationDestination).
+		WithDestination("example.com:80")
+
+	// Register circuit
+	enforcer.RegisterCircuit(circuitID, key)
+
+	// Register some streams
+	enforcer.RegisterStream(circuitID, 1)
+	enforcer.RegisterStream(circuitID, 2)
+
+	stats := enforcer.Stats()
+	if stats.TrackedStreams != 2 {
+		t.Errorf("TrackedStreams = %d, want 2", stats.TrackedStreams)
+	}
+
+	// Register circuit again - should NOT reset stream list
+	newKey := circuit.NewIsolationKey(circuit.IsolationCredential).
+		WithCredentials("alice")
+	enforcer.RegisterCircuit(circuitID, newKey)
+
+	// Streams should still be tracked
+	stats = enforcer.Stats()
+	if stats.TrackedStreams != 2 {
+		t.Errorf("TrackedStreams after duplicate register = %d, want 2 (should be preserved)", stats.TrackedStreams)
+	}
+
+	// Original key should still be used
+	gotKey := enforcer.GetCircuitIsolationKey(circuitID)
+	if !gotKey.Equals(key) {
+		t.Error("Original isolation key should be preserved after duplicate registration")
 	}
 }
 
