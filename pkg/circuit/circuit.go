@@ -179,6 +179,36 @@ func (c *Circuit) Age() time.Duration {
 	return time.Since(c.CreatedAt)
 }
 
+// GetHops returns a copy of the circuit hops.
+// The returned slice is a copy to prevent external modification.
+func (c *Circuit) GetHops() []*Hop {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	hops := make([]*Hop, len(c.Hops))
+	copy(hops, c.Hops)
+	return hops
+}
+
+// Close closes the circuit and sets its state to closed.
+// This is safe to call multiple times.
+func (c *Circuit) Close() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.State == StateClosed {
+		return
+	}
+
+	c.State = StateClosed
+
+	// Close the relay receive channel if it exists
+	if c.relayReceiveChan != nil {
+		close(c.relayReceiveChan)
+		c.relayReceiveChan = nil
+	}
+}
+
 // Manager manages a collection of circuits
 type Manager struct {
 	circuits map[uint32]*Circuit
