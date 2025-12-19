@@ -12,7 +12,7 @@ data:
     # Network Settings
     SocksPort {{ .Values.service.socksPort }}
     ControlPort {{ .Values.service.controlPort }}
-    
+
     # Logging
     LogLevel {{ .Values.config.logLevel }}
 

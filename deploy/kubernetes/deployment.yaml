@@ -35,21 +35,17 @@ spec:
 
       containers:
         - name: go-tor
-          image: go-tor:latest
+          image: go-tor:0.1.0
           imagePullPolicy: IfNotPresent
 
-          # Command with all necessary flags
+          # Command with config file and essential flags
           args:
+            - "-config"
+            - "/etc/go-tor/torrc"
             - "-data-dir"
             - "/home/nonroot/.tor"
-            - "-socks-port"
-            - "9050"
-            - "-control-port"
-            - "9051"
             - "-metrics-port"
             - "9052"
-            - "-log-level"
-            - "info"
 
           ports:
             - name: socks
@@ -81,6 +77,9 @@ spec:
 
           # Volume mounts
           volumeMounts:
+            - name: config
+              mountPath: /etc/go-tor
+              readOnly: true
             - name: tor-data
               mountPath: /home/nonroot/.tor
             - name: tmp
@@ -117,6 +116,9 @@ spec:
             failureThreshold: 18  # 3 minutes max startup time
 
       volumes:
+        - name: config
+          configMap:
+            name: go-tor-config
         - name: tor-data
           emptyDir: {}
         - name: tmp
