@@ -340,9 +340,9 @@ func (s *Server) handleConnection(ctx context.Context, conn net.Conn) {
 		// Send success reply
 		s.sendReply(conn, replySuccess, conn.LocalAddr())
 
-		// In Phase 8, this would relay data through the rendezvous circuit
-		// For Phase 7.3.4, we just log success and close
-		s.logger.Debug("Onion service connection established (mock relay)")
+		// TODO: In production, relay data through the rendezvous circuit
+		// Current implementation establishes connection but does not relay traffic
+		s.logger.Debug("Onion service connection established, awaiting traffic relay implementation")
 		time.Sleep(100 * time.Millisecond)
 		return
 	}

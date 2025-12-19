@@ -339,7 +339,8 @@ func (s *Server) handleGetConf(conn *connection, args []string) {
 		return
 	}
 
-	// Return dummy values for now
+	// TODO: Return actual configuration values when Config reference is available
+	// Currently returns empty values for all keys as Config is not yet passed to Server
 	var replies []string
 	for _, key := range args {
 		replies = append(replies, fmt.Sprintf("250-%s=", key))
