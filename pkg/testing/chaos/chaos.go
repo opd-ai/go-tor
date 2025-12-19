@@ -260,6 +260,7 @@ var (
 // NetworkFaultInjector simulates network-level faults.
 type NetworkFaultInjector struct {
 	mu          sync.RWMutex
+	randMu      sync.Mutex // Separate mutex for rand to allow concurrent config reads
 	enabled     bool
 	partitioned bool
 	packetLoss  float64
@@ -337,19 +338,27 @@ func (n *NetworkFaultInjector) IsPartitioned() bool {
 
 // ShouldDropPacket returns true if the packet should be dropped.
 func (n *NetworkFaultInjector) ShouldDropPacket() bool {
-	n.mu.Lock()
-	defer n.mu.Unlock()
+	n.mu.RLock()
+	enabled := n.enabled
+	partitioned := n.partitioned
+	packetLoss := n.packetLoss
+	n.mu.RUnlock()
 
-	if !n.enabled {
+	if !enabled {
 		return false
 	}
 
-	if n.partitioned {
+	if partitioned {
 		atomic.AddInt64(&n.packetsDropped, 1)
 		return true
 	}
 
-	if n.rand.Float64() < n.packetLoss {
+	// Use separate mutex for rand access
+	n.randMu.Lock()
+	shouldDrop := n.rand.Float64() < packetLoss
+	n.randMu.Unlock()
+
+	if shouldDrop {
 		atomic.AddInt64(&n.packetsDropped, 1)
 		return true
 	}

@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/opd-ai/go-tor/pkg/circuit"
@@ -93,15 +94,16 @@ func (s *Suite) CreateMockCircuit(ctx context.Context, numHops int) (*circuit.Ci
 	default:
 	}
 
-	s.mu.Lock()
-	if !s.running {
-		s.mu.Unlock()
+	// Get unique ID using atomic operation (thread-safe)
+	id := atomic.AddUint32(&s.circuitIDCounter, 1)
+
+	s.mu.RLock()
+	running := s.running
+	s.mu.RUnlock()
+
+	if !running {
 		return nil, fmt.Errorf("suite not running")
 	}
-
-	id := s.circuitIDCounter + 1
-	s.circuitIDCounter = id
-	s.mu.Unlock()
 
 	circ := &circuit.Circuit{
 		ID:        id,
