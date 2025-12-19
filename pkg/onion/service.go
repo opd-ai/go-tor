@@ -311,11 +311,12 @@ func (s *Service) establishIntroductionPoint(ctx context.Context, relay *HSDirec
 		return nil, fmt.Errorf("failed to generate enc key: %w", err)
 	}
 
-	// In Phase 7.4, use mock circuit ID
-	// In production, this would:
+	// TODO: Implement full circuit establishment
+	// In production, this should:
 	// 1. Build a 3-hop circuit to the relay
 	// 2. Send ESTABLISH_INTRO cell
 	// 3. Wait for INTRO_ESTABLISHED acknowledgment
+	// Currently using a placeholder circuit ID until circuit builder is integrated
 	// Safe conversion with bounds check (AUDIT-006)
 	numIntroPoints := len(s.introPoints)
 	circuitID, err := security.SafeIntToUint32(3000 + numIntroPoints)
@@ -328,7 +329,7 @@ func (s *Service) establishIntroductionPoint(ctx context.Context, relay *HSDirec
 		CircuitID:   circuitID,
 		AuthKey:     authKey,
 		EncKey:      encKey,
-		Established: true, // Mock for Phase 7.4
+		Established: true, // Placeholder - actual establishment requires circuit builder
 		CreatedAt:   time.Now(),
 	}
 

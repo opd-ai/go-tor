@@ -13,6 +13,10 @@ import (
 	"github.com/opd-ai/go-tor/pkg/security"
 )
 
+// demoCircuitID is a placeholder circuit ID for demonstration purposes
+// In production, circuit IDs are assigned by the circuit builder
+const demoCircuitID = 1000
+
 func main() {
 	fmt.Println("=== Introduction Point Protocol Demo ===")
 	fmt.Println()
@@ -102,14 +106,17 @@ func main() {
 	fmt.Println("--- Creating Introduction Circuit ---")
 
 	ctx := context.Background()
-	// Pass nil for circuit builder to use mock implementation
+	// Without a real circuit builder, this will return an error
+	// In production, you would pass a configured circuit builder
 	circuitID, err := intro.CreateIntroductionCircuit(ctx, introPoint, nil)
 	if err != nil {
-		fmt.Printf("✗ Failed to create introduction circuit: %v\n", err)
-		return
+		fmt.Printf("  Note: %v\n", err)
+		fmt.Println("  This is expected - a circuit builder is required in production")
+		fmt.Println("  Using placeholder circuit ID for demo purposes")
+		circuitID = demoCircuitID
+	} else {
+		fmt.Printf("✓ Introduction circuit created (ID: %d)\n", circuitID)
 	}
-
-	fmt.Printf("✓ Introduction circuit created (ID: %d)\n", circuitID)
 	fmt.Println("  In a full implementation, this circuit would:")
 	fmt.Println("    1. Use the circuit builder to create a 3-hop circuit")
 	fmt.Println("    2. Extend to the introduction point")
@@ -119,14 +126,15 @@ func main() {
 	// === Part 5: Sending INTRODUCE1 Cell ===
 	fmt.Println("--- Sending INTRODUCE1 Cell ---")
 
-	// Pass nil for cell sender to use mock implementation
+	// Without a real cell sender, this will return an error
+	// In production, you would pass a configured cell sender
 	err = intro.SendIntroduce1(ctx, circuitID, introduce1Data, nil)
 	if err != nil {
-		fmt.Printf("✗ Failed to send INTRODUCE1: %v\n", err)
-		return
+		fmt.Printf("  Note: %v\n", err)
+		fmt.Println("  This is expected - a cell sender is required in production")
+	} else {
+		fmt.Println("✓ INTRODUCE1 cell sent")
 	}
-
-	fmt.Println("✓ INTRODUCE1 cell sent")
 	fmt.Println("  In a full implementation, this would:")
 	fmt.Println("    1. Wrap data in RELAY cell with INTRODUCE1 command")
 	fmt.Println("    2. Send over the circuit")
@@ -141,15 +149,17 @@ func main() {
 	freshDesc := createMockDescriptor(freshAddr)
 	client.CacheDescriptor(freshAddr, freshDesc)
 
+	// Without a real circuit builder, this will fail
+	// In production, you would configure the client with a circuit builder
 	fullCircuitID, err := client.ConnectToOnionService(ctx, freshAddr)
 	if err != nil {
-		fmt.Printf("✗ Failed to connect to onion service: %v\n", err)
-		return
+		fmt.Printf("  Note: %v\n", err)
+		fmt.Println("  This is expected - a circuit builder is required in production")
+	} else {
+		fmt.Printf("✓ Successfully orchestrated connection to onion service\n")
+		fmt.Printf("  Circuit ID: %d\n", fullCircuitID)
+		fmt.Printf("  Address: %s\n", freshAddr.String())
 	}
-
-	fmt.Printf("✓ Successfully orchestrated connection to onion service\n")
-	fmt.Printf("  Circuit ID: %d\n", fullCircuitID)
-	fmt.Printf("  Address: %s\n", freshAddr.String())
 	fmt.Println()
 
 	// === Summary ===
@@ -158,9 +168,9 @@ func main() {
 	fmt.Println("Phase 7.3.3 Implementation Status:")
 	fmt.Println("  ✓ Introduction point selection")
 	fmt.Println("  ✓ INTRODUCE1 cell construction")
-	fmt.Println("  ✓ Introduction circuit creation (mock)")
-	fmt.Println("  ✓ Cell sending protocol (mock)")
-	fmt.Println("  ✓ Full connection orchestration")
+	fmt.Println("  ✓ Introduction circuit creation (requires circuit builder)")
+	fmt.Println("  ✓ Cell sending protocol (requires cell sender)")
+	fmt.Println("  ✓ Full connection orchestration (requires circuit builder)")
 	fmt.Println()
 	fmt.Println("Next Steps (Phase 7.3.4):")
 	fmt.Println("  - Rendezvous point selection")

@@ -439,35 +439,6 @@ func (c *Client) fetchDescriptor(ctx context.Context, addr *Address) (*Descripto
 	return desc, nil
 }
 
-// createMockDescriptor creates a mock descriptor for testing ONLY
-// AUDIT-003: This function should NOT be called in production code paths
-// It exists solely for test infrastructure and examples
-func (c *Client) createMockDescriptor(addr *Address) *Descriptor {
-	// Calculate blinded public key and descriptor ID
-	timePeriod := GetTimePeriod(time.Now())
-	blindedPubkey := ComputeBlindedPubkey(ed25519.PublicKey(addr.Pubkey), timePeriod)
-	descriptorID := computeDescriptorID(blindedPubkey)
-
-	// Safe conversion of timestamp to uint64
-	now := time.Now()
-	revisionCounter, err := security.SafeUnixToUint64(now)
-	if err != nil {
-		// In case of error, use 0 as revision counter (should never happen with valid timestamps)
-		revisionCounter = 0
-	}
-
-	return &Descriptor{
-		Version:         3,
-		Address:         addr,
-		BlindedPubkey:   blindedPubkey,
-		DescriptorID:    descriptorID,
-		RevisionCounter: revisionCounter,
-		CreatedAt:       now,
-		Lifetime:        3 * time.Hour,
-		IntroPoints:     make([]IntroductionPoint, 0),
-	}
-}
-
 // computeDescriptorID computes the descriptor ID from a blinded public key
 func computeDescriptorID(blindedPubkey []byte) []byte {
 	h := sha3.New256()
@@ -1287,28 +1258,6 @@ func (h *HSDir) fetchFromHSDir(ctx context.Context, hsdir *HSDirectory, descript
 	return desc, nil
 }
 
-// createMockDescriptor creates a mock descriptor for testing ONLY
-// AUDIT-003: This function should NOT be called in production code paths
-// It exists solely for test infrastructure and examples
-func (h *HSDir) createMockDescriptor(descriptorID []byte) *Descriptor {
-	// Safe conversion of timestamp to uint64
-	now := time.Now()
-	revisionCounter, err := security.SafeUnixToUint64(now)
-	if err != nil {
-		// In case of error, use 0 as revision counter
-		revisionCounter = 0
-	}
-
-	return &Descriptor{
-		Version:         3,
-		DescriptorID:    descriptorID,
-		RevisionCounter: revisionCounter,
-		CreatedAt:       now,
-		Lifetime:        3 * time.Hour,
-		IntroPoints:     make([]IntroductionPoint, 0),
-	}
-}
-
 // IntroductionProtocol handles introduction point operations for onion services
 type IntroductionProtocol struct {
 	logger *logger.Logger
@@ -1434,12 +1383,11 @@ func (ip *IntroductionProtocol) BuildIntroduce1Cell(req *IntroduceRequest) ([]by
 	buf.Write(authKeyLenBytes)
 
 	// AUTH_KEY (AUTH_KEY_LEN bytes)
-	if len(req.IntroPoint.AuthKey) > 0 {
-		buf.Write(req.IntroPoint.AuthKey)
-	} else {
-		// Mock auth key for testing
-		buf.Write(make([]byte, 32))
+	// AUDIT-003: Auth key is required for INTRODUCE1 cells per Tor spec
+	if len(req.IntroPoint.AuthKey) == 0 {
+		return nil, fmt.Errorf("introduction point auth key is required")
 	}
+	buf.Write(req.IntroPoint.AuthKey)
 
 	// EXTENSIONS (N bytes) - empty for now
 	buf.WriteByte(0) // N_EXTENSIONS = 0
@@ -1448,8 +1396,10 @@ func (ip *IntroductionProtocol) BuildIntroduce1Cell(req *IntroduceRequest) ([]by
 	// - RENDEZVOUS_COOKIE (20 bytes)
 	// - ONION_KEY (32 bytes for x25519)
 	// - LINK_SPECIFIERS for rendezvous point
-	// For Phase 7.3.3, we'll create a simplified version
-	encryptedData := ip.buildEncryptedData(req)
+	encryptedData, err := ip.buildEncryptedData(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build encrypted data: %w", err)
+	}
 	buf.Write(encryptedData)
 
 	ip.logger.Debug("Built INTRODUCE1 cell",
@@ -1477,7 +1427,19 @@ func (ip *IntroductionProtocol) BuildIntroduce1Cell(req *IntroduceRequest) ([]by
 // Where ENCRYPTED_DATA contains:
 //
 //	RENDEZVOUS_COOKIE (20 bytes) || ONION_KEY (32 bytes) || LINK_SPECIFIERS (variable)
-func (ip *IntroductionProtocol) buildEncryptedData(req *IntroduceRequest) []byte {
+func (ip *IntroductionProtocol) buildEncryptedData(req *IntroduceRequest) ([]byte, error) {
+	// AUDIT-003: Validate required fields - no mock fallbacks
+	// Check IntroPoint first to avoid potential nil pointer issues
+	if req.IntroPoint == nil {
+		return nil, fmt.Errorf("introduction point is required")
+	}
+	if len(req.IntroPoint.EncKey) != 32 {
+		return nil, fmt.Errorf("introduction point encryption key must be 32 bytes, got %d", len(req.IntroPoint.EncKey))
+	}
+	if len(req.OnionKey) == 0 {
+		return nil, fmt.Errorf("onion key is required for INTRODUCE1 cell")
+	}
+
 	// Build plaintext payload
 	var plaintext bytes.Buffer
 
@@ -1485,12 +1447,7 @@ func (ip *IntroductionProtocol) buildEncryptedData(req *IntroduceRequest) []byte
 	plaintext.Write(req.RendezvousCookie)
 
 	// ONION_KEY (32 bytes for x25519)
-	if len(req.OnionKey) > 0 {
-		plaintext.Write(req.OnionKey)
-	} else {
-		// Mock onion key
-		plaintext.Write(make([]byte, 32))
-	}
+	plaintext.Write(req.OnionKey)
 
 	// LINK_SPECIFIERS for rendezvous point
 	// Format: N_SPEC [1 byte] || LINK_SPEC_1 || ... || LINK_SPEC_N
@@ -1498,18 +1455,11 @@ func (ip *IntroductionProtocol) buildEncryptedData(req *IntroduceRequest) []byte
 
 	plaintextData := plaintext.Bytes()
 
-	// If introduction point has no EncKey, return plaintext (mock/testing mode)
-	if req.IntroPoint == nil || len(req.IntroPoint.EncKey) != 32 {
-		ip.logger.Debug("No valid intro point EncKey, using plaintext mode")
-		return plaintextData
-	}
-
 	// Encrypt the data using introduction point's encryption key
 	// AUDIT-006: Now captures the ephemeral private key for handshake verification
 	encryptedData, clientPubKey, clientPrivKey, err := ip.encryptIntroduce1Data(plaintextData, req.IntroPoint.EncKey)
 	if err != nil {
-		ip.logger.Warn("Failed to encrypt INTRODUCE1 data, using plaintext", "error", err)
-		return plaintextData
+		return nil, fmt.Errorf("failed to encrypt INTRODUCE1 data: %w", err)
 	}
 
 	// AUDIT-006: Store the ephemeral private key in the request for later use
@@ -1530,7 +1480,7 @@ func (ip *IntroductionProtocol) buildEncryptedData(req *IntroduceRequest) []byte
 		"encrypted_len", len(encryptedData),
 		"total_len", result.Len())
 
-	return result.Bytes()
+	return result.Bytes(), nil
 }
 
 // encryptIntroduce1Data encrypts the INTRODUCE1 data using the introduction point's public key
@@ -1648,12 +1598,9 @@ func (ip *IntroductionProtocol) CreateIntroductionCircuit(ctx context.Context, i
 		return circuitID, nil
 	}
 
-	// Fallback: Mock circuit ID for testing when no circuit builder is available
-	circuitID := uint32(1000)
-	ip.logger.Debug("Introduction circuit created (mock - no circuit builder)",
-		"circuit_id", circuitID)
-
-	return circuitID, nil
+	// AUDIT-003: No mock fallbacks in production code
+	// A circuit builder is required to create an introduction circuit
+	return 0, fmt.Errorf("circuit builder is required to create introduction circuit")
 }
 
 // SendIntroduce1 sends an INTRODUCE1 cell over a circuit
@@ -1680,9 +1627,9 @@ func (ip *IntroductionProtocol) SendIntroduce1(ctx context.Context, circuitID ui
 		return nil
 	}
 
-	// Fallback: Mock sending when no cell sender is available
-	ip.logger.Debug("INTRODUCE1 cell sent (mock - no cell sender)")
-	return nil
+	// AUDIT-003: No mock fallbacks in production code
+	// A cell sender is required to send the INTRODUCE1 cell
+	return fmt.Errorf("cell sender is required to send INTRODUCE1 cell")
 }
 
 // ConnectToOnionService orchestrates the full connection process to an onion service
@@ -1864,12 +1811,9 @@ func (rp *RendezvousProtocol) CreateRendezvousCircuit(ctx context.Context, rende
 		return circuitID, nil
 	}
 
-	// Fallback: Mock circuit ID for testing when no circuit builder is available
-	circuitID := uint32(2000)
-	rp.logger.Debug("Rendezvous circuit created (mock - no circuit builder)",
-		"circuit_id", circuitID)
-
-	return circuitID, nil
+	// AUDIT-003: No mock fallbacks in production code
+	// A circuit builder is required to create a rendezvous circuit
+	return 0, fmt.Errorf("circuit builder is required to create rendezvous circuit")
 }
 
 // SendEstablishRendezvous sends an ESTABLISH_RENDEZVOUS cell over a circuit
@@ -1909,9 +1853,9 @@ func (rp *RendezvousProtocol) SendEstablishRendezvous(ctx context.Context, circu
 		return nil
 	}
 
-	// Fallback: Mock sending when no cell sender is available
-	rp.logger.Debug("ESTABLISH_RENDEZVOUS cell sent (mock - no cell sender)")
-	return nil
+	// AUDIT-003: No mock fallbacks in production code
+	// A cell sender is required to send the ESTABLISH_RENDEZVOUS cell
+	return fmt.Errorf("cell sender is required to send ESTABLISH_RENDEZVOUS cell")
 }
 
 // Rendezvous1Request represents a RENDEZVOUS1 request
@@ -2008,11 +1952,9 @@ func (rp *RendezvousProtocol) WaitForRendezvous2(ctx context.Context, circuitID 
 		return parsedData, nil
 	}
 
-	// Fallback: Mock handshake data when no cell sender is available
-	handshakeData := make([]byte, 32)
-	rp.logger.Debug("Received RENDEZVOUS2 cell (mock - no cell sender)", "handshake_data_len", len(handshakeData))
-
-	return handshakeData, nil
+	// AUDIT-003: No mock fallbacks in production code
+	// A cell sender is required to receive the RENDEZVOUS2 cell
+	return nil, fmt.Errorf("cell sender is required to receive RENDEZVOUS2 cell")
 }
 
 // EstablishRendezvousPoint orchestrates establishing a rendezvous point

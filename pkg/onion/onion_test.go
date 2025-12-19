@@ -1218,10 +1218,11 @@ func TestBuildIntroduce1Cell(t *testing.T) {
 			errContains: "invalid rendezvous cookie length",
 		},
 		{
-			name: "valid request with auth key",
+			name: "valid request with complete keys",
 			request: &IntroduceRequest{
 				IntroPoint: &IntroductionPoint{
 					AuthKey: make([]byte, 32),
+					EncKey:  make([]byte, 32), // Required for encryption
 				},
 				RendezvousCookie: rendezvousCookie,
 				RendezvousPoint:  "test-rendezvous-point",
@@ -1232,15 +1233,43 @@ func TestBuildIntroduce1Cell(t *testing.T) {
 			minSize:   75, // LEGACY_KEY_ID(20) + AUTH_KEY_TYPE(1) + AUTH_KEY_LEN(2) + AUTH_KEY(32) + EXT(1) + ENCRYPTED(>=20)
 		},
 		{
-			name: "valid request without auth key",
+			name: "request without auth key - should fail",
 			request: &IntroduceRequest{
-				IntroPoint:       &IntroductionPoint{},
+				IntroPoint: &IntroductionPoint{
+					EncKey: make([]byte, 32),
+				},
+				RendezvousCookie: rendezvousCookie,
+				RendezvousPoint:  "test-rendezvous-point",
+				OnionKey:         make([]byte, 32),
+			},
+			wantErr:     true,
+			errContains: "introduction point auth key is required",
+		},
+		{
+			name: "request without enc key - should fail",
+			request: &IntroduceRequest{
+				IntroPoint: &IntroductionPoint{
+					AuthKey: make([]byte, 32),
+				},
+				RendezvousCookie: rendezvousCookie,
+				RendezvousPoint:  "test-rendezvous-point",
+				OnionKey:         make([]byte, 32),
+			},
+			wantErr:     true,
+			errContains: "introduction point encryption key must be 32 bytes",
+		},
+		{
+			name: "request without onion key - should fail",
+			request: &IntroduceRequest{
+				IntroPoint: &IntroductionPoint{
+					AuthKey: make([]byte, 32),
+					EncKey:  make([]byte, 32),
+				},
 				RendezvousCookie: rendezvousCookie,
 				RendezvousPoint:  "test-rendezvous-point",
 			},
-			wantErr:   false,
-			checkSize: true,
-			minSize:   75,
+			wantErr:     true,
+			errContains: "onion key is required",
 		},
 	}
 
@@ -1291,15 +1320,18 @@ func TestCreateIntroductionCircuit(t *testing.T) {
 			errContains: "introduction point is nil",
 		},
 		{
-			name: "valid introduction point",
+			// AUDIT-003: nil circuit builder now returns error instead of mock
+			name: "valid introduction point without circuit builder",
 			introPoint: &IntroductionPoint{
 				OnionKey: make([]byte, 32),
 				AuthKey:  make([]byte, 32),
 			},
-			wantErr: false,
+			wantErr:     true,
+			errContains: "circuit builder is required",
 		},
 		{
-			name: "introduction point with link specifiers",
+			// AUDIT-003: nil circuit builder now returns error instead of mock
+			name: "introduction point with link specifiers without circuit builder",
 			introPoint: &IntroductionPoint{
 				OnionKey: make([]byte, 32),
 				AuthKey:  make([]byte, 32),
@@ -1307,12 +1339,14 @@ func TestCreateIntroductionCircuit(t *testing.T) {
 					{Type: 0, Data: []byte{192, 168, 1, 1}},
 				},
 			},
-			wantErr: false,
+			wantErr:     true,
+			errContains: "circuit builder is required",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Pass nil circuit builder - now returns error per AUDIT-003
 			circuitID, err := intro.CreateIntroductionCircuit(ctx, tt.introPoint, nil)
 
 			if tt.wantErr {
@@ -1357,15 +1391,18 @@ func TestSendIntroduce1(t *testing.T) {
 			errContains: "introduce1 data is empty",
 		},
 		{
-			name:      "valid data",
-			circuitID: 1000,
-			data:      make([]byte, 100),
-			wantErr:   false,
+			// AUDIT-003: nil cell sender now returns error instead of mock
+			name:        "valid data without cell sender",
+			circuitID:   1000,
+			data:        make([]byte, 100),
+			wantErr:     true,
+			errContains: "cell sender is required",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Pass nil cell sender - now returns error per AUDIT-003
 			err := intro.SendIntroduce1(ctx, tt.circuitID, tt.data, nil)
 
 			if tt.wantErr {
@@ -1384,6 +1421,7 @@ func TestSendIntroduce1(t *testing.T) {
 }
 
 // TestConnectToOnionService tests the full connection orchestration
+// AUDIT-003: Without circuit builder, connection should fail with proper error
 func TestConnectToOnionService(t *testing.T) {
 	log := logger.NewDefault()
 	client := NewClient(log)
@@ -1396,7 +1434,7 @@ func TestConnectToOnionService(t *testing.T) {
 	}
 	addr.Raw = addr.Encode()
 
-	// Create a mock descriptor with introduction points
+	// Create a test descriptor with introduction points
 	desc := &Descriptor{
 		Version: 3,
 		Address: addr,
@@ -1404,6 +1442,7 @@ func TestConnectToOnionService(t *testing.T) {
 			{
 				OnionKey: make([]byte, 32),
 				AuthKey:  make([]byte, 32),
+				EncKey:   make([]byte, 32),
 			},
 		},
 		CreatedAt: time.Now(),
@@ -1413,8 +1452,8 @@ func TestConnectToOnionService(t *testing.T) {
 	// Cache the descriptor so we don't need HSDirs
 	client.CacheDescriptor(addr, desc)
 
-	// Provide mock relays for rendezvous point selection
-	mockRelays := []*HSDirectory{
+	// Provide relays for rendezvous point selection
+	testRelays := []*HSDirectory{
 		{
 			Fingerprint: "0000000000000000000000000000000000000001",
 			Address:     "127.0.0.1",
@@ -1422,18 +1461,21 @@ func TestConnectToOnionService(t *testing.T) {
 			HSDir:       true,
 		},
 	}
-	client.UpdateHSDirs(mockRelays)
+	client.UpdateHSDirs(testRelays)
 
 	ctx := context.Background()
 
-	// Test connection
-	circuitID, err := client.ConnectToOnionService(ctx, addr)
-	if err != nil {
-		t.Errorf("Failed to connect to onion service: %v", err)
+	// Test connection - should fail because no circuit builder is configured
+	// AUDIT-003: Mock fallbacks removed, requires real circuit builder
+	_, err := client.ConnectToOnionService(ctx, addr)
+	if err == nil {
+		t.Error("Expected error without circuit builder")
+		return
 	}
 
-	if circuitID == 0 {
-		t.Error("Expected non-zero circuit ID")
+	// Verify error message indicates circuit builder is required
+	if !strings.Contains(err.Error(), "circuit builder is required") {
+		t.Errorf("Expected 'circuit builder is required' error, got: %v", err)
 	}
 }
 
@@ -1447,9 +1489,11 @@ func TestIntroduce1CellFormat(t *testing.T) {
 		rendezvousCookie[i] = byte(i)
 	}
 
+	// AUDIT-003: Include all required fields (AuthKey, EncKey, OnionKey)
 	req := &IntroduceRequest{
 		IntroPoint: &IntroductionPoint{
 			AuthKey: make([]byte, 32),
+			EncKey:  make([]byte, 32),
 		},
 		RendezvousCookie: rendezvousCookie,
 		RendezvousPoint:  "test-rp",
@@ -1659,42 +1703,50 @@ func TestCreateRendezvousCircuit(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
-		name              string
-		rendezvousPoint   *HSDirectory
-		expectError       bool
-		expectedCircuitID uint32
+		name            string
+		rendezvousPoint *HSDirectory
+		expectError     bool
+		errContains     string
 	}{
 		{
 			name:            "nil rendezvous point",
 			rendezvousPoint: nil,
 			expectError:     true,
+			errContains:     "rendezvous point is nil",
 		},
 		{
-			name: "valid rendezvous point",
+			// AUDIT-003: nil circuit builder now returns error instead of mock
+			name: "valid rendezvous point without circuit builder",
 			rendezvousPoint: &HSDirectory{
 				Fingerprint: "test-rp",
 				Address:     "1.1.1.1",
 				ORPort:      9001,
 			},
-			expectError:       false,
-			expectedCircuitID: 2000,
+			expectError: true,
+			errContains: "circuit builder is required",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Pass nil circuit builder - now returns error per AUDIT-003
 			circuitID, err := rendezvous.CreateRendezvousCircuit(ctx, tt.rendezvousPoint, nil)
 
 			if tt.expectError {
 				if err == nil {
 					t.Error("Expected error but got none")
+				} else if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
+					t.Errorf("Error message %q does not contain %q", err.Error(), tt.errContains)
+				}
+				if circuitID != 0 {
+					t.Errorf("Expected circuit ID 0 on error, got %d", circuitID)
 				}
 			} else {
 				if err != nil {
 					t.Errorf("Unexpected error: %v", err)
 				}
-				if circuitID != tt.expectedCircuitID {
-					t.Errorf("Expected circuit ID %d, got %d", tt.expectedCircuitID, circuitID)
+				if circuitID == 0 {
+					t.Error("Expected non-zero circuit ID")
 				}
 			}
 		})
@@ -1712,28 +1764,35 @@ func TestSendEstablishRendezvous(t *testing.T) {
 		circuitID   uint32
 		data        []byte
 		expectError bool
+		errContains string
 	}{
 		{
 			name:        "empty data",
 			circuitID:   2000,
 			data:        []byte{},
 			expectError: true,
+			errContains: "establish rendezvous data is empty",
 		},
 		{
-			name:        "valid data",
+			// AUDIT-003: nil cell sender now returns error instead of mock
+			name:        "valid data without cell sender",
 			circuitID:   2000,
 			data:        make([]byte, 20),
-			expectError: false,
+			expectError: true,
+			errContains: "cell sender is required",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Pass nil cell sender - now returns error per AUDIT-003
 			err := rendezvous.SendEstablishRendezvous(ctx, tt.circuitID, tt.data, nil)
 
 			if tt.expectError {
 				if err == nil {
 					t.Error("Expected error but got none")
+				} else if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
+					t.Errorf("Error message %q does not contain %q", err.Error(), tt.errContains)
 				}
 			} else {
 				if err != nil {
@@ -1858,6 +1917,7 @@ func TestParseRendezvous2Cell(t *testing.T) {
 }
 
 // TestWaitForRendezvous2 tests waiting for RENDEZVOUS2 cell
+// AUDIT-003: Without cell sender, waiting should fail with proper error
 func TestWaitForRendezvous2(t *testing.T) {
 	log := logger.NewDefault()
 	rendezvous := NewRendezvousProtocol(log)
@@ -1865,17 +1925,21 @@ func TestWaitForRendezvous2(t *testing.T) {
 
 	circuitID := uint32(2000)
 
-	handshakeData, err := rendezvous.WaitForRendezvous2(ctx, circuitID, nil)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+	// Test without cell sender - should fail per AUDIT-003
+	_, err := rendezvous.WaitForRendezvous2(ctx, circuitID, nil)
+	if err == nil {
+		t.Error("Expected error without cell sender")
+		return
 	}
 
-	if len(handshakeData) == 0 {
-		t.Error("Expected non-empty handshake data")
+	// Verify error message indicates cell sender is required
+	if !strings.Contains(err.Error(), "cell sender is required") {
+		t.Errorf("Expected 'cell sender is required' error, got: %v", err)
 	}
 }
 
 // TestEstablishRendezvousPoint tests the full rendezvous point establishment
+// AUDIT-003: Without circuit builder, establishment should fail with proper error
 func TestEstablishRendezvousPoint(t *testing.T) {
 	log := logger.NewDefault()
 	client := NewClient(log)
@@ -1886,7 +1950,7 @@ func TestEstablishRendezvousPoint(t *testing.T) {
 		rendezvousCookie[i] = byte(i)
 	}
 
-	mockRelays := []*HSDirectory{
+	testRelays := []*HSDirectory{
 		{
 			Fingerprint: "relay1",
 			Address:     "1.1.1.1",
@@ -1901,25 +1965,21 @@ func TestEstablishRendezvousPoint(t *testing.T) {
 		},
 	}
 
-	circuitID, rendezvousPoint, err := client.EstablishRendezvousPoint(ctx, rendezvousCookie, mockRelays)
-	if err != nil {
-		t.Fatalf("Failed to establish rendezvous point: %v", err)
+	// Test without circuit builder - should fail per AUDIT-003
+	_, _, err := client.EstablishRendezvousPoint(ctx, rendezvousCookie, testRelays)
+	if err == nil {
+		t.Error("Expected error without circuit builder")
+		return
 	}
 
-	if circuitID == 0 {
-		t.Error("Expected non-zero circuit ID")
-	}
-
-	if rendezvousPoint == nil {
-		t.Fatal("Expected non-nil rendezvous point")
-	}
-
-	if rendezvousPoint.Fingerprint == "" {
-		t.Error("Expected non-empty rendezvous point fingerprint")
+	// Verify error message indicates circuit builder is required
+	if !strings.Contains(err.Error(), "circuit builder is required") {
+		t.Errorf("Expected 'circuit builder is required' error, got: %v", err)
 	}
 }
 
 // TestCompleteRendezvous tests completing the rendezvous protocol
+// AUDIT-003: Without cell sender, completion should fail with proper error
 func TestCompleteRendezvous(t *testing.T) {
 	log := logger.NewDefault()
 	client := NewClient(log)
@@ -1927,9 +1987,16 @@ func TestCompleteRendezvous(t *testing.T) {
 
 	rendezvousCircuitID := uint32(2000)
 
+	// Test without cell sender - should fail per AUDIT-003
 	err := client.CompleteRendezvous(ctx, rendezvousCircuitID)
-	if err != nil {
-		t.Errorf("Failed to complete rendezvous: %v", err)
+	if err == nil {
+		t.Error("Expected error without cell sender")
+		return
+	}
+
+	// Verify error message indicates cell sender is required
+	if !strings.Contains(err.Error(), "cell sender is required") {
+		t.Errorf("Expected 'cell sender is required' error, got: %v", err)
 	}
 }
 
@@ -2232,7 +2299,10 @@ func TestBuildEncryptedDataWithEncryption(t *testing.T) {
 	}
 
 	// Build encrypted data
-	result := ip.buildEncryptedData(req)
+	result, err := ip.buildEncryptedData(req)
+	if err != nil {
+		t.Fatalf("buildEncryptedData failed: %v", err)
+	}
 
 	// Verify result contains: CLIENT_PK (32 bytes) + ENCRYPTED_DATA
 	// Plaintext would be: RENDEZVOUS_COOKIE (20) + ONION_KEY (32) + N_SPEC (1) = 53 bytes
@@ -2257,7 +2327,8 @@ func TestBuildEncryptedDataWithEncryption(t *testing.T) {
 	}
 }
 
-// TestBuildEncryptedDataWithoutEncKey tests fallback to plaintext mode
+// TestBuildEncryptedDataWithoutEncKey tests that missing encryption keys return errors
+// AUDIT-003: No mock fallbacks - missing required fields should return errors
 func TestBuildEncryptedDataWithoutEncKey(t *testing.T) {
 	log := logger.NewDefault()
 	ip := NewIntroductionProtocol(log)
@@ -2268,16 +2339,19 @@ func TestBuildEncryptedDataWithoutEncKey(t *testing.T) {
 	tests := []struct {
 		name       string
 		introPoint *IntroductionPoint
+		wantErr    string
 	}{
 		{
 			name:       "nil introduction point",
 			introPoint: nil,
+			wantErr:    "introduction point is required",
 		},
 		{
 			name: "introduction point with no EncKey",
 			introPoint: &IntroductionPoint{
 				AuthKey: make([]byte, 32),
 			},
+			wantErr: "introduction point encryption key must be 32 bytes",
 		},
 		{
 			name: "introduction point with invalid EncKey length",
@@ -2285,6 +2359,7 @@ func TestBuildEncryptedDataWithoutEncKey(t *testing.T) {
 				EncKey:  make([]byte, 16), // Wrong length
 				AuthKey: make([]byte, 32),
 			},
+			wantErr: "introduction point encryption key must be 32 bytes",
 		},
 	}
 
@@ -2296,17 +2371,14 @@ func TestBuildEncryptedDataWithoutEncKey(t *testing.T) {
 				OnionKey:         onionKey,
 			}
 
-			result := ip.buildEncryptedData(req)
-
-			// Should return plaintext: RENDEZVOUS_COOKIE (20) + ONION_KEY (32) + N_SPEC (1) = 53 bytes
-			expectedLen := 53
-			if len(result) != expectedLen {
-				t.Errorf("Plaintext result length = %d, want %d", len(result), expectedLen)
+			_, err := ip.buildEncryptedData(req)
+			if err == nil {
+				t.Error("Expected error for missing/invalid EncKey")
+				return
 			}
 
-			// Verify it starts with rendezvous cookie
-			if !bytes.Equal(result[0:20], rendezvousCookie) {
-				t.Error("Result should start with rendezvous cookie")
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("Error = %q, want to contain %q", err.Error(), tt.wantErr)
 			}
 		})
 	}
