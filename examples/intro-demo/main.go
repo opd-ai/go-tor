@@ -13,6 +13,10 @@ import (
 	"github.com/opd-ai/go-tor/pkg/security"
 )
 
+// demoCircuitID is a placeholder circuit ID for demonstration purposes
+// In production, circuit IDs are assigned by the circuit builder
+const demoCircuitID = 1000
+
 func main() {
 	fmt.Println("=== Introduction Point Protocol Demo ===")
 	fmt.Println()
@@ -109,7 +113,7 @@ func main() {
 		fmt.Printf("  Note: %v\n", err)
 		fmt.Println("  This is expected - a circuit builder is required in production")
 		fmt.Println("  Using placeholder circuit ID for demo purposes")
-		circuitID = 1000
+		circuitID = demoCircuitID
 	} else {
 		fmt.Printf("✓ Introduction circuit created (ID: %d)\n", circuitID)
 	}

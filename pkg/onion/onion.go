@@ -439,8 +439,6 @@ func (c *Client) fetchDescriptor(ctx context.Context, addr *Address) (*Descripto
 	return desc, nil
 }
 
-
-
 // computeDescriptorID computes the descriptor ID from a blinded public key
 func computeDescriptorID(blindedPubkey []byte) []byte {
 	h := sha3.New256()
@@ -1431,14 +1429,15 @@ func (ip *IntroductionProtocol) BuildIntroduce1Cell(req *IntroduceRequest) ([]by
 //	RENDEZVOUS_COOKIE (20 bytes) || ONION_KEY (32 bytes) || LINK_SPECIFIERS (variable)
 func (ip *IntroductionProtocol) buildEncryptedData(req *IntroduceRequest) ([]byte, error) {
 	// AUDIT-003: Validate required fields - no mock fallbacks
-	if len(req.OnionKey) == 0 {
-		return nil, fmt.Errorf("onion key is required for INTRODUCE1 cell")
-	}
+	// Check IntroPoint first to avoid potential nil pointer issues
 	if req.IntroPoint == nil {
 		return nil, fmt.Errorf("introduction point is required")
 	}
 	if len(req.IntroPoint.EncKey) != 32 {
 		return nil, fmt.Errorf("introduction point encryption key must be 32 bytes, got %d", len(req.IntroPoint.EncKey))
+	}
+	if len(req.OnionKey) == 0 {
+		return nil, fmt.Errorf("onion key is required for INTRODUCE1 cell")
 	}
 
 	// Build plaintext payload
