@@ -1,0 +1,17 @@
+apiVersion: v2
+name: go-tor
+description: A Helm chart for deploying go-tor, a pure Go Tor client implementation
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - tor
+  - proxy
+  - privacy
+  - socks5
+home: https://github.com/opd-ai/go-tor
+sources:
+  - https://github.com/opd-ai/go-tor
+maintainers:
+  - name: opd-ai
+    url: https://github.com/opd-ai

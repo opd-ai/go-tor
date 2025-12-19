@@ -1,0 +1,18 @@
+# PodDisruptionBudget for go-tor
+# Ensures availability during voluntary disruptions (e.g., node maintenance)
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: go-tor-pdb
+  namespace: go-tor
+  labels:
+    app.kubernetes.io/name: go-tor
+    app.kubernetes.io/component: proxy
+spec:
+  # Ensure at least one pod is available during disruptions
+  # For single replica deployments, use minAvailable: 0 to allow maintenance
+  # For multi-replica deployments, use minAvailable: 1 or maxUnavailable: 1
+  minAvailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: go-tor

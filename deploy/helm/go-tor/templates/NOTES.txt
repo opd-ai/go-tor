@@ -1,0 +1,30 @@
+1. Get the SOCKS proxy URL by running these commands:
+{{- if contains "NodePort" .Values.service.type }}
+  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "go-tor.fullname" . }})
+  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
+  echo "SOCKS proxy: socks5://$NODE_IP:$NODE_PORT"
+{{- else if contains "LoadBalancer" .Values.service.type }}
+  NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+        You can watch the status with: kubectl get --namespace {{ .Release.Namespace }} svc -w {{ include "go-tor.fullname" . }}
+  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "go-tor.fullname" . }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
+  echo "SOCKS proxy: socks5://$SERVICE_IP:{{ .Values.service.socksPort }}"
+{{- else if contains "ClusterIP" .Values.service.type }}
+  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "go-tor.name" . }},app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
+  export CONTAINER_PORT=$(kubectl get pod --namespace {{ .Release.Namespace }} $POD_NAME -o jsonpath="{.spec.containers[0].ports[0].containerPort}")
+  echo "Visit http://127.0.0.1:8080 for metrics and use socks5://127.0.0.1:{{ .Values.service.socksPort }} for the proxy"
+  kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME {{ .Values.service.socksPort }}:{{ .Values.service.socksPort }} {{ .Values.service.metricsPort }}:{{ .Values.service.metricsPort }}
+{{- end }}
+
+2. Test the connection with curl:
+   curl --socks5 127.0.0.1:{{ .Values.service.socksPort }} https://check.torproject.org
+
+3. View metrics:
+   kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "go-tor.fullname" . }} {{ .Values.service.metricsPort }}:{{ .Values.service.metricsPort }}
+   Then visit http://127.0.0.1:{{ .Values.service.metricsPort }}/metrics
+
+4. Check health:
+   kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "go-tor.fullname" . }} {{ .Values.service.metricsPort }}:{{ .Values.service.metricsPort }}
+   Then visit http://127.0.0.1:{{ .Values.service.metricsPort }}/health
+
+IMPORTANT: This is an educational implementation. Do NOT use for real anonymity needs.
+Use official Tor Browser or Arti for privacy-critical applications.

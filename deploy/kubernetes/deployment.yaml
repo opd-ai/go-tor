@@ -1,0 +1,136 @@
+# Deployment for go-tor client
+# Runs the Tor client with production-ready configuration
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: go-tor
+  namespace: go-tor
+  labels:
+    app.kubernetes.io/name: go-tor
+    app.kubernetes.io/component: proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: go-tor
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: go-tor
+        app.kubernetes.io/component: proxy
+      annotations:
+        # Prometheus scrape annotations
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9052"
+        prometheus.io/path: "/metrics"
+    spec:
+      # Security context for the pod
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+
+      containers:
+        - name: go-tor
+          image: go-tor:latest
+          imagePullPolicy: IfNotPresent
+
+          # Command with all necessary flags
+          args:
+            - "-data-dir"
+            - "/home/nonroot/.tor"
+            - "-socks-port"
+            - "9050"
+            - "-control-port"
+            - "9051"
+            - "-metrics-port"
+            - "9052"
+            - "-log-level"
+            - "info"
+
+          ports:
+            - name: socks
+              containerPort: 9050
+              protocol: TCP
+            - name: control
+              containerPort: 9051
+              protocol: TCP
+            - name: metrics
+              containerPort: 9052
+              protocol: TCP
+
+          # Resource limits and requests
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+
+          # Security context for container
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+
+          # Volume mounts
+          volumeMounts:
+            - name: tor-data
+              mountPath: /home/nonroot/.tor
+            - name: tmp
+              mountPath: /tmp
+
+          # Liveness probe - checks if the process is running
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: metrics
+            initialDelaySeconds: 90
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+
+          # Readiness probe - checks if ready to receive traffic
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: metrics
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          # Startup probe - allows longer initial startup
+          startupProbe:
+            httpGet:
+              path: /health
+              port: metrics
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 18  # 3 minutes max startup time
+
+      volumes:
+        - name: tor-data
+          emptyDir: {}
+        - name: tmp
+          emptyDir:
+            sizeLimit: 10Mi
+
+      # Graceful termination
+      terminationGracePeriodSeconds: 30
+
+      # Topology spread for better availability
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: go-tor
