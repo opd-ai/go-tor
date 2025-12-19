@@ -27,14 +27,6 @@ data:
     ConnLimit {{ .Values.config.connLimit }}
     DormantTimeout {{ .Values.config.dormantTimeout }}
 
-    # Performance Tuning
-    EnableConnectionPooling {{ .Values.config.enableConnectionPooling }}
-    ConnectionPoolMaxIdle {{ .Values.config.connectionPoolMaxIdle }}
-    ConnectionPoolMaxLife {{ .Values.config.connectionPoolMaxLife }}
-    EnableCircuitPrebuilding {{ .Values.config.enableCircuitPrebuilding }}
-    CircuitPoolMinSize {{ .Values.config.circuitPoolMinSize }}
-    CircuitPoolMaxSize {{ .Values.config.circuitPoolMaxSize }}
-    EnableBufferPooling {{ .Values.config.enableBufferPooling }}
-
-    # Isolation
-    IsolationLevel {{ .Values.config.isolationLevel }}
+    # NOTE: Advanced options such as connection pooling, circuit prebuilding,
+    # buffer pooling, and isolation levels are configured programmatically
+    # by go-tor and are not parsed from this torrc file.

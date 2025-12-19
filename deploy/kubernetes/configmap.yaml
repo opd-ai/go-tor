@@ -31,14 +31,6 @@ data:
     ConnLimit 1000
     DormantTimeout 24h
 
-    # Performance Tuning
-    EnableConnectionPooling true
-    ConnectionPoolMaxIdle 5
-    ConnectionPoolMaxLife 10m
-    EnableCircuitPrebuilding true
-    CircuitPoolMinSize 2
-    CircuitPoolMaxSize 10
-    EnableBufferPooling true
-
-    # Isolation (none for performance, change to destination for privacy)
-    IsolationLevel none
+    # NOTE: Advanced options such as connection pooling, circuit prebuilding,
+    # buffer pooling, and isolation levels are configured programmatically
+    # by go-tor and are not parsed from this torrc file.

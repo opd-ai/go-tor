@@ -45,3 +45,11 @@ spec:
       port: 9050
       targetPort: socks
       protocol: TCP
+    - name: control
+      port: 9051
+      targetPort: control
+      protocol: TCP
+    - name: metrics
+      port: 9052
+      targetPort: metrics
+      protocol: TCP

@@ -37,5 +37,13 @@ spec:
       targetPort: socks
       protocol: TCP
       name: socks
+    - port: {{ .Values.service.controlPort }}
+      targetPort: control
+      protocol: TCP
+      name: control
+    - port: {{ .Values.service.metricsPort }}
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
   selector:
     {{- include "go-tor.selectorLabels" . | nindent 4 }}

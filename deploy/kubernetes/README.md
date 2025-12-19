@@ -7,11 +7,7 @@ This directory contains Kubernetes manifests for deploying go-tor.
 ### Using Kustomize
 
 ```bash
-# Apply all resources
-kubectl apply -k deploy/kubernetes/
-
-# Or deploy to a specific namespace
-kubectl create namespace go-tor
+# Apply all resources (creates the `go-tor` namespace automatically)
 kubectl apply -k deploy/kubernetes/
 ```
 

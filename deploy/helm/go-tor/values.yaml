@@ -63,6 +63,9 @@ service:
   metricsPort: 9052
 
 # go-tor specific configuration
+# NOTE: Only options listed below are supported in the torrc file.
+# Advanced options like connection pooling, circuit prebuilding, buffer pooling,
+# and isolation levels are configured programmatically by go-tor.
 config:
   # Log level: debug, info, warn, error
   logLevel: info
@@ -80,18 +83,6 @@ config:
   connLimit: 1000
   # Dormant timeout
   dormantTimeout: "24h"
-  # Connection pooling
-  enableConnectionPooling: true
-  connectionPoolMaxIdle: 5
-  connectionPoolMaxLife: "10m"
-  # Circuit prebuilding
-  enableCircuitPrebuilding: true
-  circuitPoolMinSize: 2
-  circuitPoolMaxSize: 10
-  # Buffer pooling
-  enableBufferPooling: true
-  # Isolation level: none, destination, credential, port, session
-  isolationLevel: "none"
 
 # Resource limits and requests
 resources:

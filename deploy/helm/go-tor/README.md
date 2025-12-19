@@ -54,7 +54,11 @@ See [values.yaml](values.yaml) for the full list of configurable parameters.
 | `config.useEntryGuards` | Enable entry guards | `true` |
 | `config.circuitBuildTimeout` | Circuit build timeout | `60s` |
 | `config.maxCircuitDirtiness` | Max circuit age before rotation | `10m` |
-| `config.isolationLevel` | Stream isolation level | `none` |
+| `config.newCircuitPeriod` | New circuit creation period | `30s` |
+| `config.connLimit` | Maximum connections | `1000` |
+| `config.dormantTimeout` | Dormant timeout | `24h` |
+
+> **Note:** Advanced options like connection pooling, circuit prebuilding, buffer pooling, and isolation levels are configured programmatically by go-tor and are not available via torrc configuration.
 
 ### Resource Management
 
@@ -114,8 +118,8 @@ helm install tor-ha ./deploy/helm/go-tor -f ha-values.yaml
 ```yaml
 # privacy-values.yaml
 config:
-  isolationLevel: destination
   numEntryGuards: 4
+  circuitBuildTimeout: "90s"
 ```
 
 ```bash
