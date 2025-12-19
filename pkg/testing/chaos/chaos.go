@@ -37,10 +37,10 @@ type Config struct {
 // DefaultConfig returns sensible defaults for chaos testing.
 func DefaultConfig() *Config {
 	return &Config{
-		FailureRate:      0.1,                 // 10% failure rate
+		FailureRate:      0.1, // 10% failure rate
 		LatencyMin:       10 * time.Millisecond,
 		LatencyMax:       100 * time.Millisecond,
-		ConnectionDrops:  0.05,                // 5% connection drop rate
+		ConnectionDrops:  0.05, // 5% connection drop rate
 		TimeoutDuration:  5 * time.Second,
 		RecoveryInterval: 100 * time.Millisecond,
 	}
@@ -49,10 +49,10 @@ func DefaultConfig() *Config {
 // AggressiveConfig returns a more aggressive chaos configuration.
 func AggressiveConfig() *Config {
 	return &Config{
-		FailureRate:      0.3,                 // 30% failure rate
+		FailureRate:      0.3, // 30% failure rate
 		LatencyMin:       50 * time.Millisecond,
 		LatencyMax:       500 * time.Millisecond,
-		ConnectionDrops:  0.15,                // 15% connection drop rate
+		ConnectionDrops:  0.15, // 15% connection drop rate
 		TimeoutDuration:  2 * time.Second,
 		RecoveryInterval: 50 * time.Millisecond,
 	}
@@ -60,18 +60,18 @@ func AggressiveConfig() *Config {
 
 // Engine provides chaos engineering capabilities.
 type Engine struct {
-	mu           sync.RWMutex
-	config       *Config
-	logger       *logger.Logger
-	enabled      bool
-	paused       bool
-	
+	mu      sync.RWMutex
+	config  *Config
+	logger  *logger.Logger
+	enabled bool
+	paused  bool
+
 	// Statistics
-	failuresInjected   int64
-	latencyInjected    int64
-	dropsInjected      int64
-	timeoutsInjected   int64
-	
+	failuresInjected int64
+	latencyInjected  int64
+	dropsInjected    int64
+	timeoutsInjected int64
+
 	// Random source
 	rand *rand.Rand
 }
@@ -84,7 +84,7 @@ func NewEngine(cfg *Config, log *logger.Logger) *Engine {
 	if log == nil {
 		log = logger.NewDefault()
 	}
-	
+
 	return &Engine{
 		config:  cfg,
 		logger:  log,
@@ -136,17 +136,17 @@ func (e *Engine) MaybeInjectFailure() error {
 	if !e.IsActive() {
 		return nil
 	}
-	
+
 	e.mu.Lock()
 	shouldFail := e.rand.Float64() < e.config.FailureRate
 	e.mu.Unlock()
-	
+
 	if shouldFail {
 		atomic.AddInt64(&e.failuresInjected, 1)
 		e.logger.Debug("Chaos: injecting failure")
 		return ErrChaosFailure
 	}
-	
+
 	return nil
 }
 
@@ -155,12 +155,12 @@ func (e *Engine) MaybeInjectLatency() {
 	if !e.IsActive() {
 		return
 	}
-	
+
 	e.mu.Lock()
 	latencyRange := e.config.LatencyMax - e.config.LatencyMin
 	latency := e.config.LatencyMin + time.Duration(e.rand.Int63n(int64(latencyRange)))
 	e.mu.Unlock()
-	
+
 	atomic.AddInt64(&e.latencyInjected, 1)
 	e.logger.Debug("Chaos: injecting latency", "duration", latency)
 	time.Sleep(latency)
@@ -172,17 +172,17 @@ func (e *Engine) MaybeInjectDrop() bool {
 	if !e.IsActive() {
 		return false
 	}
-	
+
 	e.mu.Lock()
 	shouldDrop := e.rand.Float64() < e.config.ConnectionDrops
 	e.mu.Unlock()
-	
+
 	if shouldDrop {
 		atomic.AddInt64(&e.dropsInjected, 1)
 		e.logger.Debug("Chaos: injecting connection drop")
 		return true
 	}
-	
+
 	return false
 }
 
@@ -191,7 +191,7 @@ func (e *Engine) WrapContext(ctx context.Context) (context.Context, context.Canc
 	if !e.IsActive() {
 		return ctx, func() {}
 	}
-	
+
 	return context.WithTimeout(ctx, e.config.TimeoutDuration)
 }
 
@@ -200,18 +200,18 @@ func (e *Engine) MaybeTimeout(ctx context.Context) error {
 	if !e.IsActive() {
 		return nil
 	}
-	
+
 	e.mu.Lock()
 	// 20% chance to force timeout when chaos is active
 	shouldTimeout := e.rand.Float64() < 0.2
 	e.mu.Unlock()
-	
+
 	if shouldTimeout {
 		atomic.AddInt64(&e.timeoutsInjected, 1)
 		e.logger.Debug("Chaos: forcing timeout")
 		return context.DeadlineExceeded
 	}
-	
+
 	return nil
 }
 
@@ -255,14 +255,14 @@ var (
 
 // NetworkFaultInjector simulates network-level faults.
 type NetworkFaultInjector struct {
-	mu           sync.RWMutex
-	enabled      bool
-	partitioned  bool
-	packetLoss   float64
-	bandwidth    int64 // bytes per second, 0 = unlimited
-	logger       *logger.Logger
-	rand         *rand.Rand
-	
+	mu          sync.RWMutex
+	enabled     bool
+	partitioned bool
+	packetLoss  float64
+	bandwidth   int64 // bytes per second, 0 = unlimited
+	logger      *logger.Logger
+	rand        *rand.Rand
+
 	// Statistics
 	packetsDropped int64
 	bytesThrottled int64
@@ -275,7 +275,7 @@ func NewNetworkFaultInjector(log *logger.Logger) *NetworkFaultInjector {
 	}
 	return &NetworkFaultInjector{
 		logger: log,
-		rand:   rand.New(rand.NewSource(time.Now().UnixNano())), //nolint:gosec
+		rand:   rand.New(rand.NewSource(time.Now().UnixNano())), //nolint:gosec // G404: Use of weak random number generator is acceptable for network fault simulation
 	}
 }
 
@@ -335,21 +335,21 @@ func (n *NetworkFaultInjector) IsPartitioned() bool {
 func (n *NetworkFaultInjector) ShouldDropPacket() bool {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	
+
 	if !n.enabled {
 		return false
 	}
-	
+
 	if n.partitioned {
 		atomic.AddInt64(&n.packetsDropped, 1)
 		return true
 	}
-	
+
 	if n.rand.Float64() < n.packetLoss {
 		atomic.AddInt64(&n.packetsDropped, 1)
 		return true
 	}
-	
+
 	return false
 }
 
@@ -357,11 +357,11 @@ func (n *NetworkFaultInjector) ShouldDropPacket() bool {
 func (n *NetworkFaultInjector) ThrottleDelay(bytes int64) time.Duration {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	
+
 	if !n.enabled || n.bandwidth <= 0 {
 		return 0
 	}
-	
+
 	// Calculate delay: bytes / (bytes/second) = seconds
 	delay := time.Duration(float64(bytes) / float64(n.bandwidth) * float64(time.Second))
 	atomic.AddInt64(&n.bytesThrottled, bytes)
@@ -384,17 +384,17 @@ type NetworkFaultStats struct {
 
 // RelaySimulator simulates Tor relay behavior for testing.
 type RelaySimulator struct {
-	mu        sync.RWMutex
-	running   bool
-	healthy   bool
+	mu         sync.RWMutex
+	running    bool
+	healthy    bool
 	overloaded bool
-	logger    *logger.Logger
-	
+	logger     *logger.Logger
+
 	// Behavior configuration
-	responseDelay   time.Duration
-	failureRate     float64
+	responseDelay     time.Duration
+	failureRate       float64
 	overloadThreshold int32
-	
+
 	// Current state
 	activeConnections int32
 }
@@ -459,28 +459,28 @@ func (r *RelaySimulator) SetFailureRate(rate float64) {
 // AddConnection simulates a new connection.
 func (r *RelaySimulator) AddConnection() error {
 	connections := atomic.AddInt32(&r.activeConnections, 1)
-	
+
 	r.mu.RLock()
 	threshold := r.overloadThreshold
 	r.mu.RUnlock()
-	
+
 	if connections > threshold {
 		r.mu.Lock()
 		r.overloaded = true
 		r.mu.Unlock()
 	}
-	
+
 	return nil
 }
 
 // RemoveConnection simulates removing a connection.
 func (r *RelaySimulator) RemoveConnection() {
 	connections := atomic.AddInt32(&r.activeConnections, -1)
-	
+
 	r.mu.RLock()
 	threshold := r.overloadThreshold
 	r.mu.RUnlock()
-	
+
 	if connections < threshold/2 {
 		r.mu.Lock()
 		r.overloaded = false

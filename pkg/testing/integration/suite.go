@@ -24,13 +24,13 @@ import (
 // Suite provides the test harness for integration tests. It manages mock
 // servers, test fixtures, and lifecycle operations.
 type Suite struct {
-	mu          sync.RWMutex
-	logger      *logger.Logger
-	mockServers []*MockServer
-	circuits    map[uint32]*circuit.Circuit
+	mu               sync.RWMutex
+	logger           *logger.Logger
+	mockServers      []*MockServer
+	circuits         map[uint32]*circuit.Circuit
 	circuitIDCounter uint32
-	running     bool
-	startedAt   time.Time
+	running          bool
+	startedAt        time.Time
 }
 
 // NewSuite creates a new integration test suite with default configuration.
@@ -105,7 +105,7 @@ func (s *Suite) CreateMockCircuit(ctx context.Context, numHops int) (*circuit.Ci
 		hop := circuit.NewHop(
 			generateMockFingerprint(),
 			fmt.Sprintf("192.168.1.%d:9001", i+1),
-			i == 0,        // first hop is guard
+			i == 0,         // first hop is guard
 			i == numHops-1, // last hop is exit
 		)
 		circ.AddHop(hop)
