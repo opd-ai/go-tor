@@ -75,7 +75,7 @@ func TestCircuitRecoveryOnFailure(t *testing.T) {
 	// Eventually should have a working circuit
 	stats := circPool.Stats()
 	if stats.Open < 1 {
-		t.Logf("Warning: Expected at least 1 open circuit after recovery, got %d", stats.Open)
+		t.Errorf("Expected at least 1 open circuit after recovery, got %d", stats.Open)
 	}
 
 	t.Logf("Recovery test: %d attempts, %d failures, %d open circuits",
@@ -118,13 +118,18 @@ func TestCircuitPoolRecoveryFromEmpty(t *testing.T) {
 		circ.Close() // Close instead of putting back
 	}
 
-	// Wait for pool to rebuild
-	time.Sleep(300 * time.Millisecond)
-
-	// Pool should have recovered
-	stats := circPool.Stats()
-	if stats.Open < 1 {
-		t.Logf("Pool recovery in progress: %d open circuits", stats.Open)
+	// Wait for pool to rebuild, polling until at least one circuit is open or timeout
+	maxWait := 2 * time.Second
+	deadline := time.Now().Add(maxWait)
+	for {
+		stats := circPool.Stats()
+		if stats.Open >= 1 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("Pool did not recover to at least 1 open circuit within %v; stats: %+v", maxWait, stats)
+		}
+		time.Sleep(50 * time.Millisecond)
 	}
 }
 
@@ -404,12 +409,22 @@ func TestGracefulDegradation(t *testing.T) {
 	circPool := pool.NewCircuitPool(poolConfig, builder, log)
 	defer circPool.Close()
 
-	// Monitor pool health during degradation
+	// Monitor pool health during degradation using ticker-based collection
+	ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
+	defer cancel()
+
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
 	var samples []int
-	for i := 0; i < 10; i++ {
-		time.Sleep(100 * time.Millisecond)
-		stats := circPool.Stats()
-		samples = append(samples, stats.Open)
+	for len(samples) < 10 {
+		select {
+		case <-ctx.Done():
+			t.Fatalf("timed out collecting circuit pool stats: collected %d samples", len(samples))
+		case <-ticker.C:
+			stats := circPool.Stats()
+			samples = append(samples, stats.Open)
+		}
 	}
 
 	// System should maintain some capacity even during degradation

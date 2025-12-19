@@ -14,7 +14,6 @@ import (
 	"fmt"
 	"net"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/opd-ai/go-tor/pkg/circuit"
@@ -85,15 +84,25 @@ func (s *Suite) Stop() error {
 
 // CreateMockCircuit creates a simulated circuit for testing purposes.
 // The circuit will have the specified number of hops with mock relay data.
+// Note: Circuit IDs may be non-sequential if concurrent creation and context cancellation occur.
 func (s *Suite) CreateMockCircuit(ctx context.Context, numHops int) (*circuit.Circuit, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	// Check context first
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
 
+	s.mu.Lock()
 	if !s.running {
+		s.mu.Unlock()
 		return nil, fmt.Errorf("suite not running")
 	}
 
-	id := atomic.AddUint32(&s.circuitIDCounter, 1)
+	id := s.circuitIDCounter + 1
+	s.circuitIDCounter = id
+	s.mu.Unlock()
+
 	circ := &circuit.Circuit{
 		ID:        id,
 		CreatedAt: time.Now(),
@@ -111,11 +120,19 @@ func (s *Suite) CreateMockCircuit(ctx context.Context, numHops int) (*circuit.Ci
 		circ.AddHop(hop)
 	}
 
-	// Simulate build delay
+	// Simulate build delay outside of lock
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case <-time.After(10 * time.Millisecond):
+	}
+
+	// Re-acquire lock to add circuit to map
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.running {
+		return nil, fmt.Errorf("suite stopped during circuit creation")
 	}
 
 	circ.SetState(circuit.StateOpen)
@@ -183,11 +200,12 @@ func (s *MockServer) ConnectionCount() int {
 func (s *MockServer) Stop() error {
 	var err error
 	s.closeOnce.Do(func() {
-		close(s.closeCh)
-		s.running = false
+		// Close listener first to stop accept loop from accepting new connections
 		err = s.listener.Close()
+		close(s.closeCh)
 
 		s.mu.Lock()
+		s.running = false
 		for _, conn := range s.connections {
 			conn.Close()
 		}
@@ -209,8 +227,20 @@ func (s *MockServer) acceptLoop() {
 			}
 		}
 
+		// Check if we're shutting down before adding connection
+		select {
+		case <-s.closeCh:
+			conn.Close()
+			return
+		default:
+		}
+
 		s.mu.Lock()
-		s.connections = append(s.connections, conn)
+		if s.running {
+			s.connections = append(s.connections, conn)
+		} else {
+			conn.Close()
+		}
 		s.mu.Unlock()
 	}
 }

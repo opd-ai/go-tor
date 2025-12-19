@@ -92,12 +92,9 @@ func TestCircuitBuildWithContext(t *testing.T) {
 	}
 	defer suite.Stop()
 
-	// Create context with very short timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
-	defer cancel()
-
-	// Wait for context to expire
-	time.Sleep(10 * time.Millisecond)
+	// Create an already cancelled context for deterministic test
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
 
 	// Circuit creation should fail due to context cancellation
 	_, err := suite.CreateMockCircuit(ctx, 3)
@@ -222,8 +219,21 @@ func TestCircuitPoolIntegration(t *testing.T) {
 	}
 	defer circPool.Close()
 
-	// Wait for prebuilding
-	time.Sleep(200 * time.Millisecond)
+	// Wait for prebuilding by polling until we have at least the minimum number
+	// of open circuits, or until a timeout is reached to avoid hanging tests.
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		stats := circPool.Stats()
+		if stats.Open >= 2 {
+			break
+		}
+
+		if time.Now().After(deadline) {
+			t.Fatalf("Timed out waiting for circuit pool prebuilding; expected at least 2 open circuits, got %d", stats.Open)
+		}
+
+		time.Sleep(10 * time.Millisecond)
+	}
 
 	// Check pool stats
 	stats := circPool.Stats()

@@ -152,16 +152,20 @@ func (e *Engine) MaybeInjectFailure() error {
 
 // MaybeInjectLatency potentially adds latency based on the configured settings.
 func (e *Engine) MaybeInjectLatency() {
-	if !e.IsActive() {
+	e.mu.Lock()
+	if !e.enabled || e.paused {
+		e.mu.Unlock()
 		return
 	}
 
-	e.mu.Lock()
 	latencyRange := e.config.LatencyMax - e.config.LatencyMin
-	latency := e.config.LatencyMin + time.Duration(e.rand.Int63n(int64(latencyRange)))
+	latency := e.config.LatencyMin
+	if latencyRange > 0 {
+		latency += time.Duration(e.rand.Int63n(int64(latencyRange)))
+	}
+	atomic.AddInt64(&e.latencyInjected, 1)
 	e.mu.Unlock()
 
-	atomic.AddInt64(&e.latencyInjected, 1)
 	e.logger.Debug("Chaos: injecting latency", "duration", latency)
 	time.Sleep(latency)
 }
@@ -333,8 +337,8 @@ func (n *NetworkFaultInjector) IsPartitioned() bool {
 
 // ShouldDropPacket returns true if the packet should be dropped.
 func (n *NetworkFaultInjector) ShouldDropPacket() bool {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
+	n.mu.Lock()
+	defer n.mu.Unlock()
 
 	if !n.enabled {
 		return false
@@ -389,6 +393,7 @@ type RelaySimulator struct {
 	healthy    bool
 	overloaded bool
 	logger     *logger.Logger
+	rand       *rand.Rand
 
 	// Behavior configuration
 	responseDelay     time.Duration
@@ -408,6 +413,7 @@ func NewRelaySimulator(log *logger.Logger) *RelaySimulator {
 		logger:            log,
 		healthy:           true,
 		overloadThreshold: 100,
+		rand:              rand.New(rand.NewSource(time.Now().UnixNano())), //nolint:gosec // G404: Use of weak random number generator is acceptable for relay simulation
 	}
 }
 
@@ -456,19 +462,50 @@ func (r *RelaySimulator) SetFailureRate(rate float64) {
 	r.failureRate = rate
 }
 
+// SimulateRequest simulates a relay request with configured delay and failure rate.
+// Returns nil if successful, or an error if the request should fail.
+func (r *RelaySimulator) SimulateRequest() error {
+	r.mu.Lock()
+	delay := r.responseDelay
+	shouldFail := r.rand.Float64() < r.failureRate
+	r.mu.Unlock()
+
+	// Apply response delay
+	if delay > 0 {
+		time.Sleep(delay)
+	}
+
+	// Check if request should fail based on failure rate
+	if shouldFail {
+		return errors.New("simulated relay failure")
+	}
+
+	return nil
+}
+
+// GetResponseDelay returns the current response delay setting.
+func (r *RelaySimulator) GetResponseDelay() time.Duration {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.responseDelay
+}
+
+// GetFailureRate returns the current failure rate setting.
+func (r *RelaySimulator) GetFailureRate() float64 {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.failureRate
+}
+
 // AddConnection simulates a new connection.
 func (r *RelaySimulator) AddConnection() error {
 	connections := atomic.AddInt32(&r.activeConnections, 1)
 
-	r.mu.RLock()
-	threshold := r.overloadThreshold
-	r.mu.RUnlock()
-
-	if connections > threshold {
-		r.mu.Lock()
+	r.mu.Lock()
+	if connections > r.overloadThreshold {
 		r.overloaded = true
-		r.mu.Unlock()
 	}
+	r.mu.Unlock()
 
 	return nil
 }
@@ -477,15 +514,11 @@ func (r *RelaySimulator) AddConnection() error {
 func (r *RelaySimulator) RemoveConnection() {
 	connections := atomic.AddInt32(&r.activeConnections, -1)
 
-	r.mu.RLock()
-	threshold := r.overloadThreshold
-	r.mu.RUnlock()
-
-	if connections < threshold/2 {
-		r.mu.Lock()
+	r.mu.Lock()
+	if connections < r.overloadThreshold/2 {
 		r.overloaded = false
-		r.mu.Unlock()
 	}
+	r.mu.Unlock()
 }
 
 // IsOverloaded returns true if the relay is overloaded.

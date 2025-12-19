@@ -513,13 +513,11 @@ func TestChaosContextTimeout(t *testing.T) {
 	wrappedCtx, cancel := engine.WrapContext(ctx)
 	defer cancel()
 
-	// Wait for timeout
-	time.Sleep(100 * time.Millisecond)
-
+	// Wait for context to complete with timeout
 	select {
 	case <-wrappedCtx.Done():
 		// Expected
-	default:
+	case <-time.After(200 * time.Millisecond):
 		t.Error("Expected context to be done after timeout")
 	}
 }

@@ -179,8 +179,9 @@ func (c *Circuit) Age() time.Duration {
 	return time.Since(c.CreatedAt)
 }
 
-// GetHops returns a copy of the circuit hops.
-// The returned slice is a copy to prevent external modification.
+// GetHops returns a copy of the circuit hops slice.
+// Note: While the slice itself is copied, the Hop pointers are shared.
+// Callers should not modify the Hop objects directly.
 func (c *Circuit) GetHops() []*Hop {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
