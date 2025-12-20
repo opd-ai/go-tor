@@ -59,9 +59,9 @@ func GetConnectionID(ctx context.Context) string {
 	return ""
 }
 
-// WithCorrelationContext returns a new Logger with the correlation ID from
-// the context added as an attribute. If no correlation ID is in the context,
-// returns the logger unchanged.
+// WithCorrelationContext returns a new Logger with any correlation and
+// connection IDs from the context added as attributes. If neither ID is in
+// the context, it returns the logger unchanged.
 func (l *Logger) WithCorrelationContext(ctx context.Context) *Logger {
 	result := l
 	if corrID := GetCorrelationID(ctx); corrID != "" {

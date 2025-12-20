@@ -251,7 +251,7 @@ go test -v ./pkg/logger/...  # All tests pass
 go test -cover ./pkg/logger/...  # 95.3% coverage
 ```
 
-**Note**: The logger infrastructure is now in place. Existing logger methods (`Circuit()`, `Stream()`) already existed. The new context utilities enable callers to propagate correlation IDs through their request handling. Future work may update specific call sites in circuit/socks/stream packages to use these utilities, but the core infrastructure is complete and ready for use
+**Note**: The logger infrastructure is now in place. Existing logger methods (`Circuit()`, `Stream()`) already existed. The new context utilities enable callers to propagate correlation IDs through their request handling. Future work may update specific call sites in circuit/socks/stream packages to use these utilities, but the core infrastructure is complete and ready for use.
 
 ---
 
