@@ -54,6 +54,13 @@ type Metrics struct {
 	ReplayBackwardAttempts *Counter // Replay attempts in backward direction
 	OutOfOrderCells        *Counter // Cells received out of order (not replays)
 
+	// Rate limiting metrics (Phase 2.3)
+	RateLimitedConnections *Counter   // Connections rejected due to rate limiting
+	RateLimitedCircuits    *Counter   // TODO: Reserved for future circuit rate limiting
+	RateLimitWaitTime      *Histogram // TODO: Reserved for wait-based rate limiting
+	BackpressurePauses     *Counter   // TODO: Reserved for future backpressure implementation
+	BackpressureResumes    *Counter   // TODO: Reserved for future backpressure implementation
+
 	// System metrics
 	Uptime      *Gauge
 	startTime   time.Time
@@ -107,6 +114,13 @@ func New() *Metrics {
 		ReplayBackwardAttempts: NewCounter(),
 		OutOfOrderCells:        NewCounter(),
 
+		// Rate limiting metrics (Phase 2.3)
+		RateLimitedConnections: NewCounter(),
+		RateLimitedCircuits:    NewCounter(),
+		RateLimitWaitTime:      NewHistogram(),
+		BackpressurePauses:     NewCounter(),
+		BackpressureResumes:    NewCounter(),
+
 		// System metrics
 		Uptime:    NewGauge(),
 		startTime: now,
@@ -154,6 +168,31 @@ func (m *Metrics) RecordReplayAttempt(isForward bool) {
 // RecordOutOfOrderCell records a cell received out of order
 func (m *Metrics) RecordOutOfOrderCell() {
 	m.OutOfOrderCells.Inc()
+}
+
+// RecordRateLimitedConnection records a connection rejected due to rate limiting
+func (m *Metrics) RecordRateLimitedConnection() {
+	m.RateLimitedConnections.Inc()
+}
+
+// RecordRateLimitedCircuit records a circuit creation rejected due to rate limiting
+func (m *Metrics) RecordRateLimitedCircuit() {
+	m.RateLimitedCircuits.Inc()
+}
+
+// RecordRateLimitWait records time spent waiting for rate limiter
+func (m *Metrics) RecordRateLimitWait(duration time.Duration) {
+	m.RateLimitWaitTime.Observe(duration)
+}
+
+// RecordBackpressure records a backpressure event
+// pause: true when backpressure is applied, false when released
+func (m *Metrics) RecordBackpressure(pause bool) {
+	if pause {
+		m.BackpressurePauses.Inc()
+	} else {
+		m.BackpressureResumes.Inc()
+	}
 }
 
 // UpdateUptime updates the uptime metric
@@ -212,6 +251,13 @@ func (m *Metrics) Snapshot() *Snapshot {
 		ReplayBackwardAttempts: m.ReplayBackwardAttempts.Value(),
 		OutOfOrderCells:        m.OutOfOrderCells.Value(),
 
+		// Rate limiting metrics (Phase 2.3)
+		RateLimitedConnections: m.RateLimitedConnections.Value(),
+		RateLimitedCircuits:    m.RateLimitedCircuits.Value(),
+		RateLimitWaitTimeAvg:   m.RateLimitWaitTime.Mean(),
+		BackpressurePauses:     m.BackpressurePauses.Value(),
+		BackpressureResumes:    m.BackpressureResumes.Value(),
+
 		// System metrics
 		UptimeSeconds: m.Uptime.Value(),
 	}
@@ -263,6 +309,13 @@ type Snapshot struct {
 	ReplayForwardAttempts  int64 // Replay attempts in forward direction
 	ReplayBackwardAttempts int64 // Replay attempts in backward direction
 	OutOfOrderCells        int64 // Cells received out of order
+
+	// Rate limiting metrics (Phase 2.3)
+	RateLimitedConnections int64         // Connections rejected due to rate limiting
+	RateLimitedCircuits    int64         // Circuit creations rejected due to rate limiting
+	RateLimitWaitTimeAvg   time.Duration // Average time spent waiting for rate limiter
+	BackpressurePauses     int64         // Number of times backpressure was applied
+	BackpressureResumes    int64         // Number of times backpressure was released
 
 	// System metrics
 	UptimeSeconds int64

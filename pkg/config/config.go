@@ -66,6 +66,20 @@ type Config struct {
 	PaddingIdleTimeout   time.Duration // Time circuit must be idle before padding (default: 1s)
 	PaddingDummyTraffic  bool          // Use dummy RELAY_DATA instead of PADDING cells (default: false)
 	PaddingBurstSize     int           // Number of padding cells per burst (default: 1)
+
+	// Rate limiting configuration (Phase 2.3)
+	EnableRateLimiting            bool    // Enable rate limiting (default: true)
+	SOCKSConnectionsPerSecond     float64 // Max SOCKS connections per second (default: 100)
+	SOCKSConnectionsBurst         int     // Burst capacity for SOCKS connections (default: 50)
+	CircuitCreationsPerSecond     float64 // TODO: Reserved for future circuit rate limiting (default: 10)
+	CircuitCreationsBurst         int     // TODO: Reserved for future circuit rate limiting (default: 5)
+	MaxConcurrentConnections      int     // Max concurrent SOCKS connections (default: 1000)
+	StreamBufferHighWaterMark     int     // TODO: Reserved for future backpressure implementation (default: 65536)
+	StreamBufferLowWaterMark      int     // TODO: Reserved for future backpressure implementation (default: 16384)
+	EnablePerClientRateLimiting   bool    // Enable per-client rate limiting (default: false)
+	PerClientConnectionsPerSecond float64 // Per-client connection rate (default: 10)
+	PerClientConnectionsBurst     int     // Per-client burst capacity (default: 5)
+	RateLimitCleanupInterval      int     // Cleanup interval for per-client limiters in seconds (default: 300)
 }
 
 // OnionServiceConfig represents configuration for a single onion service
@@ -140,6 +154,19 @@ func DefaultConfig() *Config {
 		PaddingIdleTimeout:   time.Second,
 		PaddingDummyTraffic:  false,
 		PaddingBurstSize:     1,
+		// Rate limiting defaults (Phase 2.3 - enabled by default for resource protection)
+		EnableRateLimiting:            true,
+		SOCKSConnectionsPerSecond:     100.0,
+		SOCKSConnectionsBurst:         50,
+		CircuitCreationsPerSecond:     10.0,
+		CircuitCreationsBurst:         5,
+		MaxConcurrentConnections:      1000,
+		StreamBufferHighWaterMark:     65536,
+		StreamBufferLowWaterMark:      16384,
+		EnablePerClientRateLimiting:   false,
+		PerClientConnectionsPerSecond: 10.0,
+		PerClientConnectionsBurst:     5,
+		RateLimitCleanupInterval:      300,
 	}
 }
 
@@ -269,6 +296,45 @@ func (c *Config) Validate() error {
 	}
 	if c.PaddingBurstSize < 0 {
 		return fmt.Errorf("PaddingBurstSize must be non-negative")
+	}
+
+	// Validate rate limiting configuration (Phase 2.3)
+	if c.EnableRateLimiting {
+		if c.SOCKSConnectionsPerSecond <= 0 {
+			return fmt.Errorf("SOCKSConnectionsPerSecond must be positive when rate limiting is enabled")
+		}
+		if c.SOCKSConnectionsBurst <= 0 {
+			return fmt.Errorf("SOCKSConnectionsBurst must be positive when rate limiting is enabled")
+		}
+		if c.CircuitCreationsPerSecond <= 0 {
+			return fmt.Errorf("CircuitCreationsPerSecond must be positive when rate limiting is enabled")
+		}
+		if c.CircuitCreationsBurst <= 0 {
+			return fmt.Errorf("CircuitCreationsBurst must be positive when rate limiting is enabled")
+		}
+	}
+	if c.MaxConcurrentConnections < 0 {
+		return fmt.Errorf("MaxConcurrentConnections must be non-negative")
+	}
+	if c.StreamBufferHighWaterMark < 0 {
+		return fmt.Errorf("StreamBufferHighWaterMark must be non-negative")
+	}
+	if c.StreamBufferLowWaterMark < 0 {
+		return fmt.Errorf("StreamBufferLowWaterMark must be non-negative")
+	}
+	if c.StreamBufferLowWaterMark > c.StreamBufferHighWaterMark {
+		return fmt.Errorf("StreamBufferLowWaterMark must be <= StreamBufferHighWaterMark")
+	}
+	if c.EnablePerClientRateLimiting {
+		if c.PerClientConnectionsPerSecond <= 0 {
+			return fmt.Errorf("PerClientConnectionsPerSecond must be positive when per-client rate limiting is enabled")
+		}
+		if c.PerClientConnectionsBurst <= 0 {
+			return fmt.Errorf("PerClientConnectionsBurst must be positive when per-client rate limiting is enabled")
+		}
+	}
+	if c.RateLimitCleanupInterval < 0 {
+		return fmt.Errorf("RateLimitCleanupInterval must be non-negative")
 	}
 
 	return nil
