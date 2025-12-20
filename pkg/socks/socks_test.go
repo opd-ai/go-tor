@@ -392,32 +392,16 @@ func TestSOCKS5UnsupportedVersion(t *testing.T) {
 	handshake := []byte{0x04, 0x01, 0x00}
 	conn.Write(handshake)
 
-	// Server should send a rejection response (SOCKS5 version with "no acceptable methods" 0xFF)
-	// then close the connection
-	buf := make([]byte, 10)
-	n, err := conn.Read(buf)
-
-	// LOW-005: Server now properly sends rejection before closing
-	// Expect either:
-	// 1. A SOCKS5 rejection response (version=0x05, method=0xFF), then connection closes
-	// 2. Connection closed immediately (EOF)
-	if err != nil {
-		// Connection closed without response - this is also acceptable
-		return
-	}
-
-	// Verify rejection response format
-	if n >= 2 {
-		if buf[0] != 0x05 || buf[1] != 0xFF {
-			t.Errorf("Expected SOCKS5 rejection response {0x05, 0xFF}, got {0x%02X, 0x%02X}", buf[0], buf[1])
-		}
-	}
-
-	// After rejection, connection should be closed
+	// LOW-005: Server closes connection without sending a SOCKS5 response
+	// to avoid confusing clients speaking other protocols (e.g., SOCKS4).
+	// Wait briefly for server to process and close connection
 	time.Sleep(100 * time.Millisecond)
+
+	// Try to read - should get EOF or error since connection is closed
+	buf := make([]byte, 10)
 	_, err = conn.Read(buf)
 	if err == nil {
-		t.Error("Expected connection to be closed after rejection")
+		t.Error("Expected error or connection close for unsupported version")
 	}
 }
 

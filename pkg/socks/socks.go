@@ -522,13 +522,10 @@ func (s *Server) handshake(conn net.Conn) (string, error) {
 	nmethods := header[1]
 
 	if version != socks5Version {
-		// LOW-005 Fix: Send proper error response for unsupported version
-		// Per RFC 1928, if no acceptable methods are available, respond with 0xFF
-		// For version mismatch, we reject with "no acceptable methods" response
-		response := []byte{socks5Version, authNoAccept}
-		if _, writeErr := conn.Write(response); writeErr != nil {
-			s.logger.Debug("Failed to send version rejection", "error", writeErr)
-		}
+		// LOW-005 Fix: Version mismatch handling
+		// Do not send a SOCKS5-formatted response to a non-SOCKS5 client.
+		// Simply close the connection to avoid confusing clients speaking other protocols.
+		// The connection will be closed by the caller when we return an error.
 		return "", fmt.Errorf("unsupported SOCKS version: %d", version)
 	}
 

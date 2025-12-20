@@ -264,9 +264,9 @@ While the codebase shows mature development with ~74% test coverage, security ha
 #### FINDING LOW-005: Lenient SOCKS5 Version Handling
 **Severity:** LOW
 **Category:** Input Validation
-**Location:** `pkg/socks/socks.go:513-535`
+**Location:** `pkg/socks/socks.go:524-528`
 **Status:** ✅ RESOLVED (2025-12-20)
-**Resolution:** Enhanced SOCKS5 handshake to send proper RFC 1928 rejection response (version=0x05, method=0xFF) when client sends unsupported SOCKS version before closing connection. This provides clearer feedback to clients attempting to connect with wrong protocol version.
+**Resolution:** Enhanced SOCKS5 handshake to properly handle unsupported protocol versions. When a client sends an unsupported version (e.g., SOCKS4), the server now closes the connection immediately without sending a SOCKS5-formatted response, which would confuse clients speaking different protocols.
 
 ---
 
