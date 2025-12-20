@@ -297,3 +297,191 @@ func TestGuardManagerNonExistentDirectory(t *testing.T) {
 		t.Errorf("Save() to new directory failed: %v", err)
 	}
 }
+
+func TestNewGuardManagerWithConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	config := DefaultGuardManagerConfig(tmpDir)
+	gm, err := NewGuardManagerWithConfig(config, logger.NewDefault())
+	if err != nil {
+		t.Fatalf("NewGuardManagerWithConfig() failed: %v", err)
+	}
+
+	if gm == nil {
+		t.Fatal("NewGuardManagerWithConfig() returned nil")
+	}
+
+	// Verify enhanced persistence is enabled
+	if !gm.HasEnhancedPersistence() {
+		t.Error("Enhanced persistence should be enabled with default config")
+	}
+}
+
+func TestGuardManagerWithConfigNilConfig(t *testing.T) {
+	_, err := NewGuardManagerWithConfig(nil, logger.NewDefault())
+	if err == nil {
+		t.Error("NewGuardManagerWithConfig(nil) should fail")
+	}
+}
+
+func TestGuardManagerEnhancedPersistenceSaveLoad(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	config := DefaultGuardManagerConfig(tmpDir)
+	gm1, err := NewGuardManagerWithConfig(config, logger.NewDefault())
+	if err != nil {
+		t.Fatalf("NewGuardManagerWithConfig() failed: %v", err)
+	}
+
+	relay := &directory.Relay{
+		Nickname:    "EnhancedGuard",
+		Fingerprint: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+		Address:     "192.0.2.1:9001",
+		Flags:       []string{"Guard", "Running", "Valid", "Stable"},
+	}
+
+	if err := gm1.AddGuard(relay); err != nil {
+		t.Fatalf("AddGuard() failed: %v", err)
+	}
+
+	if err := gm1.Save(); err != nil {
+		t.Fatalf("Save() failed: %v", err)
+	}
+
+	// Create new manager and verify state was persisted
+	gm2, err := NewGuardManagerWithConfig(config, logger.NewDefault())
+	if err != nil {
+		t.Fatalf("NewGuardManagerWithConfig() failed on reload: %v", err)
+	}
+
+	guards := gm2.GetGuards()
+	if len(guards) != 1 {
+		t.Errorf("GetGuards() returned %d guards, want 1", len(guards))
+	}
+
+	if guards[0].Nickname != "EnhancedGuard" {
+		t.Errorf("Guard nickname = %s, want EnhancedGuard", guards[0].Nickname)
+	}
+}
+
+func TestGuardManagerBackupCreation(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	config := &GuardManagerConfig{
+		DataDir:          tmpDir,
+		MaxGuards:        3,
+		GuardExpiry:      90 * 24 * time.Hour,
+		BackupCount:      3,
+		SnapshotInterval: 0, // Disable snapshots for this test
+		LockTimeout:      10 * time.Second,
+	}
+
+	gm, err := NewGuardManagerWithConfig(config, logger.NewDefault())
+	if err != nil {
+		t.Fatalf("NewGuardManagerWithConfig() failed: %v", err)
+	}
+
+	relay := &directory.Relay{
+		Nickname:    "BackupGuard",
+		Fingerprint: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+		Address:     "192.0.2.1:9001",
+		Flags:       []string{"Guard", "Running", "Valid", "Stable"},
+	}
+
+	// Save multiple times to create backups
+	for i := 0; i < 4; i++ {
+		if err := gm.AddGuard(relay); err != nil {
+			t.Fatalf("AddGuard() iteration %d failed: %v", i, err)
+		}
+		if err := gm.Save(); err != nil {
+			t.Fatalf("Save() iteration %d failed: %v", i, err)
+		}
+	}
+
+	// Check that backups exist
+	backups := gm.GetBackupPaths()
+	if len(backups) == 0 {
+		t.Error("No backups created after multiple saves")
+	}
+	if len(backups) > config.BackupCount {
+		t.Errorf("Too many backups: got %d, want <= %d", len(backups), config.BackupCount)
+	}
+}
+
+func TestGuardManagerSnapshotLoop(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	config := &GuardManagerConfig{
+		DataDir:          tmpDir,
+		MaxGuards:        3,
+		GuardExpiry:      90 * 24 * time.Hour,
+		BackupCount:      3,
+		SnapshotInterval: 100 * time.Millisecond, // Fast for testing
+		LockTimeout:      10 * time.Second,
+	}
+
+	gm, err := NewGuardManagerWithConfig(config, logger.NewDefault())
+	if err != nil {
+		t.Fatalf("NewGuardManagerWithConfig() failed: %v", err)
+	}
+
+	relay := &directory.Relay{
+		Nickname:    "SnapshotGuard",
+		Fingerprint: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+		Address:     "192.0.2.1:9001",
+		Flags:       []string{"Guard", "Running", "Valid", "Stable"},
+	}
+
+	if err := gm.AddGuard(relay); err != nil {
+		t.Fatalf("AddGuard() failed: %v", err)
+	}
+
+	gm.StartSnapshotLoop()
+
+	// Wait for snapshots to occur
+	time.Sleep(350 * time.Millisecond)
+
+	gm.StopSnapshotLoop()
+
+	// Verify file was created by snapshot loop
+	stateFile := filepath.Join(tmpDir, "guard_state.json")
+	if _, err := os.Stat(stateFile); os.IsNotExist(err) {
+		t.Error("State file should exist after snapshot loop")
+	}
+}
+
+func TestGuardManagerLegacyCompatibility(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create using legacy constructor
+	gm, err := NewGuardManager(tmpDir, logger.NewDefault())
+	if err != nil {
+		t.Fatalf("NewGuardManager() failed: %v", err)
+	}
+
+	// Legacy mode should not have enhanced persistence
+	if gm.HasEnhancedPersistence() {
+		t.Error("Legacy constructor should not enable enhanced persistence")
+	}
+
+	relay := &directory.Relay{
+		Nickname:    "LegacyGuard",
+		Fingerprint: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+		Address:     "192.0.2.1:9001",
+		Flags:       []string{"Guard", "Running", "Valid", "Stable"},
+	}
+
+	if err := gm.AddGuard(relay); err != nil {
+		t.Fatalf("AddGuard() failed: %v", err)
+	}
+
+	if err := gm.Save(); err != nil {
+		t.Fatalf("Save() failed: %v", err)
+	}
+
+	// Verify file exists
+	stateFile := filepath.Join(tmpDir, "guard_state.json")
+	if _, err := os.Stat(stateFile); os.IsNotExist(err) {
+		t.Error("State file should exist after Save()")
+	}
+}

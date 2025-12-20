@@ -80,6 +80,11 @@ type Config struct {
 	PerClientConnectionsPerSecond float64 // Per-client connection rate (default: 10)
 	PerClientConnectionsBurst     int     // Per-client burst capacity (default: 5)
 	RateLimitCleanupInterval      int     // Cleanup interval for per-client limiters in seconds (default: 300)
+
+	// Guard persistence configuration (Phase 2.4)
+	GuardStateBackupCount      int // Number of guard state backup files to retain (default: 3)
+	GuardStateSnapshotInterval int // Interval between automatic guard state snapshots in seconds (default: 300)
+	GuardStateLockTimeout      int // Timeout for acquiring guard state file lock in seconds (default: 10)
 }
 
 // OnionServiceConfig represents configuration for a single onion service
@@ -167,6 +172,10 @@ func DefaultConfig() *Config {
 		PerClientConnectionsPerSecond: 10.0,
 		PerClientConnectionsBurst:     5,
 		RateLimitCleanupInterval:      300,
+		// Guard persistence defaults (Phase 2.4)
+		GuardStateBackupCount:      3,
+		GuardStateSnapshotInterval: 300, // 5 minutes
+		GuardStateLockTimeout:      10,
 	}
 }
 
@@ -335,6 +344,17 @@ func (c *Config) Validate() error {
 	}
 	if c.RateLimitCleanupInterval < 0 {
 		return fmt.Errorf("RateLimitCleanupInterval must be non-negative")
+	}
+
+	// Validate guard persistence configuration (Phase 2.4)
+	if c.GuardStateBackupCount < 0 {
+		return fmt.Errorf("GuardStateBackupCount must be non-negative")
+	}
+	if c.GuardStateSnapshotInterval < 0 {
+		return fmt.Errorf("GuardStateSnapshotInterval must be non-negative")
+	}
+	if c.GuardStateLockTimeout < 0 {
+		return fmt.Errorf("GuardStateLockTimeout must be non-negative")
 	}
 
 	return nil
