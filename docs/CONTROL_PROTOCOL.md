@@ -272,11 +272,11 @@ with Controller.from_port(port=9051) as controller:
 | GETINFO command | ✅ Partial (core keys implemented) |
 | GETCONF command | ✅ Placeholder |
 | SETCONF command | ✅ Placeholder |
-| SETEVENTS command | ✅ Subscription only (no events yet) |
+| SETEVENTS command | ✅ Complete |
 | QUIT command | ✅ Complete |
+| Event notifications | ✅ Complete (CIRC, STREAM, BW, ORCONN, NEWDESC, GUARD, NS) |
 | Password authentication | ⏳ Planned |
 | Cookie authentication | ⏳ Planned |
-| Event notifications | ⏳ Planned |
 | Circuit management commands | ⏳ Planned |
 | Configuration management | ⏳ Planned |
 
@@ -295,8 +295,8 @@ with Controller.from_port(port=9051) as controller:
 
 ## Future Enhancements
 
-### Phase 7.1 (Near-term)
-- Event notification system (CIRC, STREAM, ORCONN)
+### Phase 7.1 ✅ (Complete)
+- ✅ Event notification system (CIRC, STREAM, ORCONN, BW, NEWDESC, GUARD, NS)
 - Extended GETINFO keys (circuit details, stream info)
 - Full configuration management
 - Password/cookie authentication

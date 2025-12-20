@@ -282,21 +282,47 @@ fmt.Printf("Total bandwidth: %d bytes\n", snapshot.TotalBytesRead + snapshot.Tot
 ```
 ### Health Checks
 ```go
-import "github.com/opd-ai/go-tor/pkg/health"
+import (
+    "context"
+    "github.com/opd-ai/go-tor/pkg/health"
+)
 
-// Create health checker
-checker := health.NewChecker()
+// Create health monitor
+monitor := health.NewMonitor()
 
-// Register component checks
-checker.RegisterCheck("circuits", circuitHealthCheck)
-checker.RegisterCheck("socks", socksHealthCheck)
+// Create and register component health checkers
+// Using built-in circuit health checker:
+circuitChecker := health.NewCircuitHealthChecker(func() health.CircuitStats {
+    return health.CircuitStats{
+        ActiveCircuits: 3,
+        MinRequired:    2,
+        FailedBuilds:   0,
+    }
+})
+monitor.RegisterChecker(circuitChecker)
 
-// Check health
-status := checker.Check()
-if status.Healthy {
+// Using built-in connection health checker:
+connChecker := health.NewConnectionHealthChecker(func() health.ConnectionStats {
+    return health.ConnectionStats{
+        OpenConnections:    5,
+        FailedConnections:  0,
+        ConnectionAttempts: 10,
+    }
+})
+monitor.RegisterChecker(connChecker)
+
+// Check health of all components
+ctx := context.Background()
+overallHealth := monitor.Check(ctx)
+
+if overallHealth.Status == health.StatusHealthy {
     fmt.Println("All systems operational")
 } else {
-    fmt.Printf("Health issues: %v\n", status.Failures)
+    for name, component := range overallHealth.Components {
+        if component.Status != health.StatusHealthy {
+            fmt.Printf("Component %s: %s - %s\n", name, component.Status, component.Message)
+        }
+    }
 }
 ```
 ---
@@ -444,22 +470,42 @@ fmt.Printf("Total: %d, In Use: %d, Idle: %d\n",
 The logger package provides structured logging with log/slog.
 ### Creating a Logger
 ```go
-import "github.com/opd-ai/go-tor/pkg/logger"
+import (
+    "log/slog"
+    "os"
 
-// Create logger with level
-log := logger.New(logger.LevelInfo, os.Stdout)
+    "github.com/opd-ai/go-tor/pkg/logger"
+)
+
+// Create logger with level (uses slog.Level)
+log := logger.New(slog.LevelInfo, os.Stdout)
+
+// Or use the default logger (info level, stdout)
+log := logger.NewDefault()
 
 // Create component-specific logger
 clientLog := log.Component("client")
+
+// Parse log level from string
+level, err := logger.ParseLevel("debug") // Returns slog.LevelDebug
+log := logger.New(level, os.Stdout)
 ```
 ### Log Levels
+Log levels use the standard `log/slog` levels:
 ```go
-const (
-    LevelDebug Level = iota
-    LevelInfo
-    LevelWarn
-    LevelError
-)
+import "log/slog"
+
+// Available levels from slog package
+slog.LevelDebug  // -4
+slog.LevelInfo   // 0
+slog.LevelWarn   // 4
+slog.LevelError  // 8
+
+// Parse from string
+level, _ := logger.ParseLevel("debug") // returns slog.LevelDebug
+level, _ := logger.ParseLevel("info")  // returns slog.LevelInfo
+level, _ := logger.ParseLevel("warn")  // returns slog.LevelWarn
+level, _ := logger.ParseLevel("error") // returns slog.LevelError
 ```
 ### Logging
 ```go
