@@ -5,6 +5,9 @@
 **Priority Issues**: 8 Critical | 12 High | 15 Medium | 9 Low
 ### Key Findings
 This go-tor implementation shows mature development with ~74% test coverage, comprehensive security controls, and thoughtful architecture. However, it requires remediation of identified issues and completion of missing features before production deployment. **Most importantly**, the project explicitly states it should NOT be used for anonymity or privacy-critical applications - use official Tor Browser or Arti for real anonymity needs.
+
+The project scope includes both client functionality and Tor bridge relay with pluggable transport support. **Exit node functionality is explicitly out of scope and will not be implemented.**
+
 The codebase demonstrates:
 - ✅ Strong engineering practices (pure Go, no CGo, no `unsafe`)
 - ✅ Good cryptographic implementation (Ed25519, Curve25519, AES-256-CTR)
@@ -855,6 +858,101 @@ The codebase demonstrates:
 - [ ] ...
 
 **Files to Create**: `pkg/plugin/`, `examples/plugins/`, `docs/PLUGIN_DEVELOPMENT.md`
+
+
+---
+
+## Phase 5: Tor Bridge Relay with Pluggable Transport Support (Future)
+**Timeline**: TBD
+**Effort**: 6-8 weeks
+
+### Project Scope Update
+The project has expanded beyond client-only functionality to include Tor bridge relay capabilities with pluggable transport support. This allows the implementation to act as an entry point to the Tor network for users in censored regions. **Note**: Exit node functionality is explicitly out of scope and will not be implemented.
+
+### 5.1 Bridge Relay Infrastructure
+**Priority**: High
+**Effort**: 2 weeks
+**Status**: Planned
+
+**Solution**:
+- [ ] Implement OR (Onion Router) protocol for relay functionality
+- [ ] Add relay descriptor generation and publishing
+- [ ] Implement bridge-specific configuration options
+- [ ] Add bandwidth accounting and reporting
+- [ ] Implement relay cell forwarding
+- [ ] Add relay identity key management
+
+**Files to Create**: `pkg/relay/`, `pkg/relay/bridge.go`, `pkg/relay/descriptor.go`
+
+
+---
+
+### 5.2 Pluggable Transport Framework
+**Priority**: High
+**Effort**: 2 weeks
+**Status**: Planned
+
+**Solution**:
+- [ ] Implement PT (Pluggable Transport) specification
+- [ ] Add PT client/server communication protocol
+- [ ] Create PT process management and lifecycle
+- [ ] Implement SOCKS-based PT communication
+- [ ] Add PT configuration and discovery
+- [ ] Support common PTs (obfs4, meek, etc.)
+
+**Files to Create**: `pkg/transport/`, `pkg/transport/pt.go`, `pkg/transport/obfs4.go`
+
+
+---
+
+### 5.3 Bridge Distribution and BridgeDB Integration
+**Priority**: Medium
+**Effort**: 1 week
+**Status**: Planned
+
+**Solution**:
+- [ ] Implement bridge descriptor format
+- [ ] Add bridge authority communication
+- [ ] Support bridge distribution mechanisms
+- [ ] Implement bridge line generation
+- [ ] Add testing with BridgeDB
+
+**Files to Create**: `pkg/relay/distribution.go`, `pkg/relay/bridgedb.go`
+
+
+---
+
+### 5.4 Relay Security Hardening
+**Priority**: High
+**Effort**: 1 week
+**Status**: Planned
+
+**Solution**:
+- [ ] Implement relay-specific security measures
+- [ ] Add rate limiting for relay connections
+- [ ] Implement DoS protection mechanisms
+- [ ] Add relay resource management
+- [ ] **Explicitly disable exit functionality**
+- [ ] Add exit policy enforcement (reject all exit traffic)
+
+**Files to Create**: `pkg/relay/security.go`, `pkg/relay/policy.go`
+
+
+---
+
+### 5.5 Bridge Relay Testing and Validation
+**Priority**: High
+**Effort**: 1 week
+**Status**: Planned
+
+**Solution**:
+- [ ] Create bridge relay integration tests
+- [ ] Add PT protocol testing
+- [ ] Implement bridge reachability testing
+- [ ] Add compatibility testing with official Tor
+- [ ] Create performance benchmarks for relay mode
+
+**Files to Create**: `pkg/relay/relay_test.go`, `pkg/transport/transport_test.go`
 
 
 ---

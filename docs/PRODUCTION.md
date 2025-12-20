@@ -19,6 +19,8 @@ This document describes deployment configurations **for testing and development 
 
 This guide covers deploying and operating the go-tor client **in test/development environments only**. Phase 6 introduced critical production hardening features including TLS certificate validation, guard node persistence, and connection retry logic.
 
+**Note**: The project scope includes both client functionality and Tor bridge relay with pluggable transport support. Exit node functionality is explicitly out of scope. Future phases will add bridge relay capabilities.
+
 **Remember**: Even with these hardening features, this software is not safe for production use.
 
 ## Production Features (Phase 6)
