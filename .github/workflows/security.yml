@@ -68,7 +68,7 @@ jobs:
     name: Trivy Container Scanning
     runs-on: ubuntu-latest
     # Skip container scanning for draft PRs; run for all other events
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
     steps:
       - name: Checkout code
         # Pin to immutable SHA for supply chain security
