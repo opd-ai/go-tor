@@ -157,9 +157,14 @@ done
 # Restart with debug logging
 sudo systemctl stop tor-client
 ./bin/tor-client -config /etc/tor/torrc -log-level debug 2>&1 | tee /tmp/tor-debug.log &
+DEBUG_PID=$!
 
-# Analyze debug output
+# Analyze debug output after waiting for data
+sleep 30
 grep -E "ERROR|WARN|circuit|connect" /tmp/tor-debug.log
+
+# When done debugging, clean up the background process
+kill $DEBUG_PID 2>/dev/null
 ```
 
 #### Escalation Trigger

@@ -45,7 +45,10 @@ curl --socks5 127.0.0.1:9050 -m 30 https://check.torproject.org/api/ip 2>/dev/nu
 # Expected output: true
 
 # 4. Check circuit build success rate
-curl -s http://localhost:9052/metrics/json | jq '{success: .CircuitBuildSuccess, failure: .CircuitBuildFailure, rate: (.CircuitBuildSuccess / (.CircuitBuildSuccess + .CircuitBuildFailure + 0.001) * 100)}'
+curl -s http://localhost:9052/metrics/json | jq '{
+  success: .CircuitBuildSuccess, 
+  failure: .CircuitBuildFailure
+} | . + {rate: ((.success / (.success + .failure + 0.001)) * 100 | floor)}'
 # Expected: rate > 80%
 
 # 5. Verify guard node status

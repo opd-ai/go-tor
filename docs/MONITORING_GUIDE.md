@@ -272,7 +272,7 @@ groups:
         annotations:
           summary: "No active Tor circuits"
           description: "go-tor has no active circuits for 2 minutes. SOCKS proxy is non-functional."
-          runbook_url: "https://example.com/docs/INCIDENT_RESPONSE.md#incident-no-active-circuits"
+          runbook_url: "INCIDENT_RESPONSE.md#incident-no-active-circuits"
 
       # Critical: Service down
       - alert: TorServiceDown
@@ -295,7 +295,7 @@ groups:
         annotations:
           summary: "High circuit build failure rate"
           description: "Circuit build failure rate is {{ $value | humanizePercentage }}."
-          runbook_url: "https://example.com/docs/INCIDENT_RESPONSE.md#incident-high-circuit-build-failure-rate"
+          runbook_url: "INCIDENT_RESPONSE.md#incident-high-circuit-build-failure-rate"
 
       # High: Low circuit count
       - alert: TorLowCircuitCount
