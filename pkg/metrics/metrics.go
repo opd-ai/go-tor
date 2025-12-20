@@ -56,10 +56,10 @@ type Metrics struct {
 
 	// Rate limiting metrics (Phase 2.3)
 	RateLimitedConnections *Counter   // Connections rejected due to rate limiting
-	RateLimitedCircuits    *Counter   // Circuit creations rejected due to rate limiting
-	RateLimitWaitTime      *Histogram // Time spent waiting for rate limiter
-	BackpressurePauses     *Counter   // Number of times backpressure was applied
-	BackpressureResumes    *Counter   // Number of times backpressure was released
+	RateLimitedCircuits    *Counter   // TODO: Reserved for future circuit rate limiting
+	RateLimitWaitTime      *Histogram // TODO: Reserved for wait-based rate limiting
+	BackpressurePauses     *Counter   // TODO: Reserved for future backpressure implementation
+	BackpressureResumes    *Counter   // TODO: Reserved for future backpressure implementation
 
 	// System metrics
 	Uptime      *Gauge

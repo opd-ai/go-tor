@@ -98,8 +98,11 @@ func (r *RateLimiter) WaitN(ctx context.Context, n int) error {
 
 // Reserve reserves n tokens for future use.
 // Returns a Reservation that indicates when the tokens will be available.
-// Note: This does not consume tokens from the bucket, it only calculates
-// the delay needed before tokens would be available.
+//
+// Behavior:
+// - If tokens are available immediately, they are consumed and delay is 0.
+// - If tokens are not available, delay indicates how long to wait before
+//   calling Allow() or Wait() to actually consume the tokens.
 func (r *RateLimiter) Reserve(n int) *Reservation {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -254,13 +257,29 @@ func (m *MultiLimiter) Allow() bool {
 }
 
 // Wait blocks until all limiters allow the operation.
+// This preserves the atomicity guarantee of Allow: either all limiters
+// allow and consume a token for this operation, or none do.
 func (m *MultiLimiter) Wait(ctx context.Context) error {
-	for _, l := range m.limiters {
-		if err := l.Wait(ctx); err != nil {
-			return err
+	if len(m.limiters) == 0 {
+		return nil
+	}
+
+	// Poll using the atomic Allow until it succeeds or the context is done.
+	// A small sleep avoids busy-waiting while still being responsive.
+	const retryDelay = 10 * time.Millisecond
+
+	for {
+		if m.Allow() {
+			return nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(retryDelay):
+			// Try again.
 		}
 	}
-	return nil
 }
 
 // KeyedRateLimiter maintains separate rate limiters per key.
@@ -308,16 +327,39 @@ func (k *KeyedRateLimiter) Wait(ctx context.Context, key string) error {
 // Cleanup removes limiters that haven't been used recently.
 // This should be called periodically to prevent memory leaks.
 func (k *KeyedRateLimiter) Cleanup(maxAge time.Duration) {
+	// Take a snapshot of the current limiters under k.mu to avoid
+	// holding both k.mu and l.mu at the same time, which can lead
+	// to lock-ordering deadlocks.
 	k.mu.Lock()
-	defer k.mu.Unlock()
+	limiters := make([]struct {
+		key string
+		l   *RateLimiter
+	}, 0, len(k.limiters))
+	for key, l := range k.limiters {
+		limiters = append(limiters, struct {
+			key string
+			l   *RateLimiter
+		}{key: key, l: l})
+	}
+	k.mu.Unlock()
 
 	now := time.Now()
-	for key, l := range k.limiters {
-		l.mu.Lock()
-		if now.Sub(l.lastUpdate) > maxAge {
-			delete(k.limiters, key)
+	for _, item := range limiters {
+		item.l.mu.Lock()
+		expired := now.Sub(item.l.lastUpdate) > maxAge
+		item.l.mu.Unlock()
+
+		if !expired {
+			continue
 		}
-		l.mu.Unlock()
+
+		// Delete expired limiter under k.mu, ensuring it hasn't been
+		// replaced concurrently with a different instance.
+		k.mu.Lock()
+		if cur, ok := k.limiters[item.key]; ok && cur == item.l {
+			delete(k.limiters, item.key)
+		}
+		k.mu.Unlock()
 	}
 }
 

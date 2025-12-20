@@ -184,13 +184,17 @@ func NewServerWithConfig(address string, circuitMgr *circuit.Manager, log *logge
 			"burst", cfg.ConnectionsBurst)
 	}
 	if cfg.EnablePerClientRateLimiting {
-		perClientLimiter = ratelimit.NewKeyedRateLimiter(
-			cfg.PerClientConnectionsPerSecond,
-			cfg.PerClientConnectionsBurst,
-		)
-		log.Info("Per-client rate limiting enabled",
-			"per_client_rate", cfg.PerClientConnectionsPerSecond,
-			"per_client_burst", cfg.PerClientConnectionsBurst)
+		if !cfg.EnableRateLimiting {
+			log.Warn("Per-client rate limiting requested but global rate limiting is disabled; per-client limits will not be applied. Enable global rate limiting to use per-client limits.")
+		} else {
+			perClientLimiter = ratelimit.NewKeyedRateLimiter(
+				cfg.PerClientConnectionsPerSecond,
+				cfg.PerClientConnectionsBurst,
+			)
+			log.Info("Per-client rate limiting enabled",
+				"per_client_rate", cfg.PerClientConnectionsPerSecond,
+				"per_client_burst", cfg.PerClientConnectionsBurst)
+		}
 	}
 
 	return &Server{
@@ -313,15 +317,16 @@ func (s *Server) acceptLoop(ctx context.Context) {
 			}
 			continue
 		}
+		s.mu.Unlock()
 
 		// Rate limiting check (ROADMAP Phase 2.3)
-		// Check rate limit while still holding the mutex to avoid race
-		if !s.checkRateLimitLocked(conn) {
-			s.mu.Unlock()
-			continue // Connection already closed in checkRateLimitLocked
+		// Check rate limit after releasing mutex - rate limiters are thread-safe
+		if !s.checkRateLimit(conn) {
+			continue // Connection already closed in checkRateLimit
 		}
 
-		// Track connection (still holding mutex)
+		// Track connection
+		s.mu.Lock()
 		s.activeConns[conn] = struct{}{}
 		s.mu.Unlock()
 
@@ -330,10 +335,10 @@ func (s *Server) acceptLoop(ctx context.Context) {
 	}
 }
 
-// checkRateLimitLocked checks if the connection should be rate limited.
-// Must be called with s.mu held. Returns true if allowed, false if rate limited.
+// checkRateLimit checks if the connection should be rate limited.
+// Returns true if allowed, false if rate limited.
 // If rate limited, the connection is closed and metrics are recorded.
-func (s *Server) checkRateLimitLocked(conn net.Conn) bool {
+func (s *Server) checkRateLimit(conn net.Conn) bool {
 	// Skip if rate limiting is disabled
 	if s.rateLimiter == nil && s.perClientLimiter == nil {
 		return true
@@ -342,13 +347,14 @@ func (s *Server) checkRateLimitLocked(conn net.Conn) bool {
 	remoteAddr := conn.RemoteAddr().String()
 	clientIP := extractClientIP(remoteAddr)
 
-	// Check per-client rate limit first
-	if s.perClientLimiter != nil {
-		if !s.perClientLimiter.Allow(clientIP) {
-			s.logger.Warn("Per-client rate limit exceeded",
-				"client_ip", clientIP,
+	// Check global rate limit first - it's a shared resource that should be
+	// protected before per-client limits to prevent one client exhausting
+	// the global limit for all clients.
+	if s.rateLimiter != nil {
+		if !s.rateLimiter.Allow() {
+			s.logger.Warn("Global rate limit exceeded",
 				"remote", remoteAddr)
-			s.recordRateLimitedLocked()
+			s.recordRateLimited()
 			if err := conn.Close(); err != nil {
 				s.logger.Debug("Failed to close rate-limited connection", "error", err)
 			}
@@ -356,12 +362,13 @@ func (s *Server) checkRateLimitLocked(conn net.Conn) bool {
 		}
 	}
 
-	// Check global rate limit
-	if s.rateLimiter != nil {
-		if !s.rateLimiter.Allow() {
-			s.logger.Warn("Global rate limit exceeded",
+	// Check per-client rate limit
+	if s.perClientLimiter != nil {
+		if !s.perClientLimiter.Allow(clientIP) {
+			s.logger.Warn("Per-client rate limit exceeded",
+				"client_ip", clientIP,
 				"remote", remoteAddr)
-			s.recordRateLimitedLocked()
+			s.recordRateLimited()
 			if err := conn.Close(); err != nil {
 				s.logger.Debug("Failed to close rate-limited connection", "error", err)
 			}
@@ -372,11 +379,13 @@ func (s *Server) checkRateLimitLocked(conn net.Conn) bool {
 	return true
 }
 
-// recordRateLimitedLocked records a rate-limited connection in metrics.
-// Must be called with s.mu held.
-func (s *Server) recordRateLimitedLocked() {
-	if s.metrics != nil {
-		s.metrics.RecordRateLimitedConnection()
+// recordRateLimited records a rate-limited connection in metrics.
+func (s *Server) recordRateLimited() {
+	s.mu.Lock()
+	m := s.metrics
+	s.mu.Unlock()
+	if m != nil {
+		m.RecordRateLimitedConnection()
 	}
 }
 
