@@ -350,12 +350,12 @@ Create a custom configuration:
 cfg := config.DefaultConfig()
 
 // Circuit prebuilding
-cfg.PrebuiltCircuits = 3        // Keep 3 circuits ready
-cfg.MaxIdleCircuits = 10        // Allow up to 10 idle circuits
+cfg.CircuitPoolMinSize = 3      // Minimum circuits to maintain ready
+cfg.CircuitPoolMaxSize = 10     // Maximum circuits in pool
 cfg.CircuitBuildTimeout = 60 * time.Second
 
 // Connection pooling
-cfg.ConnectionPoolSize = 20     // Pool 20 connections
+cfg.ConnectionPoolMaxIdle = 5   // Max idle connections per relay
 cfg.MaxCircuitDirtiness = 10 * time.Minute  // Rotate circuits every 10 min
 ```
 ### Monitor Performance
@@ -381,13 +381,13 @@ DataDirectory ./tor-data
 Log info
 
 # Performance
-PrebuiltCircuits 3
-MaxIdleCircuits 10
+CircuitPoolMinSize 3
+CircuitPoolMaxSize 10
 CircuitBuildTimeout 60
 MaxCircuitDirtiness 600
 
 # Connection pooling
-ConnectionPoolSize 20
+ConnectionPoolMaxIdle 5
 ```
 Run with config file:
 ```bash
@@ -437,8 +437,9 @@ cfg.LogLevel = "debug"
 ### Debug Logging
 Enable detailed logging to diagnose issues:
 ```go
-// Create debug logger
-log := logger.New(logger.LevelDebug, os.Stdout)
+// Create debug logger via ParseLevel
+level, _ := logger.ParseLevel("debug")
+log := logger.New(level, os.Stdout)
 
 // Or set via config
 cfg.LogLevel = "debug"
@@ -509,9 +510,9 @@ cfg.SocksPort = 9050
 
 // Performance-optimized
 cfg := config.DefaultConfig()
-cfg.PrebuiltCircuits = 3
-cfg.MaxIdleCircuits = 10
-cfg.ConnectionPoolSize = 20
+cfg.CircuitPoolMinSize = 3
+cfg.CircuitPoolMaxSize = 10
+cfg.ConnectionPoolMaxIdle = 5
 
 // Debug configuration
 cfg := config.DefaultConfig()
