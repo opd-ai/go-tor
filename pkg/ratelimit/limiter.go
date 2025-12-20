@@ -100,9 +100,9 @@ func (r *RateLimiter) WaitN(ctx context.Context, n int) error {
 // Returns a Reservation that indicates when the tokens will be available.
 //
 // Behavior:
-// - If tokens are available immediately, they are consumed and delay is 0.
-// - If tokens are not available, delay indicates how long to wait before
-//   calling Allow() or Wait() to actually consume the tokens.
+//   - If tokens are available immediately, they are consumed and delay is 0.
+//   - If tokens are not available, delay indicates how long to wait before
+//     calling Allow() or Wait() to actually consume the tokens.
 func (r *RateLimiter) Reserve(n int) *Reservation {
 	r.mu.Lock()
 	defer r.mu.Unlock()

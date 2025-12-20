@@ -398,12 +398,18 @@ func migrateV1ToV2(oldState *GuardState) *GuardStateV2 {
 		UpdatedAt: oldState.LastUpdated,
 	}
 
-	// Calculate checksum
-	data, _ := json.Marshal(&GuardStateV2{
+	// Calculate checksum - Marshal should not fail for a valid struct,
+	// but if it does, we'll have an empty checksum which is detectable
+	data, err := json.Marshal(&GuardStateV2{
 		Version:   state.Version,
 		Guards:    state.Guards,
 		UpdatedAt: state.UpdatedAt,
 	})
+	if err != nil {
+		// Fall back to empty checksum - callers should verify checksum validity
+		state.Checksum = ""
+		return state
+	}
 	state.Checksum = calculateChecksum(data)
 
 	return state
@@ -426,5 +432,3 @@ func (p *Persistence) GetBackupPaths() []string {
 	}
 	return paths
 }
-
-

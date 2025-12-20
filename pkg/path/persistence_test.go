@@ -233,12 +233,24 @@ func TestPersistenceCorruptedFile(t *testing.T) {
 	}
 
 	// Corrupt the main file by changing the checksum
-	data, _ := os.ReadFile(filePath)
+	// Errors are intentionally ignored here as we're setting up a corruption scenario
+	// and the prior Save() ensures the file exists and is valid JSON
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("ReadFile() failed: %v", err)
+	}
 	var state GuardStateV2
-	json.Unmarshal(data, &state)
+	if err := json.Unmarshal(data, &state); err != nil {
+		t.Fatalf("Unmarshal() failed: %v", err)
+	}
 	state.Checksum = "invalid_checksum"
-	corrupted, _ := json.Marshal(state)
-	os.WriteFile(filePath, corrupted, 0o600)
+	corrupted, err := json.Marshal(state)
+	if err != nil {
+		t.Fatalf("Marshal() failed: %v", err)
+	}
+	if err := os.WriteFile(filePath, corrupted, 0o600); err != nil {
+		t.Fatalf("WriteFile() failed: %v", err)
+	}
 
 	// Load should recover from backup
 	loaded, err := p.Load(ctx)
@@ -270,8 +282,13 @@ func TestPersistenceV1Migration(t *testing.T) {
 		LastUpdated: time.Now(),
 	}
 
-	data, _ := json.Marshal(v1State)
-	os.WriteFile(filePath, data, 0o600)
+	data, err := json.Marshal(v1State)
+	if err != nil {
+		t.Fatalf("Marshal() failed: %v", err)
+	}
+	if err := os.WriteFile(filePath, data, 0o600); err != nil {
+		t.Fatalf("WriteFile() failed: %v", err)
+	}
 
 	config := DefaultPersistenceConfig(filePath)
 	p := NewPersistence(config, logger.NewDefault())
@@ -510,11 +527,14 @@ func TestVerifyChecksum(t *testing.T) {
 	}
 
 	// Test valid checksum
-	dataWithoutChecksum, _ := json.Marshal(&GuardStateV2{
+	dataWithoutChecksum, err := json.Marshal(&GuardStateV2{
 		Version:   state.Version,
 		Guards:    state.Guards,
 		UpdatedAt: state.UpdatedAt,
 	})
+	if err != nil {
+		t.Fatalf("Marshal() failed: %v", err)
+	}
 	state.Checksum = calculateChecksum(dataWithoutChecksum)
 	if !verifyChecksum(state) {
 		t.Error("verifyChecksum() with valid checksum should return true")
