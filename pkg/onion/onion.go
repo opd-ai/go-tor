@@ -36,6 +36,11 @@ const (
 	V3Version       = 0x03
 	V3ChecksumLen   = 2
 	V3PubkeyLen     = 32 // ed25519 public key
+
+	// LOW-006 FIX: Maximum descriptor size to prevent resource exhaustion
+	// Per rend-spec-v3.txt, descriptors are typically under 50KB
+	// We set a generous limit of 100KB to allow for padding and extensions
+	MaxDescriptorSize = 100 * 1024 // 100 KB
 )
 
 // AddressVersion represents the onion service version
@@ -1175,6 +1180,20 @@ func (h *HSDir) FetchDescriptor(ctx context.Context, addr *Address, hsdirs []*HS
 				desc.BlindedPubkey = blindedPubkey
 				desc.DescriptorID = descriptorID
 
+				// MED-002 FIX: Verify descriptor signature before accepting
+				// This prevents accepting forged or tampered descriptors
+				if err := VerifyDescriptorSignature(desc, addr); err != nil {
+					h.logger.Warn("Descriptor signature verification failed",
+						"address", addr.String(),
+						"hsdir", hsdir.Fingerprint,
+						"error", err)
+					lastErr = fmt.Errorf("descriptor signature verification failed: %w", err)
+					continue // Try next HSDir
+				}
+
+				h.logger.Debug("Descriptor signature verified successfully",
+					"address", addr.String())
+
 				return desc, nil
 			}
 		}
@@ -1235,10 +1254,18 @@ func (h *HSDir) fetchFromHSDir(ctx context.Context, hsdir *HSDirectory, descript
 		return nil, fmt.Errorf("HSDir %s returned status %d", hsdir.Fingerprint, resp.StatusCode)
 	}
 
-	// Read response body
-	body, err := io.ReadAll(resp.Body)
+	// LOW-006 FIX: Read response body with size limit to prevent resource exhaustion
+	// Use io.LimitReader to cap the maximum descriptor size we'll accept
+	limitedReader := io.LimitReader(resp.Body, MaxDescriptorSize+1)
+	body, err := io.ReadAll(limitedReader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read descriptor from %s: %w", hsdir.Fingerprint, err)
+	}
+
+	// Check if descriptor exceeded size limit
+	if len(body) > MaxDescriptorSize {
+		return nil, fmt.Errorf("descriptor from %s exceeds maximum size (%d > %d bytes)",
+			hsdir.Fingerprint, len(body), MaxDescriptorSize)
 	}
 
 	// Parse the descriptor
