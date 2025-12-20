@@ -55,11 +55,11 @@ type Metrics struct {
 	OutOfOrderCells        *Counter // Cells received out of order (not replays)
 
 	// Rate limiting metrics (Phase 2.3)
-	RateLimitedConnections *Counter // Connections rejected due to rate limiting
-	RateLimitedCircuits    *Counter // Circuit creations rejected due to rate limiting
+	RateLimitedConnections *Counter   // Connections rejected due to rate limiting
+	RateLimitedCircuits    *Counter   // Circuit creations rejected due to rate limiting
 	RateLimitWaitTime      *Histogram // Time spent waiting for rate limiter
-	BackpressurePauses     *Counter // Number of times backpressure was applied
-	BackpressureResumes    *Counter // Number of times backpressure was released
+	BackpressurePauses     *Counter   // Number of times backpressure was applied
+	BackpressureResumes    *Counter   // Number of times backpressure was released
 
 	// System metrics
 	Uptime      *Gauge

@@ -112,20 +112,20 @@ type Config struct {
 func DefaultConfig() *Config {
 	return &Config{
 		MaxConnections:                defaultMaxConnections,
-		EnableDNSResolution:          true,                  // DNS leak prevention enabled by default
-		DNSTimeout:                   30 * time.Second,      // Standard DNS timeout
-		IsolationLevel:               circuit.IsolationNone, // Backward compatible default
-		IsolateDestinations:          false,
-		IsolateSOCKSAuth:             false,
-		IsolateClientPort:            false,
-		IsolationMode:                "off", // Default: no enforcement for backward compatibility
-		EnforceOnExistingCircuits:    true,
-		EnableRateLimiting:           true,   // Rate limiting enabled by default
-		ConnectionsPerSecond:         100.0,  // 100 connections/second
-		ConnectionsBurst:             50,     // Burst of 50 connections
-		EnablePerClientRateLimiting:  false,  // Per-client limiting disabled by default
+		EnableDNSResolution:           true,                  // DNS leak prevention enabled by default
+		DNSTimeout:                    30 * time.Second,      // Standard DNS timeout
+		IsolationLevel:                circuit.IsolationNone, // Backward compatible default
+		IsolateDestinations:           false,
+		IsolateSOCKSAuth:              false,
+		IsolateClientPort:             false,
+		IsolationMode:                 "off", // Default: no enforcement for backward compatibility
+		EnforceOnExistingCircuits:     true,
+		EnableRateLimiting:            true,  // Rate limiting enabled by default
+		ConnectionsPerSecond:          100.0, // 100 connections/second
+		ConnectionsBurst:              50,    // Burst of 50 connections
+		EnablePerClientRateLimiting:   false, // Per-client limiting disabled by default
 		PerClientConnectionsPerSecond: 10.0,  // 10 connections/second per client
-		PerClientConnectionsBurst:    5,      // Burst of 5 per client
+		PerClientConnectionsBurst:     5,     // Burst of 5 per client
 	}
 }
 
@@ -149,9 +149,9 @@ type Server struct {
 	listenerReady     chan struct{} // Signals when listener is ready
 
 	// Rate limiting (ROADMAP Phase 2.3)
-	rateLimiter       *ratelimit.RateLimiter       // Global connection rate limiter
-	perClientLimiter  *ratelimit.KeyedRateLimiter  // Per-client rate limiter
-	metrics           *metrics.Metrics             // Optional metrics for recording rate limit events
+	rateLimiter      *ratelimit.RateLimiter      // Global connection rate limiter
+	perClientLimiter *ratelimit.KeyedRateLimiter // Per-client rate limiter
+	metrics          *metrics.Metrics            // Optional metrics for recording rate limit events
 }
 
 // NewServer creates a new SOCKS5 proxy server
