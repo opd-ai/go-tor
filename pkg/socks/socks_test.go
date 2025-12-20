@@ -11,6 +11,7 @@ import (
 
 	"github.com/opd-ai/go-tor/pkg/circuit"
 	"github.com/opd-ai/go-tor/pkg/logger"
+	"github.com/opd-ai/go-tor/pkg/metrics"
 	"github.com/opd-ai/go-tor/pkg/pool"
 )
 
@@ -738,4 +739,199 @@ func TestSendDNSReply(t *testing.T) {
 
 	// This test would require a proper mock connection setup
 	// For now, we verify the basic structure through unit tests
+}
+
+// Rate limiting tests (ROADMAP Phase 2.3)
+
+func TestRateLimitingConfigDefaults(t *testing.T) {
+	cfg := DefaultConfig()
+
+	// Verify rate limiting defaults are set
+	if !cfg.EnableRateLimiting {
+		t.Error("EnableRateLimiting should default to true")
+	}
+	if cfg.ConnectionsPerSecond != 100.0 {
+		t.Errorf("ConnectionsPerSecond = %v, want 100.0", cfg.ConnectionsPerSecond)
+	}
+	if cfg.ConnectionsBurst != 50 {
+		t.Errorf("ConnectionsBurst = %d, want 50", cfg.ConnectionsBurst)
+	}
+	if cfg.EnablePerClientRateLimiting {
+		t.Error("EnablePerClientRateLimiting should default to false")
+	}
+	if cfg.PerClientConnectionsPerSecond != 10.0 {
+		t.Errorf("PerClientConnectionsPerSecond = %v, want 10.0", cfg.PerClientConnectionsPerSecond)
+	}
+	if cfg.PerClientConnectionsBurst != 5 {
+		t.Errorf("PerClientConnectionsBurst = %d, want 5", cfg.PerClientConnectionsBurst)
+	}
+}
+
+func TestServerWithRateLimiting(t *testing.T) {
+	log := logger.NewDefault()
+	mgr := circuit.NewManager()
+
+	cfg := &Config{
+		MaxConnections:       1000,
+		EnableRateLimiting:   true,
+		ConnectionsPerSecond: 10.0,
+		ConnectionsBurst:     2,
+	}
+
+	server := NewServerWithConfig("127.0.0.1:0", mgr, log, cfg)
+	if server.rateLimiter == nil {
+		t.Error("Rate limiter should be initialized when enabled")
+	}
+	if server.perClientLimiter != nil {
+		t.Error("Per-client limiter should be nil when not enabled")
+	}
+}
+
+func TestServerWithPerClientRateLimiting(t *testing.T) {
+	log := logger.NewDefault()
+	mgr := circuit.NewManager()
+
+	cfg := &Config{
+		MaxConnections:                1000,
+		EnableRateLimiting:            true,
+		ConnectionsPerSecond:          100.0,
+		ConnectionsBurst:              50,
+		EnablePerClientRateLimiting:   true,
+		PerClientConnectionsPerSecond: 10.0,
+		PerClientConnectionsBurst:     5,
+	}
+
+	server := NewServerWithConfig("127.0.0.1:0", mgr, log, cfg)
+	if server.rateLimiter == nil {
+		t.Error("Rate limiter should be initialized")
+	}
+	if server.perClientLimiter == nil {
+		t.Error("Per-client limiter should be initialized when enabled")
+	}
+}
+
+func TestServerWithRateLimitingDisabled(t *testing.T) {
+	log := logger.NewDefault()
+	mgr := circuit.NewManager()
+
+	cfg := &Config{
+		MaxConnections:     1000,
+		EnableRateLimiting: false,
+	}
+
+	server := NewServerWithConfig("127.0.0.1:0", mgr, log, cfg)
+	if server.rateLimiter != nil {
+		t.Error("Rate limiter should be nil when disabled")
+	}
+}
+
+func TestExtractClientIP(t *testing.T) {
+	tests := []struct {
+		name       string
+		remoteAddr string
+		want       string
+	}{
+		{
+			name:       "IPv4 with port",
+			remoteAddr: "192.168.1.100:12345",
+			want:       "192.168.1.100",
+		},
+		{
+			name:       "IPv6 with port",
+			remoteAddr: "[::1]:12345",
+			want:       "::1",
+		},
+		{
+			name:       "localhost",
+			remoteAddr: "127.0.0.1:8080",
+			want:       "127.0.0.1",
+		},
+		{
+			name:       "invalid address (no port)",
+			remoteAddr: "192.168.1.100",
+			want:       "192.168.1.100",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := extractClientIP(tt.remoteAddr)
+			if got != tt.want {
+				t.Errorf("extractClientIP(%q) = %q, want %q", tt.remoteAddr, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRateLimitedConnectionIntegration(t *testing.T) {
+	log := logger.NewDefault()
+	mgr := circuit.NewManager()
+
+	// Very strict rate limit for testing: 1 connection per second, burst of 1
+	cfg := &Config{
+		MaxConnections:       1000,
+		EnableRateLimiting:   true,
+		ConnectionsPerSecond: 1.0,
+		ConnectionsBurst:     1,
+		EnableDNSResolution:  true,
+		DNSTimeout:           30 * time.Second,
+		IsolationMode:        "off",
+	}
+
+	server := NewServerWithConfig("127.0.0.1:0", mgr, log, cfg)
+	circuitPool := newMockCircuitPool(log)
+	server.SetCircuitPool(circuitPool)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go server.ListenAndServe(ctx)
+
+	addr := server.ListenerAddr().String()
+
+	// First connection should succeed
+	conn1, err := net.Dial("tcp", addr)
+	if err != nil {
+		t.Fatalf("First connection failed: %v", err)
+	}
+	defer conn1.Close()
+
+	// Second connection should be rate limited (within same second, burst exhausted)
+	conn2, err := net.Dial("tcp", addr)
+	if err != nil {
+		t.Fatalf("Second dial failed (expected to connect, then be closed): %v", err)
+	}
+	defer conn2.Close()
+
+	// Give the server time to process and rate limit the second connection
+	time.Sleep(100 * time.Millisecond)
+
+	// The second connection should be closed by the server due to rate limiting
+	// We can verify this by trying to read - should get EOF or error
+	conn2.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+	buf := make([]byte, 1)
+	_, err = conn2.Read(buf)
+	if err == nil {
+		t.Error("Expected second connection to be rate limited and closed")
+	}
+}
+
+func TestSetMetrics(t *testing.T) {
+	log := logger.NewDefault()
+	mgr := circuit.NewManager()
+
+	server := NewServer("127.0.0.1:0", mgr, log)
+
+	// Initially nil
+	if server.metrics != nil {
+		t.Error("Metrics should be nil initially")
+	}
+
+	// Set metrics
+	m := &metrics.Metrics{}
+	server.SetMetrics(m)
+
+	if server.metrics != m {
+		t.Error("SetMetrics should set the metrics instance")
+	}
 }

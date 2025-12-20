@@ -14,8 +14,10 @@ import (
 
 	"github.com/opd-ai/go-tor/pkg/circuit"
 	"github.com/opd-ai/go-tor/pkg/logger"
+	"github.com/opd-ai/go-tor/pkg/metrics"
 	"github.com/opd-ai/go-tor/pkg/onion"
 	"github.com/opd-ai/go-tor/pkg/pool"
+	"github.com/opd-ai/go-tor/pkg/ratelimit"
 	"github.com/opd-ai/go-tor/pkg/stream"
 )
 
@@ -90,20 +92,40 @@ type Config struct {
 	IsolationMode string
 	// EnforceOnExistingCircuits checks isolation when reusing circuits
 	EnforceOnExistingCircuits bool
+
+	// Rate limiting configuration (ROADMAP Phase 2.3)
+	// EnableRateLimiting enables rate limiting for SOCKS connections
+	EnableRateLimiting bool
+	// ConnectionsPerSecond is the rate limit for new connections per second
+	ConnectionsPerSecond float64
+	// ConnectionsBurst is the burst capacity for connection rate limiting
+	ConnectionsBurst int
+	// EnablePerClientRateLimiting enables per-client rate limiting
+	EnablePerClientRateLimiting bool
+	// PerClientConnectionsPerSecond is the per-client connection rate limit
+	PerClientConnectionsPerSecond float64
+	// PerClientConnectionsBurst is the per-client burst capacity
+	PerClientConnectionsBurst int
 }
 
 // DefaultConfig returns default SOCKS5 server configuration
 func DefaultConfig() *Config {
 	return &Config{
-		MaxConnections:            defaultMaxConnections,
-		EnableDNSResolution:       true,                  // DNS leak prevention enabled by default
-		DNSTimeout:                30 * time.Second,      // Standard DNS timeout
-		IsolationLevel:            circuit.IsolationNone, // Backward compatible default
-		IsolateDestinations:       false,
-		IsolateSOCKSAuth:          false,
-		IsolateClientPort:         false,
-		IsolationMode:             "off", // Default: no enforcement for backward compatibility
-		EnforceOnExistingCircuits: true,
+		MaxConnections:                defaultMaxConnections,
+		EnableDNSResolution:          true,                  // DNS leak prevention enabled by default
+		DNSTimeout:                   30 * time.Second,      // Standard DNS timeout
+		IsolationLevel:               circuit.IsolationNone, // Backward compatible default
+		IsolateDestinations:          false,
+		IsolateSOCKSAuth:             false,
+		IsolateClientPort:            false,
+		IsolationMode:                "off", // Default: no enforcement for backward compatibility
+		EnforceOnExistingCircuits:    true,
+		EnableRateLimiting:           true,   // Rate limiting enabled by default
+		ConnectionsPerSecond:         100.0,  // 100 connections/second
+		ConnectionsBurst:             50,     // Burst of 50 connections
+		EnablePerClientRateLimiting:  false,  // Per-client limiting disabled by default
+		PerClientConnectionsPerSecond: 10.0,  // 10 connections/second per client
+		PerClientConnectionsBurst:    5,      // Burst of 5 per client
 	}
 }
 
@@ -125,6 +147,11 @@ type Server struct {
 	shutdownOnce      sync.Once
 	closeListener     sync.Once
 	listenerReady     chan struct{} // Signals when listener is ready
+
+	// Rate limiting (ROADMAP Phase 2.3)
+	rateLimiter       *ratelimit.RateLimiter       // Global connection rate limiter
+	perClientLimiter  *ratelimit.KeyedRateLimiter  // Per-client rate limiter
+	metrics           *metrics.Metrics             // Optional metrics for recording rate limit events
 }
 
 // NewServer creates a new SOCKS5 proxy server
@@ -147,6 +174,25 @@ func NewServerWithConfig(address string, circuitMgr *circuit.Manager, log *logge
 	isolationPolicy := buildIsolationPolicy(cfg, log)
 	isolationEnforcer := stream.NewIsolationEnforcer(isolationPolicy, log)
 
+	// Create rate limiters if enabled (ROADMAP Phase 2.3)
+	var rateLimiter *ratelimit.RateLimiter
+	var perClientLimiter *ratelimit.KeyedRateLimiter
+	if cfg.EnableRateLimiting {
+		rateLimiter = ratelimit.NewRateLimiter(cfg.ConnectionsPerSecond, cfg.ConnectionsBurst)
+		log.Info("Rate limiting enabled",
+			"connections_per_second", cfg.ConnectionsPerSecond,
+			"burst", cfg.ConnectionsBurst)
+	}
+	if cfg.EnablePerClientRateLimiting {
+		perClientLimiter = ratelimit.NewKeyedRateLimiter(
+			cfg.PerClientConnectionsPerSecond,
+			cfg.PerClientConnectionsBurst,
+		)
+		log.Info("Per-client rate limiting enabled",
+			"per_client_rate", cfg.PerClientConnectionsPerSecond,
+			"per_client_burst", cfg.PerClientConnectionsBurst)
+	}
+
 	return &Server{
 		address:           address,
 		circuitMgr:        circuitMgr,
@@ -158,6 +204,8 @@ func NewServerWithConfig(address string, circuitMgr *circuit.Manager, log *logge
 		activeConns:       make(map[net.Conn]struct{}),
 		shutdown:          make(chan struct{}),
 		listenerReady:     make(chan struct{}),
+		rateLimiter:       rateLimiter,
+		perClientLimiter:  perClientLimiter,
 	}
 }
 
@@ -187,6 +235,13 @@ func (s *Server) SetCircuitPool(pool *pool.CircuitPool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.circuitPool = pool
+}
+
+// SetMetrics sets the metrics instance for recording rate limit events
+func (s *Server) SetMetrics(m *metrics.Metrics) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.metrics = m
 }
 
 // ListenAndServe starts the SOCKS5 server
@@ -257,14 +312,83 @@ func (s *Server) acceptLoop(ctx context.Context) {
 			}
 			continue
 		}
+		s.mu.Unlock()
+
+		// Rate limiting check (ROADMAP Phase 2.3)
+		if !s.checkRateLimit(conn) {
+			continue // Connection already closed in checkRateLimit
+		}
 
 		// Track connection
+		s.mu.Lock()
 		s.activeConns[conn] = struct{}{}
 		s.mu.Unlock()
 
 		// Handle connection
 		go s.handleConnection(ctx, conn)
 	}
+}
+
+// checkRateLimit checks if the connection should be rate limited.
+// Returns true if connection is allowed, false if rate limited.
+// If rate limited, the connection is closed and metrics are recorded.
+func (s *Server) checkRateLimit(conn net.Conn) bool {
+	// Skip if rate limiting is disabled
+	if s.rateLimiter == nil && s.perClientLimiter == nil {
+		return true
+	}
+
+	remoteAddr := conn.RemoteAddr().String()
+	clientIP := extractClientIP(remoteAddr)
+
+	// Check per-client rate limit first
+	if s.perClientLimiter != nil {
+		if !s.perClientLimiter.Allow(clientIP) {
+			s.logger.Warn("Per-client rate limit exceeded",
+				"client_ip", clientIP,
+				"remote", remoteAddr)
+			s.recordRateLimited()
+			if err := conn.Close(); err != nil {
+				s.logger.Debug("Failed to close rate-limited connection", "error", err)
+			}
+			return false
+		}
+	}
+
+	// Check global rate limit
+	if s.rateLimiter != nil {
+		if !s.rateLimiter.Allow() {
+			s.logger.Warn("Global rate limit exceeded",
+				"remote", remoteAddr)
+			s.recordRateLimited()
+			if err := conn.Close(); err != nil {
+				s.logger.Debug("Failed to close rate-limited connection", "error", err)
+			}
+			return false
+		}
+	}
+
+	return true
+}
+
+// recordRateLimited records a rate-limited connection in metrics if available.
+func (s *Server) recordRateLimited() {
+	s.mu.Lock()
+	m := s.metrics
+	s.mu.Unlock()
+	if m != nil {
+		m.RecordRateLimitedConnection()
+	}
+}
+
+// extractClientIP extracts the IP address from a remote address string.
+func extractClientIP(remoteAddr string) string {
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		// If split fails, use the whole address
+		return remoteAddr
+	}
+	return host
 }
 
 // handleConnection handles a SOCKS5 connection
