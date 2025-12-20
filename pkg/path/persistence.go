@@ -58,9 +58,13 @@ type Persistence struct {
 	flock  *flock.Flock
 	mu     sync.Mutex
 
+	// snapshotMu protects the snapshot loop lifecycle (start/stop).
+	snapshotMu sync.Mutex
 	// snapshotCancel cancels the snapshot loop.
 	snapshotCancel context.CancelFunc
-	snapshotWg     sync.WaitGroup
+	// snapshotRunning indicates if the snapshot loop is currently running.
+	snapshotRunning bool
+	snapshotWg      sync.WaitGroup
 }
 
 // NewPersistence creates a new Persistence manager.
@@ -210,7 +214,11 @@ func (p *Persistence) Save(ctx context.Context, guards []GuardEntry) error {
 	if err := p.acquireLock(ctx); err != nil {
 		return err
 	}
-	defer p.releaseLock()
+	defer func() {
+		if err := p.releaseLock(); err != nil {
+			p.logger.Warn("Failed to release file lock", "error", err)
+		}
+	}()
 
 	// Rotate backups before writing new state
 	if err := p.rotateBackups(); err != nil {
@@ -264,7 +272,11 @@ func (p *Persistence) Load(ctx context.Context) ([]GuardEntry, error) {
 	if err := p.acquireLock(ctx); err != nil {
 		return nil, err
 	}
-	defer p.releaseLock()
+	defer func() {
+		if err := p.releaseLock(); err != nil {
+			p.logger.Error("Failed to release file lock", "error", err)
+		}
+	}()
 
 	data, err := os.ReadFile(p.config.FilePath)
 	if err != nil {
@@ -292,6 +304,8 @@ func (p *Persistence) Load(ctx context.Context) ([]GuardEntry, error) {
 	// Verify checksum for V2
 	if !verifyChecksum(&stateV2) {
 		p.logger.Warn("Guard state checksum mismatch, attempting backup recovery")
+		// Intentionally call loadFromBackup while holding p.mu and the file lock:
+		// loadFromBackup only reads backup files and does not acquire additional locks.
 		return p.loadFromBackup(ctx)
 	}
 
@@ -341,13 +355,24 @@ func (p *Persistence) loadFromBackup(ctx context.Context) ([]GuardEntry, error) 
 // StartSnapshotLoop starts a goroutine that periodically saves guard state.
 // The provided getGuards function is called to retrieve the current guard list.
 // Returns immediately if SnapshotInterval is 0.
+// This method is safe to call concurrently; duplicate calls are ignored.
 func (p *Persistence) StartSnapshotLoop(getGuards func() []GuardEntry) {
 	if p.config.SnapshotInterval <= 0 {
 		return
 	}
 
+	p.snapshotMu.Lock()
+	defer p.snapshotMu.Unlock()
+
+	// Prevent starting multiple snapshot loops
+	if p.snapshotRunning {
+		p.logger.Debug("Snapshot loop already running, ignoring duplicate start")
+		return
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	p.snapshotCancel = cancel
+	p.snapshotRunning = true
 
 	p.snapshotWg.Add(1)
 	go func() {
@@ -359,9 +384,19 @@ func (p *Persistence) StartSnapshotLoop(getGuards func() []GuardEntry) {
 }
 
 // StopSnapshotLoop stops the snapshot loop and waits for it to finish.
+// This method is safe to call concurrently and multiple times.
 func (p *Persistence) StopSnapshotLoop() {
-	if p.snapshotCancel != nil {
-		p.snapshotCancel()
+	p.snapshotMu.Lock()
+	if !p.snapshotRunning {
+		p.snapshotMu.Unlock()
+		return
+	}
+	cancel := p.snapshotCancel
+	p.snapshotRunning = false
+	p.snapshotMu.Unlock()
+
+	if cancel != nil {
+		cancel()
 		p.snapshotWg.Wait()
 		p.logger.Info("Stopped snapshot loop")
 	}
