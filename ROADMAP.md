@@ -402,17 +402,18 @@ The codebase demonstrates:
 
 ---
 
-### 2.12 Missing Database for Guard Persistence
+### 2.12 Reliable Guard Persistence with Flatfile Storage
 **Priority**: High
-**Effort**: 4 days
-**Problem**: Guard node persistence exists but may be using simple file storage. Production needs reliable database storage with backup and recovery.
+**Effort**: 3 days
+**Problem**: Guard node persistence exists but may need improvements for reliable file-based storage with backup and recovery.
 
 **Solution**:
-- [ ] Implement SQLite for local guard persistence
-- [ ] Add database migrations framework
-- [ ] Implement proper transaction handling
-- [ ] Add database health checks
-- [ ] Implement automatic backup procedures
+- [ ] Implement atomic file writes with temp file + rename pattern for guard state
+- [ ] Add JSON/TOML-based guard state file with schema versioning
+- [ ] Implement file locking to prevent concurrent write corruption
+- [ ] Add file integrity checks (checksums/hashes)
+- [ ] Implement automatic backup with rotation (keep last N copies)
+- [ ] Add periodic state snapshots with configurable intervals
 - [ ] ...
 
 **Files Affected**: `pkg/path/guard.go`, `pkg/path/persistence.go` (new)
@@ -905,7 +906,7 @@ The codebase demonstrates:
 ### Decision Points
 - Choose tracing backend (OpenTelemetry recommended)
 - Select container base image (distroless recommended)
-- Decide on database for guard persistence (SQLite recommended)
+- Choose guard persistence file format (JSON or TOML recommended)
 - Choose plugin system architecture (if Phase 4.9 prioritized)
 
 
