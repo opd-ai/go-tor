@@ -1,0 +1,9 @@
+# Namespace for go-tor deployment
+# Creates an isolated namespace for the Tor client
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: go-tor
+  labels:
+    app.kubernetes.io/name: go-tor
+    app.kubernetes.io/component: namespace

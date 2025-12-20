@@ -1,0 +1,55 @@
+# Service for go-tor
+# Exposes SOCKS proxy, control protocol, and metrics endpoints
+apiVersion: v1
+kind: Service
+metadata:
+  name: go-tor
+  namespace: go-tor
+  labels:
+    app.kubernetes.io/name: go-tor
+    app.kubernetes.io/component: proxy
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: go-tor
+  ports:
+    - name: socks
+      port: 9050
+      targetPort: socks
+      protocol: TCP
+    - name: control
+      port: 9051
+      targetPort: control
+      protocol: TCP
+    - name: metrics
+      port: 9052
+      targetPort: metrics
+      protocol: TCP
+---
+# Headless service for direct pod access if needed
+apiVersion: v1
+kind: Service
+metadata:
+  name: go-tor-headless
+  namespace: go-tor
+  labels:
+    app.kubernetes.io/name: go-tor
+    app.kubernetes.io/component: proxy
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: go-tor
+  ports:
+    - name: socks
+      port: 9050
+      targetPort: socks
+      protocol: TCP
+    - name: control
+      port: 9051
+      targetPort: control
+      protocol: TCP
+    - name: metrics
+      port: 9052
+      targetPort: metrics
+      protocol: TCP

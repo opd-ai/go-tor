@@ -270,17 +270,44 @@ The codebase demonstrates:
 ### 2.6 Missing Kubernetes Deployment Manifests
 **Priority**: High
 **Effort**: 3 days
-**Problem**: No Kubernetes manifests, Helm charts, or deployment automation exist. Modern cloud deployments require these.
+**Status**: ✅ **COMPLETE** - Full Kubernetes manifests and Helm chart implemented
 
 **Solution**:
-- [ ] Create Kubernetes Deployment manifest
-- [ ] Add Service and ConfigMap definitions
-- [ ] Create Helm chart with configurable values
-- [ ] Add PodDisruptionBudget for availability
-- [ ] Implement proper resource limits and requests
-- [ ] ...
+- [x] Create Kubernetes Deployment manifest
+- [x] Add Service and ConfigMap definitions
+- [x] Create Helm chart with configurable values
+- [x] Add PodDisruptionBudget for availability
+- [x] Implement proper resource limits and requests
 
-**Files to Create**: `deploy/kubernetes/`, `deploy/helm/go-tor/`
+**Implementation Details**:
+- Created `deploy/kubernetes/` directory with production-ready manifests
+- Namespace, Deployment, Service, ConfigMap, and PodDisruptionBudget manifests
+- Added Kustomize configuration for easy deployment
+- Created `deploy/helm/go-tor/` Helm chart with full customization
+- Helm chart includes ServiceAccount, probes, persistence options, and topology spread
+- Security context follows best practices (non-root, read-only filesystem, dropped capabilities)
+- Added README documentation for both Kubernetes and Helm deployments
+
+**Files Created**: 
+- `deploy/kubernetes/namespace.yaml`
+- `deploy/kubernetes/configmap.yaml`
+- `deploy/kubernetes/deployment.yaml`
+- `deploy/kubernetes/service.yaml`
+- `deploy/kubernetes/pdb.yaml`
+- `deploy/kubernetes/kustomization.yaml`
+- `deploy/kubernetes/README.md`
+- `deploy/helm/go-tor/Chart.yaml`
+- `deploy/helm/go-tor/values.yaml`
+- `deploy/helm/go-tor/.helmignore`
+- `deploy/helm/go-tor/README.md`
+- `deploy/helm/go-tor/templates/_helpers.tpl`
+- `deploy/helm/go-tor/templates/configmap.yaml`
+- `deploy/helm/go-tor/templates/deployment.yaml`
+- `deploy/helm/go-tor/templates/service.yaml`
+- `deploy/helm/go-tor/templates/serviceaccount.yaml`
+- `deploy/helm/go-tor/templates/pdb.yaml`
+- `deploy/helm/go-tor/templates/pvc.yaml`
+- `deploy/helm/go-tor/templates/NOTES.txt`
 
 
 ---

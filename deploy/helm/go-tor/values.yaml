@@ -1,0 +1,162 @@
+# Default values for go-tor Helm chart
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Number of replicas
+replicaCount: 1
+
+# Container image configuration
+# NOTE: You must provide a fully qualified image name with your registry.
+# Example: image.repository = "ghcr.io/opd-ai/go-tor"
+# Build the image using: docker build -t your-registry/go-tor:tag .
+image:
+  repository: go-tor
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# Service account configuration
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+# Pod annotations
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "9052"
+  prometheus.io/path: "/metrics"
+
+# Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+# Container security context
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# Service configuration
+service:
+  type: ClusterIP
+  # SOCKS5 proxy port
+  socksPort: 9050
+  # Tor control protocol port
+  controlPort: 9051
+  # HTTP metrics port
+  metricsPort: 9052
+
+# go-tor specific configuration
+# NOTE: Only options listed below are supported in the torrc file.
+# Advanced options like connection pooling, circuit prebuilding, buffer pooling,
+# and isolation levels are configured programmatically by go-tor.
+config:
+  # Log level: debug, info, warn, error
+  logLevel: info
+  # Number of entry guards
+  numEntryGuards: 3
+  # Use entry guards for anonymity
+  useEntryGuards: true
+  # Circuit build timeout
+  circuitBuildTimeout: "60s"
+  # Max circuit dirtiness before rotation
+  maxCircuitDirtiness: "10m"
+  # New circuit creation period
+  newCircuitPeriod: "30s"
+  # Maximum connections
+  connLimit: 1000
+  # Dormant timeout
+  dormantTimeout: "24h"
+
+# Resource limits and requests
+resources:
+  requests:
+    memory: "64Mi"
+    cpu: "100m"
+  limits:
+    memory: "256Mi"
+    cpu: "500m"
+
+# Liveness probe configuration
+livenessProbe:
+  httpGet:
+    path: /health
+    port: metrics
+  initialDelaySeconds: 90
+  periodSeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 3
+
+# Readiness probe configuration
+readinessProbe:
+  httpGet:
+    path: /health
+    port: metrics
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Startup probe configuration
+startupProbe:
+  httpGet:
+    path: /health
+    port: metrics
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 18  # 3 minutes max startup time
+
+# Node selector for pod scheduling
+nodeSelector: {}
+
+# Tolerations for pod scheduling
+tolerations: []
+
+# Affinity rules for pod scheduling
+affinity: {}
+
+# Pod disruption budget configuration
+podDisruptionBudget:
+  enabled: true
+  # Use minAvailable or maxUnavailable, not both
+  minAvailable: 0
+  # maxUnavailable: 1
+
+# Persistence configuration for Tor data directory
+persistence:
+  enabled: false
+  # Storage class for dynamic provisioning
+  storageClass: ""
+  # Access modes
+  accessModes:
+    - ReadWriteOnce
+  # Size of the persistent volume
+  size: 1Gi
+  # Annotations for the PVC
+  annotations: {}
+
+# Topology spread constraints for pod distribution
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+
+# Termination grace period
+terminationGracePeriodSeconds: 30

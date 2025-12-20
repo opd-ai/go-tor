@@ -1,0 +1,18 @@
+{{- if .Values.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "go-tor.fullname" . }}
+  labels:
+    {{- include "go-tor.labels" . | nindent 4 }}
+spec:
+  {{- if not (kindIs "invalid" .Values.podDisruptionBudget.maxUnavailable) }}
+  maxUnavailable: {{ .Values.podDisruptionBudget.maxUnavailable }}
+  {{- else }}
+  {{/* Default to minAvailable if neither is explicitly set, or use the provided value */}}
+  minAvailable: {{ default 0 .Values.podDisruptionBudget.minAvailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "go-tor.selectorLabels" . | nindent 6 }}
+{{- end }}

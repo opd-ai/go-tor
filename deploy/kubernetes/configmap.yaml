@@ -1,0 +1,36 @@
+# ConfigMap for go-tor configuration
+# Contains the production torrc configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: go-tor-config
+  namespace: go-tor
+  labels:
+    app.kubernetes.io/name: go-tor
+    app.kubernetes.io/component: config
+data:
+  torrc: |
+    # Production Tor Configuration for Kubernetes
+    # Recommended settings for production deployments
+
+    # Network Settings
+    SocksPort 9050
+    ControlPort 9051
+
+    # Logging (container-friendly)
+    LogLevel info
+
+    # Circuit Configuration
+    NumEntryGuards 3
+    UseEntryGuards true
+    CircuitBuildTimeout 60s
+    MaxCircuitDirtiness 10m
+    NewCircuitPeriod 30s
+
+    # Connection Settings
+    ConnLimit 1000
+    DormantTimeout 24h
+
+    # NOTE: Advanced options such as connection pooling, circuit prebuilding,
+    # buffer pooling, and isolation levels are configured programmatically
+    # by go-tor and are not parsed from this torrc file.

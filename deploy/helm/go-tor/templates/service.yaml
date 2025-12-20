@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "go-tor.fullname" . }}
+  labels:
+    {{- include "go-tor.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.socksPort }}
+      targetPort: socks
+      protocol: TCP
+      name: socks
+    - port: {{ .Values.service.controlPort }}
+      targetPort: control
+      protocol: TCP
+      name: control
+    - port: {{ .Values.service.metricsPort }}
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+  selector:
+    {{- include "go-tor.selectorLabels" . | nindent 4 }}
+---
+# Headless service for direct pod access
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "go-tor.fullname" . }}-headless
+  labels:
+    {{- include "go-tor.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - port: {{ .Values.service.socksPort }}
+      targetPort: socks
+      protocol: TCP
+      name: socks
+    - port: {{ .Values.service.controlPort }}
+      targetPort: control
+      protocol: TCP
+      name: control
+    - port: {{ .Values.service.metricsPort }}
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+  selector:
+    {{- include "go-tor.selectorLabels" . | nindent 4 }}
