@@ -90,6 +90,9 @@ groups:
           action: "Check circuit build logs. Verify relay reachability. Consider increasing prebuilt circuit count."
 
       # High circuit build failure rate - SLI breach
+      # Note: Adding 0.001 to denominator prevents division by zero at startup.
+      # When there are zero builds, the result approaches 0 (no failures), which
+      # is the correct behavior - we don't want to alert when service just started.
       - alert: TorHighCircuitFailureRate
         expr: |
           (

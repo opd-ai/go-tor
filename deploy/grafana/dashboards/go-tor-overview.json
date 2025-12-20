@@ -17,7 +17,6 @@
   "gnetId": null,
   "graphTooltip": 1,
   "id": null,
-  "iteration": 1703030400000,
   "links": [
     {
       "asDropdown": false,
@@ -245,7 +244,7 @@
       "pluginVersion": "9.0.0",
       "targets": [
         {
-          "expr": "(sum(tor_circuit_build_success_total{instance=~\"$instance\"}) / sum(tor_circuit_builds_total{instance=~\"$instance\"})) * 100",
+          "expr": "(sum(tor_circuit_build_success_total{instance=~\"$instance\"}) / clamp_min(sum(tor_circuit_builds_total{instance=~\"$instance\"}), 1)) * 100",
           "legendFormat": "",
           "refId": "A"
         }

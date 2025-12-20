@@ -51,9 +51,9 @@ go-tor defines the following SLIs for monitoring service health:
 
 | SLO | Monthly Error Budget | Alert Threshold |
 |-----|---------------------|-----------------|
-| Circuit Success 70% | 30% failures allowed | Fast burn: >2%/hour |
-| Connection Success 80% | 20% failures allowed | Fast burn: >1%/hour |
-| Latency P95 ≤ 10s | 0.1% violations allowed | >10s for 10 minutes |
+| Circuit Success Rate ≥ 70% | 30% failed circuits allowed | Fast burn: >2% of circuits failing per hour |
+| Connection Success Rate ≥ 80% | 20% failed connections allowed | Fast burn: >1% of connections failing per hour |
+| Latency P95 ≤ 10s | 0.1% of requests may exceed 10s | P95 > 10s for 10 consecutive minutes |
 
 ---
 
