@@ -128,9 +128,9 @@ func (m *mockTLSRelay) handleHandshake(conn net.Conn) {
 	payload[1] = byte(now >> 16)
 	payload[2] = byte(now >> 8)
 	payload[3] = byte(now)
-	// Other address (IPv4)
-	payload[4] = 0x04
-	payload[5] = 4
+	// Other address: type=0x04 (IPv4 per tor-spec.txt), length=4 bytes
+	payload[4] = 0x04 // Address type: IPv4 (per tor-spec.txt section 6.4)
+	payload[5] = 4    // Address length: 4 bytes for IPv4
 	// Number of this addresses
 	payload[10] = 0
 	netinfoResponse.Payload = payload
@@ -696,6 +696,9 @@ func TestVersionsPayloadParsing(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Parse versions from payload (same encoding as receiveVersions in protocol.go)
+			// This test validates that the encoding logic produces the expected output
+			// by decoding it with the same algorithm used in the handshake
 			var versions []int
 			for i := 0; i < len(tt.payload); i += 2 {
 				version := int(tt.payload[i])<<8 | int(tt.payload[i+1])
