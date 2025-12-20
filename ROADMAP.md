@@ -862,14 +862,16 @@ The codebase demonstrates:
 
 ---
 
-## Phase 5: Tor Bridge Relay with Pluggable Transport Support (Future)
-**Timeline**: TBD
+## Future: Tor Bridge Relay with Pluggable Transport Support
+**Timeline**: TBD (after production readiness achieved)
 **Effort**: 6-8 weeks
 
 ### Project Scope Update
 The project has expanded beyond client-only functionality to include Tor bridge relay capabilities with pluggable transport support. This allows the implementation to act as an entry point to the Tor network for users in censored regions. **Note**: Exit node functionality is explicitly out of scope and will not be implemented.
 
-### 5.1 Bridge Relay Infrastructure
+This corresponds to **Phase 9** in the development roadmap (see README.md).
+
+### Bridge Relay Infrastructure
 **Priority**: High
 **Effort**: 2 weeks
 **Status**: Planned
@@ -887,7 +889,7 @@ The project has expanded beyond client-only functionality to include Tor bridge 
 
 ---
 
-### 5.2 Pluggable Transport Framework
+### Pluggable Transport Framework
 **Priority**: High
 **Effort**: 2 weeks
 **Status**: Planned
@@ -905,7 +907,7 @@ The project has expanded beyond client-only functionality to include Tor bridge 
 
 ---
 
-### 5.3 Bridge Distribution and BridgeDB Integration
+### Bridge Distribution and BridgeDB Integration
 **Priority**: Medium
 **Effort**: 1 week
 **Status**: Planned
@@ -922,7 +924,7 @@ The project has expanded beyond client-only functionality to include Tor bridge 
 
 ---
 
-### 5.4 Relay Security Hardening
+### Relay Security Hardening
 **Priority**: High
 **Effort**: 1 week
 **Status**: Planned
@@ -940,7 +942,7 @@ The project has expanded beyond client-only functionality to include Tor bridge 
 
 ---
 
-### 5.5 Bridge Relay Testing and Validation
+### Bridge Relay Testing and Validation
 **Priority**: High
 **Effort**: 1 week
 **Status**: Planned

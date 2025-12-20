@@ -128,7 +128,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture and r
 - **Pure Go**: No CGo dependencies for maximum portability
 - **Client and Bridge Relay**: Full client functionality plus Tor bridge relay with pluggable transport support (no exit node functionality)
 - **Embedded-Optimized**: Low memory footprint (<50MB RSS) and resource efficiency
-- **Feature Parity**: Match C Tor client capabilities, with bridge relay support
+- **Client Feature Parity**: Match C Tor client capabilities (excluding exit node functionality), with bridge relay support
 - **Cross-Platform**: Support for ARM, MIPS, x86 architectures
 
 ## Quick Start

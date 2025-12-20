@@ -14,9 +14,9 @@ For actual Tor usage:
 
 ## Overview
 
-go-tor is a pure Go implementation of a Tor client and bridge relay designed for embedded systems **as an educational project**. This document provides an architectural overview of the system.
+go-tor is a pure Go implementation of a Tor client with planned bridge relay capabilities, designed for embedded systems **as an educational project**. This document provides an architectural overview of the system.
 
-**Note**: While this implementation attempts to follow Tor specifications, it has not undergone the extensive security review and testing that official Tor software receives. The project aims to support both client functionality and bridge relay operation with pluggable transport support, but explicitly does not implement exit node functionality.
+**Note**: While this implementation attempts to follow Tor specifications, it has not undergone the extensive security review and testing that official Tor software receives. The project currently implements client functionality, with bridge relay operation and pluggable transport support planned for Phase 9. Exit node functionality is explicitly out of scope and will not be implemented.
 
 ## Design Principles
 
