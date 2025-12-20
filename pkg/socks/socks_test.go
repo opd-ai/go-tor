@@ -396,7 +396,7 @@ func TestSOCKS5UnsupportedVersion(t *testing.T) {
 	// then close the connection
 	buf := make([]byte, 10)
 	n, err := conn.Read(buf)
-	
+
 	// LOW-005: Server now properly sends rejection before closing
 	// Expect either:
 	// 1. A SOCKS5 rejection response (version=0x05, method=0xFF), then connection closes
@@ -405,14 +405,14 @@ func TestSOCKS5UnsupportedVersion(t *testing.T) {
 		// Connection closed without response - this is also acceptable
 		return
 	}
-	
+
 	// Verify rejection response format
 	if n >= 2 {
 		if buf[0] != 0x05 || buf[1] != 0xFF {
 			t.Errorf("Expected SOCKS5 rejection response {0x05, 0xFF}, got {0x%02X, 0x%02X}", buf[0], buf[1])
 		}
 	}
-	
+
 	// After rejection, connection should be closed
 	time.Sleep(100 * time.Millisecond)
 	_, err = conn.Read(buf)
