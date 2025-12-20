@@ -28,7 +28,7 @@ This document provides step-by-step resolution guidance for all security issues 
 | Category | Status | Count |
 |----------|--------|-------|
 | **Critical Issues** | ✅ All Resolved | 8/8 |
-| **High Severity** | ⚠️ Partially Complete | 1/12 remaining |
+| **High Severity** | ✅ All Resolved | 0/12 remaining |
 | **Medium Severity** | ⚠️ Partially Complete | 6/7 remaining |
 | **Low Severity** | 📋 Planned | 7/8 remaining |
 
@@ -43,10 +43,9 @@ The go-tor implementation demonstrates solid engineering practices:
 - ✅ Comprehensive constant-time operations
 - ✅ CI/CD security scanning (gosec, govulncheck, CodeQL, Trivy)
 - ✅ Error context in logs (correlation IDs, connection IDs)
+- ✅ Guard persistence with file locking, backups, and checksums (Phase 2.4)
 
 **Remaining Priority Work**:
-- Rate limiting and backpressure
-- Guard persistence improvements
 - Test coverage improvements for critical packages
 
 ---
@@ -317,196 +316,57 @@ go test -v ./pkg/metrics/...     # All tests pass
 
 ---
 
-### 2.4 🔴 Guard Persistence with Flatfile Storage (ROADMAP 2.12)
+### 2.4 ✅ Guard Persistence with Flatfile Storage (ROADMAP 2.12)
 
-**Status**: PARTIALLY IMPLEMENTED
+**Status**: COMPLETE
 
 **Priority**: HIGH  
 **Effort**: 3 days
 
 **Problem**: Guard node persistence may need improvements for atomic writes, file locking, and backup.
 
-**Step-by-Step Resolution**:
+**Solution**:
+- [x] Implement file locking using github.com/gofrs/flock
+- [x] Add schema versioning (GuardStateV2 with Version field)
+- [x] Add integrity checks (SHA-256 checksums)
+- [x] Implement backup rotation (configurable backup count)
+- [x] Add periodic state snapshots with configurable intervals
+- [x] Maintain backward compatibility with legacy persistence
 
-1. **Implement atomic file writes**:
-   ```go
-   // pkg/path/persistence.go
-   // Recommended: Use github.com/natefinch/atomic for cross-platform atomicity
-   import (
-       "bytes"
-       "github.com/natefinch/atomic"
-   )
-   
-   // atomicWrite writes data to path atomically across platforms.
-   // Uses github.com/natefinch/atomic to ensure atomicity on all platforms
-   // including Windows, where os.Rename may fail if destination exists.
-   func (p *Persistence) atomicWrite(path string, data []byte) error {
-       return atomic.WriteFile(path, bytes.NewReader(data))
-   }
-   ```
+**Implementation Details**:
+- Created `pkg/path/persistence.go` with enhanced persistence layer:
+  - `Persistence` type with file locking, checksum verification, backup rotation
+  - `PersistenceConfig` for configurable behavior (backup count, snapshot interval, lock timeout)
+  - `GuardStateV2` with version field and checksum for integrity verification
+  - Automatic backup rotation keeping last N copies
+  - Periodic snapshot loop for automatic state saving
+  - Automatic recovery from backup files when primary file is corrupted
+  - Schema migration from V1 (legacy) to V2 format
+- Updated `pkg/path/guards.go`:
+  - Added `GuardManagerConfig` for enhanced configuration
+  - Added `NewGuardManagerWithConfig()` constructor for enhanced persistence
+  - `StartSnapshotLoop()` / `StopSnapshotLoop()` for automatic periodic saving
+  - `HasEnhancedPersistence()` to check if enhanced features are enabled
+  - `GetBackupPaths()` to list existing backup files
+  - Maintained backward compatibility with existing `NewGuardManager()` constructor
+- Updated `pkg/config/config.go`:
+  - Added `GuardStateBackupCount`, `GuardStateSnapshotInterval`, `GuardStateLockTimeout`
+  - Added validation for new configuration options
 
-2. **Add file locking**:
-   ```go
-   func (p *Persistence) acquireLock(path string) (*flock.Flock, error) {
-       lock := flock.New(path + ".lock")
-       if err := lock.Lock(); err != nil {
-           return nil, err
-       }
-       return lock, nil
-   }
-   ```
-
-3. **Add schema versioning**:
-   ```go
-   type GuardStateV2 struct {
-       Version   int           `json:"version"`
-       Guards    []GuardEntry  `json:"guards"`
-       UpdatedAt time.Time     `json:"updated_at"`
-       Checksum  string        `json:"checksum"`
-   }
-   ```
-
-4. **Add integrity checks**:
-   ```go
-   import (
-       "crypto/sha256"
-       "encoding/hex"
-       "encoding/json"
-   )
-   
-   // calculateChecksum returns the hex-encoded SHA-256 checksum of the given data.
-   func (p *Persistence) calculateChecksum(data []byte) string {
-       h := sha256.Sum256(data)
-       return hex.EncodeToString(h[:])
-   }
-   
-   // verifyChecksum recomputes the checksum for the given state (excluding the
-   // Checksum field itself) and compares it with the stored Checksum value.
-   // Returns true only if the checksum matches.
-   func (p *Persistence) verifyChecksum(state *GuardStateV2) bool {
-       if state == nil || state.Checksum == "" {
-           return false
-       }
-       // Make a copy and clear Checksum so it's not included in calculation
-       copyState := *state
-       copyState.Checksum = ""
-       
-       data, err := json.Marshal(copyState)
-       if err != nil {
-           return false
-       }
-       
-       expected := p.calculateChecksum(data)
-       return expected == state.Checksum
-   }
-   ```
-
-5. **Implement backup rotation**:
-   ```go
-   import (
-       "fmt"
-       "io"
-       "os"
-   )
-   
-   // copyFile copies src to dst with proper resource cleanup.
-   // Preserves source file permissions (0600) for security.
-   func copyFile(src, dst string) error {
-       source, err := os.Open(src)
-       if err != nil {
-           return fmt.Errorf("open source: %w", err)
-       }
-       defer source.Close()
-       
-       // Get source file info for permissions
-       info, err := source.Stat()
-       if err != nil {
-           return fmt.Errorf("stat source: %w", err)
-       }
-       
-       dest, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, info.Mode())
-       if err != nil {
-           return fmt.Errorf("create destination: %w", err)
-       }
-       
-       n, err := io.Copy(dest, source)
-       if closeErr := dest.Close(); closeErr != nil && err == nil {
-           err = fmt.Errorf("close destination: %w", closeErr)
-       }
-       if err != nil {
-           os.Remove(dst)  // Clean up partial copy on error
-           return fmt.Errorf("copy failed: %w", err)
-       }
-       
-       // Verify copy was complete
-       if n != info.Size() {
-           os.Remove(dst)
-           return fmt.Errorf("incomplete copy: wrote %d of %d bytes", n, info.Size())
-       }
-       
-       return nil
-   }
-   
-   func (p *Persistence) rotateBackups(path string, keepN int) error {
-       // Keep last N backups - rotate from oldest to newest
-       for i := keepN - 1; i >= 1; i-- {
-           oldPath := fmt.Sprintf("%s.backup.%d", path, i)
-           newPath := fmt.Sprintf("%s.backup.%d", path, i+1)
-           if err := os.Rename(oldPath, newPath); err != nil {
-               // Ignore missing older backups, but fail on other errors
-               if !os.IsNotExist(err) {
-                   return fmt.Errorf("failed to rotate backup %s to %s: %w", oldPath, newPath, err)
-               }
-           }
-       }
-       
-       if err := copyFile(path, path+".backup.1"); err != nil {
-           return fmt.Errorf("failed to create primary backup for %s: %w", path, err)
-       }
-       
-       return nil
-   }
-   ```
-
-6. **Add periodic state snapshots**:
-   ```go
-   import (
-       "context"
-       "time"
-   )
-   
-   // startSnapshotLoop periodically saves guard state. Accepts context for graceful shutdown.
-   func (gm *GuardManager) startSnapshotLoop(ctx context.Context, interval time.Duration) {
-       ticker := time.NewTicker(interval)
-       defer ticker.Stop()
-       
-       for {
-           select {
-           case <-ctx.Done():
-               gm.logger.Info("Stopping snapshot loop", "reason", ctx.Err())
-               return
-           case <-ticker.C:
-               if err := gm.SaveState(); err != nil {
-                   gm.logger.Error("Failed to save guard state", "error", err)
-               }
-           }
-       }
-   }
-   ```
-
-**Files to Create**:
+**Files Created**:
 - `pkg/path/persistence.go`
 - `pkg/path/persistence_test.go`
 
-**Files to Modify**:
-- `pkg/path/guards.go` - Use new persistence layer
-- `pkg/config/config.go` - Add persistence config
+**Files Modified**:
+- `pkg/path/guards.go` - Integrated new persistence layer
+- `pkg/path/guards_test.go` - Added tests for enhanced persistence
+- `pkg/config/config.go` - Added persistence config options
 
 **Verification**:
 ```bash
-go test -v ./pkg/path/... -run TestPersistence
-# Test concurrent access
-go test -race ./pkg/path/...
+go test -v ./pkg/path/... -run TestPersistence  # All tests pass
+go test -race ./pkg/path/...                     # Race detector clean
+go build ./...                                   # Build successful
 ```
 
 ---

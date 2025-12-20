@@ -2,6 +2,7 @@
 package path
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -29,6 +30,35 @@ type GuardEntry struct {
 	Confirmed   bool      `json:"confirmed"`
 }
 
+// GuardManagerConfig holds configuration for the guard manager.
+type GuardManagerConfig struct {
+	// DataDir is the directory for persistent state.
+	DataDir string
+	// MaxGuards is the maximum number of guard nodes to maintain.
+	MaxGuards int
+	// GuardExpiry is how long before a guard expires without use.
+	GuardExpiry time.Duration
+	// BackupCount is the number of backup files to retain.
+	BackupCount int
+	// SnapshotInterval is the interval between automatic state snapshots.
+	// Set to 0 to disable automatic snapshots.
+	SnapshotInterval time.Duration
+	// LockTimeout is the timeout for acquiring the file lock.
+	LockTimeout time.Duration
+}
+
+// DefaultGuardManagerConfig returns sensible defaults for guard management.
+func DefaultGuardManagerConfig(dataDir string) *GuardManagerConfig {
+	return &GuardManagerConfig{
+		DataDir:          dataDir,
+		MaxGuards:        3,                   // Tor typically uses 3 guard nodes
+		GuardExpiry:      90 * 24 * time.Hour, // 90 days per Tor spec
+		BackupCount:      3,
+		SnapshotInterval: 5 * time.Minute,
+		LockTimeout:      10 * time.Second,
+	}
+}
+
 // GuardManager manages persistent guard nodes
 type GuardManager struct {
 	logger      *logger.Logger
@@ -37,26 +67,58 @@ type GuardManager struct {
 	mu          sync.RWMutex
 	maxGuards   int
 	guardExpiry time.Duration
+
+	// persistence is the enhanced persistence layer (optional)
+	persistence *Persistence
 }
 
-// NewGuardManager creates a new guard manager
+// NewGuardManager creates a new guard manager.
+// This is the backward-compatible constructor that uses legacy persistence.
+// For enhanced persistence with file locking, backups, and snapshots,
+// use NewGuardManagerWithConfig instead.
 func NewGuardManager(dataDir string, log *logger.Logger) (*GuardManager, error) {
+	config := DefaultGuardManagerConfig(dataDir)
+	// Disable enhanced persistence for backward compatibility
+	config.BackupCount = 0
+	config.SnapshotInterval = 0
+	return NewGuardManagerWithConfig(config, log)
+}
+
+// NewGuardManagerWithConfig creates a new guard manager with enhanced configuration.
+// This constructor enables all persistence features including file locking,
+// backup rotation, and automatic snapshots.
+func NewGuardManagerWithConfig(config *GuardManagerConfig, log *logger.Logger) (*GuardManager, error) {
 	if log == nil {
 		log = logger.NewDefault()
 	}
 
+	if config == nil {
+		return nil, fmt.Errorf("config is required")
+	}
+
 	// Ensure data directory exists
-	if err := os.MkdirAll(dataDir, 0o700); err != nil {
+	if err := os.MkdirAll(config.DataDir, 0o700); err != nil {
 		return nil, fmt.Errorf("failed to create data directory: %w", err)
 	}
 
-	stateFile := filepath.Join(dataDir, "guard_state.json")
+	stateFile := filepath.Join(config.DataDir, "guard_state.json")
 
 	gm := &GuardManager{
 		logger:      log.Component("guards"),
 		stateFile:   stateFile,
-		maxGuards:   3,                   // Tor typically uses 3 guard nodes
-		guardExpiry: 90 * 24 * time.Hour, // 90 days per Tor spec
+		maxGuards:   config.MaxGuards,
+		guardExpiry: config.GuardExpiry,
+	}
+
+	// Set up enhanced persistence if backups or snapshots are enabled
+	if config.BackupCount > 0 || config.SnapshotInterval > 0 {
+		persistConfig := &PersistenceConfig{
+			FilePath:         stateFile,
+			BackupCount:      config.BackupCount,
+			SnapshotInterval: config.SnapshotInterval,
+			LockTimeout:      config.LockTimeout,
+		}
+		gm.persistence = NewPersistence(persistConfig, log)
 	}
 
 	// Load existing state if available
@@ -72,6 +134,21 @@ func NewGuardManager(dataDir string, log *logger.Logger) (*GuardManager, error) 
 
 // load loads guard state from disk
 func (gm *GuardManager) load() error {
+	// Use enhanced persistence if available
+	if gm.persistence != nil {
+		ctx := context.Background()
+		guards, err := gm.persistence.Load(ctx)
+		if err != nil {
+			return err
+		}
+		gm.mu.Lock()
+		gm.state.Guards = guards
+		gm.state.LastUpdated = time.Now()
+		gm.mu.Unlock()
+		return nil
+	}
+
+	// Legacy load
 	gm.mu.Lock()
 	defer gm.mu.Unlock()
 
@@ -93,6 +170,18 @@ func (gm *GuardManager) load() error {
 
 // Save saves guard state to disk
 func (gm *GuardManager) Save() error {
+	// Use enhanced persistence if available
+	if gm.persistence != nil {
+		gm.mu.RLock()
+		guards := make([]GuardEntry, len(gm.state.Guards))
+		copy(guards, gm.state.Guards)
+		gm.mu.RUnlock()
+
+		ctx := context.Background()
+		return gm.persistence.Save(ctx, guards)
+	}
+
+	// Legacy save
 	gm.mu.RLock()
 	defer gm.mu.RUnlock()
 
@@ -272,4 +361,37 @@ type GuardStats struct {
 	TotalGuards     int
 	ConfirmedGuards int
 	LastUpdated     time.Time
+}
+
+// StartSnapshotLoop starts automatic periodic saving of guard state.
+// This only works when enhanced persistence is enabled via NewGuardManagerWithConfig.
+func (gm *GuardManager) StartSnapshotLoop() {
+	if gm.persistence == nil {
+		gm.logger.Debug("Snapshot loop not started: enhanced persistence not enabled")
+		return
+	}
+
+	gm.persistence.StartSnapshotLoop(gm.GetGuards)
+}
+
+// StopSnapshotLoop stops the automatic periodic saving of guard state.
+// This is safe to call even if the snapshot loop was never started.
+func (gm *GuardManager) StopSnapshotLoop() {
+	if gm.persistence != nil {
+		gm.persistence.StopSnapshotLoop()
+	}
+}
+
+// HasEnhancedPersistence returns true if enhanced persistence features are enabled.
+func (gm *GuardManager) HasEnhancedPersistence() bool {
+	return gm.persistence != nil
+}
+
+// GetBackupPaths returns the paths to all backup files that exist.
+// Returns nil if enhanced persistence is not enabled.
+func (gm *GuardManager) GetBackupPaths() []string {
+	if gm.persistence == nil {
+		return nil
+	}
+	return gm.persistence.GetBackupPaths()
 }
