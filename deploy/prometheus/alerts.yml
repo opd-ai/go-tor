@@ -277,7 +277,7 @@ groups:
         annotations:
           summary: "Out-of-order cells detected"
           description: "go-tor at {{ $labels.instance }} is receiving out-of-order cells."
-          runbook_url: "https://github.com/opd-ai/go-tor/blob/main/docs/ALERTS.md#toroutoforder cells"
+          runbook_url: "https://github.com/opd-ai/go-tor/blob/main/docs/ALERTS.md#toroutofordercells"
           impact: "May indicate network issues or protocol problems."
           action: "Review network path. Check for packet loss. Monitor for further issues."
 
