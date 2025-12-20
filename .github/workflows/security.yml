@@ -29,7 +29,7 @@ jobs:
 
       - name: Set up Go
         # Pin to immutable SHA for supply chain security
-        uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe  # v5.4.0
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff  # v5.4.0
         with:
           go-version: '1.24.x'
 
@@ -56,7 +56,7 @@ jobs:
 
       - name: Set up Go
         # Pin to immutable SHA for supply chain security
-        uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe  # v5.4.0
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff  # v5.4.0
         with:
           go-version: '1.24.x'
 
