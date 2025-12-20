@@ -10,6 +10,8 @@ This guide covers running go-tor in containers using Docker and container orches
 
 **Do NOT use this software for any situation where your safety or anonymity is at stake.**
 
+**Note**: The project scope includes both Tor client functionality and Tor bridge relay with pluggable transport support (planned). Exit node functionality is explicitly out of scope and will not be implemented.
+
 ---
 
 ## Quick Start with Docker

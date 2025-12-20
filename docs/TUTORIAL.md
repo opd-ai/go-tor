@@ -13,6 +13,8 @@ This is **UNOFFICIAL, EXPERIMENTAL SOFTWARE** that has been developed without th
 - **Developers**: [Arti](https://gitlab.torproject.org/tpo/core/arti) - official Tor implementation in Rust
 - **All users**: [Official Tor software](https://www.torproject.org/) from The Tor Project
 This tutorial is **for educational and research purposes only**. Following this tutorial will help you learn about Tor protocols, but the resulting software should never be used when your safety depends on anonymity.
+
+**Note**: The project scope includes both Tor client functionality and Tor bridge relay with pluggable transport support. Exit node functionality is explicitly out of scope and will not be implemented.
 ---
 ## Table of Contents
 1. [Prerequisites](#prerequisites)

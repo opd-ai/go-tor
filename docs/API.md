@@ -11,6 +11,8 @@
 - **Developers**: Use [Arti](https://gitlab.torproject.org/tpo/core/arti) - the official Tor implementation in Rust with a proper API
 - **All developers**: See [official Tor documentation](https://www.torproject.org/download/) for proper integration methods
 This API documentation is **for educational and research purposes only**. Code written using this API should never be deployed in situations where anonymity or security is required.
+
+**Note**: The project scope includes both Tor client functionality and Tor bridge relay with pluggable transport support. Exit node functionality is explicitly out of scope and will not be implemented.
 ---
 ## Table of Contents
 - [Client API](#client-api)

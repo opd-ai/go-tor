@@ -3,7 +3,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/opd-ai/go-tor)](https://goreportcard.com/report/github.com/opd-ai/go-tor)
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
 
-A pure Go Tor client implementation for educational and research purposes.
+A pure Go Tor client and bridge relay implementation for educational and research purposes.
 
 ## ⚠️ IMPORTANT SAFETY NOTICE
 
@@ -126,9 +126,9 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture and r
 ## Design Goals
 
 - **Pure Go**: No CGo dependencies for maximum portability
-- **Client-Only**: No relay or exit node functionality
+- **Client and Bridge Relay**: Full client functionality plus Tor bridge relay with pluggable transport support (no exit node functionality)
 - **Embedded-Optimized**: Low memory footprint (<50MB RSS) and resource efficiency
-- **Feature Parity**: Match C Tor client capabilities
+- **Client Feature Parity**: Match C Tor client capabilities, with additional bridge relay support (no exit node functionality)
 - **Cross-Platform**: Support for ARM, MIPS, x86 architectures
 
 ## Quick Start
@@ -494,6 +494,16 @@ Current test coverage: ~74% overall, with critical packages at 90%+ coverage.
 - ✅ Security hardening and audit (Phase 8.4)
 - ✅ Comprehensive testing and documentation (Phase 8.5)
 - ✅ Onion Service Infrastructure Completion (Phase 8.6)
+
+### Phase 9: Tor Bridge Relay with Pluggable Transport (Planned)
+- [ ] Bridge relay infrastructure (OR protocol, descriptor publishing)
+- [ ] Pluggable Transport framework (PT specification, obfs4 support)
+- [ ] Bridge distribution and BridgeDB integration
+- [ ] Relay security hardening (rate limiting, DoS protection)
+- [ ] Exit policy enforcement (reject all exit traffic)
+- [ ] Bridge relay testing and validation
+
+**Note**: Exit node functionality is explicitly out of scope and will not be implemented. The bridge relay functionality enables go-tor to act as a Tor bridge with pluggable transport support for users in censored regions.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed development roadmap and architecture information.
 
