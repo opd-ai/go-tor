@@ -303,24 +303,25 @@ func (s *Server) acceptLoop(ctx context.Context) {
 		// Check connection limit (SEC-L006: configurable limit)
 		s.mu.Lock()
 		maxConns := s.config.MaxConnections
-		if maxConns > 0 && len(s.activeConns) >= maxConns {
+		currentConns := len(s.activeConns)
+		if maxConns > 0 && currentConns >= maxConns {
 			s.mu.Unlock()
 			s.logger.Warn("Connection limit reached, rejecting connection",
-				"limit", maxConns, "current", len(s.activeConns), "remote", conn.RemoteAddr())
+				"limit", maxConns, "current", currentConns, "remote", conn.RemoteAddr())
 			if err := conn.Close(); err != nil {
 				s.logger.Error("Failed to close rejected connection", "function", "acceptLoop", "error", err)
 			}
 			continue
 		}
-		s.mu.Unlock()
 
 		// Rate limiting check (ROADMAP Phase 2.3)
-		if !s.checkRateLimit(conn) {
-			continue // Connection already closed in checkRateLimit
+		// Check rate limit while still holding the mutex to avoid race
+		if !s.checkRateLimitLocked(conn) {
+			s.mu.Unlock()
+			continue // Connection already closed in checkRateLimitLocked
 		}
 
-		// Track connection
-		s.mu.Lock()
+		// Track connection (still holding mutex)
 		s.activeConns[conn] = struct{}{}
 		s.mu.Unlock()
 
@@ -329,10 +330,10 @@ func (s *Server) acceptLoop(ctx context.Context) {
 	}
 }
 
-// checkRateLimit checks if the connection should be rate limited.
-// Returns true if connection is allowed, false if rate limited.
+// checkRateLimitLocked checks if the connection should be rate limited.
+// Must be called with s.mu held. Returns true if allowed, false if rate limited.
 // If rate limited, the connection is closed and metrics are recorded.
-func (s *Server) checkRateLimit(conn net.Conn) bool {
+func (s *Server) checkRateLimitLocked(conn net.Conn) bool {
 	// Skip if rate limiting is disabled
 	if s.rateLimiter == nil && s.perClientLimiter == nil {
 		return true
@@ -347,7 +348,7 @@ func (s *Server) checkRateLimit(conn net.Conn) bool {
 			s.logger.Warn("Per-client rate limit exceeded",
 				"client_ip", clientIP,
 				"remote", remoteAddr)
-			s.recordRateLimited()
+			s.recordRateLimitedLocked()
 			if err := conn.Close(); err != nil {
 				s.logger.Debug("Failed to close rate-limited connection", "error", err)
 			}
@@ -360,7 +361,7 @@ func (s *Server) checkRateLimit(conn net.Conn) bool {
 		if !s.rateLimiter.Allow() {
 			s.logger.Warn("Global rate limit exceeded",
 				"remote", remoteAddr)
-			s.recordRateLimited()
+			s.recordRateLimitedLocked()
 			if err := conn.Close(); err != nil {
 				s.logger.Debug("Failed to close rate-limited connection", "error", err)
 			}
@@ -371,13 +372,11 @@ func (s *Server) checkRateLimit(conn net.Conn) bool {
 	return true
 }
 
-// recordRateLimited records a rate-limited connection in metrics if available.
-func (s *Server) recordRateLimited() {
-	s.mu.Lock()
-	m := s.metrics
-	s.mu.Unlock()
-	if m != nil {
-		m.RecordRateLimitedConnection()
+// recordRateLimitedLocked records a rate-limited connection in metrics.
+// Must be called with s.mu held.
+func (s *Server) recordRateLimitedLocked() {
+	if s.metrics != nil {
+		s.metrics.RecordRateLimitedConnection()
 	}
 }
 

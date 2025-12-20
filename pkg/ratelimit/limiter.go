@@ -98,6 +98,8 @@ func (r *RateLimiter) WaitN(ctx context.Context, n int) error {
 
 // Reserve reserves n tokens for future use.
 // Returns a Reservation that indicates when the tokens will be available.
+// Note: This does not consume tokens from the bucket, it only calculates
+// the delay needed before tokens would be available.
 func (r *RateLimiter) Reserve(n int) *Reservation {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -113,12 +115,11 @@ func (r *RateLimiter) Reserve(n int) *Reservation {
 		}
 	}
 
-	// Calculate delay until tokens are available
+	// Calculate delay until tokens would be available
+	// Do not deduct tokens that we don't have - the caller must wait
+	// for the delay period and then call Allow() or Wait()
 	deficit := needed - r.tokens
 	delay := time.Duration(deficit / r.rate * float64(time.Second))
-
-	// Reserve the tokens (will be available after delay)
-	r.tokens -= needed
 
 	return &Reservation{
 		ok:    true,
@@ -216,25 +217,40 @@ func NewMultiLimiter(limiters ...*RateLimiter) *MultiLimiter {
 }
 
 // Allow checks if an operation is allowed by all limiters.
+// This is atomic - either all limiters allow and consume a token, or none do.
 func (m *MultiLimiter) Allow() bool {
-	// Check all limiters first without consuming tokens
+	if len(m.limiters) == 0 {
+		return true
+	}
+
+	// Acquire all locks first to ensure atomicity
 	for _, l := range m.limiters {
 		l.mu.Lock()
+	}
+
+	// Check all limiters and refill tokens
+	allAllowed := true
+	for _, l := range m.limiters {
 		l.refillTokens()
 		if l.tokens < 1 {
-			l.mu.Unlock()
-			return false
+			allAllowed = false
+			break
 		}
+	}
+
+	// If all allowed, consume tokens; otherwise release locks and return false
+	if allAllowed {
+		for _, l := range m.limiters {
+			l.tokens--
+		}
+	}
+
+	// Release all locks
+	for _, l := range m.limiters {
 		l.mu.Unlock()
 	}
 
-	// All have tokens, consume from all
-	for _, l := range m.limiters {
-		l.mu.Lock()
-		l.tokens--
-		l.mu.Unlock()
-	}
-	return true
+	return allAllowed
 }
 
 // Wait blocks until all limiters allow the operation.
