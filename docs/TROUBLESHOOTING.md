@@ -45,7 +45,8 @@ This guide helps you diagnose and resolve common issues when using go-tor.
 **Diagnostic Steps:**
 1. **Check Circuit Build Logs**
    ```go
-   log := logger.New(logger.LevelDebug, os.Stdout)
+   level, _ := logger.ParseLevel("debug")
+   log := logger.New(level, os.Stdout)
    ```
    Look for:
    - Which hop fails (guard, middle, exit)
@@ -94,8 +95,8 @@ This guide helps you diagnose and resolve common issues when using go-tor.
 **Solutions:**
 1. **Enable Circuit Prebuilding**
    ```go
-   cfg.PrebuiltCircuits = 3
-   cfg.MaxIdleCircuits = 10
+   cfg.CircuitPoolMinSize = 3
+   cfg.CircuitPoolMaxSize = 10
 2. **Increase Circuit Pool**
 3. **Optimize Circuit Lifetime**
 4. **Check Resource Limits**
@@ -217,8 +218,8 @@ SIGNAL RELOAD
    ```
 3. **Reduce Connection Pool**
    ```go
-   cfg.ConnectionPoolSize = 10  // Reduce from default
-   cfg.MaxIdleCircuits = 5
+   cfg.ConnectionPoolMaxIdle = 3  // Reduce from default
+   cfg.CircuitPoolMaxSize = 5
 ### Disk Space Issues
 **Error:** `no space left on device`
 **Solutions:**
@@ -235,8 +236,9 @@ SIGNAL RELOAD
 // Via configuration
 cfg.LogLevel = "debug"
 
-// Or create debug logger directly
-log := logger.New(logger.LevelDebug, os.Stdout)
+// Or create debug logger directly via ParseLevel
+level, _ := logger.ParseLevel("debug")
+log := logger.New(level, os.Stdout)
 ```
 ### Structured Logging Output
 Debug logs include:
@@ -256,7 +258,8 @@ if err != nil {
 }
 defer logFile.Close()
 
-log := logger.New(logger.LevelDebug, logFile)
+level, _ := logger.ParseLevel("debug")
+log := logger.New(level, logFile)
 ```
 ### Selective Component Logging
 ```go

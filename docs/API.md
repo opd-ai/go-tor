@@ -196,9 +196,9 @@ type Config struct {
     CircuitBuildTimeout time.Duration
 
     // Performance tuning
-    PrebuiltCircuits    int
-    MaxIdleCircuits     int
-    ConnectionPoolSize  int
+    CircuitPoolMinSize       int
+    CircuitPoolMaxSize       int
+    ConnectionPoolMaxIdle    int
 }
 ```
 ### Validation
@@ -557,7 +557,7 @@ func main() {
     cfg.ControlPort = 9051
 
     // Create logger
-    log := logger.New(logger.LevelInfo, os.Stdout)
+    log := logger.NewDefault()
 
     // Create and start client
     torClient, err := client.New(cfg, log)
@@ -646,8 +646,8 @@ if err != nil {
 ### 3. Performance Optimization
 ```go
 cfg := config.DefaultConfig()
-cfg.PrebuiltCircuits = 3
-cfg.MaxIdleCircuits = 10
+cfg.CircuitPoolMinSize = 3
+cfg.CircuitPoolMaxSize = 10
 ```
 ### 4. Monitoring
 ```go
