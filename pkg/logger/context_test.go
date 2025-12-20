@@ -3,6 +3,7 @@ package logger
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"log/slog"
 	"strings"
 	"testing"
@@ -18,11 +19,9 @@ func TestGenerateRequestID(t *testing.T) {
 		if len(id) != 16 {
 			t.Errorf("GenerateRequestID() returned ID of length %d, want 16", len(id))
 		}
-		// Should be valid hex
-		for _, c := range id {
-			if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
-				t.Errorf("GenerateRequestID() returned non-hex character: %c", c)
-			}
+		// Verify it's valid hex by attempting to decode it
+		if _, err := hex.DecodeString(id); err != nil {
+			t.Errorf("GenerateRequestID() returned invalid hex: %s, error: %v", id, err)
 		}
 	})
 
