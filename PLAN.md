@@ -207,7 +207,8 @@ go test -v ./pkg/onion/...
 2. **Add gosec SAST scanning**:
    ```yaml
    - name: Run gosec
-     uses: securego/gosec@v2.21.4
+     # Pin to immutable SHA for supply chain security; update intentionally
+     uses: securego/gosec@6fbd381238e97e1d1f3358f0d6d65de78dcf9245  # v2.21.4
      with:
        args: '-no-fail -fmt sarif -out results.sarif ./...'
    ```
@@ -215,13 +216,15 @@ go test -v ./pkg/onion/...
 3. **Add govulncheck for dependencies**:
    ```yaml
    - name: Run govulncheck
-     uses: golang/govulncheck-action@v1.0.4
+     # Pin to immutable SHA for supply chain security
+     uses: golang/govulncheck-action@b625fbe08f3bccbe446d94fbf87fcc875a4f50ee  # v1.0.4
    ```
 
 4. **Add Trivy container scanning**:
    ```yaml
    - name: Run Trivy
-     uses: aquasecurity/trivy-action@0.28.0
+     # Pin to immutable SHA for supply chain security; update intentionally
+     uses: aquasecurity/trivy-action@915b19bbe73b92a6cf82a1bc12b087c9a19a5fe2  # v0.28.0
      with:
        image-ref: 'go-tor:latest'
        format: 'sarif'
@@ -283,10 +286,20 @@ act -W .github/workflows/security.yml
 2. **Add request ID generation**:
    ```go
    // pkg/logger/request_id.go
-   func GenerateRequestID() string {
+   import (
+       "crypto/rand"
+       "encoding/hex"
+       "fmt"
+   )
+   
+   // GenerateRequestID creates a cryptographically random 16-character request ID.
+   // Returns the ID and an error if random generation fails.
+   func GenerateRequestID() (string, error) {
        b := make([]byte, 8)
-       crypto.Read(b)
-       return hex.EncodeToString(b)
+       if _, err := rand.Read(b); err != nil {
+           return "", fmt.Errorf("failed to generate request ID: %w", err)
+       }
+       return hex.EncodeToString(b), nil
    }
    ```
 
@@ -401,14 +414,28 @@ go run ./cmd/tor-client/... 2>&1 | grep -E "(circuit_id|correlation_id)"
 
 6. **Integrate with SOCKS server**:
    ```go
+   const rateLimitBackoffDelay = 10 * time.Millisecond
+   
+   // Server must have a ctx field initialized during NewServer():
+   //   type Server struct { ctx context.Context; ... }
    func (s *Server) acceptLoop() {
        for {
-           if !s.rateLimiter.Allow() {
-               s.metrics.IncrRateLimited()
-               continue
+           // Use Wait() instead of Allow() to avoid tight loop when rate limited
+           if err := s.rateLimiter.Wait(s.ctx); err != nil {
+               // Context cancelled, shutdown gracefully
+               return
            }
            conn, err := s.listener.Accept()
-           // ...
+           if err != nil {
+               if s.rateLimiter.Allow() {
+                   s.logger.Error("Accept error", "error", err)
+               } else {
+                   s.metrics.IncrRateLimited()
+                   time.Sleep(rateLimitBackoffDelay)
+               }
+               continue
+           }
+           // ... handle connection
        }
    }
    ```
@@ -448,16 +475,17 @@ go test -v ./pkg/socks/... -run TestRateLimit
 1. **Implement atomic file writes**:
    ```go
    // pkg/path/persistence.go
+   // Recommended: Use github.com/natefinch/atomic for cross-platform atomicity
+   import (
+       "bytes"
+       "github.com/natefinch/atomic"
+   )
+   
+   // atomicWrite writes data to path atomically across platforms.
+   // Uses github.com/natefinch/atomic to ensure atomicity on all platforms
+   // including Windows, where os.Rename may fail if destination exists.
    func (p *Persistence) atomicWrite(path string, data []byte) error {
-       tempFile := path + ".tmp"
-       if err := os.WriteFile(tempFile, data, 0600); err != nil {
-           return err
-       }
-       // Note: On Windows, os.Rename may fail if destination exists.
-       // For cross-platform compatibility, consider using a library like
-       // github.com/natefinch/atomic or explicitly handling Windows:
-       // if runtime.GOOS == "windows" { os.Remove(path) }
-       return os.Rename(tempFile, path)
+       return atomic.WriteFile(path, bytes.NewReader(data))
    }
    ```
 
@@ -484,34 +512,127 @@ go test -v ./pkg/socks/... -run TestRateLimit
 
 4. **Add integrity checks**:
    ```go
+   import (
+       "crypto/sha256"
+       "encoding/hex"
+       "encoding/json"
+   )
+   
+   // calculateChecksum returns the hex-encoded SHA-256 checksum of the given data.
    func (p *Persistence) calculateChecksum(data []byte) string {
        h := sha256.Sum256(data)
        return hex.EncodeToString(h[:])
    }
    
-   func (p *Persistence) verifyChecksum(state *GuardStateV2) bool
+   // verifyChecksum recomputes the checksum for the given state (excluding the
+   // Checksum field itself) and compares it with the stored Checksum value.
+   // Returns true only if the checksum matches.
+   func (p *Persistence) verifyChecksum(state *GuardStateV2) bool {
+       if state == nil || state.Checksum == "" {
+           return false
+       }
+       // Make a copy and clear Checksum so it's not included in calculation
+       copyState := *state
+       copyState.Checksum = ""
+       
+       data, err := json.Marshal(copyState)
+       if err != nil {
+           return false
+       }
+       
+       expected := p.calculateChecksum(data)
+       return expected == state.Checksum
+   }
    ```
 
 5. **Implement backup rotation**:
    ```go
+   import (
+       "fmt"
+       "io"
+       "os"
+   )
+   
+   // copyFile copies src to dst with proper resource cleanup.
+   // Preserves source file permissions (0600) for security.
+   func copyFile(src, dst string) error {
+       source, err := os.Open(src)
+       if err != nil {
+           return fmt.Errorf("open source: %w", err)
+       }
+       defer source.Close()
+       
+       // Get source file info for permissions
+       info, err := source.Stat()
+       if err != nil {
+           return fmt.Errorf("stat source: %w", err)
+       }
+       
+       dest, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, info.Mode())
+       if err != nil {
+           return fmt.Errorf("create destination: %w", err)
+       }
+       
+       n, err := io.Copy(dest, source)
+       if closeErr := dest.Close(); closeErr != nil && err == nil {
+           err = fmt.Errorf("close destination: %w", closeErr)
+       }
+       if err != nil {
+           os.Remove(dst)  // Clean up partial copy on error
+           return fmt.Errorf("copy failed: %w", err)
+       }
+       
+       // Verify copy was complete
+       if n != info.Size() {
+           os.Remove(dst)
+           return fmt.Errorf("incomplete copy: wrote %d of %d bytes", n, info.Size())
+       }
+       
+       return nil
+   }
+   
    func (p *Persistence) rotateBackups(path string, keepN int) error {
-       // Keep last N backups
+       // Keep last N backups - rotate from oldest to newest
        for i := keepN - 1; i >= 1; i-- {
            oldPath := fmt.Sprintf("%s.backup.%d", path, i)
            newPath := fmt.Sprintf("%s.backup.%d", path, i+1)
-           os.Rename(oldPath, newPath)
+           if err := os.Rename(oldPath, newPath); err != nil {
+               // Ignore missing older backups, but fail on other errors
+               if !os.IsNotExist(err) {
+                   return fmt.Errorf("failed to rotate backup %s to %s: %w", oldPath, newPath, err)
+               }
+           }
        }
-       return copyFile(path, path+".backup.1")
+       
+       if err := copyFile(path, path+".backup.1"); err != nil {
+           return fmt.Errorf("failed to create primary backup for %s: %w", path, err)
+       }
+       
+       return nil
    }
    ```
 
 6. **Add periodic state snapshots**:
    ```go
-   func (gm *GuardManager) startSnapshotLoop(interval time.Duration) {
+   import (
+       "context"
+       "time"
+   )
+   
+   // startSnapshotLoop periodically saves guard state. Accepts context for graceful shutdown.
+   func (gm *GuardManager) startSnapshotLoop(ctx context.Context, interval time.Duration) {
        ticker := time.NewTicker(interval)
-       for range ticker.C {
-           if err := gm.SaveState(); err != nil {
-               gm.logger.Error("Failed to save guard state", "error", err)
+       defer ticker.Stop()
+       
+       for {
+           select {
+           case <-ctx.Done():
+               gm.logger.Info("Stopping snapshot loop", "reason", ctx.Err())
+               return
+           case <-ticker.C:
+               if err := gm.SaveState(); err != nil {
+                   gm.logger.Error("Failed to save guard state", "error", err)
+               }
            }
        }
    }
@@ -656,11 +777,19 @@ go test -cover ./pkg/crypto/...
 1. **Enhance connection pool with health checks**:
    ```go
    // pkg/pool/connection_pool.go
+   // 
+   // The Connection type MUST implement:
+   //     func (c *Connection) Ping() bool
+   // which sends a lightweight padding/keepalive cell and returns true
+   // if the underlying connection is still alive and healthy, or false otherwise.
+   //
+   // healthCheck validates that a pooled Connection is still usable.
    func (p *ConnectionPool) healthCheck(conn *Connection) bool {
        if time.Since(conn.lastUsed) > p.maxIdleTime {
            return false
        }
-       // Send padding cell to verify connection is alive
+       // Use Connection.Ping() to verify the connection is alive before reuse.
+       // Ping() should send a PADDING cell and verify the connection responds.
        return conn.Ping()
    }
    ```
