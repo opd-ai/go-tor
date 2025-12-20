@@ -3,7 +3,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/opd-ai/go-tor)](https://goreportcard.com/report/github.com/opd-ai/go-tor)
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
 
-A pure Go Tor client and relay implementation for educational and research purposes.
+A pure Go Tor client and bridge relay implementation for educational and research purposes.
 
 ## ⚠️ IMPORTANT SAFETY NOTICE
 
@@ -128,7 +128,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture and r
 - **Pure Go**: No CGo dependencies for maximum portability
 - **Client and Bridge Relay**: Full client functionality plus Tor bridge relay with pluggable transport support (no exit node functionality)
 - **Embedded-Optimized**: Low memory footprint (<50MB RSS) and resource efficiency
-- **Client Feature Parity**: Match C Tor client capabilities (excluding exit node functionality), with bridge relay support
+- **Client Feature Parity**: Match C Tor client capabilities, with additional bridge relay support (no exit node functionality)
 - **Cross-Platform**: Support for ARM, MIPS, x86 architectures
 
 ## Quick Start

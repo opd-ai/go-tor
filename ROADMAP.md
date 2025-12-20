@@ -867,7 +867,7 @@ The codebase demonstrates:
 **Effort**: 6-8 weeks
 
 ### Project Scope Update
-The project has expanded beyond client-only functionality to include Tor bridge relay capabilities with pluggable transport support. This allows the implementation to act as an entry point to the Tor network for users in censored regions. **Note**: Exit node functionality is explicitly out of scope and will not be implemented.
+The project roadmap now includes Tor bridge relay capabilities with pluggable transport support, expanding the scope beyond client-only functionality. This allows the implementation to act as an entry point to the Tor network for users in censored regions. **Note**: Exit node functionality is explicitly out of scope and will not be implemented.
 
 This corresponds to **Phase 9** in the development roadmap (see README.md).
 
