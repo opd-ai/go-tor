@@ -481,14 +481,18 @@ import (
 log := logger.New(slog.LevelInfo, os.Stdout)
 
 // Or use the default logger (info level, stdout)
-log := logger.NewDefault()
+log = logger.NewDefault()
 
 // Create component-specific logger
 clientLog := log.Component("client")
 
 // Parse log level from string
 level, err := logger.ParseLevel("debug") // Returns slog.LevelDebug
-log := logger.New(level, os.Stdout)
+if err != nil {
+    // ParseLevel returns slog.LevelInfo as default on error
+    level = slog.LevelInfo
+}
+log = logger.New(level, os.Stdout)
 ```
 ### Log Levels
 Log levels use the standard `log/slog` levels:
@@ -501,11 +505,14 @@ slog.LevelInfo   // 0
 slog.LevelWarn   // 4
 slog.LevelError  // 8
 
-// Parse from string
-level, _ := logger.ParseLevel("debug") // returns slog.LevelDebug
-level, _ := logger.ParseLevel("info")  // returns slog.LevelInfo
-level, _ := logger.ParseLevel("warn")  // returns slog.LevelWarn
-level, _ := logger.ParseLevel("error") // returns slog.LevelError
+// Parse from string with error handling
+level, err := logger.ParseLevel("debug")
+if err != nil {
+    // ParseLevel returns slog.LevelInfo as default on error
+    level = slog.LevelInfo
+}
+// Valid strings: "debug", "info", "warn", "error"
+// Returns corresponding slog.Level values shown above
 ```
 ### Logging
 ```go
