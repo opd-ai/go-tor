@@ -1,0 +1,354 @@
+# go-tor Prometheus Alerting Rules
+#
+# This file defines alerting rules for monitoring the go-tor client.
+# It follows Prometheus alerting best practices with defined SLIs and severity levels.
+#
+# Alert Severity Levels:
+#   - critical: Page immediately (PagerDuty/phone call) - service is down or at risk
+#   - warning: Create ticket - requires attention within hours
+#   - info: Log/dashboard only - informational, may require future attention
+#
+# SLIs (Service Level Indicators):
+#   - Availability: Service is up and responding
+#   - Circuit Success Rate: ≥70% of circuit builds succeed
+#   - Connection Success Rate: ≥80% of connections succeed
+#   - Latency: Circuit build time ≤10s for 95th percentile
+
+groups:
+  # ==========================================================================
+  # CRITICAL ALERTS - Service is down or at immediate risk
+  # Action: Page on-call engineer immediately
+  # ==========================================================================
+  - name: go-tor-critical
+    interval: 30s
+    rules:
+      # Service is completely unreachable
+      - alert: TorServiceDown
+        expr: up{job="go-tor"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: service
+          sli: availability
+        annotations:
+          summary: "go-tor service is down"
+          description: "The go-tor service at {{ $labels.instance }} has been unreachable for more than 1 minute."
+          runbook_url: "https://github.com/opd-ai/go-tor/blob/main/docs/ALERTS.md#torservicedown"
+          impact: "All Tor connectivity is unavailable. Users cannot connect through the SOCKS proxy."
+          action: "Check if the process is running. Review logs for crash reasons. Restart the service."
+
+      # No active circuits - proxy is non-functional
+      - alert: TorNoActiveCircuits
+        expr: tor_active_circuits == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: circuit
+          sli: availability
+        annotations:
+          summary: "No active Tor circuits"
+          description: "go-tor at {{ $labels.instance }} has no active circuits for more than 2 minutes."
+          runbook_url: "https://github.com/opd-ai/go-tor/blob/main/docs/ALERTS.md#tornoactivecircuits"
+          impact: "SOCKS proxy cannot route traffic. All connection requests will fail."
+          action: "Check network connectivity. Verify directory consensus is current. Review circuit build errors."
+
+      # No confirmed guards - security is compromised
+      - alert: TorNoConfirmedGuardsUrgent
+        expr: tor_guards_confirmed == 0 and tor_guards_active == 0
+        for: 10m
+        labels:
+          severity: critical
+          component: guards
+          sli: availability
+        annotations:
+          summary: "No guard nodes available"
+          description: "go-tor at {{ $labels.instance }} has no active or confirmed guard nodes."
+          runbook_url: "https://github.com/opd-ai/go-tor/blob/main/docs/ALERTS.md#tornoconfirmedguardsurgent"
+          impact: "Cannot build circuits. Anonymity guarantees are not maintained."
+          action: "Check guard persistence file. Verify directory consensus. Check network connectivity to directory authorities."
+
+  # ==========================================================================
+  # WARNING ALERTS - Requires attention within hours
+  # Action: Create a ticket, investigate during business hours
+  # ==========================================================================
+  - name: go-tor-warnings
+    interval: 1m
+    rules:
+      # Low circuit count - performance degraded
+      - alert: TorLowCircuitCount
+        expr: tor_active_circuits > 0 and tor_active_circuits < 2
+        for: 5m
+        labels:
+          severity: warning
+          component: circuit
+          sli: availability
+        annotations:
+          summary: "Low active circuit count"
+          description: "go-tor at {{ $labels.instance }} has only {{ $value }} active circuit(s). Expected at least 2."
+          runbook_url: "https://github.com/opd-ai/go-tor/blob/main/docs/ALERTS.md#torlowcircuitcount"
+          impact: "Performance may be degraded. Circuit multiplexing is limited."
+          action: "Check circuit build logs. Verify relay reachability. Consider increasing prebuilt circuit count."
+
+      # High circuit build failure rate - SLI breach
+      - alert: TorHighCircuitFailureRate
+        expr: |
+          (
+            sum(rate(tor_circuit_build_failures_total[5m])) /
+            (sum(rate(tor_circuit_builds_total[5m])) + 0.001)
+          ) > 0.3
+        for: 5m
+        labels:
+          severity: warning
+          component: circuit
+          sli: circuit_success_rate
+        annotations:
+          summary: "High circuit build failure rate"
+          description: "Circuit build failure rate at {{ $labels.instance }} is {{ $value | humanizePercentage }} (SLI target: ≤30%)."
+          runbook_url: "https://github.com/opd-ai/go-tor/blob/main/docs/ALERTS.md#torhighcircuitfailurerate"
+          impact: "Reduced circuit availability. Increased latency for new connections."
+          action: "Check relay health. Review circuit build error logs. Verify consensus freshness."
+
+      # High connection failure rate
+      - alert: TorHighConnectionFailureRate
+        expr: |
+          (
+            sum(rate(tor_connection_failures_total[5m])) /
+            (sum(rate(tor_connection_attempts_total[5m])) + 0.001)
+          ) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+          component: connection
+          sli: connection_success_rate
+        annotations:
+          summary: "High connection failure rate"
+          description: "Connection failure rate at {{ $labels.instance }} is {{ $value | humanizePercentage }} (SLI target: ≤20%)."
+          runbook_url: "https://github.com/opd-ai/go-tor/blob/main/docs/ALERTS.md#torhighconnectionfailurerate"
+          impact: "Difficulty establishing connections to relays. May cause circuit build failures."
+          action: "Check network connectivity. Verify firewall rules. Review TLS handshake errors."
+
+      # Slow circuit builds - latency SLI breach
+      - alert: TorSlowCircuitBuilds
+        expr: tor_circuit_build_duration_seconds_p95 > 10
+        for: 10m
+        labels:
+          severity: warning
+          component: circuit
+          sli: latency
+        annotations:
+          summary: "Slow circuit build times"
+          description: "95th percentile circuit build time at {{ $labels.instance }} is {{ $value }}s (SLI target: ≤10s)."
+          runbook_url: "https://github.com/opd-ai/go-tor/blob/main/docs/ALERTS.md#torslowcircuitbuilds"
+          impact: "New connections take longer to establish. User experience degraded."
+          action: "Check network latency to relays. Review relay selection policy. Consider geographic relay preferences."
+
+      # High retry rate - indicates instability
+      - alert: TorHighConnectionRetryRate
+        expr: |
+          (
+            sum(rate(tor_connection_retries_total[5m])) /
+            (sum(rate(tor_connection_attempts_total[5m])) + 0.001)
+          ) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          component: connection
+          sli: reliability
+        annotations:
+          summary: "High connection retry rate"
+          description: "Connection retry rate at {{ $labels.instance }} is {{ $value | humanizePercentage }}."
+          runbook_url: "https://github.com/opd-ai/go-tor/blob/main/docs/ALERTS.md#torhighconnectionretryrate"
+          impact: "Increased resource usage. Connections take longer to establish."
+          action: "Review retry logs. Check for network instability. Consider adjusting retry policy."
+
+      # No confirmed guards for extended period
+      - alert: TorNoConfirmedGuards
+        expr: tor_guards_confirmed == 0 and tor_guards_active > 0
+        for: 30m
+        labels:
+          severity: warning
+          component: guards
+          sli: security
+        annotations:
+          summary: "No confirmed guard nodes"
+          description: "go-tor at {{ $labels.instance }} has active guards but none are confirmed after 30 minutes."
+          runbook_url: "https://github.com/opd-ai/go-tor/blob/main/docs/ALERTS.md#tornoconfirmedguards"
+          impact: "Guard rotation may be excessive. Anonymity set may be reduced."
+          action: "Check guard persistence. Verify guards are reachable. Review guard selection policy."
+
+      # High SOCKS error rate
+      - alert: TorHighSocksErrorRate
+        expr: |
+          (
+            rate(tor_socks_errors_total[5m]) /
+            (rate(tor_socks_requests_total[5m]) + 0.001)
+          ) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          component: socks
+          sli: error_rate
+        annotations:
+          summary: "High SOCKS proxy error rate"
+          description: "SOCKS error rate at {{ $labels.instance }} is {{ $value | humanizePercentage }}."
+          runbook_url: "https://github.com/opd-ai/go-tor/blob/main/docs/ALERTS.md#torhighsockserrorrate"
+          impact: "Client applications may experience connection failures."
+          action: "Check SOCKS server logs. Verify circuit availability. Review client request patterns."
+
+      # Replay attacks detected
+      - alert: TorReplayAttacksDetected
+        expr: rate(tor_replay_attempts_detected_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          component: security
+          sli: security
+        annotations:
+          summary: "Replay attacks detected"
+          description: "Replay attacks are being detected at {{ $labels.instance }} ({{ $value }} per second)."
+          runbook_url: "https://github.com/opd-ai/go-tor/blob/main/docs/ALERTS.md#torreplayattacksdetected"
+          impact: "Potential attack in progress. Security may be compromised."
+          action: "Review replay attack logs. Consider rotating circuits. Check for malicious relays."
+
+  # ==========================================================================
+  # INFO ALERTS - Informational, may need attention
+  # Action: Review during regular monitoring, no immediate action required
+  # ==========================================================================
+  - name: go-tor-info
+    interval: 2m
+    rules:
+      # High stream activity
+      - alert: TorHighStreamActivity
+        expr: tor_active_streams > 100
+        for: 15m
+        labels:
+          severity: info
+          component: streams
+          sli: capacity
+        annotations:
+          summary: "High stream activity"
+          description: "go-tor at {{ $labels.instance }} has {{ $value }} active streams."
+          runbook_url: "https://github.com/opd-ai/go-tor/blob/main/docs/ALERTS.md#torhighstreamactivity"
+          impact: "May indicate high load. Monitor for resource exhaustion."
+          action: "Review stream distribution across circuits. Consider scaling or adding circuit capacity."
+
+      # Low guard count
+      - alert: TorLowGuardCount
+        expr: tor_guards_active > 0 and tor_guards_active < 2
+        for: 1h
+        labels:
+          severity: info
+          component: guards
+          sli: resilience
+        annotations:
+          summary: "Low guard node count"
+          description: "go-tor at {{ $labels.instance }} has only {{ $value }} active guard(s)."
+          runbook_url: "https://github.com/opd-ai/go-tor/blob/main/docs/ALERTS.md#torlowguardcount"
+          impact: "Reduced resilience if guard becomes unavailable."
+          action: "Monitor guard selection. Guards will be added automatically over time."
+
+      # Circuit isolation misses high
+      - alert: TorHighIsolationMisses
+        expr: |
+          (
+            rate(tor_isolation_misses_total[5m]) /
+            (rate(tor_isolation_hits_total[5m]) + rate(tor_isolation_misses_total[5m]) + 0.001)
+          ) > 0.5
+        for: 30m
+        labels:
+          severity: info
+          component: isolation
+          sli: efficiency
+        annotations:
+          summary: "High circuit isolation miss rate"
+          description: "Circuit isolation miss rate at {{ $labels.instance }} is {{ $value | humanizePercentage }}."
+          runbook_url: "https://github.com/opd-ai/go-tor/blob/main/docs/ALERTS.md#torhighisolationmisses"
+          impact: "Many isolated circuits being built. May increase circuit build load."
+          action: "Review isolation requirements. Consider prebuilding isolated circuits."
+
+      # Out of order cells detected (may indicate network issues)
+      - alert: TorOutOfOrderCells
+        expr: rate(tor_out_of_order_cells_total[5m]) > 0.1
+        for: 15m
+        labels:
+          severity: info
+          component: protocol
+          sli: reliability
+        annotations:
+          summary: "Out-of-order cells detected"
+          description: "go-tor at {{ $labels.instance }} is receiving out-of-order cells."
+          runbook_url: "https://github.com/opd-ai/go-tor/blob/main/docs/ALERTS.md#toroutoforder cells"
+          impact: "May indicate network issues or protocol problems."
+          action: "Review network path. Check for packet loss. Monitor for further issues."
+
+      # Extended uptime - may need restart for updates
+      - alert: TorExtendedUptime
+        expr: tor_uptime_seconds > 604800  # 7 days
+        for: 1h
+        labels:
+          severity: info
+          component: service
+          sli: maintenance
+        annotations:
+          summary: "Extended uptime detected"
+          description: "go-tor at {{ $labels.instance }} has been running for {{ $value | humanizeDuration }}."
+          runbook_url: "https://github.com/opd-ai/go-tor/blob/main/docs/ALERTS.md#torextendeduptime"
+          impact: "May be running outdated code. Consider scheduled restart."
+          action: "Check for available updates. Schedule maintenance window if needed."
+
+  # ==========================================================================
+  # SLO BURN RATE ALERTS - Multi-window SLO monitoring
+  # Based on Google SRE practices for error budget consumption
+  # ==========================================================================
+  - name: go-tor-slo
+    interval: 1m
+    rules:
+      # Circuit success SLO - Fast burn (2% budget in 1 hour)
+      - alert: TorCircuitSuccessSLOFastBurn
+        expr: |
+          (
+            sum(rate(tor_circuit_build_failures_total[5m])) /
+            (sum(rate(tor_circuit_builds_total[5m])) + 0.001)
+          ) > 0.30
+          and
+          (
+            sum(rate(tor_circuit_build_failures_total[1h])) /
+            (sum(rate(tor_circuit_builds_total[1h])) + 0.001)
+          ) > 0.30
+        for: 2m
+        labels:
+          severity: warning
+          component: circuit
+          sli: circuit_success_rate
+          slo: "70%"
+        annotations:
+          summary: "Circuit success SLO - fast burn rate"
+          description: "Burning error budget at >2% per hour. Current 5m failure rate: {{ $value | humanizePercentage }}."
+          runbook_url: "https://github.com/opd-ai/go-tor/blob/main/docs/ALERTS.md#torcircuitsuccessslofastburn"
+          impact: "Will exhaust monthly error budget in days if sustained."
+          action: "Investigate circuit build failures immediately. Check relay connectivity."
+
+      # Circuit success SLO - Slow burn (5% budget in 6 hours)
+      - alert: TorCircuitSuccessSLOSlowBurn
+        expr: |
+          (
+            sum(rate(tor_circuit_build_failures_total[30m])) /
+            (sum(rate(tor_circuit_builds_total[30m])) + 0.001)
+          ) > 0.25
+          and
+          (
+            sum(rate(tor_circuit_build_failures_total[6h])) /
+            (sum(rate(tor_circuit_builds_total[6h])) + 0.001)
+          ) > 0.25
+        for: 15m
+        labels:
+          severity: info
+          component: circuit
+          sli: circuit_success_rate
+          slo: "70%"
+        annotations:
+          summary: "Circuit success SLO - slow burn rate"
+          description: "Slowly burning error budget. 30m failure rate: {{ $value | humanizePercentage }}."
+          runbook_url: "https://github.com/opd-ai/go-tor/blob/main/docs/ALERTS.md#torcircuitsuccesssloslowburn"
+          impact: "Will impact monthly SLO if sustained for days."
+          action: "Review circuit build trends. Plan investigation during business hours."
