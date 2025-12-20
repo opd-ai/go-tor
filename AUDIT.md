@@ -15,13 +15,16 @@ The implementation demonstrates solid engineering practices with comprehensive s
 ### Recommendation: **FIX REQUIRED BEFORE PRODUCTION**
 While the codebase shows mature development with ~74% test coverage, security hardening, and thoughtful architecture, it requires remediation of identified medium-severity issues and completion of missing security features before embedded deployment.
 ### Issue Summary by Severity
-| Severity | Count | Categories |
-|----------|-------|------------|
-| **CRITICAL** | 0 | None identified |
-| **HIGH** | 0 | Successfully remediated in prior audits |
-| **MEDIUM** | 7 | Protocol compliance, anonymity, input validation |
-| **LOW** | 8 | Code quality, testing, documentation |
-| **INFORMATIONAL** | 5 | Best practices, hardening opportunities |
+| Severity | Count | Resolved | Remaining | Categories |
+|----------|-------|----------|-----------|------------|
+| **CRITICAL** | 0 | 0 | 0 | None identified |
+| **HIGH** | 0 | 0 | 0 | Successfully remediated in prior audits |
+| **MEDIUM** | 7 | 6 | 1 | Protocol compliance, anonymity, input validation |
+| **LOW** | 8 | 1 | 7 | Code quality, testing, documentation |
+| **INFORMATIONAL** | 5 | 0 | 5 | Best practices, hardening opportunities |
+
+*Last Updated: 2025-12-20*
+
 ### Key Findings
 **Strengths:**
 - ✅ Strong cryptographic implementation (Ed25519, Curve25519, AES-256-CTR, SHA3-256)
@@ -61,6 +64,8 @@ While the codebase shows mature development with ~74% test coverage, security ha
 **Severity:** MEDIUM
 **Category:** Protocol Compliance
 **Location:** `pkg/crypto/crypto.go:222-270`
+**Status:** ✅ RESOLVED
+**Resolution:** `NtorProcessResponse` function is integrated into `pkg/circuit/extension.go` (ProcessCreated2 and ProcessExtended2 methods). Server responses are now properly verified with AUTH MAC validation and key derivation per tor-spec.txt section 5.1.4.
 
 ---
 
@@ -68,6 +73,8 @@ While the codebase shows mature development with ~74% test coverage, security ha
 **Severity:** MEDIUM
 **Category:** Cryptographic Verification
 **Location:** `pkg/onion/onion.go:900-950` (HSDir.fetchFromHSDir)
+**Status:** ✅ RESOLVED (2025-12-20)
+**Resolution:** Added call to `VerifyDescriptorSignature` in `FetchDescriptor` after successfully parsing descriptors. Verification includes certificate chain validation per cert-spec.txt. Failed signature verification now causes the client to try the next HSDir.
 
 ---
 
@@ -75,6 +82,8 @@ While the codebase shows mature development with ~74% test coverage, security ha
 **Severity:** MEDIUM
 **Category:** Protocol Security
 **Location:** `pkg/circuit/circuit.go` (Circuit struct and methods)
+**Status:** ✅ RESOLVED
+**Resolution:** `ReplayProtection` is implemented in `pkg/cell/replay.go` with sliding window sequence tracking and digest-based duplicate detection. Integrated into Circuit struct with `ValidateCellForReplay` method and called during `DeliverRelayCell`.
 
 ---
 
@@ -220,6 +229,8 @@ While the codebase shows mature development with ~74% test coverage, security ha
 **Severity:** MEDIUM
 **Category:** Privacy Leak
 **Location:** `pkg/socks/socks.go:400-450`
+**Status:** ✅ RESOLVED
+**Resolution:** DNS resolution commands (RESOLVE 0xF0 and RESOLVE_PTR 0xF1) are implemented in `handleResolve` and `handleResolvePTR` functions. DNS queries are routed through Tor circuits via RELAY_RESOLVE cells, preventing DNS leaks to local resolvers.
 
 ---
 
@@ -227,6 +238,8 @@ While the codebase shows mature development with ~74% test coverage, security ha
 **Severity:** MEDIUM
 **Category:** Anonymity
 **Location:** Circuit layer (missing feature)
+**Status:** ✅ RESOLVED
+**Resolution:** Circuit padding infrastructure is implemented in `pkg/circuit/circuit.go` with `paddingEnabled`, `paddingInterval`, `ShouldSendPadding()`, `RecordPaddingSent()`, and `RecordActivity()` methods. Additional padding machine implementation in `pkg/circuit/padding.go` provides configurable padding strategies.
 
 ---
 
@@ -234,7 +247,8 @@ While the codebase shows mature development with ~74% test coverage, security ha
 **Severity:** MEDIUM
 **Category:** Privacy Leak
 **Location:** `pkg/socks/socks.go:330-380`, `pkg/circuit/isolation.go`
-**Current Implementation:**
+**Status:** ✅ RESOLVED
+**Resolution:** Full stream isolation is implemented with `IsolationEnforcer` in `pkg/stream/isolation.go` and `IsolationKey` in `pkg/circuit/isolation.go`. SOCKS5 server validates stream requests against isolation policy and enforces circuit compatibility checks.
 
 ---
 
@@ -257,6 +271,8 @@ While the codebase shows mature development with ~74% test coverage, security ha
 **Severity:** LOW
 **Category:** Resource Exhaustion
 **Location:** `pkg/onion/onion.go:900-950`
+**Status:** ✅ RESOLVED (2025-12-20)
+**Resolution:** Added `MaxDescriptorSize` constant (100 KB) and implemented size limit check in `fetchFromHSDir` using `io.LimitReader`. Descriptors exceeding the limit are rejected with an error, preventing resource exhaustion attacks.
 
 ---
 
