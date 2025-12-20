@@ -382,21 +382,24 @@ go build ./...                                   # Build successful
 
 **Problem**: Several critical packages have test coverage below 70%.
 
-| Package | Current Coverage | Target |
-|---------|-----------------|--------|
-| pkg/protocol | 27.6% | 70%+ |
-| pkg/client | 35.1% | 70%+ |
-| pkg/socks | 43.1% | 70%+ |
-| pkg/circuit | 58.4% | 75%+ |
-| pkg/crypto | 64.8% | 80%+ |
+| Package | Current Coverage | Target | Status |
+|---------|-----------------|--------|--------|
+| pkg/protocol | ~~27.6%~~ **86.7%** | 70%+ | ✅ COMPLETE |
+| pkg/client | 35.1% | 70%+ | 🟡 Pending |
+| pkg/socks | ~~43.1%~~ 40.6% | 70%+ | 🟡 Pending |
+| pkg/circuit | ~~58.4%~~ 68.1% | 75%+ | 🟡 Pending |
+| pkg/crypto | ~~64.8%~~ **89.8%** | 80%+ | ✅ Already exceeds target |
 
 **Step-by-Step Resolution**:
 
-1. **Protocol package (pkg/protocol)**:
-   - Add tests for VERSIONS cell handling
-   - Add tests for NETINFO cell handling
-   - Add tests for error conditions
-   - Add tests for timeout scenarios
+1. **Protocol package (pkg/protocol)** ✅ **COMPLETE**:
+   - [x] Add tests for VERSIONS cell handling
+   - [x] Add tests for NETINFO cell handling
+   - [x] Add tests for error conditions (wrong cell type, incompatible versions, invalid payload)
+   - [x] Add tests for timeout scenarios
+   - [x] Add comprehensive TLS mock server for handshake testing
+   - [x] Fixed VERSIONS cell handling to be variable-length per tor-spec.txt
+   - **Coverage: 27.6% → 86.7%**
 
 2. **Client package (pkg/client)**:
    - Add integration tests with mock Tor network
@@ -416,14 +419,18 @@ go build ./...                                   # Build successful
    - Add tests for circuit timeout handling
    - Add tests for replay protection edge cases
 
-5. **Crypto package (pkg/crypto)**:
+5. **Crypto package (pkg/crypto)** ✅ **Already exceeds target (89.8%)**:
    - Add tests for ntor edge cases
    - Add tests for key derivation
    - Add tests for constant-time operations
    - Add fuzzing tests for parsers
 
-**Files to Create/Modify**:
-- All `*_test.go` files in affected packages
+**Files Created**:
+- `pkg/protocol/handshake_test.go` - Comprehensive TLS-based handshake tests
+
+**Files Modified**:
+- `pkg/cell/cell.go` - Fixed VERSIONS cell to be variable-length per tor-spec.txt
+- `pkg/cell/cell_test.go` - Added test for VERSIONS variable-length
 
 **Verification**:
 ```bash

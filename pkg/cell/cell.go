@@ -56,9 +56,12 @@ type Cell struct {
 	Payload []byte  // Cell payload
 }
 
-// IsVariableLength returns true if the command indicates a variable-length cell
+// IsVariableLength returns true if the command indicates a variable-length cell.
+// Per tor-spec.txt section 3, variable-length cells have command >= 128.
+// Exception: VERSIONS (command 7) is always variable-length as it's the only
+// cell type allowed before version negotiation is complete.
 func (c Command) IsVariableLength() bool {
-	return c >= 128
+	return c >= 128 || c == CmdVersions
 }
 
 // String returns a human-readable representation of the command
