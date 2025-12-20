@@ -232,6 +232,19 @@ func (s *Server) acceptLoop(ctx context.Context) {
 			}
 		}
 
+		// LOW-003 Fix: Check for shutdown even after successful Accept
+		// This prevents goroutine leaks when shutdown occurs during Accept
+		select {
+		case <-s.shutdown:
+			// Shutdown signaled while Accept was returning - close connection and exit
+			if err := conn.Close(); err != nil {
+				s.logger.Debug("Failed to close connection during shutdown", "error", err)
+			}
+			return
+		default:
+			// Not shutting down, continue processing
+		}
+
 		// Check connection limit (SEC-L006: configurable limit)
 		s.mu.Lock()
 		maxConns := s.config.MaxConnections
@@ -509,6 +522,10 @@ func (s *Server) handshake(conn net.Conn) (string, error) {
 	nmethods := header[1]
 
 	if version != socks5Version {
+		// LOW-005 Fix: Version mismatch handling
+		// Do not send a SOCKS5-formatted response to a non-SOCKS5 client.
+		// Simply close the connection to avoid confusing clients speaking other protocols.
+		// The connection will be closed by the caller when we return an error.
 		return "", fmt.Errorf("unsupported SOCKS version: %d", version)
 	}
 

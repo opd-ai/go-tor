@@ -392,10 +392,12 @@ func TestSOCKS5UnsupportedVersion(t *testing.T) {
 	handshake := []byte{0x04, 0x01, 0x00}
 	conn.Write(handshake)
 
-	// Server should close connection
+	// LOW-005: Server closes connection without sending a SOCKS5 response
+	// to avoid confusing clients speaking other protocols (e.g., SOCKS4).
+	// Wait briefly for server to process and close connection
 	time.Sleep(100 * time.Millisecond)
 
-	// Try to read - should get EOF or error
+	// Try to read - should get EOF or error since connection is closed
 	buf := make([]byte, 10)
 	_, err = conn.Read(buf)
 	if err == nil {
