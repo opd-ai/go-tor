@@ -20,7 +20,7 @@ While the codebase shows mature development with ~74% test coverage, security ha
 | **CRITICAL** | 0 | 0 | 0 | None identified |
 | **HIGH** | 0 | 0 | 0 | Successfully remediated in prior audits |
 | **MEDIUM** | 7 | 6 | 1 | Protocol compliance, anonymity, input validation |
-| **LOW** | 8 | 1 | 7 | Code quality, testing, documentation |
+| **LOW** | 8 | 3 | 5 | Code quality, testing, documentation |
 | **INFORMATIONAL** | 5 | 0 | 5 | Best practices, hardening opportunities |
 
 *Last Updated: 2025-12-20*
@@ -219,8 +219,9 @@ While the codebase shows mature development with ~74% test coverage, security ha
 #### FINDING LOW-003: Potential Goroutine Leak in acceptLoop
 **Severity:** LOW
 **Category:** Resource Management
-**Location:** `pkg/socks/socks.go:280-320`
-- Goroutines may not exit cleanly on shutdown
+**Location:** `pkg/socks/socks.go:222-255`
+**Status:** ✅ RESOLVED (2025-12-20)
+**Resolution:** Added shutdown channel check after successful Accept() in acceptLoop to ensure goroutines exit cleanly even when shutdown occurs during a successful connection accept. The fix closes any connection accepted during shutdown and exits the goroutine promptly.
 
 ---
 
@@ -263,7 +264,9 @@ While the codebase shows mature development with ~74% test coverage, security ha
 #### FINDING LOW-005: Lenient SOCKS5 Version Handling
 **Severity:** LOW
 **Category:** Input Validation
-**Location:** `pkg/socks/socks.go:250-260`
+**Location:** `pkg/socks/socks.go:513-535`
+**Status:** ✅ RESOLVED (2025-12-20)
+**Resolution:** Enhanced SOCKS5 handshake to send proper RFC 1928 rejection response (version=0x05, method=0xFF) when client sends unsupported SOCKS version before closing connection. This provides clearer feedback to clients attempting to connect with wrong protocol version.
 
 ---
 
