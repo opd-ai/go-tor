@@ -1,0 +1,118 @@
+# Security scanning workflow for go-tor
+# Runs on push to main, pull requests, and weekly schedule
+# Includes: gosec (SAST), govulncheck (dependency scanning), Trivy (container),
+#           and CodeQL (semantic code analysis)
+# All actions are pinned to immutable SHA hashes for supply chain security
+name: Security Scanning
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1'  # Weekly on Mondays at 6 AM UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  gosec:
+    name: gosec SAST
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        # Pin to immutable SHA for supply chain security
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      - name: Set up Go
+        # Pin to immutable SHA for supply chain security
+        uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe  # v5.4.0
+        with:
+          go-version: '1.24.x'
+
+      - name: Run gosec
+        # Pin to immutable SHA for supply chain security
+        uses: securego/gosec@6fbd381238e97e1d1f3358f0d6d65de78dcf9245  # v2.21.4
+        with:
+          args: '-fmt sarif -out results.sarif ./...'
+
+      - name: Upload SARIF file
+        # Pin to immutable SHA for supply chain security
+        uses: github/codeql-action/upload-sarif@294a9d92911152fe08befb9ec03e240add280cb3  # v3.26.8
+        with:
+          sarif_file: results.sarif
+        if: success() || failure()
+
+  govulncheck:
+    name: govulncheck Dependency Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        # Pin to immutable SHA for supply chain security
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      - name: Set up Go
+        # Pin to immutable SHA for supply chain security
+        uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe  # v5.4.0
+        with:
+          go-version: '1.24.x'
+
+      - name: Run govulncheck
+        # Pin to immutable SHA for supply chain security
+        uses: golang/govulncheck-action@b625fbe08f3bccbe446d94fbf87fcc875a4f50ee  # v1.0.4
+
+  trivy:
+    name: Trivy Container Scanning
+    runs-on: ubuntu-latest
+    # Skip container scanning for draft PRs; run for all other events
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
+    steps:
+      - name: Checkout code
+        # Pin to immutable SHA for supply chain security
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      - name: Build container image
+        run: docker build -t go-tor:${{ github.sha }} .
+
+      - name: Run Trivy vulnerability scanner
+        # Pin to immutable SHA for supply chain security
+        uses: aquasecurity/trivy-action@915b19bbe73b92a6cf82a1bc12b087c9a19a5fe2  # v0.28.0
+        with:
+          image-ref: 'go-tor:${{ github.sha }}'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+
+      - name: Upload Trivy scan results
+        # Pin to immutable SHA for supply chain security
+        uses: github/codeql-action/upload-sarif@294a9d92911152fe08befb9ec03e240add280cb3  # v3.26.8
+        with:
+          sarif_file: 'trivy-results.sarif'
+        if: success() || failure()
+
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        # Pin to immutable SHA for supply chain security
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      - name: Initialize CodeQL
+        # Pin to immutable SHA for supply chain security
+        uses: github/codeql-action/init@294a9d92911152fe08befb9ec03e240add280cb3  # v3.26.8
+        with:
+          languages: go
+
+      - name: Autobuild
+        # Pin to immutable SHA for supply chain security
+        uses: github/codeql-action/autobuild@294a9d92911152fe08befb9ec03e240add280cb3  # v3.26.8
+
+      - name: Perform CodeQL Analysis
+        # Pin to immutable SHA for supply chain security
+        uses: github/codeql-action/analyze@294a9d92911152fe08befb9ec03e240add280cb3  # v3.26.8
+        with:
+          category: "/language:go"

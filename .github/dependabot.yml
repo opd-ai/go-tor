@@ -1,0 +1,50 @@
+# Dependabot configuration for automated dependency updates
+# Scans Go modules, GitHub Actions, and Docker for security updates
+version: 2
+updates:
+  # Go modules dependency updates
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "go"
+    commit-message:
+      prefix: "deps(go)"
+    groups:
+      # Group golang.org/x/* modules because they are tightly coupled and often
+      # need to be updated together. Other Go dependencies are intentionally
+      # left ungrouped so they are updated in separate PRs for easier review
+      # and more targeted rollbacks if issues arise.
+      go-dependencies:
+        patterns:
+          - "golang.org/x/*"
+
+  # GitHub Actions dependency updates
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "ci"
+    commit-message:
+      prefix: "deps(actions)"
+
+  # Docker base image updates
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "deps(docker)"
