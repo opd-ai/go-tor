@@ -31,20 +31,20 @@ jobs:
         # Pin to immutable SHA for supply chain security
         uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe  # v5.4.0
         with:
-          go-version: '1.22.x'
+          go-version: '1.24.x'
 
       - name: Run gosec
         # Pin to immutable SHA for supply chain security
         uses: securego/gosec@6fbd381238e97e1d1f3358f0d6d65de78dcf9245  # v2.21.4
         with:
-          args: '-no-fail -fmt sarif -out results.sarif ./...'
+          args: '-fmt sarif -out results.sarif ./...'
 
       - name: Upload SARIF file
         # Pin to immutable SHA for supply chain security
         uses: github/codeql-action/upload-sarif@294a9d92911152fe08befb9ec03e240add280cb3  # v3.26.8
         with:
           sarif_file: results.sarif
-        if: always()
+        if: success() || failure()
 
   govulncheck:
     name: govulncheck Dependency Scanning
@@ -58,7 +58,7 @@ jobs:
         # Pin to immutable SHA for supply chain security
         uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe  # v5.4.0
         with:
-          go-version: '1.22.x'
+          go-version: '1.24.x'
 
       - name: Run govulncheck
         # Pin to immutable SHA for supply chain security
@@ -91,7 +91,7 @@ jobs:
         uses: github/codeql-action/upload-sarif@294a9d92911152fe08befb9ec03e240add280cb3  # v3.26.8
         with:
           sarif_file: 'trivy-results.sarif'
-        if: always()
+        if: success() || failure()
 
   codeql:
     name: CodeQL Analysis

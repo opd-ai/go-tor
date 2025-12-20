@@ -384,6 +384,7 @@ The codebase demonstrates:
 - Created `.github/workflows/security.yml` with four security scanning jobs
 - Created `.github/dependabot.yml` with automated updates for Go modules, GitHub Actions, and Docker
 - All GitHub Actions are pinned to immutable SHAs for supply chain security
+- **Note**: SBOM generation was deferred to a future iteration. The current security scanning provides vulnerability detection, but SBOM generation would add supply chain transparency. Consider adding SBOM generation using `anchore/sbom-action` in a future PR.
 
 **Files Created**: `.github/workflows/security.yml`, `.github/dependabot.yml`
 

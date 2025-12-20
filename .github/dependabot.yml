@@ -15,6 +15,10 @@ updates:
     commit-message:
       prefix: "deps(go)"
     groups:
+      # Group golang.org/x/* modules because they are tightly coupled and often
+      # need to be updated together. Other Go dependencies are intentionally
+      # left ungrouped so they are updated in separate PRs for easier review
+      # and more targeted rollbacks if issues arise.
       go-dependencies:
         patterns:
           - "golang.org/x/*"
