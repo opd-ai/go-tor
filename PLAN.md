@@ -386,9 +386,11 @@ go build ./...                                   # Build successful
 |---------|-----------------|--------|--------|
 | pkg/protocol | ~~27.6%~~ **86.7%** | 70%+ | ✅ COMPLETE |
 | pkg/client | 35.1% | 70%+ | 🟡 Pending |
-| pkg/socks | ~~43.1%~~ 40.6% | 70%+ | 🟡 Pending |
-| pkg/circuit | ~~58.4%~~ 68.1% | 75%+ | 🟡 Pending |
+| pkg/socks | ~~43.1%~~ 40.6%† | 70%+ | 🟡 Pending |
+| pkg/circuit | ~~58.4%~~ 68.1%† | 75%+ | 🟡 Pending |
 | pkg/crypto | ~~64.8%~~ **89.8%** | 80%+ | ✅ Already exceeds target |
+
+> † The updated coverage values for `pkg/socks` and `pkg/circuit` reflect the latest CI measurement. These changes are **not** the result of the protocol package remediation work; they represent normal measurement variance from different test runs. Additional tests for these packages remain to be implemented.
 
 **Step-by-Step Resolution**:
 

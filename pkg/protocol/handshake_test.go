@@ -122,16 +122,21 @@ func (m *mockTLSRelay) handleHandshake(conn net.Conn) {
 	// Send NETINFO response
 	netinfoResponse := cell.NewCell(0, cell.CmdNetinfo)
 	payload := make([]byte, 11)
-	// Timestamp (4 bytes)
+	// Timestamp (4 bytes, big-endian)
 	now := uint32(time.Now().Unix())
 	payload[0] = byte(now >> 24)
 	payload[1] = byte(now >> 16)
 	payload[2] = byte(now >> 8)
 	payload[3] = byte(now)
-	// Other address: type=0x04 (IPv4 per tor-spec.txt), length=4 bytes
+	// Other address: type=0x04 (IPv4 per tor-spec.txt), length=4 bytes, address=0.0.0.0
 	payload[4] = 0x04 // Address type: IPv4 (per tor-spec.txt section 6.4)
 	payload[5] = 4    // Address length: 4 bytes for IPv4
-	// Number of this addresses
+	// IPv4 address bytes (0.0.0.0 - placeholder address)
+	payload[6] = 0
+	payload[7] = 0
+	payload[8] = 0
+	payload[9] = 0
+	// Number of "this" addresses (set to 0 per test expectations)
 	payload[10] = 0
 	netinfoResponse.Payload = payload
 
@@ -236,11 +241,12 @@ func TestPerformHandshakeContextCanceled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
 
-	// This should fail because context is canceled (but may fail for other reasons too)
+	// This should fail - connection is not open, so we expect an error
+	// Note: The error may be either due to the canceled context or because
+	// the connection was never established. Both are acceptable failures.
 	err := h.PerformHandshake(ctx)
 	if err == nil {
-		// This is expected to fail because connection is not open
-		t.Log("Handshake failed as expected")
+		t.Error("Expected error when handshake with canceled context or non-connected connection")
 	}
 }
 
@@ -294,7 +300,9 @@ func (m *mockTLSRelayWrongCommand) serve() {
 				if err := wrongCell.Encode(&buf); err != nil {
 					return
 				}
-				c.Write(buf.Bytes())
+				if _, err := c.Write(buf.Bytes()); err != nil {
+					return
+				}
 			}(conn)
 		}
 	}()
@@ -396,7 +404,9 @@ func (m *mockTLSRelayIncompatibleVersion) serve() {
 				if err := responseCell.Encode(&buf); err != nil {
 					return
 				}
-				c.Write(buf.Bytes())
+				if _, err := c.Write(buf.Bytes()); err != nil {
+					return
+				}
 			}(conn)
 		}
 	}()
@@ -498,7 +508,9 @@ func (m *mockTLSRelayInvalidPayload) serve() {
 				if err := responseCell.Encode(&buf); err != nil {
 					return
 				}
-				c.Write(buf.Bytes())
+				if _, err := c.Write(buf.Bytes()); err != nil {
+					return
+				}
 			}(conn)
 		}
 	}()
@@ -600,7 +612,9 @@ func (m *mockTLSRelayWrongNetinfo) serve() {
 				if err := versionsCell.Encode(&buf); err != nil {
 					return
 				}
-				c.Write(buf.Bytes())
+				if _, err := c.Write(buf.Bytes()); err != nil {
+					return
+				}
 
 				// Read NETINFO cell
 				_, err = cell.DecodeCell(c)
@@ -614,7 +628,9 @@ func (m *mockTLSRelayWrongNetinfo) serve() {
 				if err := wrongCell.Encode(&buf2); err != nil {
 					return
 				}
-				c.Write(buf2.Bytes())
+				if _, err := c.Write(buf2.Bytes()); err != nil {
+					return
+				}
 			}(conn)
 		}
 	}()
