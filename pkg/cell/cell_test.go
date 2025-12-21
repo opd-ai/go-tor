@@ -13,6 +13,7 @@ func TestCommandIsVariableLength(t *testing.T) {
 		{CmdPadding, false},
 		{CmdCreate, false},
 		{CmdRelay, false},
+		{CmdVersions, true}, // VERSIONS is always variable-length per tor-spec.txt
 		{CmdVPadding, true},
 		{CmdCerts, true},
 		{Command(200), true},
