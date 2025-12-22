@@ -245,14 +245,9 @@ func TestCheckAndRebuildCircuitsEmptyList(t *testing.T) {
 
 	// Add enough circuits so the rebuild logic doesn't trigger
 	// The minCircuitCount is 2, so we need at least 2 circuits
-	for i := 1; i <= 3; i++ {
-		circ := circuit.NewCircuit(uint32(i))
-		circ.SetState(circuit.StateOpen)
-		circ.CreatedAt = time.Now()
-		client.circuitsMu.Lock()
-		client.circuits = append(client.circuits, circ)
-		client.circuitsMu.Unlock()
-	}
+	addTestCircuit(client, 1, circuit.StateOpen, 0)
+	addTestCircuit(client, 2, circuit.StateOpen, 0)
+	addTestCircuit(client, 3, circuit.StateOpen, 0)
 
 	ctx := context.Background()
 
@@ -339,14 +334,8 @@ func TestCheckAndRebuildCircuitsWithPoolEnabled(t *testing.T) {
 	defer client.Stop()
 
 	// Add at least 2 circuits to prevent rebuild logic from triggering
-	for i := 1; i <= 2; i++ {
-		circ := circuit.NewCircuit(uint32(i))
-		circ.SetState(circuit.StateOpen)
-		circ.CreatedAt = time.Now()
-		client.circuitsMu.Lock()
-		client.circuits = append(client.circuits, circ)
-		client.circuitsMu.Unlock()
-	}
+	addTestCircuit(client, 1, circuit.StateOpen, 0)
+	addTestCircuit(client, 2, circuit.StateOpen, 0)
 
 	ctx := context.Background()
 
@@ -425,13 +414,9 @@ func TestGetStatsWithActiveCircuits(t *testing.T) {
 	defer client.Stop()
 
 	// Add mock circuits
-	for i := 1; i <= 3; i++ {
-		circ := circuit.NewCircuit(uint32(i))
-		circ.SetState(circuit.StateOpen)
-		client.circuitsMu.Lock()
-		client.circuits = append(client.circuits, circ)
-		client.circuitsMu.Unlock()
-	}
+	addTestCircuit(client, 1, circuit.StateOpen, 0)
+	addTestCircuit(client, 2, circuit.StateOpen, 0)
+	addTestCircuit(client, 3, circuit.StateOpen, 0)
 
 	stats := client.GetStats()
 
@@ -461,14 +446,16 @@ func TestMaintainCircuitsShutdown(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
+	started := make(chan struct{})
 	done := make(chan struct{})
 	go func() {
+		close(started)
 		client.maintainCircuits(ctx)
 		close(done)
 	}()
 
-	// Give it a moment to start
-	time.Sleep(50 * time.Millisecond)
+	// Wait for goroutine to start
+	<-started
 
 	// Cancel context
 	cancel()
@@ -497,14 +484,16 @@ func TestMaintainCircuitsShutdownSignal(t *testing.T) {
 
 	ctx := context.Background()
 
+	started := make(chan struct{})
 	done := make(chan struct{})
 	go func() {
+		close(started)
 		client.maintainCircuits(ctx)
 		close(done)
 	}()
 
-	// Give it a moment to start
-	time.Sleep(50 * time.Millisecond)
+	// Wait for goroutine to start
+	<-started
 
 	// Close shutdown channel to trigger exit
 	close(client.shutdown)
@@ -536,14 +525,16 @@ func TestMonitorBandwidthShutdown(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
+	started := make(chan struct{})
 	done := make(chan struct{})
 	go func() {
+		close(started)
 		client.monitorBandwidth(ctx)
 		close(done)
 	}()
 
-	// Give it a moment to start
-	time.Sleep(50 * time.Millisecond)
+	// Wait for goroutine to start
+	<-started
 
 	// Cancel context
 	cancel()
@@ -997,7 +988,7 @@ func TestGetStatsFullFields(t *testing.T) {
 	}
 }
 
-// TestMonitorBandwidthTickerBehavior tests monitorBandwidth shutdown via shutdown channel
+// TestMonitorBandwidthShutdownChannel tests monitorBandwidth shutdown via shutdown channel
 func TestMonitorBandwidthShutdownChannel(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.DataDirectory = t.TempDir()
@@ -1010,14 +1001,16 @@ func TestMonitorBandwidthShutdownChannel(t *testing.T) {
 
 	ctx := context.Background()
 
+	started := make(chan struct{})
 	done := make(chan struct{})
 	go func() {
+		close(started)
 		client.monitorBandwidth(ctx)
 		close(done)
 	}()
 
-	// Give it a moment to start
-	time.Sleep(50 * time.Millisecond)
+	// Wait for goroutine to start
+	<-started
 
 	// Close shutdown channel to stop
 	close(client.shutdown)
@@ -1036,27 +1029,25 @@ func TestMonitorBandwidthShutdownChannel(t *testing.T) {
 	client.Stop()
 }
 
-// TestConnect tests the Connect function (wrapper for ConnectWithContext)
+// TestConnectFails verifies that establishing a connection fails in test environments
 func TestConnectFails(t *testing.T) {
-	// Connect starts with a background context and will try network operations
-	// We can't mock the network, so we just verify the function exists and returns an error
-	// since it can't bootstrap the Tor network in a test environment
-	done := make(chan error, 1)
-	go func() {
-		_, err := Connect()
-		done <- err
-	}()
+	// Use a cancelable context to ensure no goroutines outlive the test.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-	select {
-	case err := <-done:
-		// Expected to fail due to network issues in test environment
-		if err == nil {
-			t.Log("Connect succeeded unexpectedly")
-		} else {
-			t.Logf("Connect returned expected error: %v", err)
-		}
-	case <-time.After(5 * time.Second):
-		t.Log("Connect is still running, cancelling test (network operation in progress)")
+	opts := &Options{
+		SocksPort:     29112,
+		ControlPort:   29113,
+		DataDirectory: t.TempDir(),
+		LogLevel:      "info",
+	}
+
+	_, err := ConnectWithOptionsContext(ctx, opts)
+	// Expected to fail due to network issues or short timeout in the test environment.
+	if err == nil {
+		t.Log("ConnectWithOptionsContext succeeded unexpectedly")
+	} else {
+		t.Logf("ConnectWithOptionsContext returned expected error: %v", err)
 	}
 }
 
@@ -1169,6 +1160,10 @@ func TestPublishConsensusEventsWithMiddleRelays(t *testing.T) {
 
 // TestConnectWithOptionsFails tests ConnectWithOptions wrapper
 func TestConnectWithOptionsFails(t *testing.T) {
+	// Use a cancelable context to ensure no goroutines outlive the test.
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
 	opts := &Options{
 		SocksPort:     29104,
 		ControlPort:   29105,
@@ -1176,24 +1171,12 @@ func TestConnectWithOptionsFails(t *testing.T) {
 		LogLevel:      "info",
 	}
 
-	// ConnectWithOptions wraps ConnectWithOptionsContext with background context
-	// It will fail during network bootstrap in test environment
-	done := make(chan error, 1)
-	go func() {
-		_, err := ConnectWithOptions(opts)
-		done <- err
-	}()
-
-	// Wait briefly then cancel the goroutine
-	select {
-	case err := <-done:
-		if err == nil {
-			t.Log("ConnectWithOptions succeeded unexpectedly")
-		} else {
-			t.Logf("ConnectWithOptions returned expected error: %v", err)
-		}
-	case <-time.After(3 * time.Second):
-		t.Log("ConnectWithOptions still running (expected, network operation)")
+	// ConnectWithOptionsContext respects the context timeout
+	_, err := ConnectWithOptionsContext(ctx, opts)
+	if err == nil {
+		t.Log("ConnectWithOptionsContext succeeded unexpectedly")
+	} else {
+		t.Logf("ConnectWithOptionsContext returned expected error: %v", err)
 	}
 }
 
