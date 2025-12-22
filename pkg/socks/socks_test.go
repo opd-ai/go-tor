@@ -1205,21 +1205,21 @@ func TestSOCKS5UnsupportedAddressType(t *testing.T) {
 // TestBuildIsolationPolicy tests the isolation policy builder
 func TestBuildIsolationPolicy(t *testing.T) {
 	tests := []struct {
-		name           string
-		cfg            *Config
-		expectedMode   stream.IsolationMode
-		expectedSOCKS  bool
-		expectedDest   bool
-		expectedPort   bool
-		invalidMode    bool
+		name          string
+		cfg           *Config
+		expectedMode  stream.IsolationMode
+		expectedSOCKS bool
+		expectedDest  bool
+		expectedPort  bool
+		invalidMode   bool
 	}{
 		{
 			name: "off mode",
 			cfg: &Config{
-				IsolationMode:     "off",
-				IsolateSOCKSAuth:  false,
+				IsolationMode:       "off",
+				IsolateSOCKSAuth:    false,
 				IsolateDestinations: false,
-				IsolateClientPort: false,
+				IsolateClientPort:   false,
 			},
 			expectedMode:  stream.IsolationModeOff,
 			expectedSOCKS: false,
@@ -1229,10 +1229,10 @@ func TestBuildIsolationPolicy(t *testing.T) {
 		{
 			name: "warn mode",
 			cfg: &Config{
-				IsolationMode:     "warn",
-				IsolateSOCKSAuth:  true,
+				IsolationMode:       "warn",
+				IsolateSOCKSAuth:    true,
 				IsolateDestinations: true,
-				IsolateClientPort: true,
+				IsolateClientPort:   true,
 			},
 			expectedMode:  stream.IsolationModeWarn,
 			expectedSOCKS: true,
@@ -1242,10 +1242,10 @@ func TestBuildIsolationPolicy(t *testing.T) {
 		{
 			name: "strict mode",
 			cfg: &Config{
-				IsolationMode:     "strict",
-				IsolateSOCKSAuth:  true,
+				IsolationMode:       "strict",
+				IsolateSOCKSAuth:    true,
 				IsolateDestinations: false,
-				IsolateClientPort: false,
+				IsolateClientPort:   false,
 			},
 			expectedMode:  stream.IsolationModeStrict,
 			expectedSOCKS: true,
@@ -1255,10 +1255,10 @@ func TestBuildIsolationPolicy(t *testing.T) {
 		{
 			name: "invalid mode defaults to off",
 			cfg: &Config{
-				IsolationMode:     "invalid_mode",
-				IsolateSOCKSAuth:  true,
+				IsolationMode:       "invalid_mode",
+				IsolateSOCKSAuth:    true,
 				IsolateDestinations: true,
-				IsolateClientPort: true,
+				IsolateClientPort:   true,
 			},
 			expectedMode:  stream.IsolationModeOff,
 			expectedSOCKS: true,
@@ -1523,15 +1523,8 @@ func TestSendDNSReplyHostnameTooLong(t *testing.T) {
 	defer server.Close()
 	defer client.Close()
 
-	// Create a hostname longer than 255 bytes
-	longHostname := string(make([]byte, 300))
-	for i := range longHostname {
-		longHostname = longHostname[:i] + "a"
-	}
-	longHostname = ""
-	for i := 0; i < 300; i++ {
-		longHostname += "a"
-	}
+	// Create a hostname longer than 255 bytes using strings.Repeat
+	longHostname := strings.Repeat("a", 300)
 
 	done := make(chan []byte, 1)
 	go func() {
@@ -1653,10 +1646,10 @@ func TestConnectionLimitEnforcement(t *testing.T) {
 
 	// Very low connection limit for testing
 	cfg := &Config{
-		MaxConnections:     2,
-		EnableRateLimiting: false, // Disable rate limiting for this test
+		MaxConnections:      2,
+		EnableRateLimiting:  false, // Disable rate limiting for this test
 		EnableDNSResolution: true,
-		IsolationMode:      "off",
+		IsolationMode:       "off",
 	}
 
 	server := NewServerWithConfig("127.0.0.1:0", mgr, log, cfg)
@@ -1809,10 +1802,10 @@ func TestSOCKS5ResolvePTRCommandWithPoolNil(t *testing.T) {
 	// Send RESOLVE_PTR command with IPv4 address
 	ipv4 := net.ParseIP("1.2.3.4").To4()
 	request := []byte{
-		0x05,        // Version
+		0x05,          // Version
 		cmdResolvePTR, // RESOLVE_PTR command
-		0x00,        // Reserved
-		0x01,        // IPv4 address type
+		0x00,          // Reserved
+		0x01,          // IPv4 address type
 	}
 	request = append(request, ipv4...)
 	portBytes := make([]byte, 2)
@@ -1952,8 +1945,8 @@ func TestIsolationModeConfig(t *testing.T) {
 			mgr := circuit.NewManager()
 
 			cfg := &Config{
-				MaxConnections:  1000,
-				IsolationMode:   tt.mode,
+				MaxConnections:      1000,
+				IsolationMode:       tt.mode,
 				EnableDNSResolution: true,
 			}
 
@@ -2001,12 +1994,12 @@ func TestSOCKS5ResolvePTRWithInvalidIP(t *testing.T) {
 
 	// Send RESOLVE_PTR with valid IPv4 - tests the full handleResolvePTR path
 	request := []byte{
-		0x05,        // Version
+		0x05,          // Version
 		cmdResolvePTR, // RESOLVE_PTR command
-		0x00,        // Reserved
-		0x01,        // IPv4 address type
-		8, 8, 8, 8,  // 8.8.8.8
-		0x00, 0x00,  // Port (ignored)
+		0x00,          // Reserved
+		0x01,          // IPv4 address type
+		8, 8, 8, 8,    // 8.8.8.8
+		0x00, 0x00, // Port (ignored)
 	}
 
 	if _, err := conn.Write(request); err != nil {
@@ -2068,12 +2061,12 @@ func TestDNSResolutionDisabled(t *testing.T) {
 
 			// Send DNS command
 			request := []byte{
-				0x05,        // Version
-				tt.cmd,      // DNS command
-				0x00,        // Reserved
-				0x01,        // IPv4 address type
-				1, 2, 3, 4,  // IP
-				0x00, 0x50,  // Port
+				0x05,       // Version
+				tt.cmd,     // DNS command
+				0x00,       // Reserved
+				0x01,       // IPv4 address type
+				1, 2, 3, 4, // IP
+				0x00, 0x50, // Port
 			}
 
 			if _, err := conn.Write(request); err != nil {
@@ -2172,7 +2165,7 @@ func TestPerClientRateLimiting(t *testing.T) {
 		ConnectionsPerSecond:          100.0,
 		ConnectionsBurst:              100,
 		EnablePerClientRateLimiting:   true,
-		PerClientConnectionsPerSecond: 1.0,  // Very strict
+		PerClientConnectionsPerSecond: 1.0, // Very strict
 		PerClientConnectionsBurst:     1,
 		EnableDNSResolution:           true,
 		IsolationMode:                 "off",
