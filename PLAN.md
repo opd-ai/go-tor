@@ -386,11 +386,11 @@ go build ./...                                   # Build successful
 |---------|-----------------|--------|--------|
 | pkg/protocol | ~~27.6%~~ **86.7%** | 70%+ | ✅ COMPLETE |
 | pkg/client | ~~35.1%~~ **62.5%** | 70%+ | 🟡 In Progress (network-dependent functions remain) |
-| pkg/socks | ~~43.1%~~ 40.6%† | 70%+ | 🟡 Pending |
+| pkg/socks | ~~43.1%~~ ~~40.6%~~ **71.5%** | 70%+ | ✅ COMPLETE |
 | pkg/circuit | ~~58.4%~~ 68.1%† | 75%+ | 🟡 Pending |
 | pkg/crypto | ~~64.8%~~ **89.8%** | 80%+ | ✅ Already exceeds target |
 
-> † The updated coverage values for `pkg/socks` and `pkg/circuit` reflect the latest CI measurement. These changes are **not** the result of the protocol package remediation work; they represent normal measurement variance from different test runs. Additional tests for these packages remain to be implemented.
+> † The updated coverage values for `pkg/circuit` reflect the latest CI measurement. These changes are **not** the result of the protocol package remediation work; they represent normal measurement variance from different test runs. Additional tests for this package remain to be implemented.
 
 **Step-by-Step Resolution**:
 
@@ -418,11 +418,19 @@ go build ./...                                   # Build successful
    - **Note**: Remaining functions (Start, buildInitialCircuits, buildCircuitForPool) require network access and are covered by integration tests (run with `-tags=integration`)
    - **Coverage: 35.1% → 62.5%**
 
-3. **SOCKS package (pkg/socks)**:
-   - Add tests for all SOCKS5 commands
-   - Add tests for authentication methods
-   - Add tests for connection handling
-   - Add tests for rate limiting (when implemented)
+3. **SOCKS package (pkg/socks)** ✅ **COMPLETE (40.6% → 71.5%)**:
+   - [x] Add tests for all SOCKS5 commands (CONNECT, BIND rejection, UDP rejection)
+   - [x] Add tests for authentication methods (no-auth, password auth)
+   - [x] Add tests for password auth version validation
+   - [x] Add tests for connection handling and limits
+   - [x] Add tests for rate limiting (global and per-client)
+   - [x] Add tests for DNS resolution commands (RESOLVE, RESOLVE_PTR)
+   - [x] Add tests for DNS reply formatting
+   - [x] Add tests for isolation policy building
+   - [x] Add tests for unsupported address types and versions
+   - [x] Add tests for IPv6 address handling
+   - [x] Add tests for shutdown behavior
+   - **Coverage: 40.6% → 71.5%**
 
 4. **Circuit package (pkg/circuit)**:
    - Add tests for circuit extension
@@ -443,6 +451,7 @@ go build ./...                                   # Build successful
 **Files Modified**:
 - `pkg/cell/cell.go` - Fixed VERSIONS cell to be variable-length per tor-spec.txt
 - `pkg/cell/cell_test.go` - Added test for VERSIONS variable-length
+- `pkg/socks/socks_test.go` - Added comprehensive test coverage for SOCKS5 server
 
 **Verification**:
 ```bash
