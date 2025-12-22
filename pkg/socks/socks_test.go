@@ -1045,9 +1045,13 @@ func TestSOCKS5IPv6Request(t *testing.T) {
 
 	// Handshake
 	handshake := []byte{0x05, 0x01, 0x00}
-	conn.Write(handshake)
+	if _, err := conn.Write(handshake); err != nil {
+		t.Fatalf("Failed to write handshake: %v", err)
+	}
 	response := make([]byte, 2)
-	io.ReadFull(conn, response)
+	if _, err := io.ReadFull(conn, response); err != nil {
+		t.Fatalf("Failed to read handshake response: %v", err)
+	}
 
 	// Send CONNECT request with IPv6 address (::1:80)
 	ipv6Addr := net.ParseIP("::1")
@@ -1120,9 +1124,13 @@ func TestSOCKS5UnsupportedCommand(t *testing.T) {
 
 			// Handshake
 			handshake := []byte{0x05, 0x01, 0x00}
-			conn.Write(handshake)
+			if _, err := conn.Write(handshake); err != nil {
+				t.Fatalf("Failed to write handshake: %v", err)
+			}
 			response := make([]byte, 2)
-			io.ReadFull(conn, response)
+			if _, err := io.ReadFull(conn, response); err != nil {
+				t.Fatalf("Failed to read handshake response: %v", err)
+			}
 
 			// Send unsupported command
 			request := []byte{
@@ -1173,9 +1181,13 @@ func TestSOCKS5UnsupportedAddressType(t *testing.T) {
 
 	// Handshake
 	handshake := []byte{0x05, 0x01, 0x00}
-	conn.Write(handshake)
+	if _, err := conn.Write(handshake); err != nil {
+		t.Fatalf("Failed to write handshake: %v", err)
+	}
 	response := make([]byte, 2)
-	io.ReadFull(conn, response)
+	if _, err := io.ReadFull(conn, response); err != nil {
+		t.Fatalf("Failed to read handshake response: %v", err)
+	}
 
 	// Send request with unsupported address type (0x99)
 	request := []byte{
@@ -1672,30 +1684,48 @@ func TestConnectionLimitEnforcement(t *testing.T) {
 
 		// Keep connections alive with handshake
 		handshake := []byte{0x05, 0x01, 0x00}
-		conn.Write(handshake)
+		if _, err := conn.Write(handshake); err != nil {
+			t.Fatalf("Failed to write handshake (conn %d): %v", i, err)
+		}
 		response := make([]byte, 2)
-		io.ReadFull(conn, response)
+		if _, err := io.ReadFull(conn, response); err != nil {
+			t.Fatalf("Failed to read handshake response (conn %d): %v", i, err)
+		}
 	}
 
-	// Small delay to ensure connections are tracked
-	time.Sleep(50 * time.Millisecond)
-
-	// Third connection should be rejected (server closes it immediately)
-	conn3, err := net.Dial("tcp", addr)
-	if err != nil {
-		// Some systems may fail the dial if server rejects
-		t.Logf("Third connection dial failed (expected): %v", err)
-	} else {
-		defer conn3.Close()
-		// Try to do handshake - should fail since connection limit exceeded
-		time.Sleep(100 * time.Millisecond)
-		conn3.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
-		buf := make([]byte, 1)
-		_, err = conn3.Read(buf)
-		// Connection should be closed or timeout
-		if err == nil {
-			t.Log("Third connection was unexpectedly accepted")
+	// Third connection should be rejected (server closes it when limit is exceeded).
+	// Poll until the limit is enforced or we hit a timeout to avoid timing flakiness.
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		if time.Now().After(deadline) {
+			t.Fatalf("Third connection was unexpectedly accepted after waiting for limit enforcement")
 		}
+
+		conn3, err := net.Dial("tcp", addr)
+		if err != nil {
+			// Some systems may fail the dial if server rejects; this is acceptable.
+			t.Logf("Third connection dial failed (expected): %v", err)
+			break
+		}
+
+		func() {
+			defer conn3.Close()
+
+			// Set a short read deadline and attempt to read; the server should close
+			// the connection or cause a timeout due to the connection limit.
+			conn3.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+			buf := make([]byte, 1)
+			_, readErr := conn3.Read(buf)
+
+			if readErr != nil {
+				// Expected: connection closed or timed out because limit was exceeded.
+				return
+			}
+		}()
+
+		// If we reach here without an error from Read, the connection was accepted.
+		// Retry until the server starts enforcing the limit or we hit the deadline.
+		time.Sleep(10 * time.Millisecond)
 	}
 
 	// Cleanup
@@ -1733,9 +1763,13 @@ func TestSOCKS5ResolveCommandWithPoolNil(t *testing.T) {
 
 	// Handshake
 	handshake := []byte{0x05, 0x01, 0x00}
-	conn.Write(handshake)
+	if _, err := conn.Write(handshake); err != nil {
+		t.Fatalf("Failed to write handshake: %v", err)
+	}
 	response := make([]byte, 2)
-	io.ReadFull(conn, response)
+	if _, err := io.ReadFull(conn, response); err != nil {
+		t.Fatalf("Failed to read handshake response: %v", err)
+	}
 
 	// Send RESOLVE command
 	domain := "example.com"
@@ -1795,9 +1829,13 @@ func TestSOCKS5ResolvePTRCommandWithPoolNil(t *testing.T) {
 
 	// Handshake
 	handshake := []byte{0x05, 0x01, 0x00}
-	conn.Write(handshake)
+	if _, err := conn.Write(handshake); err != nil {
+		t.Fatalf("Failed to write handshake: %v", err)
+	}
 	response := make([]byte, 2)
-	io.ReadFull(conn, response)
+	if _, err := io.ReadFull(conn, response); err != nil {
+		t.Fatalf("Failed to read handshake response: %v", err)
+	}
 
 	// Send RESOLVE_PTR command with IPv4 address
 	ipv4 := net.ParseIP("1.2.3.4").To4()
@@ -1958,8 +1996,8 @@ func TestIsolationModeConfig(t *testing.T) {
 	}
 }
 
-// TestSOCKS5ResolvePTRWithInvalidIP tests RESOLVE_PTR with invalid IP format
-func TestSOCKS5ResolvePTRWithInvalidIP(t *testing.T) {
+// TestSOCKS5ResolvePTRWithValidIP tests RESOLVE_PTR with a valid IPv4 address
+func TestSOCKS5ResolvePTRWithValidIP(t *testing.T) {
 	manager := circuit.NewManager()
 	log := logger.NewDefault()
 
@@ -1988,9 +2026,13 @@ func TestSOCKS5ResolvePTRWithInvalidIP(t *testing.T) {
 
 	// Handshake
 	handshake := []byte{0x05, 0x01, 0x00}
-	conn.Write(handshake)
+	if _, err := conn.Write(handshake); err != nil {
+		t.Fatalf("Failed to write handshake: %v", err)
+	}
 	response := make([]byte, 2)
-	io.ReadFull(conn, response)
+	if _, err := io.ReadFull(conn, response); err != nil {
+		t.Fatalf("Failed to read handshake response: %v", err)
+	}
 
 	// Send RESOLVE_PTR with valid IPv4 - tests the full handleResolvePTR path
 	request := []byte{
@@ -2055,9 +2097,13 @@ func TestDNSResolutionDisabled(t *testing.T) {
 
 			// Handshake
 			handshake := []byte{0x05, 0x01, 0x00}
-			conn.Write(handshake)
+			if _, err := conn.Write(handshake); err != nil {
+				t.Fatalf("Failed to write handshake: %v", err)
+			}
 			response := make([]byte, 2)
-			io.ReadFull(conn, response)
+			if _, err := io.ReadFull(conn, response); err != nil {
+				t.Fatalf("Failed to read handshake response: %v", err)
+			}
 
 			// Send DNS command
 			request := []byte{
@@ -2119,15 +2165,23 @@ func TestSOCKS5WithStrictIsolation(t *testing.T) {
 
 	// Handshake with password auth
 	handshake := []byte{0x05, 0x01, 0x02}
-	conn.Write(handshake)
+	if _, err := conn.Write(handshake); err != nil {
+		t.Fatalf("Failed to write handshake: %v", err)
+	}
 	response := make([]byte, 2)
-	io.ReadFull(conn, response)
+	if _, err := io.ReadFull(conn, response); err != nil {
+		t.Fatalf("Failed to read handshake response: %v", err)
+	}
 
 	// Password auth
 	auth := []byte{0x01, 0x04, 'u', 's', 'e', 'r', 0x04, 'p', 'a', 's', 's'}
-	conn.Write(auth)
+	if _, err := conn.Write(auth); err != nil {
+		t.Fatalf("Failed to write auth: %v", err)
+	}
 	authResponse := make([]byte, 2)
-	io.ReadFull(conn, authResponse)
+	if _, err := io.ReadFull(conn, authResponse); err != nil {
+		t.Fatalf("Failed to read auth response: %v", err)
+	}
 
 	// Send CONNECT request
 	request := []byte{
@@ -2191,9 +2245,13 @@ func TestPerClientRateLimiting(t *testing.T) {
 
 	// Do handshake on first connection
 	handshake := []byte{0x05, 0x01, 0x00}
-	conn1.Write(handshake)
+	if _, err := conn1.Write(handshake); err != nil {
+		t.Fatalf("Failed to write handshake: %v", err)
+	}
 	response := make([]byte, 2)
-	io.ReadFull(conn1, response)
+	if _, err := io.ReadFull(conn1, response); err != nil {
+		t.Fatalf("Failed to read handshake response: %v", err)
+	}
 
 	if response[1] != 0x00 {
 		t.Errorf("First connection handshake failed, got auth method 0x%02X", response[1])
