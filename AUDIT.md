@@ -23,7 +23,7 @@ While the codebase shows mature development with ~74% test coverage, security ha
 | **LOW** | 8 | 3 | 5 | Code quality, testing, documentation |
 | **INFORMATIONAL** | 5 | 0 | 5 | Best practices, hardening opportunities |
 
-*Last Updated: 2025-12-20*
+*Last Updated: 2025-12-22*
 
 ### Key Findings
 **Strengths:**
@@ -319,27 +319,34 @@ While the codebase shows mature development with ~74% test coverage, security ha
 | pkg/security | 96.2% | ✅ Yes | ✅ Excellent |
 | pkg/health | 96.5% | ⚠️ Moderate | ✅ Excellent |
 | pkg/control | 90.9% | ⚠️ Moderate | ✅ Good |
+| pkg/crypto | 89.8% | ✅ Yes | ✅ Good |
 | pkg/config | 89.4% | ✅ Yes | ✅ Good |
 | pkg/httpmetrics | 88.2% | ❌ No | ✅ Good |
+| pkg/protocol | 86.7% | ✅ Yes | ✅ Good |
 | pkg/stream | 82.4% | ✅ Yes | ✅ Good |
 | pkg/onion | 74.0% | ✅ Yes | ⚠️ Adequate |
 | pkg/helpers | 72.2% | ❌ No | ⚠️ Adequate |
+| pkg/socks | 71.5% | ✅ Yes | ⚠️ Adequate |
 | pkg/cell | 71.3% | ✅ Yes | ⚠️ Adequate |
-| pkg/crypto | 64.8% | ✅ Yes | ⚠️ Needs improvement |
+| pkg/circuit | 68.1% | ✅ Yes | ⚠️ Needs improvement |
 | pkg/path | 64.8% | ✅ Yes | ⚠️ Needs improvement |
+| pkg/client | 62.5% | ✅ Yes | ⚠️ Needs improvement |
 | pkg/connection | 61.1% | ✅ Yes | ⚠️ Needs improvement |
-| pkg/directory | 60.9% | ⚠️ Moderate | ⚠️ Needs improvement |
 | pkg/pool | 61.0% | ⚠️ Moderate | ⚠️ Needs improvement |
+| pkg/directory | 60.9% | ⚠️ Moderate | ⚠️ Needs improvement |
 | pkg/autoconfig | 60.7% | ❌ No | ⚠️ Needs improvement |
-| pkg/circuit | 58.4% | ✅ Yes | ❌ Needs improvement |
 | pkg/benchmark | 57.6% | ❌ No | ⚠️ Adequate |
-| pkg/socks | 43.1% | ✅ Yes | ❌ Needs improvement |
-| pkg/client | 35.1% | ✅ Yes | ❌ Needs improvement |
-| pkg/protocol | 27.6% | ✅ Yes | ❌ Needs improvement |
 #### FINDING MED-007: Insufficient Test Coverage for Critical Packages
 **Severity:** MEDIUM
 **Category:** Code Quality
 **Location:** Multiple critical packages
+**Status:** ✅ PARTIALLY RESOLVED (2025-12-22)
+**Resolution:** Test coverage improved for critical packages:
+- pkg/protocol: 27.6% → 86.7% (COMPLETE)
+- pkg/socks: 43.1% → 71.5% (COMPLETE - exceeds 70% target)
+- pkg/crypto: 64.8% → 89.8% (COMPLETE - exceeds 80% target)
+- pkg/client: 35.1% → 62.5% (IN PROGRESS - network tests remain)
+- pkg/circuit: 58.4% → 68.1% (PENDING - needs 75%+ target)
 
 ---
 
