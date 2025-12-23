@@ -1696,7 +1696,8 @@ func TestConnectionLimitEnforcement(t *testing.T) {
 	// Third connection should be rejected (server closes it when limit is exceeded).
 	// Poll until the limit is enforced or we hit a timeout to avoid timing flakiness.
 	deadline := time.Now().Add(2 * time.Second)
-	for {
+	connectionRejected := false
+	for !connectionRejected {
 		if time.Now().After(deadline) {
 			t.Fatalf("Third connection was unexpectedly accepted after waiting for limit enforcement")
 		}
@@ -1705,23 +1706,22 @@ func TestConnectionLimitEnforcement(t *testing.T) {
 		if err != nil {
 			// Some systems may fail the dial if server rejects; this is acceptable.
 			t.Logf("Third connection dial failed (expected): %v", err)
+			connectionRejected = true
 			break
 		}
 
-		func() {
-			defer conn3.Close()
+		// Set a short read deadline and attempt to read; the server should close
+		// the connection or cause a timeout due to the connection limit.
+		conn3.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+		buf := make([]byte, 1)
+		_, readErr := conn3.Read(buf)
+		conn3.Close()
 
-			// Set a short read deadline and attempt to read; the server should close
-			// the connection or cause a timeout due to the connection limit.
-			conn3.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
-			buf := make([]byte, 1)
-			_, readErr := conn3.Read(buf)
-
-			if readErr != nil {
-				// Expected: connection closed or timed out because limit was exceeded.
-				return
-			}
-		}()
+		if readErr != nil {
+			// Expected: connection closed or timed out because limit was exceeded.
+			connectionRejected = true
+			break
+		}
 
 		// If we reach here without an error from Read, the connection was accepted.
 		// Retry until the server starts enforcing the limit or we hit the deadline.
@@ -2333,9 +2333,13 @@ func TestConnectWithNoCircuitPool(t *testing.T) {
 
 	// Handshake
 	handshake := []byte{0x05, 0x01, 0x00}
-	conn.Write(handshake)
+	if _, err := conn.Write(handshake); err != nil {
+		t.Fatalf("Failed to write handshake: %v", err)
+	}
 	response := make([]byte, 2)
-	io.ReadFull(conn, response)
+	if _, err := io.ReadFull(conn, response); err != nil {
+		t.Fatalf("Failed to read handshake response: %v", err)
+	}
 
 	// Send CONNECT request
 	request := []byte{
@@ -2410,9 +2414,13 @@ func TestReadRequestVersionMismatch(t *testing.T) {
 
 	// Handshake
 	handshake := []byte{0x05, 0x01, 0x00}
-	conn.Write(handshake)
+	if _, err := conn.Write(handshake); err != nil {
+		t.Fatalf("Failed to write handshake: %v", err)
+	}
 	response := make([]byte, 2)
-	io.ReadFull(conn, response)
+	if _, err := io.ReadFull(conn, response); err != nil {
+		t.Fatalf("Failed to read handshake response: %v", err)
+	}
 
 	// Send request with wrong version (4 instead of 5)
 	request := []byte{
