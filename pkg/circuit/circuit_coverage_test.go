@@ -368,10 +368,10 @@ func TestCircuitStreamOperations(t *testing.T) {
 	// Test ReadFromStream - with timeout context to avoid hanging
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
-	
+
 	// Close the circuit's relay channel first to prevent hanging
 	c.Close()
-	
+
 	data, err := c.ReadFromStream(ctx, 1)
 	// Should return error or nil data since circuit is closed
 	if err == nil && data != nil {
