@@ -165,9 +165,8 @@ func TestConnectionPoolSetMetrics(t *testing.T) {
 	}
 }
 
-func TestConnectionPoolHealthCheckBehavior(t *testing.T) {
-	// Test that health check behavior is properly integrated into the pool
-	// by verifying the pool handles nil connections gracefully
+func TestConnectionPoolRemoveNonexistent(t *testing.T) {
+	// Test that removing a non-existent connection doesn't panic or error
 	log := logger.NewDefault()
 	pool := NewConnectionPool(nil, log)
 

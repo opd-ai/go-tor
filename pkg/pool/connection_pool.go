@@ -76,7 +76,6 @@ func (p *ConnectionPool) Get(ctx context.Context, address string, cfg *connectio
 	defer p.mu.Unlock()
 
 	key := address
-	needsNewConnection := true
 
 	// Try to reuse an existing connection
 	if pc, ok := p.connections[key]; ok {
@@ -102,7 +101,6 @@ func (p *ConnectionPool) Get(ctx context.Context, address string, cfg *connectio
 						pc.lastUsed = time.Now()
 						p.logger.Debug("Reusing pooled connection", "address", address)
 						p.recordConnectionReused()
-						needsNewConnection = false
 						return pc.conn, nil
 					}
 				} else {
@@ -111,7 +109,6 @@ func (p *ConnectionPool) Get(ctx context.Context, address string, cfg *connectio
 					pc.lastUsed = time.Now()
 					p.logger.Debug("Reusing pooled connection", "address", address)
 					p.recordConnectionReused()
-					needsNewConnection = false
 					return pc.conn, nil
 				}
 			} else {
@@ -127,12 +124,8 @@ func (p *ConnectionPool) Get(ctx context.Context, address string, cfg *connectio
 		}
 	}
 
-	// Create a new connection if needed
-	if needsNewConnection {
-		return p.createNewConnection(ctx, key, cfg)
-	}
-
-	return nil, fmt.Errorf("unexpected state: no connection available")
+	// Create a new connection
+	return p.createNewConnection(ctx, key, cfg)
 }
 
 // createNewConnection creates a new connection and adds it to the pool
@@ -352,5 +345,7 @@ func (p *ConnectionPool) HasMetrics() bool {
 
 // MaxIdleTime returns the maximum idle time configuration for health checks.
 func (p *ConnectionPool) MaxIdleTime() time.Duration {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
 	return p.maxIdleTime
 }
