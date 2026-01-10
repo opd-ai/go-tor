@@ -76,6 +76,7 @@ func (p *ConnectionPool) Get(ctx context.Context, address string, cfg *connectio
 	defer p.mu.Unlock()
 
 	key := address
+	needsNewConnection := true
 
 	// Try to reuse an existing connection
 	if pc, ok := p.connections[key]; ok {
@@ -95,29 +96,48 @@ func (p *ConnectionPool) Get(ctx context.Context, address string, cfg *connectio
 						p.recordConnectionClosed()
 						p.updatePoolSize()
 						// Fall through to create a new connection
-						goto createNew
+					} else {
+						// Health check passed, reuse connection
+						pc.inUse = true
+						pc.lastUsed = time.Now()
+						p.logger.Debug("Reusing pooled connection", "address", address)
+						p.recordConnectionReused()
+						needsNewConnection = false
+						return pc.conn, nil
 					}
+				} else {
+					// Connection recently used, reuse without health check
+					pc.inUse = true
+					pc.lastUsed = time.Now()
+					p.logger.Debug("Reusing pooled connection", "address", address)
+					p.recordConnectionReused()
+					needsNewConnection = false
+					return pc.conn, nil
 				}
-				pc.inUse = true
-				pc.lastUsed = time.Now()
-				p.logger.Debug("Reusing pooled connection", "address", address)
-				p.recordConnectionReused()
-				return pc.conn, nil
+			} else {
+				// Connection too old, close it
+				p.logger.Debug("Closing old pooled connection", "address", address, "age", time.Since(pc.createdAt))
+				if err := pc.conn.Close(); err != nil {
+					p.logger.Error("Failed to close old pooled connection", "function", "Get", "address", address, "error", err)
+				}
+				delete(p.connections, key)
+				p.recordConnectionClosed()
+				p.updatePoolSize()
 			}
-			// Connection too old, close it
-			p.logger.Debug("Closing old pooled connection", "address", address, "age", time.Since(pc.createdAt))
-			if err := pc.conn.Close(); err != nil {
-				p.logger.Error("Failed to close old pooled connection", "function", "Get", "address", address, "error", err)
-			}
-			delete(p.connections, key)
-			p.recordConnectionClosed()
-			p.updatePoolSize()
 		}
 	}
 
-createNew:
-	// Create a new connection
-	p.logger.Debug("Creating new pooled connection", "address", address)
+	// Create a new connection if needed
+	if needsNewConnection {
+		return p.createNewConnection(ctx, key, cfg)
+	}
+
+	return nil, fmt.Errorf("unexpected state: no connection available")
+}
+
+// createNewConnection creates a new connection and adds it to the pool
+func (p *ConnectionPool) createNewConnection(ctx context.Context, key string, cfg *connection.Config) (*connection.Connection, error) {
+	p.logger.Debug("Creating new pooled connection", "address", key)
 	conn := connection.New(cfg, p.logger)
 
 	if err := conn.Connect(ctx, cfg); err != nil {
@@ -321,4 +341,16 @@ func (p *ConnectionPool) SetMetrics(m *metrics.Metrics) {
 	defer p.mu.Unlock()
 	p.metrics = m
 	p.updatePoolSize()
+}
+
+// HasMetrics returns true if the pool has a metrics collector attached.
+func (p *ConnectionPool) HasMetrics() bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.metrics != nil
+}
+
+// MaxIdleTime returns the maximum idle time configuration for health checks.
+func (p *ConnectionPool) MaxIdleTime() time.Duration {
+	return p.maxIdleTime
 }
