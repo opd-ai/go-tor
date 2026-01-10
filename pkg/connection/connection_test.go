@@ -176,6 +176,70 @@ func TestConnectionReceiveCellNotOpen(t *testing.T) {
 	}
 }
 
+func TestConnectionPing(t *testing.T) {
+	tests := []struct {
+		name      string
+		setup     func(*Connection)
+		wantAlive bool
+	}{
+		{
+			name: "ping_connecting_connection",
+			setup: func(c *Connection) {
+				// Default state is StateConnecting
+			},
+			wantAlive: false,
+		},
+		{
+			name: "ping_open_connection_no_tls",
+			setup: func(c *Connection) {
+				c.setState(StateOpen)
+				// tlsConn is nil
+			},
+			wantAlive: false,
+		},
+		{
+			name: "ping_closed_connection",
+			setup: func(c *Connection) {
+				c.setState(StateClosed)
+			},
+			wantAlive: false,
+		},
+		{
+			name: "ping_failed_connection",
+			setup: func(c *Connection) {
+				c.setState(StateFailed)
+			},
+			wantAlive: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := DefaultConfig("127.0.0.1:9001")
+			conn := New(cfg, logger.NewDefault())
+			tt.setup(conn)
+
+			got := conn.Ping()
+			if got != tt.wantAlive {
+				t.Errorf("Ping() = %v, want %v", got, tt.wantAlive)
+			}
+		})
+	}
+}
+
+func TestConnectionPingAfterClose(t *testing.T) {
+	cfg := DefaultConfig("127.0.0.1:9001")
+	conn := New(cfg, logger.NewDefault())
+
+	// Close the connection
+	_ = conn.Close()
+
+	// Ping should return false for closed connection
+	if conn.Ping() {
+		t.Error("Ping() = true for closed connection, want false")
+	}
+}
+
 // Mock TLS server for testing
 func setupMockTLSServer(t *testing.T) (string, func()) {
 	// Create a self-signed certificate for testing

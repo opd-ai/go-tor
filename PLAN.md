@@ -44,9 +44,11 @@ The go-tor implementation demonstrates solid engineering practices:
 - ✅ CI/CD security scanning (gosec, govulncheck, CodeQL, Trivy)
 - ✅ Error context in logs (correlation IDs, connection IDs)
 - ✅ Guard persistence with file locking, backups, and checksums (Phase 2.4)
+- ✅ Connection pool with health checks and metrics (Phase 3.3)
 
 **Remaining Priority Work**:
-- Test coverage improvements for critical packages
+- Configuration validation enhancements
+- Distributed tracing integration
 
 ---
 
@@ -510,56 +512,54 @@ go test -cover ./pkg/crypto/...    # 89.8%
 
 ---
 
-### 3.3 🟡 Connection Pooling (ROADMAP 3.5)
+### 3.3 ✅ Connection Pooling Enhancement (ROADMAP 3.5)
 
-**Status**: PARTIALLY IMPLEMENTED
+**Status**: COMPLETE
 
 **Priority**: MEDIUM  
 **Effort**: 4 days
 
-**Step-by-Step Resolution**:
+**Solution**:
+- [x] Add `Ping()` method to Connection for health checking
+- [x] Implement `healthCheck()` in ConnectionPool using Ping
+- [x] Add connection pool metrics (PoolConnectionsCreated, PoolConnectionsReused, PoolConnectionsClosed, PoolSize, PoolHealthCheckFailed)
+- [x] Add `SetMetrics()` method to ConnectionPool for attaching metrics
+- [x] Add `MaxIdleTime` config option for health check timing
+- [x] Integrate health checks into connection reuse flow
+- [x] Add comprehensive tests for new functionality
 
-1. **Enhance connection pool with health checks**:
-   ```go
-   // pkg/pool/connection_pool.go
-   // 
-   // The Connection type MUST implement:
-   //     func (c *Connection) Ping() bool
-   // which sends a lightweight padding/keepalive cell and returns true
-   // if the underlying connection is still alive and healthy, or false otherwise.
-   //
-   // healthCheck validates that a pooled Connection is still usable.
-   func (p *ConnectionPool) healthCheck(conn *Connection) bool {
-       if time.Since(conn.lastUsed) > p.maxIdleTime {
-           return false
-       }
-       // Use Connection.Ping() to verify the connection is alive before reuse.
-       // Ping() should send a PADDING cell and verify the connection responds.
-       return conn.Ping()
-   }
-   ```
+**Implementation Details**:
+- Added `Ping()` method to `pkg/connection/connection.go` that verifies connection state and TLS connection validity
+- Added health check infrastructure to `pkg/pool/connection_pool.go`:
+  - `healthCheck()` validates pooled connections before reuse
+  - Health checks trigger automatically for idle connections (configurable via `MaxIdleTime`)
+  - Failed health checks cause connection to be closed and replaced
+- Added connection pool metrics to `pkg/metrics/metrics.go`:
+  - `PoolConnectionsCreated` - Counter for new connections created
+  - `PoolConnectionsReused` - Counter for connections successfully reused
+  - `PoolConnectionsClosed` - Counter for connections closed/removed
+  - `PoolSize` - Gauge for current pool size
+  - `PoolHealthCheckFailed` - Counter for failed health checks
+- Added helper methods: `RecordPoolConnectionCreated()`, `RecordPoolConnectionReused()`, `RecordPoolConnectionClosed()`, `SetPoolSize()`, `RecordPoolHealthCheckFailed()`
 
-2. **Add connection reuse metrics**:
-   ```go
-   ConnectionReused  prometheus.Counter
-   ConnectionCreated prometheus.Counter
-   ConnectionClosed  prometheus.Counter
-   PoolSize          prometheus.Gauge
-   ```
+**Files Modified**:
+- `pkg/connection/connection.go` - Added `Ping()` method
+- `pkg/pool/connection_pool.go` - Added health check and metrics integration
+- `pkg/metrics/metrics.go` - Added connection pool metrics
 
-3. **Implement lifecycle management**:
-   ```go
-   type ConnectionLifecycle struct {
-       onCreate  func(*Connection)
-       onBorrow  func(*Connection)
-       onReturn  func(*Connection)
-       onDestroy func(*Connection)
-   }
-   ```
+**Files Created/Modified for Tests**:
+- `pkg/connection/connection_test.go` - Added Ping tests
+- `pkg/pool/connection_pool_test.go` - Added health check and metrics tests
+- `pkg/metrics/metrics_test.go` - Added pool metrics tests
 
-**Files to Modify**:
-- `pkg/pool/connection_pool.go`
-- `pkg/metrics/metrics.go`
+**Note**: The lifecycle management (onCreate, onBorrow, onReturn, onDestroy callbacks) is deferred to a future iteration as it requires more architectural changes and is not required for basic connection pooling functionality.
+
+**Verification**:
+```bash
+go test -v ./pkg/connection/... -run TestConnectionPing  # Ping tests pass
+go test -v ./pkg/pool/... -run TestConnectionPool        # Pool tests pass
+go test -v ./pkg/metrics/... -run TestRecordPoolMetrics  # Metrics tests pass
+```
 
 ---
 

@@ -61,6 +61,13 @@ type Metrics struct {
 	BackpressurePauses     *Counter   // TODO: Reserved for future backpressure implementation
 	BackpressureResumes    *Counter   // TODO: Reserved for future backpressure implementation
 
+	// Connection pool metrics (Phase 3.3)
+	PoolConnectionsCreated *Counter // New connections created (not reused from pool)
+	PoolConnectionsReused  *Counter // Connections successfully reused from pool
+	PoolConnectionsClosed  *Counter // Connections closed/removed from pool
+	PoolSize               *Gauge   // Current number of connections in pool
+	PoolHealthCheckFailed  *Counter // Health checks that detected unhealthy connections
+
 	// System metrics
 	Uptime      *Gauge
 	startTime   time.Time
@@ -120,6 +127,13 @@ func New() *Metrics {
 		RateLimitWaitTime:      NewHistogram(),
 		BackpressurePauses:     NewCounter(),
 		BackpressureResumes:    NewCounter(),
+
+		// Connection pool metrics (Phase 3.3)
+		PoolConnectionsCreated: NewCounter(),
+		PoolConnectionsReused:  NewCounter(),
+		PoolConnectionsClosed:  NewCounter(),
+		PoolSize:               NewGauge(),
+		PoolHealthCheckFailed:  NewCounter(),
 
 		// System metrics
 		Uptime:    NewGauge(),
@@ -195,6 +209,31 @@ func (m *Metrics) RecordBackpressure(pause bool) {
 	}
 }
 
+// RecordPoolConnectionCreated records when a new connection is created in the pool
+func (m *Metrics) RecordPoolConnectionCreated() {
+	m.PoolConnectionsCreated.Inc()
+}
+
+// RecordPoolConnectionReused records when a connection is successfully reused from the pool
+func (m *Metrics) RecordPoolConnectionReused() {
+	m.PoolConnectionsReused.Inc()
+}
+
+// RecordPoolConnectionClosed records when a connection is closed/removed from the pool
+func (m *Metrics) RecordPoolConnectionClosed() {
+	m.PoolConnectionsClosed.Inc()
+}
+
+// SetPoolSize sets the current number of connections in the pool
+func (m *Metrics) SetPoolSize(size int64) {
+	m.PoolSize.Set(size)
+}
+
+// RecordPoolHealthCheckFailed records when a health check detects an unhealthy connection
+func (m *Metrics) RecordPoolHealthCheckFailed() {
+	m.PoolHealthCheckFailed.Inc()
+}
+
 // UpdateUptime updates the uptime metric
 func (m *Metrics) UpdateUptime() {
 	m.startTimeMu.RLock()
@@ -258,6 +297,13 @@ func (m *Metrics) Snapshot() *Snapshot {
 		BackpressurePauses:     m.BackpressurePauses.Value(),
 		BackpressureResumes:    m.BackpressureResumes.Value(),
 
+		// Connection pool metrics (Phase 3.3)
+		PoolConnectionsCreated: m.PoolConnectionsCreated.Value(),
+		PoolConnectionsReused:  m.PoolConnectionsReused.Value(),
+		PoolConnectionsClosed:  m.PoolConnectionsClosed.Value(),
+		PoolSize:               m.PoolSize.Value(),
+		PoolHealthCheckFailed:  m.PoolHealthCheckFailed.Value(),
+
 		// System metrics
 		UptimeSeconds: m.Uptime.Value(),
 	}
@@ -316,6 +362,13 @@ type Snapshot struct {
 	RateLimitWaitTimeAvg   time.Duration // Average time spent waiting for rate limiter
 	BackpressurePauses     int64         // Number of times backpressure was applied
 	BackpressureResumes    int64         // Number of times backpressure was released
+
+	// Connection pool metrics (Phase 3.3)
+	PoolConnectionsCreated int64 // New connections created (not reused from pool)
+	PoolConnectionsReused  int64 // Connections successfully reused from pool
+	PoolConnectionsClosed  int64 // Connections closed/removed from pool
+	PoolSize               int64 // Current number of connections in pool
+	PoolHealthCheckFailed  int64 // Health checks that detected unhealthy connections
 
 	// System metrics
 	UptimeSeconds int64

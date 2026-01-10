@@ -339,3 +339,69 @@ func TestSnapshotIndependence(t *testing.T) {
 		t.Errorf("snap2 circuit builds = %d, want 2", snap2.CircuitBuilds)
 	}
 }
+
+func TestRecordPoolMetrics(t *testing.T) {
+	m := New()
+
+	// Test RecordPoolConnectionCreated
+	m.RecordPoolConnectionCreated()
+	if m.PoolConnectionsCreated.Value() != 1 {
+		t.Errorf("PoolConnectionsCreated = %d, want 1", m.PoolConnectionsCreated.Value())
+	}
+
+	// Test RecordPoolConnectionReused
+	m.RecordPoolConnectionReused()
+	if m.PoolConnectionsReused.Value() != 1 {
+		t.Errorf("PoolConnectionsReused = %d, want 1", m.PoolConnectionsReused.Value())
+	}
+
+	// Test RecordPoolConnectionClosed
+	m.RecordPoolConnectionClosed()
+	if m.PoolConnectionsClosed.Value() != 1 {
+		t.Errorf("PoolConnectionsClosed = %d, want 1", m.PoolConnectionsClosed.Value())
+	}
+
+	// Test SetPoolSize
+	m.SetPoolSize(5)
+	if m.PoolSize.Value() != 5 {
+		t.Errorf("PoolSize = %d, want 5", m.PoolSize.Value())
+	}
+
+	// Test RecordPoolHealthCheckFailed
+	m.RecordPoolHealthCheckFailed()
+	if m.PoolHealthCheckFailed.Value() != 1 {
+		t.Errorf("PoolHealthCheckFailed = %d, want 1", m.PoolHealthCheckFailed.Value())
+	}
+}
+
+func TestPoolMetricsInSnapshot(t *testing.T) {
+	m := New()
+
+	// Record pool metrics
+	m.RecordPoolConnectionCreated()
+	m.RecordPoolConnectionCreated()
+	m.RecordPoolConnectionReused()
+	m.RecordPoolConnectionClosed()
+	m.SetPoolSize(3)
+	m.RecordPoolHealthCheckFailed()
+	m.RecordPoolHealthCheckFailed()
+
+	// Get snapshot
+	snap := m.Snapshot()
+
+	if snap.PoolConnectionsCreated != 2 {
+		t.Errorf("snapshot PoolConnectionsCreated = %d, want 2", snap.PoolConnectionsCreated)
+	}
+	if snap.PoolConnectionsReused != 1 {
+		t.Errorf("snapshot PoolConnectionsReused = %d, want 1", snap.PoolConnectionsReused)
+	}
+	if snap.PoolConnectionsClosed != 1 {
+		t.Errorf("snapshot PoolConnectionsClosed = %d, want 1", snap.PoolConnectionsClosed)
+	}
+	if snap.PoolSize != 3 {
+		t.Errorf("snapshot PoolSize = %d, want 3", snap.PoolSize)
+	}
+	if snap.PoolHealthCheckFailed != 2 {
+		t.Errorf("snapshot PoolHealthCheckFailed = %d, want 2", snap.PoolHealthCheckFailed)
+	}
+}
