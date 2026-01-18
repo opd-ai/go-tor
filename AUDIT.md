@@ -20,10 +20,10 @@ While the codebase shows mature development with ~74% test coverage, security ha
 | **CRITICAL** | 0 | 0 | 0 | None identified |
 | **HIGH** | 0 | 0 | 0 | Successfully remediated in prior audits |
 | **MEDIUM** | 7 | 7 | 0 | Protocol compliance, anonymity, input validation |
-| **LOW** | 8 | 3 | 5 | Code quality, testing, documentation |
+| **LOW** | 8 | 6 | 2 | Code quality, testing, documentation |
 | **INFORMATIONAL** | 5 | 0 | 5 | Best practices, hardening opportunities |
 
-*Last Updated: 2026-01-02*
+*Last Updated: 2026-01-18*
 
 ### Key Findings
 **Strengths:**
@@ -200,7 +200,14 @@ While the codebase shows mature development with ~74% test coverage, security ha
 **Severity:** LOW
 **Category:** Resource Management
 **Location:** Multiple files
-- Audit all resource acquisition functions
+**Status:** ✅ RESOLVED (2026-01-18)
+**Resolution:** Comprehensive audit performed. All resource acquisition patterns in pkg/ have proper deferred cleanup:
+- File operations (os.Open, os.Create, os.OpenFile) use defer close or explicit close with error handling
+- HTTP response bodies properly closed with defer in pkg/directory and pkg/onion
+- Network connections have proper close patterns with closeOnce protection
+- Timers/tickers consistently use defer Stop()
+- Mutexes use defer unlock or proper explicit unlock patterns
+- Gzip/zlib readers properly closed with defer
 
 ---
 
