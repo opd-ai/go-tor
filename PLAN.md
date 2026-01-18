@@ -45,10 +45,10 @@ The go-tor implementation demonstrates solid engineering practices:
 - ✅ Error context in logs (correlation IDs, connection IDs)
 - ✅ Guard persistence with file locking, backups, and checksums (Phase 2.4)
 - ✅ Connection pool with health checks and metrics (Phase 3.3)
+- ✅ Configuration validation with --strict mode (Phase 3.2)
 
 **Remaining Priority Work**:
-- Configuration validation enhancements
-- Distributed tracing integration
+- Distributed tracing integration (3.4)
 
 ---
 
@@ -467,48 +467,35 @@ go test -cover ./pkg/crypto/...    # 89.8%
 
 ---
 
-### 3.2 🟡 Configuration Validation Enhancement (ROADMAP 3.3)
+### 3.2 ✅ Configuration Validation Enhancement (ROADMAP 3.3)
 
-**Status**: PARTIALLY IMPLEMENTED
+**Status**: COMPLETE
 
 **Priority**: MEDIUM  
 **Effort**: 3 days
 
-**Step-by-Step Resolution**:
+**Resolution**:
+- [x] Comprehensive field validators in `pkg/config/schema.go` with `ValidateDetailed()`
+- [x] Validation rules with clear messages via `ValidationError` struct
+- [x] Configuration templates in `configs/templates/` (minimal, production, development, high-security)
+- [x] Enhanced config validation CLI with `--strict` mode in `cmd/tor-config-validator/main.go`
 
-1. **Add comprehensive field validators**:
-   ```go
-   // pkg/config/validation.go
-   func (v *Validator) validatePort(port int, fieldName string) error
-   func (v *Validator) validateAddress(addr string) error
-   func (v *Validator) validatePath(path string, mustExist bool) error
-   func (v *Validator) validateDuration(d time.Duration, min, max time.Duration) error
-   ```
+**Implementation Details**:
+- `ValidateDetailed()` provides comprehensive validation with Field, Value, Message, Suggestion, and Severity
+- Configuration templates exist as torrc files (not YAML) matching existing project conventions
+- CLI now supports `-strict` flag to treat warnings as errors for production environments
 
-2. **Add validation rules with clear messages**:
-   ```go
-   type ValidationRule struct {
-       Field      string
-       Validator  func(interface{}) error
-       Message    string
-       Suggestion string
-   }
-   ```
+**Files Modified**:
+- `cmd/tor-config-validator/main.go` - Added `-strict` flag
 
-3. **Add configuration templates**:
-   - `configs/embedded.yaml` - Minimal resource profile
-   - `configs/desktop.yaml` - Standard desktop usage
-   - `configs/server.yaml` - High-performance server
+**Verification**:
+```bash
+# Normal validation (warnings are allowed)
+tor-config-validator -config myconfig.conf
 
-4. **Enhance config validation CLI**:
-   ```bash
-   tor-config-validator --config /path/to/config --strict
-   ```
-
-**Files to Create/Modify**:
-- `pkg/config/validation.go`
-- `configs/templates/` (new directory)
-- `cmd/tor-config-validator/main.go`
+# Strict validation (warnings are errors)
+tor-config-validator -config myconfig.conf -strict
+```
 
 ---
 
