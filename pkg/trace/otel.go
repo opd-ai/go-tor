@@ -10,6 +10,7 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/propagation"
@@ -18,6 +19,10 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 	oteltrace "go.opentelemetry.io/otel/trace"
 )
+
+// Version is the service version used for tracing.
+// It can be overridden at build time using ldflags.
+var Version = "0.9.12"
 
 // TracingConfig holds configuration for OpenTelemetry tracing.
 type TracingConfig struct {
@@ -73,7 +78,7 @@ func InitOTelTracer(cfg TracingConfig) (*OTelProvider, error) {
 	res, err := resource.New(ctx,
 		resource.WithAttributes(
 			semconv.ServiceName(cfg.ServiceName),
-			semconv.ServiceVersion("0.9.12"),
+			semconv.ServiceVersion(Version),
 		),
 	)
 	if err != nil {
@@ -232,7 +237,7 @@ func (e *OTelExporter) Export(span *Span) error {
 
 	// Set status
 	if span.Status == StatusError {
-		otelSpan.SetStatus(2, "") // 2 = Error in OTel codes
+		otelSpan.SetStatus(codes.Error, "")
 	}
 
 	// End the span
