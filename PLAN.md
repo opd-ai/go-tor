@@ -46,9 +46,10 @@ The go-tor implementation demonstrates solid engineering practices:
 - ✅ Guard persistence with file locking, backups, and checksums (Phase 2.4)
 - ✅ Connection pool with health checks and metrics (Phase 3.3)
 - ✅ Configuration validation with --strict mode (Phase 3.2)
+- ✅ Distributed tracing integration with OpenTelemetry SDK (Phase 3.4)
 
 **Remaining Priority Work**:
-- Distributed tracing integration (3.4)
+- All Priority 3 (Medium) tasks are complete. See Priority 4 (Low Severity) for remaining items.
 
 ---
 
@@ -550,45 +551,51 @@ go test -v ./pkg/metrics/... -run TestRecordPoolMetrics  # Metrics tests pass
 
 ---
 
-### 3.4 🟡 Distributed Tracing Integration (ROADMAP 3.6)
+### 3.4 ✅ Distributed Tracing Integration (ROADMAP 3.6)
 
-**Status**: PARTIALLY IMPLEMENTED
+**Status**: COMPLETE
 
 **Priority**: MEDIUM  
 **Effort**: 3 days
 
-**Step-by-Step Resolution**:
+**Solution**:
+- [x] Add OpenTelemetry SDK integration (`pkg/trace/otel.go`)
+- [x] Add OTLP/gRPC exporter for standard tracing backends
+- [x] Add stdout exporter for development/debugging
+- [x] Add noop exporter for disabled tracing
+- [x] Add TracingConfig with configurable options
+- [x] Add tracing configuration to `pkg/config/config.go`
+- [x] Add comprehensive tests for OpenTelemetry integration
 
-1. **Add OpenTelemetry SDK integration**:
-   ```go
-   // pkg/trace/otel.go
-   import "go.opentelemetry.io/otel"
-   
-   func InitOTelTracer(serviceName string, endpoint string) (*sdktrace.TracerProvider, error)
-   ```
+**Implementation Details**:
+- Created `pkg/trace/otel.go` with:
+  - `TracingConfig` struct for configurable tracing settings
+  - `DefaultTracingConfig()` for sensible defaults
+  - `InitOTelTracer()` for initializing OpenTelemetry with configurable exporter, sampler, and resource
+  - `OTelProvider` wrapper for lifecycle management with `Tracer()`, `StartSpan()`, and `Shutdown()` methods
+  - `OTelExporter` bridge for compatibility with existing `Exporter` interface
+  - Support for OTLP/gRPC, stdout, and noop exporters
+  - Support for AlwaysSample, NeverSample, and TraceIDRatioBased samplers
+- Created `pkg/trace/otel_test.go` with comprehensive test coverage
+- Updated `pkg/config/config.go` with tracing configuration fields:
+  - `EnableTracing`, `TracingEndpoint`, `TracingSampleRate`, `TracingExporter`, `TracingInsecure`, `TracingTimeout`
+- Added validation for tracing configuration in `Validate()` method
 
-2. **Add Jaeger exporter**:
-   ```go
-   // pkg/trace/exporters.go
-   func NewJaegerExporter(endpoint string) (sdktrace.SpanExporter, error)
-   ```
+**Note**: Jaeger-specific exporter was replaced with OTLP/gRPC exporter, which is the modern standard and is compatible with Jaeger, Zipkin, and other OTLP-compatible backends. The OTLP protocol is now the recommended approach by OpenTelemetry.
 
-3. **Add configuration**:
-   ```go
-   type TracingConfig struct {
-       Enabled   bool
-       Endpoint  string   // Jaeger/Zipkin endpoint
-       SampleRate float64 // 0.0 to 1.0
-       Exporter  string   // "jaeger", "zipkin", "otlp"
-   }
-   ```
-
-**Files to Create**:
-- `pkg/trace/exporters.go`
+**Files Created**:
 - `pkg/trace/otel.go`
+- `pkg/trace/otel_test.go`
 
-**Files to Modify**:
-- `pkg/config/config.go`
+**Files Modified**:
+- `pkg/config/config.go` - Added tracing configuration fields and validation
+
+**Verification**:
+```bash
+go test -v ./pkg/trace/...  # All tests pass
+go test -v ./pkg/config/...  # All tests pass
+go build ./...               # Build successful
+```
 
 ---
 

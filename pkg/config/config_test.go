@@ -223,6 +223,98 @@ func TestConfigValidate(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		// Tracing configuration validation tests
+		{
+			name: "invalid TracingExporter",
+			modify: func(c *Config) {
+				c.TracingExporter = "invalid"
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid TracingExporter jaeger",
+			modify: func(c *Config) {
+				c.TracingExporter = "jaeger"
+			},
+			wantErr: true,
+		},
+		{
+			name: "valid TracingExporter otlp",
+			modify: func(c *Config) {
+				c.TracingExporter = "otlp"
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid TracingExporter stdout",
+			modify: func(c *Config) {
+				c.TracingExporter = "stdout"
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid TracingExporter noop",
+			modify: func(c *Config) {
+				c.TracingExporter = "noop"
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid TracingSampleRate negative",
+			modify: func(c *Config) {
+				c.TracingSampleRate = -0.1
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid TracingSampleRate too large",
+			modify: func(c *Config) {
+				c.TracingSampleRate = 1.5
+			},
+			wantErr: true,
+		},
+		{
+			name: "valid TracingSampleRate zero",
+			modify: func(c *Config) {
+				c.TracingSampleRate = 0.0
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid TracingSampleRate one",
+			modify: func(c *Config) {
+				c.TracingSampleRate = 1.0
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid TracingSampleRate half",
+			modify: func(c *Config) {
+				c.TracingSampleRate = 0.5
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid TracingTimeout negative",
+			modify: func(c *Config) {
+				c.TracingTimeout = -1 * time.Second
+			},
+			wantErr: true,
+		},
+		{
+			name: "valid TracingTimeout zero",
+			modify: func(c *Config) {
+				c.TracingTimeout = 0
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid TracingTimeout positive",
+			modify: func(c *Config) {
+				c.TracingTimeout = 30 * time.Second
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
