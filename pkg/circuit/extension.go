@@ -179,6 +179,13 @@ func (e *Extension) generateHandshakeData(handshakeType HandshakeType) ([]byte, 
 		return handshakeData, nil
 
 	case HandshakeTypeTAP:
+		// LOW-001: Log deprecation warning for TAP handshake (RSA-1024)
+		// TAP handshake uses RSA-1024 which is deprecated due to insufficient security margin.
+		// The ntor handshake (Curve25519) should be preferred for all new circuits.
+		e.logger.Warn("TAP handshake is deprecated - prefer ntor handshake (RSA-1024 offers insufficient security margin)",
+			"circuit_id", e.circuit.ID,
+			"recommendation", "use HandshakeTypeNTor for improved security")
+
 		// TAP handshake: PK_ID (16 bytes) || Symmetric key material (128 bytes)
 		// This is legacy and simplified
 		data := make([]byte, 144)
