@@ -3,6 +3,7 @@ package circuit
 import (
 	"context"
 	"crypto/rand"
+	"log/slog"
 	"strings"
 	"testing"
 
@@ -48,6 +49,32 @@ func TestCreateFirstHopTAP(t *testing.T) {
 	err := ext.CreateFirstHop(ctx, HandshakeTypeTAP)
 	if err != nil {
 		t.Fatalf("Failed to create first hop with TAP: %v", err)
+	}
+}
+
+// TestTAPHandshakeDeprecationWarning verifies that TAP handshake logs a deprecation warning (LOW-001)
+func TestTAPHandshakeDeprecationWarning(t *testing.T) {
+	// Capture log output to verify deprecation warning
+	var logBuffer strings.Builder
+	log := logger.New(slog.LevelWarn, &logBuffer)
+	circuit := NewCircuit(1)
+	ext := NewExtension(circuit, log)
+
+	_, err := ext.generateHandshakeData(HandshakeTypeTAP)
+	if err != nil {
+		t.Fatalf("Failed to generate TAP handshake data: %v", err)
+	}
+
+	// Verify deprecation warning was logged
+	logOutput := logBuffer.String()
+	if !strings.Contains(logOutput, "TAP handshake is deprecated") {
+		t.Errorf("Expected deprecation warning in log output, got: %s", logOutput)
+	}
+	if !strings.Contains(logOutput, "RSA-1024") {
+		t.Errorf("Expected RSA-1024 mentioned in deprecation warning, got: %s", logOutput)
+	}
+	if !strings.Contains(logOutput, "HandshakeTypeNTor") {
+		t.Errorf("Expected HandshakeTypeNTor recommendation in warning, got: %s", logOutput)
 	}
 }
 

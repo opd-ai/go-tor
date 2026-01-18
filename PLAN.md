@@ -603,15 +603,22 @@ go build ./...               # Build successful
 
 ## Priority 4: Low Severity Issues
 
-### 4.1 📋 RSA-1024 Support (AUDIT LOW-001)
+### 4.1 ✅ RSA-1024 Support (AUDIT LOW-001)
 
-**Status**: DOCUMENTED (Low Priority)
+**Status**: COMPLETE (2026-01-18)
 
 **Problem**: Legacy TAP handshake uses RSA-1024 (deprecated).
 
-**Resolution**: Document as deprecated, prefer ntor handshake. RSA-1024 support maintained for backward compatibility with older relays.
+**Resolution**: Added deprecation warning when TAP handshake is used, recommending migration to ntor handshake. RSA-1024 support maintained for backward compatibility with older relays.
 
-**Action**: Add deprecation warning in logs when TAP handshake is used.
+**Implementation Details**:
+- Added deprecation warning log in `pkg/circuit/extension.go` when TAP handshake type is used
+- Warning includes circuit ID and recommendation to use `HandshakeTypeNTor`
+- Added test `TestTAPHandshakeDeprecationWarning` to verify warning is logged
+
+**Files Modified**:
+- `pkg/circuit/extension.go` - Added deprecation warning in `generateHandshakeData` TAP case
+- `pkg/circuit/extension_test.go` - Added test for deprecation warning
 
 ---
 

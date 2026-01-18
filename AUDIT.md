@@ -20,7 +20,7 @@ While the codebase shows mature development with ~74% test coverage, security ha
 | **CRITICAL** | 0 | 0 | 0 | None identified |
 | **HIGH** | 0 | 0 | 0 | Successfully remediated in prior audits |
 | **MEDIUM** | 7 | 7 | 0 | Protocol compliance, anonymity, input validation |
-| **LOW** | 8 | 6 | 2 | Code quality, testing, documentation |
+| **LOW** | 8 | 7 | 1 | Code quality, testing, documentation |
 | **INFORMATIONAL** | 5 | 0 | 5 | Best practices, hardening opportunities |
 
 *Last Updated: 2026-01-18*
@@ -179,7 +179,9 @@ While the codebase shows mature development with ~74% test coverage, security ha
 #### FINDING LOW-001: RSA-1024 Support (TAP Handshake)
 **Severity:** LOW
 **Category:** Cryptographic Strength
-**Location:** `pkg/crypto/crypto.go:140-180`
+**Location:** `pkg/crypto/crypto.go:140-180`, `pkg/circuit/extension.go:181-195`
+**Status:** ✅ RESOLVED (2026-01-18)
+**Resolution:** Added deprecation warning when TAP handshake is used. The warning recommends migration to ntor handshake (HandshakeTypeNTor) which uses Curve25519. RSA-1024 support is maintained for backward compatibility with older relays but users are actively warned about the security implications.
 
 ---
 
