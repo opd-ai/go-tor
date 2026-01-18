@@ -219,7 +219,7 @@ func printValidationResult(result *config.ValidationResult) {
 	}
 
 	if len(result.Warnings) > 0 {
-		printWarnings(result.Warnings, "Warnings:", "⚠ ")
+		printWarnings(result.Warnings, "Warnings:", "⚠")
 	}
 
 	if result.Valid && len(result.Errors) == 0 {
