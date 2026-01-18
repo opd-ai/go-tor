@@ -40,18 +40,24 @@ type TracingConfig struct {
 	Insecure bool
 	// Timeout is the export timeout duration
 	Timeout time.Duration
+	// SetGlobalProvider controls whether to set the global OpenTelemetry provider.
+	// When true (the default), the tracer provider is set globally which may cause
+	// issues in testing or when multiple providers need to coexist.
+	// Set to false to use only the returned OTelProvider instance.
+	SetGlobalProvider bool
 }
 
 // DefaultTracingConfig returns a TracingConfig with sensible defaults.
 func DefaultTracingConfig() TracingConfig {
 	return TracingConfig{
-		Enabled:     false,
-		ServiceName: "go-tor",
-		Endpoint:    "localhost:4317",
-		SampleRate:  1.0,
-		Exporter:    "noop",
-		Insecure:    false,
-		Timeout:     10 * time.Second,
+		Enabled:           false,
+		ServiceName:       "go-tor",
+		Endpoint:          "localhost:4317",
+		SampleRate:        1.0,
+		Exporter:          "noop",
+		Insecure:          false,
+		Timeout:           10 * time.Second,
+		SetGlobalProvider: true,
 	}
 }
 
@@ -62,8 +68,28 @@ type OTelProvider struct {
 }
 
 // InitOTelTracer initializes OpenTelemetry tracing with the given configuration.
-// It returns an OTelProvider that must be closed when the application shuts down.
+// It returns an OTelProvider whose Shutdown method must be called when the application shuts down.
+//
+// Note: When cfg.SetGlobalProvider is true (the default), this function sets the global
+// OpenTelemetry tracer provider and text map propagator. This may cause issues in
+// environments where multiple tracer providers need to coexist (e.g., testing).
+// Set cfg.SetGlobalProvider to false to use the returned OTelProvider instance directly
+// without modifying global state.
 func InitOTelTracer(cfg TracingConfig) (*OTelProvider, error) {
+	return InitOTelTracerWithContext(context.Background(), cfg)
+}
+
+// InitOTelTracerWithContext initializes OpenTelemetry tracing with the given context and configuration.
+// The context is used for resource creation and exporter initialization, allowing the caller
+// to control timeouts and cancellation for these potentially network-bound operations.
+// It returns an OTelProvider whose Shutdown method must be called when the application shuts down.
+//
+// Note: When cfg.SetGlobalProvider is true (the default), this function sets the global
+// OpenTelemetry tracer provider and text map propagator. This may cause issues in
+// environments where multiple tracer providers need to coexist (e.g., testing).
+// Set cfg.SetGlobalProvider to false to use the returned OTelProvider instance directly
+// without modifying global state.
+func InitOTelTracerWithContext(ctx context.Context, cfg TracingConfig) (*OTelProvider, error) {
 	if !cfg.Enabled {
 		// Return a noop provider when tracing is disabled
 		return &OTelProvider{
@@ -71,8 +97,6 @@ func InitOTelTracer(cfg TracingConfig) (*OTelProvider, error) {
 			tracer:   oteltrace.NewNoopTracerProvider().Tracer(cfg.ServiceName),
 		}, nil
 	}
-
-	ctx := context.Background()
 
 	// Create resource with service information
 	res, err := resource.New(ctx,
@@ -130,12 +154,14 @@ func InitOTelTracer(cfg TracingConfig) (*OTelProvider, error) {
 		sdktrace.WithSampler(sampler),
 	)
 
-	// Set as global provider
-	otel.SetTracerProvider(provider)
-	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
-		propagation.TraceContext{},
-		propagation.Baggage{},
-	))
+	// Optionally set as global provider
+	if cfg.SetGlobalProvider {
+		otel.SetTracerProvider(provider)
+		otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
+			propagation.TraceContext{},
+			propagation.Baggage{},
+		))
+	}
 
 	return &OTelProvider{
 		provider: provider,
@@ -191,6 +217,9 @@ func NewOTelExporter(provider *OTelProvider) *OTelExporter {
 // Export converts our Span to an OpenTelemetry span and exports it.
 // Note: This creates a synthetic span for compatibility. For best performance,
 // use the OTelProvider.StartSpan method directly with OpenTelemetry's native API.
+// Note: Parent-child relationships cannot be fully preserved when using this bridge
+// because our internal span IDs are not compatible with OpenTelemetry's trace context.
+// For proper trace hierarchy, use the native OpenTelemetry API via OTelProvider.StartSpan.
 func (e *OTelExporter) Export(span *Span) error {
 	if span == nil {
 		return nil
@@ -198,10 +227,26 @@ func (e *OTelExporter) Export(span *Span) error {
 
 	ctx := context.Background()
 
-	// Create a synthetic span with the recorded timing
-	_, otelSpan := e.tracer.Start(ctx, span.Name,
+	// Build span start options with timing and kind
+	opts := []oteltrace.SpanStartOption{
 		oteltrace.WithTimestamp(span.StartTime),
-	)
+	}
+
+	// Map our Span.Kind to the corresponding OpenTelemetry span kind
+	switch span.Kind {
+	case SpanKindClient:
+		opts = append(opts, oteltrace.WithSpanKind(oteltrace.SpanKindClient))
+	case SpanKindServer:
+		opts = append(opts, oteltrace.WithSpanKind(oteltrace.SpanKindServer))
+	case SpanKindInternal:
+		opts = append(opts, oteltrace.WithSpanKind(oteltrace.SpanKindInternal))
+	default:
+		// Fall back to internal if kind is unknown or unspecified
+		opts = append(opts, oteltrace.WithSpanKind(oteltrace.SpanKindInternal))
+	}
+
+	// Create a synthetic span with the recorded timing and kind
+	_, otelSpan := e.tracer.Start(ctx, span.Name, opts...)
 
 	// Set attributes
 	attrs := make([]attribute.KeyValue, 0, len(span.Attributes))
@@ -235,9 +280,12 @@ func (e *OTelExporter) Export(span *Span) error {
 		)
 	}
 
-	// Set status
-	if span.Status == StatusError {
+	// Set status based on span status
+	switch span.Status {
+	case StatusError:
 		otelSpan.SetStatus(codes.Error, "")
+	case StatusCancelled:
+		otelSpan.SetStatus(codes.Error, "cancelled")
 	}
 
 	// End the span
@@ -246,7 +294,13 @@ func (e *OTelExporter) Export(span *Span) error {
 	return nil
 }
 
-// Close shuts down the underlying provider.
+// Close shuts down the underlying provider with a bounded timeout to prevent
+// indefinite blocking during cleanup. The shutdown operation flushes any
+// buffered spans to the remote endpoint before returning.
 func (e *OTelExporter) Close() error {
-	return e.provider.Shutdown(context.Background())
+	// Use a bounded context to avoid hanging indefinitely during shutdown.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	return e.provider.Shutdown(ctx)
 }

@@ -356,3 +356,141 @@ func TestOTelProviderShutdownNilProvider(t *testing.T) {
 		t.Errorf("Shutdown should not error with nil provider: %v", err)
 	}
 }
+
+func TestOTelExporterExportWithCancelledStatus(t *testing.T) {
+	cfg := DefaultTracingConfig()
+	cfg.Enabled = true
+	cfg.Exporter = "noop"
+	cfg.SetGlobalProvider = false
+
+	provider, err := InitOTelTracer(cfg)
+	if err != nil {
+		t.Fatalf("InitOTelTracer failed: %v", err)
+	}
+	defer provider.Shutdown(context.Background())
+
+	exporter := NewOTelExporter(provider)
+
+	// Create a span with cancelled status
+	span := &Span{
+		TraceID:    "trace-123",
+		SpanID:     "span-123",
+		Name:       "cancelled-operation",
+		Kind:       SpanKindInternal,
+		StartTime:  time.Now(),
+		Status:     StatusCancelled,
+		Attributes: map[string]interface{}{},
+		Events:     []Event{},
+	}
+	span.EndTime = span.StartTime.Add(50 * time.Millisecond)
+
+	err = exporter.Export(span)
+	if err != nil {
+		t.Errorf("Export should not error: %v", err)
+	}
+}
+
+func TestOTelExporterExportSpanKinds(t *testing.T) {
+	cfg := DefaultTracingConfig()
+	cfg.Enabled = true
+	cfg.Exporter = "noop"
+	cfg.SetGlobalProvider = false
+
+	provider, err := InitOTelTracer(cfg)
+	if err != nil {
+		t.Fatalf("InitOTelTracer failed: %v", err)
+	}
+	defer provider.Shutdown(context.Background())
+
+	exporter := NewOTelExporter(provider)
+
+	testCases := []struct {
+		name string
+		kind SpanKind
+	}{
+		{"client", SpanKindClient},
+		{"server", SpanKindServer},
+		{"internal", SpanKindInternal},
+		{"empty", ""},
+		{"unknown", SpanKind("unknown")},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			span := &Span{
+				TraceID:    "trace-123",
+				SpanID:     "span-123",
+				Name:       "kind-test-operation",
+				Kind:       tc.kind,
+				StartTime:  time.Now(),
+				Status:     StatusOK,
+				Attributes: map[string]interface{}{},
+				Events:     []Event{},
+			}
+			span.EndTime = span.StartTime.Add(50 * time.Millisecond)
+
+			err := exporter.Export(span)
+			if err != nil {
+				t.Errorf("Export should not error for kind %s: %v", tc.name, err)
+			}
+		})
+	}
+}
+
+func TestInitOTelTracerWithContext(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cfg := DefaultTracingConfig()
+	cfg.Enabled = true
+	cfg.Exporter = "noop"
+	cfg.SetGlobalProvider = false
+
+	provider, err := InitOTelTracerWithContext(ctx, cfg)
+	if err != nil {
+		t.Fatalf("InitOTelTracerWithContext failed: %v", err)
+	}
+	defer provider.Shutdown(context.Background())
+
+	if provider == nil {
+		t.Fatal("Expected non-nil provider")
+	}
+
+	if provider.provider == nil {
+		t.Error("Expected non-nil internal provider when enabled")
+	}
+}
+
+func TestTracingConfigSetGlobalProvider(t *testing.T) {
+	// Test with SetGlobalProvider = false
+	cfg := DefaultTracingConfig()
+	cfg.Enabled = true
+	cfg.Exporter = "noop"
+	cfg.SetGlobalProvider = false
+
+	provider, err := InitOTelTracer(cfg)
+	if err != nil {
+		t.Fatalf("InitOTelTracer failed: %v", err)
+	}
+	defer provider.Shutdown(context.Background())
+
+	if provider == nil {
+		t.Fatal("Expected non-nil provider")
+	}
+
+	// The provider should still be functional
+	ctx := context.Background()
+	ctx, span := provider.StartSpan(ctx, "test-operation")
+	if span == nil {
+		t.Error("Expected non-nil span")
+	}
+	span.End()
+}
+
+func TestDefaultTracingConfigSetGlobalProvider(t *testing.T) {
+	cfg := DefaultTracingConfig()
+
+	if !cfg.SetGlobalProvider {
+		t.Error("Expected SetGlobalProvider to be true by default")
+	}
+}
