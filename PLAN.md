@@ -30,7 +30,7 @@ This document provides step-by-step resolution guidance for all security issues 
 | **Critical Issues** | ✅ All Resolved | 8/8 |
 | **High Severity** | ✅ All Resolved | 12/12 |
 | **Medium Severity** | ✅ All Resolved | 7/7 |
-| **Low Severity** | 📋 Planned | 3/8 remaining |
+| **Low Severity** | 📋 Planned | 2/8 remaining |
 
 ### Key Findings
 
@@ -47,6 +47,8 @@ The go-tor implementation demonstrates solid engineering practices:
 - ✅ Connection pool with health checks and metrics (Phase 3.3)
 - ✅ Configuration validation with --strict mode (Phase 3.2)
 - ✅ Distributed tracing integration with OpenTelemetry SDK (Phase 3.4)
+- ✅ Comprehensive deferred resource cleanup verified (LOW-002)
+- ✅ Goroutine leak prevention in acceptLoop (LOW-003)
 
 **Remaining Priority Work**:
 - All Priority 3 (Medium) tasks are complete. See Priority 4 (Low Severity) for remaining items.
@@ -613,26 +615,34 @@ go build ./...               # Build successful
 
 ---
 
-### 4.2 📋 Deferred Resource Cleanup (AUDIT LOW-002)
+### 4.2 ✅ Deferred Resource Cleanup (AUDIT LOW-002)
 
-**Status**: NEEDS REVIEW
+**Status**: COMPLETE (2026-01-18)
 
-**Action**: Audit all resource acquisition functions for proper defer statements.
+**Resolution**: Comprehensive audit performed. All resource acquisition patterns in pkg/ have proper deferred cleanup:
 
-```bash
-# Find functions that acquire resources
-grep -rn "Open\|Dial\|Accept\|Lock" pkg/ --include="*.go" | grep -v "_test.go"
-```
+- **File operations** (`pkg/config/loader.go`, `pkg/path/persistence.go`, `pkg/trace/exporter.go`): All use defer close or proper explicit close patterns
+- **HTTP response bodies** (`pkg/directory/directory.go`, `pkg/onion/onion.go`): Properly closed with defer
+- **Network connections** (`pkg/connection/connection.go`, `pkg/socks/socks.go`, `pkg/control/control.go`): All have proper close patterns with error handling
+- **Timers/tickers** (throughout codebase): All use `defer ticker.Stop()` or `defer timer.Stop()`
+- **Mutexes** (throughout codebase): All use `defer unlock` or proper explicit unlock patterns
+- **Gzip/zlib readers** (`pkg/directory/directory.go`): Properly closed with defer
+
+No missing deferred cleanup patterns were found.
 
 ---
 
-### 4.3 📋 Goroutine Leak in acceptLoop (AUDIT LOW-003)
+### 4.3 ✅ Goroutine Leak in acceptLoop (AUDIT LOW-003)
 
-**Status**: NEEDS REVIEW
+**Status**: COMPLETE (verified 2026-01-18, originally fixed 2025-12-20)
 
-**Location**: `pkg/socks/socks.go:280-320`
+**Location**: `pkg/socks/socks.go:280-336`
 
-**Action**: Ensure all goroutines check for shutdown signal and exit cleanly.
+**Resolution**: The acceptLoop now has proper shutdown handling:
+- Checks shutdown channel after successful Accept() (lines 296-305)
+- Closes any connection accepted during shutdown
+- Exits goroutine promptly when shutdown is signaled
+- Comment on line 294-295 documents the fix
 
 ---
 
@@ -646,13 +656,17 @@ grep -rn "Open\|Dial\|Accept\|Lock" pkg/ --include="*.go" | grep -v "_test.go"
 
 ---
 
-### 4.5 📋 Lenient SOCKS5 Version Handling (AUDIT LOW-005)
+### 4.5 ✅ Lenient SOCKS5 Version Handling (AUDIT LOW-005)
 
-**Status**: NEEDS REVIEW
+**Status**: COMPLETE (verified 2026-01-18)
 
-**Location**: `pkg/socks/socks.go:250-260`
+**Location**: `pkg/socks/socks.go:656-661` and `pkg/socks/socks.go:777-780`
 
-**Action**: Verify SOCKS5 version byte is strictly validated.
+**Resolution**: SOCKS5 version byte is strictly validated:
+- In handshake (line 656): Returns error if version != 0x05
+- In readRequest (line 777): Returns error if version != 0x05 and sends replyGeneralFailure
+- Comment "LOW-005 Fix" on line 657 documents the version mismatch handling
+- Non-SOCKS5 clients are rejected without sending a SOCKS5 response
 
 ---
 
