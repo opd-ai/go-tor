@@ -85,6 +85,14 @@ type Config struct {
 	GuardStateBackupCount      int // Number of guard state backup files to retain (default: 3)
 	GuardStateSnapshotInterval int // Interval between automatic guard state snapshots in seconds (default: 300)
 	GuardStateLockTimeout      int // Timeout for acquiring guard state file lock in seconds (default: 10)
+
+	// Distributed tracing configuration (Phase 3.4)
+	EnableTracing     bool          // Enable distributed tracing (default: false)
+	TracingEndpoint   string        // Collector endpoint for OTLP (default: "localhost:4317")
+	TracingSampleRate float64       // Sampling rate 0.0 to 1.0 (default: 1.0 = sample all)
+	TracingExporter   string        // Exporter type: "otlp", "stdout", "noop" (default: "noop")
+	TracingInsecure   bool          // Disable TLS for OTLP exporter (default: false)
+	TracingTimeout    time.Duration // Export timeout duration (default: 10s)
 }
 
 // OnionServiceConfig represents configuration for a single onion service
@@ -176,6 +184,13 @@ func DefaultConfig() *Config {
 		GuardStateBackupCount:      3,
 		GuardStateSnapshotInterval: 300, // 5 minutes
 		GuardStateLockTimeout:      10,
+		// Distributed tracing defaults (Phase 3.4 - disabled by default)
+		EnableTracing:     false,
+		TracingEndpoint:   "localhost:4317",
+		TracingSampleRate: 1.0,
+		TracingExporter:   "noop",
+		TracingInsecure:   false,
+		TracingTimeout:    10 * time.Second,
 	}
 }
 
@@ -355,6 +370,22 @@ func (c *Config) Validate() error {
 	}
 	if c.GuardStateLockTimeout < 0 {
 		return fmt.Errorf("GuardStateLockTimeout must be non-negative")
+	}
+
+	// Validate distributed tracing configuration (Phase 3.4)
+	validTracingExporters := map[string]bool{
+		"otlp":   true,
+		"stdout": true,
+		"noop":   true,
+	}
+	if !validTracingExporters[c.TracingExporter] {
+		return fmt.Errorf("invalid TracingExporter: %s (must be otlp, stdout, or noop)", c.TracingExporter)
+	}
+	if c.TracingSampleRate < 0 || c.TracingSampleRate > 1 {
+		return fmt.Errorf("TracingSampleRate must be between 0.0 and 1.0")
+	}
+	if c.TracingTimeout < 0 {
+		return fmt.Errorf("TracingTimeout must be non-negative")
 	}
 
 	return nil
