@@ -180,15 +180,7 @@ func validateConfigFile(path string, verbose bool, strict bool) error {
 	if strict && len(result.Warnings) > 0 {
 		if !verbose {
 			// Print warnings if not already printed
-			fmt.Println("Warnings (treated as errors in strict mode):")
-			fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-			for _, warn := range result.Warnings {
-				fmt.Printf("✗ %s\n", warn.Message)
-				if warn.Suggestion != "" {
-					fmt.Printf("  → %s\n", warn.Suggestion)
-				}
-			}
-			fmt.Println()
+			printWarnings(result.Warnings, "Warnings (treated as errors in strict mode):", "✗")
 		}
 		return fmt.Errorf("configuration has %d warning(s) (strict mode)", len(result.Warnings))
 	}
@@ -198,6 +190,19 @@ func validateConfigFile(path string, verbose bool, strict bool) error {
 	}
 
 	return nil
+}
+
+// printWarnings prints a list of validation warnings with a custom title and icon
+func printWarnings(warnings []config.ValidationError, title string, icon string) {
+	fmt.Println(title)
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	for _, warn := range warnings {
+		fmt.Printf("%s %s\n", icon, warn.Message)
+		if warn.Suggestion != "" {
+			fmt.Printf("  → %s\n", warn.Suggestion)
+		}
+	}
+	fmt.Println()
 }
 
 func printValidationResult(result *config.ValidationResult) {
@@ -214,15 +219,7 @@ func printValidationResult(result *config.ValidationResult) {
 	}
 
 	if len(result.Warnings) > 0 {
-		fmt.Println("Warnings:")
-		fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-		for _, warn := range result.Warnings {
-			fmt.Printf("⚠  %s\n", warn.Message)
-			if warn.Suggestion != "" {
-				fmt.Printf("  → %s\n", warn.Suggestion)
-			}
-		}
-		fmt.Println()
+		printWarnings(result.Warnings, "Warnings:", "⚠ ")
 	}
 
 	if result.Valid && len(result.Errors) == 0 {
