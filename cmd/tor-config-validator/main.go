@@ -27,6 +27,7 @@ func main() {
 	outputFile := flag.String("output", "", "Output file for generated configuration (default: stdout)")
 	showVersion := flag.Bool("version", false, "Show version information")
 	verbose := flag.Bool("verbose", false, "Verbose output")
+	strict := flag.Bool("strict", false, "Strict mode: treat warnings as errors")
 	flag.Parse()
 
 	if *showVersion {
@@ -70,11 +71,15 @@ func main() {
 
 	// Validate config file if provided
 	if *configFile != "" {
-		if err := validateConfigFile(*configFile, *verbose); err != nil {
+		if err := validateConfigFile(*configFile, *verbose, *strict); err != nil {
 			fmt.Fprintf(os.Stderr, "Validation failed: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Println("✓ Configuration is valid")
+		if *strict {
+			fmt.Println("✓ Configuration is valid (strict mode)")
+		} else {
+			fmt.Println("✓ Configuration is valid")
+		}
 		os.Exit(0)
 	}
 
@@ -91,6 +96,7 @@ func printUsage() {
 	fmt.Println()
 	fmt.Println("Options:")
 	fmt.Println("  -config <file>           Validate configuration file")
+	fmt.Println("  -strict                  Strict mode: treat warnings as errors")
 	fmt.Println("  -generate                Generate sample configuration file")
 	fmt.Println("  -schema                  Generate JSON schema for configuration")
 	fmt.Println("  -list-templates          List available configuration templates")
@@ -106,6 +112,9 @@ func printUsage() {
 	fmt.Println()
 	fmt.Println("  # Validate with detailed feedback")
 	fmt.Println("  tor-config-validator -config myconfig.conf -verbose")
+	fmt.Println()
+	fmt.Println("  # Strict validation (warnings are errors)")
+	fmt.Println("  tor-config-validator -config myconfig.conf -strict")
 	fmt.Println()
 	fmt.Println("  # Generate sample configuration to stdout")
 	fmt.Println("  tor-config-validator -generate")
@@ -129,9 +138,12 @@ func printUsage() {
 	fmt.Println("  high-security  - Privacy-focused with strict isolation")
 }
 
-func validateConfigFile(path string, verbose bool) error {
+func validateConfigFile(path string, verbose bool, strict bool) error {
 	if verbose {
 		fmt.Printf("Validating configuration file: %s\n", path)
+		if strict {
+			fmt.Println("Mode: strict (warnings are treated as errors)")
+		}
 		fmt.Println()
 	}
 
@@ -162,6 +174,23 @@ func validateConfigFile(path string, verbose bool) error {
 
 	if !result.Valid {
 		return fmt.Errorf("configuration has %d error(s)", len(result.Errors))
+	}
+
+	// In strict mode, treat warnings as errors
+	if strict && len(result.Warnings) > 0 {
+		if !verbose {
+			// Print warnings if not already printed
+			fmt.Println("Warnings (treated as errors in strict mode):")
+			fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+			for _, warn := range result.Warnings {
+				fmt.Printf("✗ %s\n", warn.Message)
+				if warn.Suggestion != "" {
+					fmt.Printf("  → %s\n", warn.Suggestion)
+				}
+			}
+			fmt.Println()
+		}
+		return fmt.Errorf("configuration has %d warning(s) (strict mode)", len(result.Warnings))
 	}
 
 	if verbose && len(result.Warnings) > 0 {
