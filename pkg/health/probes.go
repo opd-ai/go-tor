@@ -181,12 +181,6 @@ func (m *CachedMonitor) Check(ctx context.Context) OverallHealth {
 	}
 }
 
-// probeCheckResult holds the result of a single probe check.
-type probeCheckResult struct {
-	name    string
-	healthy bool
-}
-
 // checkProbeWithCache is a helper that checks cache and performs a probe check.
 // It returns the health status and whether a failure was found.
 func (m *CachedMonitor) checkProbeWithCache(
