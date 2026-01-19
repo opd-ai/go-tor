@@ -68,6 +68,13 @@ type Metrics struct {
 	PoolSize               *Gauge   // Current number of connections in pool
 	PoolHealthCheckFailed  *Counter // Health checks that detected unhealthy connections
 
+	// Memory metrics (AUDIT LOW-007)
+	MemoryHeapAlloc      *Gauge   // Bytes of allocated heap objects
+	MemoryHeapSys        *Gauge   // Bytes obtained from OS for heap
+	MemoryHeapInuse      *Gauge   // Bytes in in-use heap spans
+	MemoryNumGoroutines  *Gauge   // Number of goroutines currently running
+	MemoryPressureEvents *Counter // Number of memory pressure events detected
+
 	// System metrics
 	Uptime      *Gauge
 	startTime   time.Time
@@ -134,6 +141,13 @@ func New() *Metrics {
 		PoolConnectionsClosed:  NewCounter(),
 		PoolSize:               NewGauge(),
 		PoolHealthCheckFailed:  NewCounter(),
+
+		// Memory metrics (AUDIT LOW-007)
+		MemoryHeapAlloc:      NewGauge(),
+		MemoryHeapSys:        NewGauge(),
+		MemoryHeapInuse:      NewGauge(),
+		MemoryNumGoroutines:  NewGauge(),
+		MemoryPressureEvents: NewCounter(),
 
 		// System metrics
 		Uptime:    NewGauge(),
@@ -234,6 +248,19 @@ func (m *Metrics) RecordPoolHealthCheckFailed() {
 	m.PoolHealthCheckFailed.Inc()
 }
 
+// UpdateMemoryMetrics updates all memory-related metrics
+func (m *Metrics) UpdateMemoryMetrics(heapAlloc, heapSys, heapInuse uint64, numGoroutines int) {
+	m.MemoryHeapAlloc.Set(int64(heapAlloc))
+	m.MemoryHeapSys.Set(int64(heapSys))
+	m.MemoryHeapInuse.Set(int64(heapInuse))
+	m.MemoryNumGoroutines.Set(int64(numGoroutines))
+}
+
+// RecordMemoryPressureEvent records when a memory pressure event is detected
+func (m *Metrics) RecordMemoryPressureEvent() {
+	m.MemoryPressureEvents.Inc()
+}
+
 // UpdateUptime updates the uptime metric
 func (m *Metrics) UpdateUptime() {
 	m.startTimeMu.RLock()
@@ -304,6 +331,13 @@ func (m *Metrics) Snapshot() *Snapshot {
 		PoolSize:               m.PoolSize.Value(),
 		PoolHealthCheckFailed:  m.PoolHealthCheckFailed.Value(),
 
+		// Memory metrics (AUDIT LOW-007)
+		MemoryHeapAlloc:      m.MemoryHeapAlloc.Value(),
+		MemoryHeapSys:        m.MemoryHeapSys.Value(),
+		MemoryHeapInuse:      m.MemoryHeapInuse.Value(),
+		MemoryNumGoroutines:  m.MemoryNumGoroutines.Value(),
+		MemoryPressureEvents: m.MemoryPressureEvents.Value(),
+
 		// System metrics
 		UptimeSeconds: m.Uptime.Value(),
 	}
@@ -369,6 +403,13 @@ type Snapshot struct {
 	PoolConnectionsClosed  int64 // Connections closed/removed from pool
 	PoolSize               int64 // Current number of connections in pool
 	PoolHealthCheckFailed  int64 // Health checks that detected unhealthy connections
+
+	// Memory metrics (AUDIT LOW-007)
+	MemoryHeapAlloc      int64 // Bytes of allocated heap objects
+	MemoryHeapSys        int64 // Bytes obtained from OS for heap
+	MemoryHeapInuse      int64 // Bytes in in-use heap spans
+	MemoryNumGoroutines  int64 // Number of goroutines currently running
+	MemoryPressureEvents int64 // Number of memory pressure events detected
 
 	// System metrics
 	UptimeSeconds int64

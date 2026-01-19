@@ -93,6 +93,14 @@ type Config struct {
 	TracingExporter   string        // Exporter type: "otlp", "stdout", "noop" (default: "noop")
 	TracingInsecure   bool          // Disable TLS for OTLP exporter (default: false)
 	TracingTimeout    time.Duration // Export timeout duration (default: 10s)
+
+	// Memory pressure monitoring configuration (AUDIT LOW-007)
+	EnableMemoryMonitoring    bool   // Enable memory pressure monitoring (default: false for embedded)
+	MemoryHighWaterMark       uint64 // Heap allocation threshold in bytes for degraded status (default: 100MB)
+	MemoryCriticalMark        uint64 // Heap allocation threshold in bytes for unhealthy status (default: 200MB)
+	MemoryMaxGoroutines       int    // Maximum goroutine count threshold (default: 10000)
+	MemoryCheckInterval       int    // Interval between memory checks in seconds (default: 30)
+	MemoryTriggerGCOnCritical bool   // Trigger GC when critical memory pressure is detected (default: true)
 }
 
 // OnionServiceConfig represents configuration for a single onion service
@@ -191,6 +199,13 @@ func DefaultConfig() *Config {
 		TracingExporter:   "noop",
 		TracingInsecure:   false,
 		TracingTimeout:    10 * time.Second,
+		// Memory pressure monitoring defaults (AUDIT LOW-007 - disabled by default for embedded)
+		EnableMemoryMonitoring:    false,
+		MemoryHighWaterMark:       100 * 1024 * 1024, // 100 MB
+		MemoryCriticalMark:        200 * 1024 * 1024, // 200 MB
+		MemoryMaxGoroutines:       10000,
+		MemoryCheckInterval:       30,
+		MemoryTriggerGCOnCritical: true,
 	}
 }
 
@@ -386,6 +401,25 @@ func (c *Config) Validate() error {
 	}
 	if c.TracingTimeout < 0 {
 		return fmt.Errorf("TracingTimeout must be non-negative")
+	}
+
+	// Validate memory pressure monitoring configuration (AUDIT LOW-007)
+	if c.EnableMemoryMonitoring {
+		if c.MemoryHighWaterMark == 0 {
+			return fmt.Errorf("MemoryHighWaterMark must be positive when memory monitoring is enabled")
+		}
+		if c.MemoryCriticalMark == 0 {
+			return fmt.Errorf("MemoryCriticalMark must be positive when memory monitoring is enabled")
+		}
+		if c.MemoryCriticalMark <= c.MemoryHighWaterMark {
+			return fmt.Errorf("MemoryCriticalMark must be greater than MemoryHighWaterMark")
+		}
+		if c.MemoryMaxGoroutines <= 0 {
+			return fmt.Errorf("MemoryMaxGoroutines must be positive when memory monitoring is enabled")
+		}
+		if c.MemoryCheckInterval <= 0 {
+			return fmt.Errorf("MemoryCheckInterval must be positive when memory monitoring is enabled")
+		}
 	}
 
 	return nil
