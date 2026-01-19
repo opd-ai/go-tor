@@ -20,7 +20,7 @@ While the codebase shows mature development with ~74% test coverage, security ha
 | **CRITICAL** | 0 | 0 | 0 | None identified |
 | **HIGH** | 0 | 0 | 0 | Successfully remediated in prior audits |
 | **MEDIUM** | 7 | 7 | 0 | Protocol compliance, anonymity, input validation |
-| **LOW** | 8 | 7 | 1 | Code quality, testing, documentation |
+| **LOW** | 8 | 8 | 0 | Code quality, testing, documentation |
 | **INFORMATIONAL** | 5 | 0 | 5 | Best practices, hardening opportunities |
 
 *Last Updated: 2026-01-18*
@@ -265,7 +265,9 @@ While the codebase shows mature development with ~74% test coverage, security ha
 #### FINDING LOW-004: Missing Guard Fingerprinting Resistance
 **Severity:** LOW
 **Category:** Anonymity
-**Location:** `pkg/path/selection.go`
+**Location:** `pkg/path/path.go`
+**Status:** ✅ RESOLVED (2026-01-18)
+**Resolution:** Documented guard fingerprinting limitations in `docs/SECURITY_LIMITATIONS.md`. The document describes the known limitation that path selection patterns may be distinguishable from official Tor client behavior, potential attack vectors, and recommended mitigations. Users are advised to use official Tor Browser for anonymity-critical applications.
 
 ---
 
