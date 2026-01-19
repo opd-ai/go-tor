@@ -82,16 +82,16 @@ type Metrics struct {
 	CheckpointRecoveries *Counter // Number of recovery operations from backup
 
 	// Path diversity metrics (Phase 3.4)
-	PathDiversityAnalyzed    *Counter   // Total paths analyzed for diversity
-	PathDiversityScore       *Histogram // Distribution of path diversity scores (0.0-1.0)
-	PathDiversityLow         *Counter   // Paths with low diversity (potential security concern)
-	PathDiversityMedium      *Counter   // Paths with medium diversity
-	PathDiversityHigh        *Counter   // Paths with high diversity
-	PathDiversityExcellent   *Counter   // Paths with excellent diversity
-	PathDiversityRejected    *Counter   // Paths rejected due to insufficient diversity
-	UniqueASNsObserved       *Gauge     // Number of unique ASNs observed across all relays
-	UniqueCountriesObserved  *Gauge     // Number of unique countries observed across all relays
-	PathDiversityAvgScore    *Gauge     // Running average diversity score (scaled 0-1000)
+	PathDiversityAnalyzed   *Counter   // Total paths analyzed for diversity
+	PathDiversityScore      *Histogram // Distribution of path diversity scores (0.0-1.0)
+	PathDiversityLow        *Counter   // Paths with low diversity (potential security concern)
+	PathDiversityMedium     *Counter   // Paths with medium diversity
+	PathDiversityHigh       *Counter   // Paths with high diversity
+	PathDiversityExcellent  *Counter   // Paths with excellent diversity
+	PathDiversityRejected   *Counter   // Paths rejected due to insufficient diversity
+	UniqueASNsObserved      *Gauge     // Number of unique ASNs observed across all relays
+	UniqueCountriesObserved *Gauge     // Number of unique countries observed across all relays
+	PathDiversityAvgScore   *Gauge     // Running average diversity score (scaled 0-1000)
 
 	// System metrics
 	Uptime      *Gauge
@@ -317,39 +317,38 @@ func (m *Metrics) RecordCheckpointRecovery() {
 	m.CheckpointRecoveries.Inc()
 }
 
-// DiversityLevel represents path diversity categories for metrics
-type DiversityLevel int
-
+// Path diversity level constants for RecordPathDiversity method.
+// These mirror the values in pkg/path/diversity.go for decoupling.
 const (
-	// DiversityLevelUnknown indicates unknown diversity
-	DiversityLevelUnknown DiversityLevel = iota
-	// DiversityLevelLow indicates low path diversity
-	DiversityLevelLow
-	// DiversityLevelMedium indicates medium path diversity
-	DiversityLevelMedium
-	// DiversityLevelHigh indicates high path diversity
-	DiversityLevelHigh
-	// DiversityLevelExcellent indicates excellent path diversity
-	DiversityLevelExcellent
+	// PathDiversityLevelUnknown indicates unknown diversity
+	PathDiversityLevelUnknown = 0
+	// PathDiversityLevelLow indicates low path diversity
+	PathDiversityLevelLow = 1
+	// PathDiversityLevelMedium indicates medium path diversity
+	PathDiversityLevelMedium = 2
+	// PathDiversityLevelHigh indicates high path diversity
+	PathDiversityLevelHigh = 3
+	// PathDiversityLevelExcellent indicates excellent path diversity
+	PathDiversityLevelExcellent = 4
 )
 
-// RecordPathDiversity records a path diversity analysis result
+// RecordPathDiversity records a path diversity analysis result.
 // score: diversity score from 0.0 to 1.0
-// level: categorized diversity level
-func (m *Metrics) RecordPathDiversity(score float64, level DiversityLevel) {
+// level: categorized diversity level (use PathDiversityLevel* constants)
+func (m *Metrics) RecordPathDiversity(score float64, level int) {
 	m.PathDiversityAnalyzed.Inc()
 	// Record score as nanoseconds for histogram compatibility (0.0-1.0 -> 0-1000ms)
 	m.PathDiversityScore.Observe(time.Duration(score * 1000 * float64(time.Millisecond)))
 
 	// Record by level
 	switch level {
-	case DiversityLevelLow:
+	case PathDiversityLevelLow:
 		m.PathDiversityLow.Inc()
-	case DiversityLevelMedium:
+	case PathDiversityLevelMedium:
 		m.PathDiversityMedium.Inc()
-	case DiversityLevelHigh:
+	case PathDiversityLevelHigh:
 		m.PathDiversityHigh.Inc()
-	case DiversityLevelExcellent:
+	case PathDiversityLevelExcellent:
 		m.PathDiversityExcellent.Inc()
 	}
 

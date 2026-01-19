@@ -4,6 +4,7 @@
 package path
 
 import (
+	"fmt"
 	"net"
 	"sync"
 	"time"
@@ -412,7 +413,7 @@ func extractFirstOctet(address string) string {
 	}
 
 	if ip4 := ip.To4(); ip4 != nil {
-		return string(rune(ip4[0]))
+		return fmt.Sprintf("%d", ip4[0])
 	}
 
 	return ""

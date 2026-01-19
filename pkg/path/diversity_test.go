@@ -1,6 +1,7 @@
 package path
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -364,12 +365,12 @@ func TestExtractSubnet(t *testing.T) {
 		address string
 		wantLen int // We just check if we get a result, not exact value
 	}{
-		{"192.168.1.1:9001", 2},  // IPv4 with port
-		{"192.168.1.1", 2},       // IPv4 without port
-		{"10.0.0.1", 2},          // IPv4
-		{"invalid", 0},           // Invalid
-		{"", 0},                  // Empty
-		{"[::1]:9001", 4},        // IPv6 loopback (might not parse cleanly)
+		{"192.168.1.1:9001", 2}, // IPv4 with port
+		{"192.168.1.1", 2},      // IPv4 without port
+		{"10.0.0.1", 2},         // IPv4
+		{"invalid", 0},          // Invalid
+		{"", 0},                 // Empty
+		{"[::1]:9001", 4},       // IPv6 loopback (might not parse cleanly)
 	}
 
 	for _, tt := range tests {
@@ -451,11 +452,12 @@ func TestConcurrentAnalysis(t *testing.T) {
 	}
 
 	done := make(chan bool)
+	errChan := make(chan error, 10)
 	for i := 0; i < 10; i++ {
 		go func() {
 			score := da.AnalyzePath(path)
 			if score == nil {
-				t.Error("AnalyzePath returned nil")
+				errChan <- fmt.Errorf("AnalyzePath returned nil")
 			}
 			done <- true
 		}()
@@ -470,6 +472,12 @@ func TestConcurrentAnalysis(t *testing.T) {
 		case <-timeout:
 			t.Fatal("Test timed out")
 		}
+	}
+
+	// Check for errors
+	close(errChan)
+	for err := range errChan {
+		t.Error(err)
 	}
 
 	stats := da.GetStats()
