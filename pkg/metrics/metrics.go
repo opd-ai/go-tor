@@ -75,6 +75,12 @@ type Metrics struct {
 	MemoryNumGoroutines  *Gauge   // Number of goroutines currently running
 	MemoryPressureEvents *Counter // Number of memory pressure events detected
 
+	// Crash recovery checkpoint metrics (AUDIT LOW-008)
+	CheckpointsSaved     *Counter // Number of successful checkpoint saves
+	CheckpointsFailed    *Counter // Number of failed checkpoint saves
+	CheckpointsLoaded    *Counter // Number of successful checkpoint loads
+	CheckpointRecoveries *Counter // Number of recovery operations from backup
+
 	// System metrics
 	Uptime      *Gauge
 	startTime   time.Time
@@ -148,6 +154,12 @@ func New() *Metrics {
 		MemoryHeapInuse:      NewGauge(),
 		MemoryNumGoroutines:  NewGauge(),
 		MemoryPressureEvents: NewCounter(),
+
+		// Crash recovery checkpoint metrics (AUDIT LOW-008)
+		CheckpointsSaved:     NewCounter(),
+		CheckpointsFailed:    NewCounter(),
+		CheckpointsLoaded:    NewCounter(),
+		CheckpointRecoveries: NewCounter(),
 
 		// System metrics
 		Uptime:    NewGauge(),
@@ -261,6 +273,26 @@ func (m *Metrics) RecordMemoryPressureEvent() {
 	m.MemoryPressureEvents.Inc()
 }
 
+// RecordCheckpointSaved records a successful checkpoint save
+func (m *Metrics) RecordCheckpointSaved() {
+	m.CheckpointsSaved.Inc()
+}
+
+// RecordCheckpointFailed records a failed checkpoint save
+func (m *Metrics) RecordCheckpointFailed() {
+	m.CheckpointsFailed.Inc()
+}
+
+// RecordCheckpointLoaded records a successful checkpoint load
+func (m *Metrics) RecordCheckpointLoaded() {
+	m.CheckpointsLoaded.Inc()
+}
+
+// RecordCheckpointRecovery records when state was recovered from a backup checkpoint
+func (m *Metrics) RecordCheckpointRecovery() {
+	m.CheckpointRecoveries.Inc()
+}
+
 // UpdateUptime updates the uptime metric
 func (m *Metrics) UpdateUptime() {
 	m.startTimeMu.RLock()
@@ -338,6 +370,12 @@ func (m *Metrics) Snapshot() *Snapshot {
 		MemoryNumGoroutines:  m.MemoryNumGoroutines.Value(),
 		MemoryPressureEvents: m.MemoryPressureEvents.Value(),
 
+		// Crash recovery checkpoint metrics (AUDIT LOW-008)
+		CheckpointsSaved:     m.CheckpointsSaved.Value(),
+		CheckpointsFailed:    m.CheckpointsFailed.Value(),
+		CheckpointsLoaded:    m.CheckpointsLoaded.Value(),
+		CheckpointRecoveries: m.CheckpointRecoveries.Value(),
+
 		// System metrics
 		UptimeSeconds: m.Uptime.Value(),
 	}
@@ -410,6 +448,12 @@ type Snapshot struct {
 	MemoryHeapInuse      int64 // Bytes in in-use heap spans
 	MemoryNumGoroutines  int64 // Number of goroutines currently running
 	MemoryPressureEvents int64 // Number of memory pressure events detected
+
+	// Crash recovery checkpoint metrics (AUDIT LOW-008)
+	CheckpointsSaved     int64 // Number of successful checkpoint saves
+	CheckpointsFailed    int64 // Number of failed checkpoint saves
+	CheckpointsLoaded    int64 // Number of successful checkpoint loads
+	CheckpointRecoveries int64 // Number of recovery operations from backup
 
 	// System metrics
 	UptimeSeconds int64
