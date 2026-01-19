@@ -95,12 +95,12 @@ type Config struct {
 	TracingTimeout    time.Duration // Export timeout duration (default: 10s)
 
 	// Memory pressure monitoring configuration (AUDIT LOW-007)
-	EnableMemoryMonitoring   bool   // Enable memory pressure monitoring (default: false for embedded)
-	MemoryHighWaterMark      uint64 // Heap allocation threshold in bytes for degraded status (default: 100MB)
-	MemoryCriticalMark       uint64 // Heap allocation threshold in bytes for unhealthy status (default: 200MB)
-	MemoryMaxGoroutines      int    // Maximum goroutine count threshold (default: 10000)
-	MemoryCheckInterval      int    // Interval between memory checks in seconds (default: 30)
-	MemoryTriggerGCOnCritical bool  // Trigger GC when critical memory pressure is detected (default: true)
+	EnableMemoryMonitoring    bool   // Enable memory pressure monitoring (default: false for embedded)
+	MemoryHighWaterMark       uint64 // Heap allocation threshold in bytes for degraded status (default: 100MB)
+	MemoryCriticalMark        uint64 // Heap allocation threshold in bytes for unhealthy status (default: 200MB)
+	MemoryMaxGoroutines       int    // Maximum goroutine count threshold (default: 10000)
+	MemoryCheckInterval       int    // Interval between memory checks in seconds (default: 30)
+	MemoryTriggerGCOnCritical bool   // Trigger GC when critical memory pressure is detected (default: true)
 }
 
 // OnionServiceConfig represents configuration for a single onion service
