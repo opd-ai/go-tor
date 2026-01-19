@@ -228,7 +228,8 @@ Tor control protocol implementation.
 2. **Memory Zeroing**: Sensitive data (keys, etc.) are explicitly zeroed after use
 3. **Error Handling**: Errors do not leak timing or state information
 4. **Circuit Padding**: Traffic analysis resistance through padding
-5. **Guard Discovery**: Precautions against guard fingerprinting
+5. **Guard Persistence**: Guard nodes are persisted to reduce fingerprinting surface (see [SECURITY_LIMITATIONS.md](./SECURITY_LIMITATIONS.md) for known limitations)
+
 
 ## Performance Targets
 
