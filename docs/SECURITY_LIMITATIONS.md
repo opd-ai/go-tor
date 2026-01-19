@@ -74,7 +74,7 @@ Circuit isolation prevents activity correlation but has inherent limitations.
 
 ### Limitations
 
-1. **Guard Node Correlation**: All circuits share the same guard node, which can enable correlation at the guard level
+1. **Guard Node Correlation**: Circuits share guards from a limited set of guard nodes, which can enable correlation at the guard level
 2. **Timing Attacks**: Circuit-level timing is still observable by network adversaries
 3. **Volume Analysis**: Traffic volume patterns remain visible despite circuit isolation
 4. **Exit Node Surveillance**: Exit nodes can observe plaintext traffic for non-encrypted connections
@@ -104,7 +104,7 @@ cfg := config.DefaultConfig()
 cfg.EnableCircuitPadding = true
 cfg.PaddingStrategy = "adaptive"
 
-// Enable stream isolation by destination
+// Enable circuit isolation by destination
 cfg.IsolationLevel = "destination"
 
 // Reduce fingerprinting through smaller circuit pools
