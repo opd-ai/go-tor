@@ -82,6 +82,16 @@ type CircuitState struct {
 // currentSchemaVersion is the current checkpoint schema version.
 const currentSchemaVersion = 1
 
+// Default values for checkpoint operations.
+const (
+	// defaultLockRetryInterval is the interval between lock acquisition retries.
+	defaultLockRetryInterval = 100 * time.Millisecond
+	// defaultFinalCheckpointTimeout is the timeout for the final checkpoint save during shutdown.
+	defaultFinalCheckpointTimeout = 5 * time.Second
+	// emaAlpha is the smoothing factor for exponential moving average (0.1 = 10% weight to new values).
+	emaAlpha = 0.1
+)
+
 // CheckpointConfig holds configuration for state checkpointing.
 type CheckpointConfig struct {
 	// FilePath is the path to the checkpoint file.
@@ -176,7 +186,7 @@ func (sc *StateCheckpointer) acquireLock(ctx context.Context) error {
 	lockCtx, cancel := context.WithTimeout(ctx, sc.config.LockTimeout)
 	defer cancel()
 
-	locked, err := sc.flock.TryLockContext(lockCtx, 100*time.Millisecond)
+	locked, err := sc.flock.TryLockContext(lockCtx, defaultLockRetryInterval)
 	if err != nil {
 		return fmt.Errorf("failed to acquire checkpoint file lock: %w", err)
 	}
@@ -437,12 +447,14 @@ func (sc *StateCheckpointer) RecordCircuitBuild(success bool, buildTimeMs int64)
 		sc.state.Circuits.TotalSuccesses++
 		sc.state.Circuits.LastBuildTime = time.Now()
 
-		// Update running average of build time
+		// Update running average of build time using exponential moving average
 		if sc.state.Circuits.TotalSuccesses == 1 {
 			sc.state.Circuits.AverageBuildTimeMs = buildTimeMs
 		} else {
-			// Exponential moving average with alpha = 0.1
-			sc.state.Circuits.AverageBuildTimeMs = (sc.state.Circuits.AverageBuildTimeMs*9 + buildTimeMs) / 10
+			// EMA formula: new_avg = old_avg * (1-alpha) + new_value * alpha
+			oldWeight := int64((1 - emaAlpha) * 10)
+			newWeight := int64(emaAlpha * 10)
+			sc.state.Circuits.AverageBuildTimeMs = (sc.state.Circuits.AverageBuildTimeMs*oldWeight + buildTimeMs*newWeight) / 10
 		}
 	} else {
 		sc.state.Circuits.TotalFailures++
@@ -532,7 +544,7 @@ func (sc *StateCheckpointer) checkpointLoop(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			// Final checkpoint before exit
-			saveCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			saveCtx, cancel := context.WithTimeout(context.Background(), defaultFinalCheckpointTimeout)
 			if err := sc.Save(saveCtx); err != nil {
 				sc.logger.Warn("Failed to save final checkpoint", "error", err)
 			}

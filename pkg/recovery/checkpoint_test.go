@@ -28,10 +28,12 @@ func TestNewStateCheckpointer(t *testing.T) {
 }
 
 func TestDefaultCheckpointConfig(t *testing.T) {
-	config := DefaultCheckpointConfig("/tmp/test.json")
+	tmpDir := t.TempDir()
+	testPath := filepath.Join(tmpDir, "test.json")
+	config := DefaultCheckpointConfig(testPath)
 
-	if config.FilePath != "/tmp/test.json" {
-		t.Errorf("FilePath = %s, want /tmp/test.json", config.FilePath)
+	if config.FilePath != testPath {
+		t.Errorf("FilePath = %s, want %s", config.FilePath, testPath)
 	}
 	if config.CheckpointInterval != 1*time.Minute {
 		t.Errorf("CheckpointInterval = %v, want 1m", config.CheckpointInterval)

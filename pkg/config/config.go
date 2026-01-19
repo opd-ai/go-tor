@@ -103,10 +103,10 @@ type Config struct {
 	MemoryTriggerGCOnCritical bool   // Trigger GC when critical memory pressure is detected (default: true)
 
 	// Crash recovery checkpointing configuration (AUDIT LOW-008)
-	EnableCrashRecovery         bool // Enable crash recovery checkpointing (default: true)
+	EnableCrashRecovery         bool   // Enable crash recovery checkpointing (default: true)
 	CrashRecoveryCheckpointPath string // Path to checkpoint file (default: "<DataDirectory>/checkpoint.json")
-	CrashRecoveryInterval       int  // Interval between checkpoints in seconds (default: 60)
-	CrashRecoveryBackupCount    int  // Number of checkpoint backup files to retain (default: 2)
+	CrashRecoveryInterval       int    // Interval between checkpoints in seconds (default: 60)
+	CrashRecoveryBackupCount    int    // Number of checkpoint backup files to retain (default: 2)
 }
 
 // OnionServiceConfig represents configuration for a single onion service
