@@ -66,9 +66,9 @@ jobs:
         echo "### Memory Allocation Highlights" >> benchmark-summary.md
         echo "" >> benchmark-summary.md
 
-        # Find benchmarks with high allocations
+        # Find benchmarks with high allocations (sort by memory column)
         echo "\`\`\`" >> benchmark-summary.md
-        grep "^Benchmark" benchmark-results.txt | sort -t$'\t' -k3 -rn | head -10 >> benchmark-summary.md || true
+        grep "^Benchmark" benchmark-results.txt | sort -k5 -rn | head -10 >> benchmark-summary.md || true
         echo "\`\`\`" >> benchmark-summary.md
 
         # Set outputs
@@ -183,18 +183,30 @@ jobs:
 
         for pkg in crypto metrics cell circuit; do
           echo "#### pkg/$pkg" >> memory-profile.md
-          echo "\`\`\`" >> memory-profile.md
-          go test -bench=. -benchmem -count=1 -run=^$ ./pkg/$pkg/... 2>&1 | grep -E "^Benchmark.*B/op" | head -5 >> memory-profile.md || echo "No memory data" >> memory-profile.md
-          echo "\`\`\`" >> memory-profile.md
+          RESULT=$(go test -bench=. -benchmem -count=1 -run=^$ ./pkg/$pkg/... 2>&1 | grep -E "^Benchmark.*B/op" | head -5 || true)
+          if [ -n "$RESULT" ]; then
+            echo "\`\`\`" >> memory-profile.md
+            echo "$RESULT" >> memory-profile.md
+            echo "\`\`\`" >> memory-profile.md
+          else
+            echo "*No memory data available*" >> memory-profile.md
+          fi
           echo "" >> memory-profile.md
         done
 
         # Check for high-allocation benchmarks (>1000 B/op)
         echo "### High Allocation Operations (>1KB/op)" >> memory-profile.md
         echo "" >> memory-profile.md
-        echo "\`\`\`" >> memory-profile.md
-        go test -bench=. -benchmem -count=1 -run=^$ ./pkg/... 2>&1 | grep -E "^Benchmark" | awk '$NF ~ /B\/op$/ && $(NF-1) > 1000 {print}' | head -20 >> memory-profile.md || echo "No high-allocation operations found" >> memory-profile.md
-        echo "\`\`\`" >> memory-profile.md
+
+        # Use a more robust awk pattern to find operations with >1000 B/op
+        HIGH_ALLOC=$(go test -bench=. -benchmem -count=1 -run=^$ ./pkg/... 2>&1 | grep -E "^Benchmark" | awk '/B\/op/ {for(i=1;i<=NF;i++) if($i ~ /^[0-9]+$/ && $(i+1) == "B/op" && $i > 1000) print}' | head -20 || true)
+        if [ -n "$HIGH_ALLOC" ]; then
+          echo "\`\`\`" >> memory-profile.md
+          echo "$HIGH_ALLOC" >> memory-profile.md
+          echo "\`\`\`" >> memory-profile.md
+        else
+          echo "*No high-allocation operations found (all operations use ≤1KB/op)*" >> memory-profile.md
+        fi
 
     - name: Upload memory profile
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
