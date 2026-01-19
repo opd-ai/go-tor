@@ -604,17 +604,48 @@ The codebase demonstrates:
 ### 3.7 Implement Health Check Enhancements
 **Priority**: Medium
 **Effort**: 2 days
-**Problem**: Health checks exist (health package: 96.5% coverage) but may lack component-level dependency checks and detailed status reporting.
+**Status**: ✅ **COMPLETE** - Full implementation with probes, caching, and dependency checks
 
 **Solution**:
-- [ ] Add detailed component health status
-- [ ] Implement dependency health checks
-- [ ] Add readiness vs liveness distinction
-- [ ] Implement health check caching
-- [ ] Add health degradation levels
-- [ ] ...
+- [x] Add detailed component health status
+- [x] Implement dependency health checks
+- [x] Add readiness vs liveness distinction
+- [x] Implement health check caching
+- [x] Add health degradation levels
 
-**Files Affected**: `pkg/health/health.go`, `pkg/httpmetrics/server.go`
+**Implementation Details**:
+- Created `pkg/health/probes.go` with Kubernetes-style liveness and readiness probe support
+  - `ProbeType` enum (liveness, readiness, startup)
+  - `ProbeResult` type for probe check results
+  - `ProbeChecker`, `LivenessChecker`, `ReadinessChecker` interfaces
+  - `CacheConfig` for configurable health check caching
+  - `CachedMonitor` with TTL-based caching for health checks, liveness, and readiness
+  - `CheckLiveness()` and `CheckReadiness()` methods with caching support
+  - Cache invalidation methods (`InvalidateCache`, `InvalidateCacheFor`)
+- Created `pkg/health/dependencies.go` with dependency-aware health checking
+  - `Dependency` type with required/optional relations
+  - `ComponentWithDeps` extending ComponentHealth with dependency info
+  - `DependencyAwareMonitor` for dependency-aware health checking
+  - `CheckWithDependencies()` returns health status including dependency information
+  - `GetHealthSummary()` provides high-level system health summary
+  - Automatic status adjustment based on dependency health
+- Updated `pkg/httpmetrics/server.go` with new endpoints
+  - `/live` endpoint for Kubernetes liveness probe
+  - `/ready` endpoint for Kubernetes readiness probe
+  - `ProbeProvider` interface for custom probe implementations
+  - `SetProbeProvider()` method to configure custom probes
+  - Fallback to regular health check when no probe provider is set
+- Comprehensive test coverage in `probes_test.go`, `dependencies_test.go`, and `server_test.go`
+
+**Files Created**: 
+- `pkg/health/probes.go` - Probe types and cached monitor
+- `pkg/health/probes_test.go` - Comprehensive probe tests
+- `pkg/health/dependencies.go` - Dependency-aware health checking
+- `pkg/health/dependencies_test.go` - Dependency health tests
+
+**Files Modified**: 
+- `pkg/httpmetrics/server.go` - Added /live and /ready endpoints
+- `pkg/httpmetrics/server_test.go` - Tests for new endpoints
 
 
 ---
