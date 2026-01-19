@@ -13,8 +13,7 @@ on:
         default: '5'
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   benchmark:
@@ -53,7 +52,7 @@ jobs:
         TOTAL=$(grep -c "^Benchmark" benchmark-results.txt || echo "0")
         echo "- **Total Benchmarks Run:** $TOTAL" >> benchmark-summary.md
 
-        # Check for slowest benchmarks (>1ms)
+        # Show a sample of benchmark timings (first 30 results)
         echo "" >> benchmark-summary.md
         echo "### Benchmark Timing Summary" >> benchmark-summary.md
         echo "" >> benchmark-summary.md
@@ -66,9 +65,9 @@ jobs:
         echo "### Memory Allocation Highlights" >> benchmark-summary.md
         echo "" >> benchmark-summary.md
 
-        # Find benchmarks with high allocations (sort by memory column)
+        # Find benchmarks with high allocations (sort by bytes/op, locating the column dynamically)
         echo "\`\`\`" >> benchmark-summary.md
-        grep "^Benchmark" benchmark-results.txt | sort -k5 -rn | head -10 >> benchmark-summary.md || true
+        grep "^Benchmark" benchmark-results.txt | awk '{ for (i = 1; i <= NF; i++) if ($i == "B/op") { print $(i-1), $0; break } }' | sort -k1,1nr | head -10 | cut -d' ' -f2- >> benchmark-summary.md || true
         echo "\`\`\`" >> benchmark-summary.md
 
         # Set outputs
@@ -128,21 +127,27 @@ jobs:
         # Crypto benchmarks (most performance-sensitive)
         echo "### Crypto Operations" >> critical-benchmarks.md
         echo "\`\`\`" >> critical-benchmarks.md
-        go test -bench=. -benchmem -count=3 -run=^$ ./pkg/crypto/... 2>&1 | grep "^Benchmark" >> critical-benchmarks.md || echo "No crypto benchmarks found" >> critical-benchmarks.md
+        if ! go test -bench=. -benchmem -count=3 -run=^$ ./pkg/crypto/... 2>&1 | grep "^Benchmark" >> critical-benchmarks.md; then
+          echo "No crypto benchmarks found" >> critical-benchmarks.md
+        fi
         echo "\`\`\`" >> critical-benchmarks.md
         echo "" >> critical-benchmarks.md
 
         # Metrics benchmarks (high-frequency operations)
         echo "### Metrics Operations" >> critical-benchmarks.md
         echo "\`\`\`" >> critical-benchmarks.md
-        go test -bench=. -benchmem -count=3 -run=^$ ./pkg/metrics/... 2>&1 | grep "^Benchmark" >> critical-benchmarks.md || echo "No metrics benchmarks found" >> critical-benchmarks.md
+        if ! go test -bench=. -benchmem -count=3 -run=^$ ./pkg/metrics/... 2>&1 | grep "^Benchmark" >> critical-benchmarks.md; then
+          echo "No metrics benchmarks found" >> critical-benchmarks.md
+        fi
         echo "\`\`\`" >> critical-benchmarks.md
         echo "" >> critical-benchmarks.md
 
         # Cell operations (core protocol)
         echo "### Cell Operations" >> critical-benchmarks.md
         echo "\`\`\`" >> critical-benchmarks.md
-        go test -bench=. -benchmem -count=3 -run=^$ ./pkg/cell/... 2>&1 | grep "^Benchmark" >> critical-benchmarks.md || echo "No cell benchmarks found" >> critical-benchmarks.md
+        if ! go test -bench=. -benchmem -count=3 -run=^$ ./pkg/cell/... 2>&1 | grep "^Benchmark" >> critical-benchmarks.md; then
+          echo "No cell benchmarks found" >> critical-benchmarks.md
+        fi
         echo "\`\`\`" >> critical-benchmarks.md
 
     - name: Upload critical path benchmarks
@@ -199,7 +204,7 @@ jobs:
         echo "" >> memory-profile.md
 
         # Use a more robust awk pattern to find operations with >1000 B/op
-        HIGH_ALLOC=$(go test -bench=. -benchmem -count=1 -run=^$ ./pkg/... 2>&1 | grep -E "^Benchmark" | awk '/B\/op/ {for(i=1;i<=NF;i++) if($i ~ /^[0-9]+$/ && $(i+1) == "B/op" && $i > 1000) print}' | head -20 || true)
+        HIGH_ALLOC=$(go test -bench=. -benchmem -count=1 -run=^$ ./pkg/... 2>&1 | grep -E "^Benchmark" | awk '/B\/op/ {for(i=1;i<=NF;i++) if($i ~ /^[0-9]+$/ && $(i+1) == "B/op" && $i > 1000) {print $0; break}}' | head -20 || true)
         if [ -n "$HIGH_ALLOC" ]; then
           echo "\`\`\`" >> memory-profile.md
           echo "$HIGH_ALLOC" >> memory-profile.md
