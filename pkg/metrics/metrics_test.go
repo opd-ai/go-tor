@@ -405,3 +405,137 @@ func TestPoolMetricsInSnapshot(t *testing.T) {
 		t.Errorf("snapshot PoolHealthCheckFailed = %d, want 2", snap.PoolHealthCheckFailed)
 	}
 }
+
+func TestRecordPathDiversity(t *testing.T) {
+	m := New()
+
+	// Test recording with high diversity level
+	m.RecordPathDiversity(0.85, PathDiversityLevelHigh)
+
+	if m.PathDiversityAnalyzed.Value() != 1 {
+		t.Errorf("PathDiversityAnalyzed = %d, want 1", m.PathDiversityAnalyzed.Value())
+	}
+	if m.PathDiversityHigh.Value() != 1 {
+		t.Errorf("PathDiversityHigh = %d, want 1", m.PathDiversityHigh.Value())
+	}
+	if m.PathDiversityScore.Count() != 1 {
+		t.Errorf("PathDiversityScore count = %d, want 1", m.PathDiversityScore.Count())
+	}
+	if m.PathDiversityAvgScore.Value() != 850 {
+		t.Errorf("PathDiversityAvgScore = %d, want 850", m.PathDiversityAvgScore.Value())
+	}
+
+	// Test recording with low diversity level
+	m.RecordPathDiversity(0.25, PathDiversityLevelLow)
+
+	if m.PathDiversityAnalyzed.Value() != 2 {
+		t.Errorf("PathDiversityAnalyzed = %d, want 2", m.PathDiversityAnalyzed.Value())
+	}
+	if m.PathDiversityLow.Value() != 1 {
+		t.Errorf("PathDiversityLow = %d, want 1", m.PathDiversityLow.Value())
+	}
+
+	// Test recording with medium diversity level
+	m.RecordPathDiversity(0.55, PathDiversityLevelMedium)
+
+	if m.PathDiversityMedium.Value() != 1 {
+		t.Errorf("PathDiversityMedium = %d, want 1", m.PathDiversityMedium.Value())
+	}
+
+	// Test recording with excellent diversity level
+	m.RecordPathDiversity(0.95, PathDiversityLevelExcellent)
+
+	if m.PathDiversityExcellent.Value() != 1 {
+		t.Errorf("PathDiversityExcellent = %d, want 1", m.PathDiversityExcellent.Value())
+	}
+
+	// Test recording with unknown level (should not increment any level counter)
+	m.RecordPathDiversity(0.5, PathDiversityLevelUnknown)
+
+	if m.PathDiversityAnalyzed.Value() != 5 {
+		t.Errorf("PathDiversityAnalyzed = %d, want 5", m.PathDiversityAnalyzed.Value())
+	}
+}
+
+func TestRecordPathDiversityRejected(t *testing.T) {
+	m := New()
+
+	m.RecordPathDiversityRejected()
+	if m.PathDiversityRejected.Value() != 1 {
+		t.Errorf("PathDiversityRejected = %d, want 1", m.PathDiversityRejected.Value())
+	}
+
+	m.RecordPathDiversityRejected()
+	m.RecordPathDiversityRejected()
+	if m.PathDiversityRejected.Value() != 3 {
+		t.Errorf("PathDiversityRejected = %d, want 3", m.PathDiversityRejected.Value())
+	}
+}
+
+func TestUpdatePathDiversityObservations(t *testing.T) {
+	m := New()
+
+	m.UpdatePathDiversityObservations(15, 8)
+
+	if m.UniqueASNsObserved.Value() != 15 {
+		t.Errorf("UniqueASNsObserved = %d, want 15", m.UniqueASNsObserved.Value())
+	}
+	if m.UniqueCountriesObserved.Value() != 8 {
+		t.Errorf("UniqueCountriesObserved = %d, want 8", m.UniqueCountriesObserved.Value())
+	}
+
+	// Test updating with new values
+	m.UpdatePathDiversityObservations(25, 12)
+
+	if m.UniqueASNsObserved.Value() != 25 {
+		t.Errorf("UniqueASNsObserved = %d, want 25", m.UniqueASNsObserved.Value())
+	}
+	if m.UniqueCountriesObserved.Value() != 12 {
+		t.Errorf("UniqueCountriesObserved = %d, want 12", m.UniqueCountriesObserved.Value())
+	}
+}
+
+func TestPathDiversityMetricsInSnapshot(t *testing.T) {
+	m := New()
+
+	// Record path diversity metrics
+	m.RecordPathDiversity(0.85, PathDiversityLevelHigh)
+	m.RecordPathDiversity(0.25, PathDiversityLevelLow)
+	m.RecordPathDiversity(0.55, PathDiversityLevelMedium)
+	m.RecordPathDiversity(0.95, PathDiversityLevelExcellent)
+	m.RecordPathDiversityRejected()
+	m.RecordPathDiversityRejected()
+	m.UpdatePathDiversityObservations(20, 10)
+
+	// Get snapshot
+	snap := m.Snapshot()
+
+	if snap.PathDiversityAnalyzed != 4 {
+		t.Errorf("snapshot PathDiversityAnalyzed = %d, want 4", snap.PathDiversityAnalyzed)
+	}
+	if snap.PathDiversityLow != 1 {
+		t.Errorf("snapshot PathDiversityLow = %d, want 1", snap.PathDiversityLow)
+	}
+	if snap.PathDiversityMedium != 1 {
+		t.Errorf("snapshot PathDiversityMedium = %d, want 1", snap.PathDiversityMedium)
+	}
+	if snap.PathDiversityHigh != 1 {
+		t.Errorf("snapshot PathDiversityHigh = %d, want 1", snap.PathDiversityHigh)
+	}
+	if snap.PathDiversityExcellent != 1 {
+		t.Errorf("snapshot PathDiversityExcellent = %d, want 1", snap.PathDiversityExcellent)
+	}
+	if snap.PathDiversityRejected != 2 {
+		t.Errorf("snapshot PathDiversityRejected = %d, want 2", snap.PathDiversityRejected)
+	}
+	if snap.UniqueASNsObserved != 20 {
+		t.Errorf("snapshot UniqueASNsObserved = %d, want 20", snap.UniqueASNsObserved)
+	}
+	if snap.UniqueCountriesObserved != 10 {
+		t.Errorf("snapshot UniqueCountriesObserved = %d, want 10", snap.UniqueCountriesObserved)
+	}
+	// PathDiversityAvgScore should be the last recorded score (0.95 * 1000 = 950)
+	if snap.PathDiversityAvgScore != 950 {
+		t.Errorf("snapshot PathDiversityAvgScore = %d, want 950", snap.PathDiversityAvgScore)
+	}
+}
