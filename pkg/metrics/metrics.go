@@ -81,6 +81,18 @@ type Metrics struct {
 	CheckpointsLoaded    *Counter // Number of successful checkpoint loads
 	CheckpointRecoveries *Counter // Number of recovery operations from backup
 
+	// Path diversity metrics (Phase 3.4)
+	PathDiversityAnalyzed   *Counter   // Total paths analyzed for diversity
+	PathDiversityScore      *Histogram // Distribution of path diversity scores (0.0-1.0)
+	PathDiversityLow        *Counter   // Paths with low diversity (potential security concern)
+	PathDiversityMedium     *Counter   // Paths with medium diversity
+	PathDiversityHigh       *Counter   // Paths with high diversity
+	PathDiversityExcellent  *Counter   // Paths with excellent diversity
+	PathDiversityRejected   *Counter   // Paths rejected due to insufficient diversity
+	UniqueASNsObserved      *Gauge     // Number of unique ASNs observed across all relays
+	UniqueCountriesObserved *Gauge     // Number of unique countries observed across all relays
+	PathDiversityAvgScore   *Gauge     // Running average diversity score (scaled 0-1000)
+
 	// System metrics
 	Uptime      *Gauge
 	startTime   time.Time
@@ -160,6 +172,18 @@ func New() *Metrics {
 		CheckpointsFailed:    NewCounter(),
 		CheckpointsLoaded:    NewCounter(),
 		CheckpointRecoveries: NewCounter(),
+
+		// Path diversity metrics (Phase 3.4)
+		PathDiversityAnalyzed:   NewCounter(),
+		PathDiversityScore:      NewHistogram(),
+		PathDiversityLow:        NewCounter(),
+		PathDiversityMedium:     NewCounter(),
+		PathDiversityHigh:       NewCounter(),
+		PathDiversityExcellent:  NewCounter(),
+		PathDiversityRejected:   NewCounter(),
+		UniqueASNsObserved:      NewGauge(),
+		UniqueCountriesObserved: NewGauge(),
+		PathDiversityAvgScore:   NewGauge(),
 
 		// System metrics
 		Uptime:    NewGauge(),
@@ -293,6 +317,56 @@ func (m *Metrics) RecordCheckpointRecovery() {
 	m.CheckpointRecoveries.Inc()
 }
 
+// Path diversity level constants for RecordPathDiversity method.
+// These mirror the values in pkg/path/diversity.go for decoupling.
+const (
+	// PathDiversityLevelUnknown indicates unknown diversity
+	PathDiversityLevelUnknown = 0
+	// PathDiversityLevelLow indicates low path diversity
+	PathDiversityLevelLow = 1
+	// PathDiversityLevelMedium indicates medium path diversity
+	PathDiversityLevelMedium = 2
+	// PathDiversityLevelHigh indicates high path diversity
+	PathDiversityLevelHigh = 3
+	// PathDiversityLevelExcellent indicates excellent path diversity
+	PathDiversityLevelExcellent = 4
+)
+
+// RecordPathDiversity records a path diversity analysis result.
+// score: diversity score from 0.0 to 1.0
+// level: categorized diversity level (use PathDiversityLevel* constants)
+func (m *Metrics) RecordPathDiversity(score float64, level int) {
+	m.PathDiversityAnalyzed.Inc()
+	// Record score using histogram (0.0-1.0 scaled to 0-1000ms for time.Duration compatibility)
+	m.PathDiversityScore.Observe(time.Duration(score * 1000 * float64(time.Millisecond)))
+
+	// Record by level
+	switch level {
+	case PathDiversityLevelLow:
+		m.PathDiversityLow.Inc()
+	case PathDiversityLevelMedium:
+		m.PathDiversityMedium.Inc()
+	case PathDiversityLevelHigh:
+		m.PathDiversityHigh.Inc()
+	case PathDiversityLevelExcellent:
+		m.PathDiversityExcellent.Inc()
+	}
+
+	// Update average score (scaled 0-1000 for integer representation)
+	m.PathDiversityAvgScore.Set(int64(score * 1000))
+}
+
+// RecordPathDiversityRejected records when a path was rejected due to low diversity
+func (m *Metrics) RecordPathDiversityRejected() {
+	m.PathDiversityRejected.Inc()
+}
+
+// UpdatePathDiversityObservations updates the count of unique ASNs and countries observed
+func (m *Metrics) UpdatePathDiversityObservations(uniqueASNs, uniqueCountries int) {
+	m.UniqueASNsObserved.Set(int64(uniqueASNs))
+	m.UniqueCountriesObserved.Set(int64(uniqueCountries))
+}
+
 // UpdateUptime updates the uptime metric
 func (m *Metrics) UpdateUptime() {
 	m.startTimeMu.RLock()
@@ -376,6 +450,19 @@ func (m *Metrics) Snapshot() *Snapshot {
 		CheckpointsLoaded:    m.CheckpointsLoaded.Value(),
 		CheckpointRecoveries: m.CheckpointRecoveries.Value(),
 
+		// Path diversity metrics (Phase 3.4)
+		PathDiversityAnalyzed:   m.PathDiversityAnalyzed.Value(),
+		PathDiversityScoreAvg:   m.PathDiversityScore.Mean(),
+		PathDiversityScoreP95:   m.PathDiversityScore.Percentile(0.95),
+		PathDiversityLow:        m.PathDiversityLow.Value(),
+		PathDiversityMedium:     m.PathDiversityMedium.Value(),
+		PathDiversityHigh:       m.PathDiversityHigh.Value(),
+		PathDiversityExcellent:  m.PathDiversityExcellent.Value(),
+		PathDiversityRejected:   m.PathDiversityRejected.Value(),
+		UniqueASNsObserved:      m.UniqueASNsObserved.Value(),
+		UniqueCountriesObserved: m.UniqueCountriesObserved.Value(),
+		PathDiversityAvgScore:   m.PathDiversityAvgScore.Value(),
+
 		// System metrics
 		UptimeSeconds: m.Uptime.Value(),
 	}
@@ -454,6 +541,19 @@ type Snapshot struct {
 	CheckpointsFailed    int64 // Number of failed checkpoint saves
 	CheckpointsLoaded    int64 // Number of successful checkpoint loads
 	CheckpointRecoveries int64 // Number of recovery operations from backup
+
+	// Path diversity metrics (Phase 3.4)
+	PathDiversityAnalyzed   int64         // Total paths analyzed for diversity
+	PathDiversityScoreAvg   time.Duration // Average diversity score (using Duration for histogram compatibility)
+	PathDiversityScoreP95   time.Duration // P95 diversity score
+	PathDiversityLow        int64         // Paths with low diversity (potential security concern)
+	PathDiversityMedium     int64         // Paths with medium diversity
+	PathDiversityHigh       int64         // Paths with high diversity
+	PathDiversityExcellent  int64         // Paths with excellent diversity
+	PathDiversityRejected   int64         // Paths rejected due to insufficient diversity
+	UniqueASNsObserved      int64         // Number of unique ASNs observed across all relays
+	UniqueCountriesObserved int64         // Number of unique countries observed across all relays
+	PathDiversityAvgScore   int64         // Running average diversity score (scaled 0-1000)
 
 	// System metrics
 	UptimeSeconds int64
