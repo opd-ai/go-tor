@@ -1,0 +1,224 @@
+name: Benchmark
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      benchmark_count:
+        description: 'Number of benchmark iterations'
+        required: false
+        default: '5'
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    name: Run Benchmarks
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+      with:
+        fetch-depth: 0  # Full history for comparison
+
+    - name: Set up Go
+      uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5  # v5.5.0
+      with:
+        go-version: '1.22.x'
+        cache: true
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Run Go benchmarks
+      run: |
+        go test -bench=. -benchmem -count=${{ github.event.inputs.benchmark_count || '5' }} \
+          -run=^$ ./pkg/... 2>&1 | tee benchmark-results.txt
+
+    - name: Parse benchmark results
+      id: parse
+      run: |
+        # Extract key metrics from benchmark results
+        echo "## Benchmark Results" > benchmark-summary.md
+        echo "" >> benchmark-summary.md
+        echo "### Key Metrics" >> benchmark-summary.md
+        echo "" >> benchmark-summary.md
+
+        # Count total benchmarks
+        TOTAL=$(grep -c "^Benchmark" benchmark-results.txt || echo "0")
+        echo "- **Total Benchmarks Run:** $TOTAL" >> benchmark-summary.md
+
+        # Show a sample of benchmark timings (first 30 results)
+        echo "" >> benchmark-summary.md
+        echo "### Benchmark Timing Summary" >> benchmark-summary.md
+        echo "" >> benchmark-summary.md
+        echo "\`\`\`" >> benchmark-summary.md
+        grep "^Benchmark" benchmark-results.txt | head -30 >> benchmark-summary.md
+        echo "\`\`\`" >> benchmark-summary.md
+
+        # Memory allocation summary
+        echo "" >> benchmark-summary.md
+        echo "### Memory Allocation Highlights" >> benchmark-summary.md
+        echo "" >> benchmark-summary.md
+
+        # Find benchmarks with high allocations (sort by bytes/op, locating the column dynamically)
+        echo "\`\`\`" >> benchmark-summary.md
+        grep "^Benchmark" benchmark-results.txt | awk '{ for (i = 1; i <= NF; i++) if ($i == "B/op") { print $(i-1), $0; break } }' | sort -k1,1nr | head -10 | cut -d' ' -f2- >> benchmark-summary.md || true
+        echo "\`\`\`" >> benchmark-summary.md
+
+        # Set outputs
+        echo "total_benchmarks=$TOTAL" >> $GITHUB_OUTPUT
+
+    - name: Upload benchmark results
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+      with:
+        name: benchmark-results
+        path: |
+          benchmark-results.txt
+          benchmark-summary.md
+        retention-days: 30
+
+    - name: Store benchmark result for tracking
+      if: github.ref == 'refs/heads/main'
+      uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684  # v4.2.3
+      with:
+        path: benchmark-results.txt
+        key: benchmark-${{ github.sha }}
+
+    - name: Compare with baseline (PR only)
+      if: github.event_name == 'pull_request'
+      run: |
+        echo "## Benchmark Comparison" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Total benchmarks executed: ${{ steps.parse.outputs.total_benchmarks }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "See artifacts for detailed benchmark results." >> $GITHUB_STEP_SUMMARY
+
+    - name: Add summary
+      run: |
+        cat benchmark-summary.md >> $GITHUB_STEP_SUMMARY
+
+  benchmark-critical-paths:
+    name: Critical Path Benchmarks
+    runs-on: ubuntu-latest
+    needs: benchmark
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+    - name: Set up Go
+      uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5  # v5.5.0
+      with:
+        go-version: '1.22.x'
+        cache: true
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Run critical path benchmarks
+      run: |
+        echo "## Critical Path Benchmark Results" > critical-benchmarks.md
+        echo "" >> critical-benchmarks.md
+
+        # Crypto benchmarks (most performance-sensitive)
+        echo "### Crypto Operations" >> critical-benchmarks.md
+        echo "\`\`\`" >> critical-benchmarks.md
+        if ! go test -bench=. -benchmem -count=3 -run=^$ ./pkg/crypto/... 2>&1 | grep "^Benchmark" >> critical-benchmarks.md; then
+          echo "No crypto benchmarks found" >> critical-benchmarks.md
+        fi
+        echo "\`\`\`" >> critical-benchmarks.md
+        echo "" >> critical-benchmarks.md
+
+        # Metrics benchmarks (high-frequency operations)
+        echo "### Metrics Operations" >> critical-benchmarks.md
+        echo "\`\`\`" >> critical-benchmarks.md
+        if ! go test -bench=. -benchmem -count=3 -run=^$ ./pkg/metrics/... 2>&1 | grep "^Benchmark" >> critical-benchmarks.md; then
+          echo "No metrics benchmarks found" >> critical-benchmarks.md
+        fi
+        echo "\`\`\`" >> critical-benchmarks.md
+        echo "" >> critical-benchmarks.md
+
+        # Cell operations (core protocol)
+        echo "### Cell Operations" >> critical-benchmarks.md
+        echo "\`\`\`" >> critical-benchmarks.md
+        if ! go test -bench=. -benchmem -count=3 -run=^$ ./pkg/cell/... 2>&1 | grep "^Benchmark" >> critical-benchmarks.md; then
+          echo "No cell benchmarks found" >> critical-benchmarks.md
+        fi
+        echo "\`\`\`" >> critical-benchmarks.md
+
+    - name: Upload critical path benchmarks
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+      with:
+        name: critical-benchmarks
+        path: critical-benchmarks.md
+        retention-days: 30
+
+    - name: Add critical path summary
+      run: cat critical-benchmarks.md >> $GITHUB_STEP_SUMMARY
+
+  memory-profile:
+    name: Memory Profiling
+    runs-on: ubuntu-latest
+    needs: benchmark
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+    - name: Set up Go
+      uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5  # v5.5.0
+      with:
+        go-version: '1.22.x'
+        cache: true
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Run memory benchmarks
+      run: |
+        echo "## Memory Profile Summary" > memory-profile.md
+        echo "" >> memory-profile.md
+
+        # Run benchmarks with memory profiling
+        echo "### Memory Allocation by Package" >> memory-profile.md
+        echo "" >> memory-profile.md
+
+        for pkg in crypto metrics cell circuit; do
+          echo "#### pkg/$pkg" >> memory-profile.md
+          RESULT=$(go test -bench=. -benchmem -count=1 -run=^$ ./pkg/$pkg/... 2>&1 | grep -E "^Benchmark.*B/op" | head -5 || true)
+          if [ -n "$RESULT" ]; then
+            echo "\`\`\`" >> memory-profile.md
+            echo "$RESULT" >> memory-profile.md
+            echo "\`\`\`" >> memory-profile.md
+          else
+            echo "*No memory data available*" >> memory-profile.md
+          fi
+          echo "" >> memory-profile.md
+        done
+
+        # Check for high-allocation benchmarks (>1000 B/op)
+        echo "### High Allocation Operations (>1KB/op)" >> memory-profile.md
+        echo "" >> memory-profile.md
+
+        # Use a more robust awk pattern to find operations with >1000 B/op
+        HIGH_ALLOC=$(go test -bench=. -benchmem -count=1 -run=^$ ./pkg/... 2>&1 | grep -E "^Benchmark" | awk '/B\/op/ {for(i=1;i<=NF;i++) if($i ~ /^[0-9]+$/ && $(i+1) == "B/op" && $i > 1000) {print $0; break}}' | head -20 || true)
+        if [ -n "$HIGH_ALLOC" ]; then
+          echo "\`\`\`" >> memory-profile.md
+          echo "$HIGH_ALLOC" >> memory-profile.md
+          echo "\`\`\`" >> memory-profile.md
+        else
+          echo "*No high-allocation operations found (all operations use ≤1KB/op)*" >> memory-profile.md
+        fi
+
+    - name: Upload memory profile
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+      with:
+        name: memory-profile
+        path: memory-profile.md
+        retention-days: 30
+
+    - name: Add memory profile summary
+      run: cat memory-profile.md >> $GITHUB_STEP_SUMMARY
