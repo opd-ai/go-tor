@@ -320,8 +320,8 @@ func TestConfigValidate(t *testing.T) {
 			name: "valid memory monitoring enabled with valid config",
 			modify: func(c *Config) {
 				c.EnableMemoryMonitoring = true
-				c.MemoryHighWaterMark = 100 * 1024 * 1024  // 100 MB
-				c.MemoryCriticalMark = 200 * 1024 * 1024   // 200 MB
+				c.MemoryHighWaterMark = 100 * 1024 * 1024 // 100 MB
+				c.MemoryCriticalMark = 200 * 1024 * 1024  // 200 MB
 				c.MemoryMaxGoroutines = 10000
 				c.MemoryCheckInterval = 30
 			},
