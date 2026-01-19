@@ -216,6 +216,7 @@ type MemoryMonitor struct {
 	stopCh     chan struct{}
 	stopOnce   sync.Once
 	lastLevel  MemoryPressureLevel
+	mu         sync.RWMutex // Protects callbacks and lastLevel
 }
 
 // NewMemoryMonitor creates a new memory monitor with the specified thresholds and check interval.
@@ -231,7 +232,10 @@ func NewMemoryMonitor(thresholds MemoryThresholds, interval time.Duration) *Memo
 }
 
 // OnPressure registers a callback to be called when memory pressure changes.
+// This method is safe to call concurrently.
 func (m *MemoryMonitor) OnPressure(callback MemoryPressureCallback) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.callbacks = append(m.callbacks, callback)
 }
 
@@ -251,11 +255,20 @@ func (m *MemoryMonitor) Start(ctx context.Context) {
 			level := m.calculatePressureLevel(stats)
 
 			// Only notify on level changes
+			m.mu.Lock()
 			if level != m.lastLevel {
-				for _, callback := range m.callbacks {
+				// Copy callbacks to avoid holding lock during callback execution
+				callbacks := make([]MemoryPressureCallback, len(m.callbacks))
+				copy(callbacks, m.callbacks)
+				m.lastLevel = level
+				m.mu.Unlock()
+
+				// Execute callbacks without holding the lock
+				for _, callback := range callbacks {
 					callback(level, stats)
 				}
-				m.lastLevel = level
+			} else {
+				m.mu.Unlock()
 			}
 		}
 	}
@@ -269,6 +282,7 @@ func (m *MemoryMonitor) Stop() {
 }
 
 // GetCurrentPressureLevel returns the current memory pressure level without triggering callbacks.
+// This method is safe to call concurrently.
 func (m *MemoryMonitor) GetCurrentPressureLevel() MemoryPressureLevel {
 	stats := m.getStats()
 	return m.calculatePressureLevel(stats)

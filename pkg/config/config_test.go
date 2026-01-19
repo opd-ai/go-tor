@@ -315,6 +315,117 @@ func TestConfigValidate(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		// Memory monitoring configuration validation tests
+		{
+			name: "valid memory monitoring enabled with valid config",
+			modify: func(c *Config) {
+				c.EnableMemoryMonitoring = true
+				c.MemoryHighWaterMark = 100 * 1024 * 1024  // 100 MB
+				c.MemoryCriticalMark = 200 * 1024 * 1024   // 200 MB
+				c.MemoryMaxGoroutines = 10000
+				c.MemoryCheckInterval = 30
+			},
+			wantErr: false,
+		},
+		{
+			name: "memory monitoring disabled with zero values is valid",
+			modify: func(c *Config) {
+				c.EnableMemoryMonitoring = false
+				c.MemoryHighWaterMark = 0
+				c.MemoryCriticalMark = 0
+				c.MemoryMaxGoroutines = 0
+				c.MemoryCheckInterval = 0
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid memory monitoring HighWaterMark zero when enabled",
+			modify: func(c *Config) {
+				c.EnableMemoryMonitoring = true
+				c.MemoryHighWaterMark = 0
+				c.MemoryCriticalMark = 200 * 1024 * 1024
+				c.MemoryMaxGoroutines = 10000
+				c.MemoryCheckInterval = 30
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid memory monitoring CriticalMark zero when enabled",
+			modify: func(c *Config) {
+				c.EnableMemoryMonitoring = true
+				c.MemoryHighWaterMark = 100 * 1024 * 1024
+				c.MemoryCriticalMark = 0
+				c.MemoryMaxGoroutines = 10000
+				c.MemoryCheckInterval = 30
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid memory monitoring CriticalMark less than HighWaterMark",
+			modify: func(c *Config) {
+				c.EnableMemoryMonitoring = true
+				c.MemoryHighWaterMark = 200 * 1024 * 1024
+				c.MemoryCriticalMark = 100 * 1024 * 1024 // Less than high water mark
+				c.MemoryMaxGoroutines = 10000
+				c.MemoryCheckInterval = 30
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid memory monitoring CriticalMark equals HighWaterMark",
+			modify: func(c *Config) {
+				c.EnableMemoryMonitoring = true
+				c.MemoryHighWaterMark = 100 * 1024 * 1024
+				c.MemoryCriticalMark = 100 * 1024 * 1024 // Equal to high water mark
+				c.MemoryMaxGoroutines = 10000
+				c.MemoryCheckInterval = 30
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid memory monitoring MaxGoroutines zero when enabled",
+			modify: func(c *Config) {
+				c.EnableMemoryMonitoring = true
+				c.MemoryHighWaterMark = 100 * 1024 * 1024
+				c.MemoryCriticalMark = 200 * 1024 * 1024
+				c.MemoryMaxGoroutines = 0
+				c.MemoryCheckInterval = 30
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid memory monitoring MaxGoroutines negative when enabled",
+			modify: func(c *Config) {
+				c.EnableMemoryMonitoring = true
+				c.MemoryHighWaterMark = 100 * 1024 * 1024
+				c.MemoryCriticalMark = 200 * 1024 * 1024
+				c.MemoryMaxGoroutines = -1
+				c.MemoryCheckInterval = 30
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid memory monitoring CheckInterval zero when enabled",
+			modify: func(c *Config) {
+				c.EnableMemoryMonitoring = true
+				c.MemoryHighWaterMark = 100 * 1024 * 1024
+				c.MemoryCriticalMark = 200 * 1024 * 1024
+				c.MemoryMaxGoroutines = 10000
+				c.MemoryCheckInterval = 0
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid memory monitoring CheckInterval negative when enabled",
+			modify: func(c *Config) {
+				c.EnableMemoryMonitoring = true
+				c.MemoryHighWaterMark = 100 * 1024 * 1024
+				c.MemoryCriticalMark = 200 * 1024 * 1024
+				c.MemoryMaxGoroutines = 10000
+				c.MemoryCheckInterval = -1
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
