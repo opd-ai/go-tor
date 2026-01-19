@@ -387,14 +387,14 @@ func extractSubnet(address string) string {
 		return ""
 	}
 
-	// For IPv4, use /16 subnet
+	// For IPv4, use /16 subnet (e.g., "192.168")
 	if ip4 := ip.To4(); ip4 != nil {
-		return ip4[0:2].String()
+		return fmt.Sprintf("%d.%d", ip4[0], ip4[1])
 	}
 
-	// For IPv6, use /32 prefix (first 4 bytes)
+	// For IPv6, use /32 prefix (first 4 bytes as hex)
 	if len(ip) >= 4 {
-		return ip[0:4].String()
+		return fmt.Sprintf("%02x%02x:%02x%02x", ip[0], ip[1], ip[2], ip[3])
 	}
 
 	return ""

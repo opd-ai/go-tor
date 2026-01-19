@@ -337,7 +337,7 @@ const (
 // level: categorized diversity level (use PathDiversityLevel* constants)
 func (m *Metrics) RecordPathDiversity(score float64, level int) {
 	m.PathDiversityAnalyzed.Inc()
-	// Record score as nanoseconds for histogram compatibility (0.0-1.0 -> 0-1000ms)
+	// Record score using histogram (0.0-1.0 scaled to 0-1000ms for time.Duration compatibility)
 	m.PathDiversityScore.Observe(time.Duration(score * 1000 * float64(time.Millisecond)))
 
 	// Record by level

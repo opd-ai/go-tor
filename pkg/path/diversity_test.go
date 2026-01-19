@@ -451,13 +451,14 @@ func TestConcurrentAnalysis(t *testing.T) {
 		},
 	}
 
-	done := make(chan bool)
+	done := make(chan bool, 10)
 	errChan := make(chan error, 10)
 	for i := 0; i < 10; i++ {
 		go func() {
 			score := da.AnalyzePath(path)
 			if score == nil {
 				errChan <- fmt.Errorf("AnalyzePath returned nil")
+				return
 			}
 			done <- true
 		}()
@@ -465,19 +466,17 @@ func TestConcurrentAnalysis(t *testing.T) {
 
 	// Wait with timeout
 	timeout := time.After(5 * time.Second)
-	for i := 0; i < 10; i++ {
+	successCount := 0
+	for successCount < 10 {
 		select {
 		case <-done:
-			// Success
+			successCount++
+		case err := <-errChan:
+			t.Error(err)
+			successCount++ // Still count to exit the loop
 		case <-timeout:
 			t.Fatal("Test timed out")
 		}
-	}
-
-	// Check for errors
-	close(errChan)
-	for err := range errChan {
-		t.Error(err)
 	}
 
 	stats := da.GetStats()
