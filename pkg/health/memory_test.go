@@ -391,6 +391,17 @@ func TestMemoryMonitorStopChannel(t *testing.T) {
 	}
 }
 
+func TestMemoryMonitorStopMultipleTimes(t *testing.T) {
+	thresholds := DefaultMemoryThresholds()
+	monitor := NewMemoryMonitor(thresholds, 50*time.Millisecond)
+
+	// Stop should be safe to call multiple times without panicking
+	monitor.Stop()
+	monitor.Stop()
+	monitor.Stop()
+	// If we get here without panicking, the test passes
+}
+
 func TestTriggerGC(t *testing.T) {
 	// This is a simple smoke test - we just verify it doesn't panic
 	TriggerGC()

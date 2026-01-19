@@ -4,6 +4,8 @@ package health
 import (
 	"context"
 	"runtime"
+	"runtime/debug"
+	"sync"
 	"time"
 )
 
@@ -212,6 +214,7 @@ type MemoryMonitor struct {
 	callbacks  []MemoryPressureCallback
 	interval   time.Duration
 	stopCh     chan struct{}
+	stopOnce   sync.Once
 	lastLevel  MemoryPressureLevel
 }
 
@@ -258,9 +261,11 @@ func (m *MemoryMonitor) Start(ctx context.Context) {
 	}
 }
 
-// Stop stops the memory monitor.
+// Stop stops the memory monitor. This method is safe to call multiple times.
 func (m *MemoryMonitor) Stop() {
-	close(m.stopCh)
+	m.stopOnce.Do(func() {
+		close(m.stopCh)
+	})
 }
 
 // GetCurrentPressureLevel returns the current memory pressure level without triggering callbacks.
@@ -295,9 +300,9 @@ func TriggerGC() {
 }
 
 // FreeOSMemory returns unused memory to the operating system.
-// This is more aggressive than TriggerGC and should be used sparingly.
+// This runs a GC cycle first, then aggressively returns free memory to the OS.
+// This is more aggressive than TriggerGC and should be used sparingly,
+// as it may cause performance overhead when memory needs to be re-acquired.
 func FreeOSMemory() {
-	runtime.GC()
-	// debug.FreeOSMemory() would be ideal here but we avoid the debug package
-	// dependency for embedded deployments
+	debug.FreeOSMemory()
 }
