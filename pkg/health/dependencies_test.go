@@ -394,3 +394,47 @@ func TestMixedDependencyStatus(t *testing.T) {
 		t.Errorf("Expected degraded service, got %s", service.Status)
 	}
 }
+
+func TestHasCircularDependency(t *testing.T) {
+	monitor := NewDependencyAwareMonitor()
+
+	// Register A depends on B
+	monitor.RegisterDependency("A", Dependency{Name: "B", Relation: DependencyRequired})
+
+	// Check if B depends on A would create a cycle
+	if !monitor.HasCircularDependency("B", Dependency{Name: "A", Relation: DependencyRequired}) {
+		t.Error("Expected circular dependency to be detected (B -> A when A -> B exists)")
+	}
+
+	// Check that C depends on A does not create a cycle
+	if monitor.HasCircularDependency("C", Dependency{Name: "A", Relation: DependencyRequired}) {
+		t.Error("Should not detect circular dependency for C -> A")
+	}
+}
+
+func TestHasCircularDependencyChain(t *testing.T) {
+	monitor := NewDependencyAwareMonitor()
+
+	// Create a chain: A -> B -> C
+	monitor.RegisterDependency("A", Dependency{Name: "B", Relation: DependencyRequired})
+	monitor.RegisterDependency("B", Dependency{Name: "C", Relation: DependencyRequired})
+
+	// Check if C depends on A would create a cycle (A -> B -> C -> A)
+	if !monitor.HasCircularDependency("C", Dependency{Name: "A", Relation: DependencyRequired}) {
+		t.Error("Expected circular dependency to be detected (C -> A when A -> B -> C exists)")
+	}
+
+	// D depends on C should not create a cycle
+	if monitor.HasCircularDependency("D", Dependency{Name: "C", Relation: DependencyRequired}) {
+		t.Error("Should not detect circular dependency for D -> C")
+	}
+}
+
+func TestHasCircularDependencyNoExistingDeps(t *testing.T) {
+	monitor := NewDependencyAwareMonitor()
+
+	// No existing dependencies - should never detect a cycle
+	if monitor.HasCircularDependency("A", Dependency{Name: "B", Relation: DependencyRequired}) {
+		t.Error("Should not detect circular dependency when no dependencies exist")
+	}
+}

@@ -76,10 +76,45 @@ func (m *DependencyAwareMonitor) RegisterChecker(checker Checker) {
 }
 
 // RegisterDependency manually registers a dependency relationship.
+// Note: Circular dependencies (e.g., A depends on B, B depends on A) are not
+// automatically detected and may lead to confusing health status results.
+// Callers should ensure dependency graphs are acyclic.
 func (m *DependencyAwareMonitor) RegisterDependency(component string, dep Dependency) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.dependencies[component] = append(m.dependencies[component], dep)
+}
+
+// HasCircularDependency checks if adding a dependency would create a cycle.
+// Returns true if a circular dependency would be created.
+func (m *DependencyAwareMonitor) HasCircularDependency(component string, dep Dependency) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.wouldCreateCycle(component, dep.Name, make(map[string]bool))
+}
+
+// wouldCreateCycle recursively checks if adding an edge from component to depName creates a cycle.
+func (m *DependencyAwareMonitor) wouldCreateCycle(component, depName string, visited map[string]bool) bool {
+	// If we've found our way back to the original component, we have a cycle
+	if depName == component {
+		return true
+	}
+
+	// If we've already visited this node in this path, skip to avoid infinite recursion
+	if visited[depName] {
+		return false
+	}
+	visited[depName] = true
+
+	// Check all dependencies of depName
+	deps := m.dependencies[depName]
+	for _, d := range deps {
+		if m.wouldCreateCycle(component, d.Name, visited) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // GetDependencies returns the dependencies for a component.

@@ -18,10 +18,6 @@ const (
 	// ProbeReadiness checks if the application is ready to receive traffic.
 	// If readiness fails, the application should be removed from load balancing.
 	ProbeReadiness ProbeType = "readiness"
-
-	// ProbeStartup checks if the application has started successfully.
-	// Used during initial startup to allow slow-starting containers.
-	ProbeStartup ProbeType = "startup"
 )
 
 // ProbeResult represents the result of a probe check.
@@ -119,10 +115,7 @@ func (m *CachedMonitor) Check(ctx context.Context) OverallHealth {
 		return m.Monitor.Check(ctx)
 	}
 
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	// Get all checkers
+	// Get all checkers first (short lock on Monitor)
 	m.Monitor.mu.RLock()
 	checkers := make([]Checker, 0, len(m.Monitor.checkers))
 	for _, checker := range m.Monitor.checkers {
@@ -133,26 +126,39 @@ func (m *CachedMonitor) Check(ctx context.Context) OverallHealth {
 	// Check each component with caching
 	components := make(map[string]ComponentHealth)
 	for _, checker := range checkers {
-		name := checker.Name()
-
-		// Check cache
-		if cached, ok := m.cache[name]; ok {
-			if time.Since(cached.timestamp) < m.cacheConfig.TTL {
-				components[name] = cached.result
-				continue
-			}
+		// Check context cancellation
+		if ctx.Err() != nil {
+			break
 		}
 
-		// Perform fresh check
+		name := checker.Name()
+
+		// Check cache (short read lock)
+		m.mu.RLock()
+		cached, ok := m.cache[name]
+		cacheValid := ok && time.Since(cached.timestamp) < m.cacheConfig.TTL
+		if cacheValid {
+			components[name] = cached.result
+		}
+		m.mu.RUnlock()
+
+		if cacheValid {
+			continue
+		}
+
+		// Perform fresh check (no lock held during potentially slow operation)
 		startTime := time.Now()
 		health := checker.Check(ctx)
 		health.ResponseTimeMs = time.Since(startTime).Milliseconds()
 
-		// Update cache
+		// Update cache (short write lock)
+		m.mu.Lock()
 		m.cache[name] = &cachedResult{
 			result:    health,
 			timestamp: time.Now(),
 		}
+		m.mu.Unlock()
+
 		components[name] = health
 	}
 
@@ -175,7 +181,53 @@ func (m *CachedMonitor) Check(ctx context.Context) OverallHealth {
 	}
 }
 
+// probeCheckResult holds the result of a single probe check.
+type probeCheckResult struct {
+	name    string
+	healthy bool
+}
+
+// checkProbeWithCache is a helper that checks cache and performs a probe check.
+// It returns the health status and whether a failure was found.
+func (m *CachedMonitor) checkProbeWithCache(
+	ctx context.Context,
+	checker Checker,
+	cache map[string]*cachedProbeResult,
+	ttl time.Duration,
+	checkFunc func(ctx context.Context) bool,
+) (healthy bool, fromCache bool) {
+	name := checker.Name()
+
+	// Check cache (short read lock)
+	if m.cacheConfig.Enabled {
+		m.mu.RLock()
+		if cached, exists := cache[name]; exists {
+			if time.Since(cached.timestamp) < ttl {
+				m.mu.RUnlock()
+				return cached.healthy, true
+			}
+		}
+		m.mu.RUnlock()
+	}
+
+	// Perform fresh check (no lock held)
+	healthy = checkFunc(ctx)
+
+	// Update cache (short write lock)
+	if m.cacheConfig.Enabled {
+		m.mu.Lock()
+		cache[name] = &cachedProbeResult{
+			healthy:   healthy,
+			timestamp: time.Now(),
+		}
+		m.mu.Unlock()
+	}
+
+	return healthy, false
+}
+
 // CheckLiveness performs liveness checks on all components with caching.
+// Returns early on first failure for efficiency.
 func (m *CachedMonitor) CheckLiveness(ctx context.Context) ProbeResult {
 	start := time.Now()
 
@@ -192,74 +244,28 @@ func (m *CachedMonitor) CheckLiveness(ctx context.Context) ProbeResult {
 		ttl = m.cacheConfig.TTL
 	}
 
-	allHealthy := true
 	var failedComponent string
 
 	for _, checker := range checkers {
+		// Check context cancellation
+		if ctx.Err() != nil {
+			return ProbeResult{
+				Type:      ProbeLiveness,
+				Healthy:   false,
+				Message:   "Context cancelled during liveness check",
+				Timestamp: time.Now(),
+				Duration:  time.Since(start).Milliseconds(),
+			}
+		}
+
 		name := checker.Name()
-		healthy := true
+		var healthy bool
 
 		// Check if component supports liveness checks
 		if lc, ok := checker.(LivenessChecker); ok {
-			// Check cache
-			if m.cacheConfig.Enabled {
-				m.mu.RLock()
-				if cached, exists := m.livenessCache[name]; exists {
-					if time.Since(cached.timestamp) < ttl {
-						healthy = cached.healthy
-						m.mu.RUnlock()
-						if !healthy {
-							allHealthy = false
-							failedComponent = name
-						}
-						continue
-					}
-				}
-				m.mu.RUnlock()
-			}
-
-			// Perform fresh check
-			healthy = lc.CheckLiveness(ctx)
-
-			// Update cache
-			if m.cacheConfig.Enabled {
-				m.mu.Lock()
-				m.livenessCache[name] = &cachedProbeResult{
-					healthy:   healthy,
-					timestamp: time.Now(),
-				}
-				m.mu.Unlock()
-			}
+			healthy, _ = m.checkProbeWithCache(ctx, checker, m.livenessCache, ttl, lc.CheckLiveness)
 		} else if pc, ok := checker.(ProbeChecker); ok {
-			// Check cache
-			if m.cacheConfig.Enabled {
-				m.mu.RLock()
-				if cached, exists := m.livenessCache[name]; exists {
-					if time.Since(cached.timestamp) < ttl {
-						healthy = cached.healthy
-						m.mu.RUnlock()
-						if !healthy {
-							allHealthy = false
-							failedComponent = name
-						}
-						continue
-					}
-				}
-				m.mu.RUnlock()
-			}
-
-			// Perform fresh check
-			healthy = pc.CheckLiveness(ctx)
-
-			// Update cache
-			if m.cacheConfig.Enabled {
-				m.mu.Lock()
-				m.livenessCache[name] = &cachedProbeResult{
-					healthy:   healthy,
-					timestamp: time.Now(),
-				}
-				m.mu.Unlock()
-			}
+			healthy, _ = m.checkProbeWithCache(ctx, checker, m.livenessCache, ttl, pc.CheckLiveness)
 		} else {
 			// Default to regular health check for liveness
 			result := checker.Check(ctx)
@@ -267,26 +273,29 @@ func (m *CachedMonitor) CheckLiveness(ctx context.Context) ProbeResult {
 		}
 
 		if !healthy {
-			allHealthy = false
 			failedComponent = name
+			// Early exit on first failure
+			return ProbeResult{
+				Type:      ProbeLiveness,
+				Healthy:   false,
+				Message:   "Component " + failedComponent + " failed liveness check",
+				Timestamp: time.Now(),
+				Duration:  time.Since(start).Milliseconds(),
+			}
 		}
-	}
-
-	msg := "All components are alive"
-	if !allHealthy {
-		msg = "Component " + failedComponent + " failed liveness check"
 	}
 
 	return ProbeResult{
 		Type:      ProbeLiveness,
-		Healthy:   allHealthy,
-		Message:   msg,
+		Healthy:   true,
+		Message:   "All components are alive",
 		Timestamp: time.Now(),
 		Duration:  time.Since(start).Milliseconds(),
 	}
 }
 
 // CheckReadiness performs readiness checks on all components with caching.
+// Returns early on first failure for efficiency.
 func (m *CachedMonitor) CheckReadiness(ctx context.Context) ProbeResult {
 	start := time.Now()
 
@@ -303,74 +312,28 @@ func (m *CachedMonitor) CheckReadiness(ctx context.Context) ProbeResult {
 		ttl = m.cacheConfig.TTL
 	}
 
-	allReady := true
 	var notReadyComponent string
 
 	for _, checker := range checkers {
+		// Check context cancellation
+		if ctx.Err() != nil {
+			return ProbeResult{
+				Type:      ProbeReadiness,
+				Healthy:   false,
+				Message:   "Context cancelled during readiness check",
+				Timestamp: time.Now(),
+				Duration:  time.Since(start).Milliseconds(),
+			}
+		}
+
 		name := checker.Name()
-		ready := true
+		var ready bool
 
 		// Check if component supports readiness checks
 		if rc, ok := checker.(ReadinessChecker); ok {
-			// Check cache
-			if m.cacheConfig.Enabled {
-				m.mu.RLock()
-				if cached, exists := m.readinessCache[name]; exists {
-					if time.Since(cached.timestamp) < ttl {
-						ready = cached.healthy
-						m.mu.RUnlock()
-						if !ready {
-							allReady = false
-							notReadyComponent = name
-						}
-						continue
-					}
-				}
-				m.mu.RUnlock()
-			}
-
-			// Perform fresh check
-			ready = rc.CheckReadiness(ctx)
-
-			// Update cache
-			if m.cacheConfig.Enabled {
-				m.mu.Lock()
-				m.readinessCache[name] = &cachedProbeResult{
-					healthy:   ready,
-					timestamp: time.Now(),
-				}
-				m.mu.Unlock()
-			}
+			ready, _ = m.checkProbeWithCache(ctx, checker, m.readinessCache, ttl, rc.CheckReadiness)
 		} else if pc, ok := checker.(ProbeChecker); ok {
-			// Check cache
-			if m.cacheConfig.Enabled {
-				m.mu.RLock()
-				if cached, exists := m.readinessCache[name]; exists {
-					if time.Since(cached.timestamp) < ttl {
-						ready = cached.healthy
-						m.mu.RUnlock()
-						if !ready {
-							allReady = false
-							notReadyComponent = name
-						}
-						continue
-					}
-				}
-				m.mu.RUnlock()
-			}
-
-			// Perform fresh check
-			ready = pc.CheckReadiness(ctx)
-
-			// Update cache
-			if m.cacheConfig.Enabled {
-				m.mu.Lock()
-				m.readinessCache[name] = &cachedProbeResult{
-					healthy:   ready,
-					timestamp: time.Now(),
-				}
-				m.mu.Unlock()
-			}
+			ready, _ = m.checkProbeWithCache(ctx, checker, m.readinessCache, ttl, pc.CheckReadiness)
 		} else {
 			// Default: healthy or degraded = ready
 			result := checker.Check(ctx)
@@ -378,20 +341,22 @@ func (m *CachedMonitor) CheckReadiness(ctx context.Context) ProbeResult {
 		}
 
 		if !ready {
-			allReady = false
 			notReadyComponent = name
+			// Early exit on first failure
+			return ProbeResult{
+				Type:      ProbeReadiness,
+				Healthy:   false,
+				Message:   "Component " + notReadyComponent + " is not ready",
+				Timestamp: time.Now(),
+				Duration:  time.Since(start).Milliseconds(),
+			}
 		}
-	}
-
-	msg := "All components are ready"
-	if !allReady {
-		msg = "Component " + notReadyComponent + " is not ready"
 	}
 
 	return ProbeResult{
 		Type:      ProbeReadiness,
-		Healthy:   allReady,
-		Message:   msg,
+		Healthy:   true,
+		Message:   "All components are ready",
 		Timestamp: time.Now(),
 		Duration:  time.Since(start).Milliseconds(),
 	}
@@ -416,12 +381,17 @@ func (m *CachedMonitor) InvalidateCacheFor(name string) {
 }
 
 // GetCacheConfig returns the current cache configuration.
+// This method is thread-safe.
 func (m *CachedMonitor) GetCacheConfig() CacheConfig {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	return m.cacheConfig
 }
 
 // SetCacheConfig updates the cache configuration.
-// This method is not thread-safe and should only be called before starting the monitor.
+// This method is thread-safe.
 func (m *CachedMonitor) SetCacheConfig(config CacheConfig) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.cacheConfig = config
 }

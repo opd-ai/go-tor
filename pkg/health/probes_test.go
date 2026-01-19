@@ -21,7 +21,18 @@ func (m *mockProbeChecker) Name() string {
 
 func (m *mockProbeChecker) Check(ctx context.Context) ComponentHealth {
 	if m.checkDelay > 0 {
-		time.Sleep(m.checkDelay)
+		select {
+		case <-ctx.Done():
+			// Context cancelled; return early with unhealthy status
+			return ComponentHealth{
+				Name:        m.name,
+				Status:      StatusUnhealthy,
+				Message:     "Check cancelled",
+				LastChecked: time.Now(),
+			}
+		case <-time.After(m.checkDelay):
+			// Delay completed
+		}
 	}
 	return ComponentHealth{
 		Name:        m.name,
@@ -353,9 +364,6 @@ func TestProbeTypeConstants(t *testing.T) {
 	if ProbeReadiness != "readiness" {
 		t.Errorf("Unexpected ProbeReadiness value: %s", ProbeReadiness)
 	}
-	if ProbeStartup != "startup" {
-		t.Errorf("Unexpected ProbeStartup value: %s", ProbeStartup)
-	}
 }
 
 // Test that regular checkers (not implementing probe interfaces) still work
@@ -457,5 +465,95 @@ func TestProbeResult(t *testing.T) {
 	}
 	if result.Duration != 42 {
 		t.Errorf("Unexpected duration: %d", result.Duration)
+	}
+}
+
+func TestCachedMonitorConcurrentAccess(t *testing.T) {
+	config := DefaultCacheConfig()
+	config.TTL = 10 * time.Millisecond
+	monitor := NewCachedMonitor(config)
+
+	// Register multiple checkers
+	for i := 0; i < 5; i++ {
+		checker := &mockProbeChecker{
+			name:        "checker" + string(rune('A'+i)),
+			status:      StatusHealthy,
+			livenessOK:  true,
+			readinessOK: true,
+		}
+		monitor.RegisterChecker(checker)
+	}
+
+	ctx := context.Background()
+	done := make(chan bool)
+	errChan := make(chan error, 100)
+
+	// Start multiple goroutines doing concurrent operations
+	for i := 0; i < 10; i++ {
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					errChan <- nil // Just signal panic occurred
+				}
+				done <- true
+			}()
+
+			for j := 0; j < 50; j++ {
+				// Mix of operations
+				switch j % 5 {
+				case 0:
+					monitor.Check(ctx)
+				case 1:
+					monitor.CheckLiveness(ctx)
+				case 2:
+					monitor.CheckReadiness(ctx)
+				case 3:
+					monitor.InvalidateCache()
+				case 4:
+					monitor.GetCacheConfig()
+				}
+			}
+		}()
+	}
+
+	// Wait for all goroutines to complete
+	for i := 0; i < 10; i++ {
+		<-done
+	}
+
+	// Check for panics
+	select {
+	case <-errChan:
+		t.Error("Concurrent access caused a panic")
+	default:
+		// No panics, test passed
+	}
+}
+
+func TestCachedMonitorContextCancellation(t *testing.T) {
+	config := DefaultCacheConfig()
+	monitor := NewCachedMonitor(config)
+
+	// Add a slow checker
+	slowChecker := &mockProbeChecker{
+		name:        "slow",
+		status:      StatusHealthy,
+		livenessOK:  true,
+		readinessOK: true,
+		checkDelay:  500 * time.Millisecond,
+	}
+	monitor.RegisterChecker(slowChecker)
+
+	// Cancel context immediately
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	// Check should handle cancelled context gracefully
+	result := monitor.CheckLiveness(ctx)
+	if result.Healthy {
+		t.Error("Expected unhealthy result when context is cancelled")
+	}
+	if result.Message != "Context cancelled during liveness check" {
+		t.Errorf("Unexpected message: %s", result.Message)
 	}
 }

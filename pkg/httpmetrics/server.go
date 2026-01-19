@@ -46,6 +46,9 @@ const DefaultShutdownTimeout = 10 * time.Second
 // before starting graceful shutdown.
 const DefaultDrainPeriod = 1 * time.Second
 
+// DefaultProbeTimeout is the default timeout for probe endpoint requests.
+const DefaultProbeTimeout = 3 * time.Second
+
 // Server provides HTTP-based metrics exposition
 type Server struct {
 	address         string
@@ -60,11 +63,13 @@ type Server struct {
 	// Shutdown configuration
 	shutdownTimeout time.Duration // Max time to wait for graceful shutdown
 	drainPeriod     time.Duration // Time to wait for connections to drain
+	probeTimeout    time.Duration // Timeout for probe requests
 
 	// Lifecycle
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
+	mu     sync.RWMutex // Protects probeProvider
 }
 
 // NewServer creates a new HTTP metrics server
@@ -82,6 +87,7 @@ func NewServer(address string, metricsProvider MetricsProvider, healthProvider H
 		cancel:          cancel,
 		shutdownTimeout: DefaultShutdownTimeout,
 		drainPeriod:     DefaultDrainPeriod,
+		probeTimeout:    DefaultProbeTimeout,
 	}
 
 	// Register handlers
@@ -205,9 +211,32 @@ func (s *Server) GetDrainPeriod() time.Duration {
 }
 
 // SetProbeProvider sets the probe provider for liveness and readiness checks.
-// This method is not thread-safe and should only be called before Start().
+// This method is thread-safe.
 func (s *Server) SetProbeProvider(provider ProbeProvider) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.probeProvider = provider
+}
+
+// getProbeProvider safely retrieves the current probe provider.
+func (s *Server) getProbeProvider() ProbeProvider {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.probeProvider
+}
+
+// SetProbeTimeout sets the timeout for probe endpoint requests.
+// This method is not thread-safe and should only be called before Start().
+func (s *Server) SetProbeTimeout(timeout time.Duration) {
+	if timeout <= 0 {
+		timeout = DefaultProbeTimeout
+	}
+	s.probeTimeout = timeout
+}
+
+// GetProbeTimeout returns the current probe timeout configuration.
+func (s *Server) GetProbeTimeout() time.Duration {
+	return s.probeTimeout
 }
 
 // handlePrometheusMetrics serves metrics in Prometheus text format
@@ -363,13 +392,14 @@ func (s *Server) handleLiveness(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+	start := time.Now()
+	ctx, cancel := context.WithTimeout(r.Context(), s.probeTimeout)
 	defer cancel()
 
 	var result health.ProbeResult
 
-	if s.probeProvider != nil {
-		result = s.probeProvider.CheckLiveness(ctx)
+	if provider := s.getProbeProvider(); provider != nil {
+		result = provider.CheckLiveness(ctx)
 	} else {
 		// Fall back to regular health check - alive if not unhealthy
 		healthStatus := s.healthProvider.Check(ctx)
@@ -378,6 +408,7 @@ func (s *Server) handleLiveness(w http.ResponseWriter, r *http.Request) {
 			Healthy:   healthStatus.Status != health.StatusUnhealthy,
 			Message:   "Derived from health check",
 			Timestamp: healthStatus.Timestamp,
+			Duration:  time.Since(start).Milliseconds(),
 		}
 	}
 
@@ -405,13 +436,14 @@ func (s *Server) handleReadiness(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+	start := time.Now()
+	ctx, cancel := context.WithTimeout(r.Context(), s.probeTimeout)
 	defer cancel()
 
 	var result health.ProbeResult
 
-	if s.probeProvider != nil {
-		result = s.probeProvider.CheckReadiness(ctx)
+	if provider := s.getProbeProvider(); provider != nil {
+		result = provider.CheckReadiness(ctx)
 	} else {
 		// Fall back to regular health check - ready if healthy or degraded
 		healthStatus := s.healthProvider.Check(ctx)
@@ -422,6 +454,7 @@ func (s *Server) handleReadiness(w http.ResponseWriter, r *http.Request) {
 			Healthy:   isReady,
 			Message:   "Derived from health check",
 			Timestamp: healthStatus.Timestamp,
+			Duration:  time.Since(start).Milliseconds(),
 		}
 	}
 
