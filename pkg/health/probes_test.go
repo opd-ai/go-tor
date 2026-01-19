@@ -8,11 +8,11 @@ import (
 
 // mockProbeChecker implements ProbeChecker for testing
 type mockProbeChecker struct {
-	name          string
-	status        Status
-	livenessOK    bool
-	readinessOK   bool
-	checkDelay    time.Duration
+	name        string
+	status      Status
+	livenessOK  bool
+	readinessOK bool
+	checkDelay  time.Duration
 }
 
 func (m *mockProbeChecker) Name() string {
@@ -112,21 +112,19 @@ func TestCachedMonitorCheckCacheDisabled(t *testing.T) {
 	}
 	monitor := NewCachedMonitor(config)
 
-	checkCount := 0
 	checker := &mockChecker{
 		name:   "counter",
 		status: StatusHealthy,
 	}
 	monitor.RegisterChecker(checker)
 
-	// Checks should not be cached
+	// Checks should not be cached - verify by running multiple checks
 	ctx := context.Background()
 	for i := 0; i < 3; i++ {
 		result := monitor.Check(ctx)
 		if result.Status != StatusHealthy {
 			t.Errorf("Check %d: expected healthy, got %s", i+1, result.Status)
 		}
-		checkCount++
 	}
 }
 

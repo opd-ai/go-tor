@@ -95,19 +95,19 @@ type cachedProbeResult struct {
 // CachedMonitor wraps Monitor with caching capabilities.
 type CachedMonitor struct {
 	*Monitor
-	cacheConfig CacheConfig
-	mu          sync.RWMutex
-	cache       map[string]*cachedResult
-	livenessCache   map[string]*cachedProbeResult
-	readinessCache  map[string]*cachedProbeResult
+	cacheConfig    CacheConfig
+	mu             sync.RWMutex
+	cache          map[string]*cachedResult
+	livenessCache  map[string]*cachedProbeResult
+	readinessCache map[string]*cachedProbeResult
 }
 
 // NewCachedMonitor creates a new cached health monitor.
 func NewCachedMonitor(config CacheConfig) *CachedMonitor {
 	return &CachedMonitor{
 		Monitor:        NewMonitor(),
-		cacheConfig:   config,
-		cache:         make(map[string]*cachedResult),
+		cacheConfig:    config,
+		cache:          make(map[string]*cachedResult),
 		livenessCache:  make(map[string]*cachedProbeResult),
 		readinessCache: make(map[string]*cachedProbeResult),
 	}
@@ -134,7 +134,7 @@ func (m *CachedMonitor) Check(ctx context.Context) OverallHealth {
 	components := make(map[string]ComponentHealth)
 	for _, checker := range checkers {
 		name := checker.Name()
-		
+
 		// Check cache
 		if cached, ok := m.cache[name]; ok {
 			if time.Since(cached.timestamp) < m.cacheConfig.TTL {
@@ -147,7 +147,7 @@ func (m *CachedMonitor) Check(ctx context.Context) OverallHealth {
 		startTime := time.Now()
 		health := checker.Check(ctx)
 		health.ResponseTimeMs = time.Since(startTime).Milliseconds()
-		
+
 		// Update cache
 		m.cache[name] = &cachedResult{
 			result:    health,
@@ -178,7 +178,7 @@ func (m *CachedMonitor) Check(ctx context.Context) OverallHealth {
 // CheckLiveness performs liveness checks on all components with caching.
 func (m *CachedMonitor) CheckLiveness(ctx context.Context) ProbeResult {
 	start := time.Now()
-	
+
 	// Get all checkers
 	m.Monitor.mu.RLock()
 	checkers := make([]Checker, 0, len(m.Monitor.checkers))
@@ -220,7 +220,7 @@ func (m *CachedMonitor) CheckLiveness(ctx context.Context) ProbeResult {
 
 			// Perform fresh check
 			healthy = lc.CheckLiveness(ctx)
-			
+
 			// Update cache
 			if m.cacheConfig.Enabled {
 				m.mu.Lock()
@@ -250,7 +250,7 @@ func (m *CachedMonitor) CheckLiveness(ctx context.Context) ProbeResult {
 
 			// Perform fresh check
 			healthy = pc.CheckLiveness(ctx)
-			
+
 			// Update cache
 			if m.cacheConfig.Enabled {
 				m.mu.Lock()
@@ -289,7 +289,7 @@ func (m *CachedMonitor) CheckLiveness(ctx context.Context) ProbeResult {
 // CheckReadiness performs readiness checks on all components with caching.
 func (m *CachedMonitor) CheckReadiness(ctx context.Context) ProbeResult {
 	start := time.Now()
-	
+
 	// Get all checkers
 	m.Monitor.mu.RLock()
 	checkers := make([]Checker, 0, len(m.Monitor.checkers))
@@ -331,7 +331,7 @@ func (m *CachedMonitor) CheckReadiness(ctx context.Context) ProbeResult {
 
 			// Perform fresh check
 			ready = rc.CheckReadiness(ctx)
-			
+
 			// Update cache
 			if m.cacheConfig.Enabled {
 				m.mu.Lock()
@@ -361,7 +361,7 @@ func (m *CachedMonitor) CheckReadiness(ctx context.Context) ProbeResult {
 
 			// Perform fresh check
 			ready = pc.CheckReadiness(ctx)
-			
+
 			// Update cache
 			if m.cacheConfig.Enabled {
 				m.mu.Lock()
