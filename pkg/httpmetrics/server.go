@@ -29,6 +29,16 @@ type HealthProvider interface {
 	Check(ctx context.Context) health.OverallHealth
 }
 
+// ProbeProvider interface for liveness and readiness checks.
+// This interface is optional - if not implemented, /live and /ready will use the
+// regular health check.
+type ProbeProvider interface {
+	// CheckLiveness performs a liveness check.
+	CheckLiveness(ctx context.Context) health.ProbeResult
+	// CheckReadiness performs a readiness check.
+	CheckReadiness(ctx context.Context) health.ProbeResult
+}
+
 // DefaultShutdownTimeout is the default timeout for graceful shutdown.
 const DefaultShutdownTimeout = 10 * time.Second
 
@@ -41,6 +51,7 @@ type Server struct {
 	address         string
 	metricsProvider MetricsProvider
 	healthProvider  HealthProvider
+	probeProvider   ProbeProvider // Optional, for /live and /ready endpoints
 	logger          *logger.Logger
 	server          *http.Server
 	listener        net.Listener
@@ -77,6 +88,8 @@ func NewServer(address string, metricsProvider MetricsProvider, healthProvider H
 	mux.HandleFunc("/metrics", s.handlePrometheusMetrics)
 	mux.HandleFunc("/metrics/json", s.handleJSONMetrics)
 	mux.HandleFunc("/health", s.handleHealth)
+	mux.HandleFunc("/live", s.handleLiveness)
+	mux.HandleFunc("/ready", s.handleReadiness)
 	mux.HandleFunc("/debug/metrics", s.handleDashboard)
 	mux.HandleFunc("/", s.handleIndex)
 
@@ -189,6 +202,12 @@ func (s *Server) GetShutdownTimeout() time.Duration {
 // This method is not thread-safe and should only be called before Start() or after Stop().
 func (s *Server) GetDrainPeriod() time.Duration {
 	return s.drainPeriod
+}
+
+// SetProbeProvider sets the probe provider for liveness and readiness checks.
+// This method is not thread-safe and should only be called before Start().
+func (s *Server) SetProbeProvider(provider ProbeProvider) {
+	s.probeProvider = provider
 }
 
 // handlePrometheusMetrics serves metrics in Prometheus text format
@@ -335,6 +354,92 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// handleLiveness serves Kubernetes-style liveness probe.
+// Returns 200 if the application is alive and should not be restarted.
+// Returns 503 if the application should be restarted.
+func (s *Server) handleLiveness(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+	defer cancel()
+
+	var result health.ProbeResult
+
+	if s.probeProvider != nil {
+		result = s.probeProvider.CheckLiveness(ctx)
+	} else {
+		// Fall back to regular health check - alive if not unhealthy
+		healthStatus := s.healthProvider.Check(ctx)
+		result = health.ProbeResult{
+			Type:      health.ProbeLiveness,
+			Healthy:   healthStatus.Status != health.StatusUnhealthy,
+			Message:   "Derived from health check",
+			Timestamp: healthStatus.Timestamp,
+		}
+	}
+
+	statusCode := http.StatusOK
+	if !result.Healthy {
+		statusCode = http.StatusServiceUnavailable
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+
+	encoder := json.NewEncoder(w)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(result); err != nil {
+		s.logger.Error("Failed to encode liveness result", "error", err)
+	}
+}
+
+// handleReadiness serves Kubernetes-style readiness probe.
+// Returns 200 if the application is ready to receive traffic.
+// Returns 503 if the application should be removed from load balancing.
+func (s *Server) handleReadiness(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+	defer cancel()
+
+	var result health.ProbeResult
+
+	if s.probeProvider != nil {
+		result = s.probeProvider.CheckReadiness(ctx)
+	} else {
+		// Fall back to regular health check - ready if healthy or degraded
+		healthStatus := s.healthProvider.Check(ctx)
+		isReady := healthStatus.Status == health.StatusHealthy ||
+			healthStatus.Status == health.StatusDegraded
+		result = health.ProbeResult{
+			Type:      health.ProbeReadiness,
+			Healthy:   isReady,
+			Message:   "Derived from health check",
+			Timestamp: healthStatus.Timestamp,
+		}
+	}
+
+	statusCode := http.StatusOK
+	if !result.Healthy {
+		statusCode = http.StatusServiceUnavailable
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+
+	encoder := json.NewEncoder(w)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(result); err != nil {
+		s.logger.Error("Failed to encode readiness result", "error", err)
+	}
+}
+
 // handleDashboard serves a simple HTML dashboard
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -397,6 +502,8 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
         <li><a href="/metrics">/metrics</a> - Prometheus format metrics</li>
         <li><a href="/metrics/json">/metrics/json</a> - JSON format metrics</li>
         <li><a href="/health">/health</a> - Health check status</li>
+        <li><a href="/live">/live</a> - Liveness probe (Kubernetes-style)</li>
+        <li><a href="/ready">/ready</a> - Readiness probe (Kubernetes-style)</li>
         <li><a href="/debug/metrics">/debug/metrics</a> - Real-time dashboard</li>
     </ul>
 </body>

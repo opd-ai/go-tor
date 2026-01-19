@@ -581,3 +581,347 @@ func TestStopCalledMultipleTimes(t *testing.T) {
 	// Second stop may return an error (server already closed) but should not panic
 	_ = server.Stop()
 }
+
+// mockProbeProvider implements ProbeProvider for testing
+type mockProbeProvider struct {
+	livenessResult  health.ProbeResult
+	readinessResult health.ProbeResult
+}
+
+func (m *mockProbeProvider) CheckLiveness(ctx context.Context) health.ProbeResult {
+	return m.livenessResult
+}
+
+func (m *mockProbeProvider) CheckReadiness(ctx context.Context) health.ProbeResult {
+	return m.readinessResult
+}
+
+func TestLivenessEndpoint(t *testing.T) {
+	metricsProvider := &mockMetricsProvider{}
+	healthProvider := &mockHealthProvider{}
+
+	server := newTestServer(metricsProvider, healthProvider)
+	if err := server.Start(); err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+	defer server.Stop()
+
+	// Test liveness endpoint (should fall back to health check)
+	url := "http://" + server.GetAddress() + "/live"
+	resp, err := http.Get(url)
+	if err != nil {
+		t.Fatalf("Failed to GET /live: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200 for liveness, got %d", resp.StatusCode)
+	}
+
+	contentType := resp.Header.Get("Content-Type")
+	if !strings.Contains(contentType, "application/json") {
+		t.Errorf("Expected Content-Type application/json, got %s", contentType)
+	}
+
+	var result health.ProbeResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("Failed to decode JSON response: %v", err)
+	}
+
+	if result.Type != health.ProbeLiveness {
+		t.Errorf("Expected liveness probe type, got %s", result.Type)
+	}
+	if !result.Healthy {
+		t.Error("Expected healthy liveness result")
+	}
+}
+
+func TestLivenessEndpointUnhealthy(t *testing.T) {
+	metricsProvider := &mockMetricsProvider{}
+	healthProvider := &mockHealthProvider{
+		health: health.OverallHealth{
+			Status:    health.StatusUnhealthy,
+			Timestamp: time.Now(),
+			Components: map[string]health.ComponentHealth{
+				"test": {
+					Name:   "test",
+					Status: health.StatusUnhealthy,
+				},
+			},
+		},
+	}
+
+	server := newTestServer(metricsProvider, healthProvider)
+	if err := server.Start(); err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+	defer server.Stop()
+
+	url := "http://" + server.GetAddress() + "/live"
+	resp, err := http.Get(url)
+	if err != nil {
+		t.Fatalf("Failed to GET /live: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Errorf("Expected status 503 for unhealthy liveness, got %d", resp.StatusCode)
+	}
+}
+
+func TestReadinessEndpoint(t *testing.T) {
+	metricsProvider := &mockMetricsProvider{}
+	healthProvider := &mockHealthProvider{}
+
+	server := newTestServer(metricsProvider, healthProvider)
+	if err := server.Start(); err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+	defer server.Stop()
+
+	// Test readiness endpoint (should fall back to health check)
+	url := "http://" + server.GetAddress() + "/ready"
+	resp, err := http.Get(url)
+	if err != nil {
+		t.Fatalf("Failed to GET /ready: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200 for readiness, got %d", resp.StatusCode)
+	}
+
+	var result health.ProbeResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("Failed to decode JSON response: %v", err)
+	}
+
+	if result.Type != health.ProbeReadiness {
+		t.Errorf("Expected readiness probe type, got %s", result.Type)
+	}
+	if !result.Healthy {
+		t.Error("Expected healthy readiness result")
+	}
+}
+
+func TestReadinessEndpointUnhealthy(t *testing.T) {
+	metricsProvider := &mockMetricsProvider{}
+	healthProvider := &mockHealthProvider{
+		health: health.OverallHealth{
+			Status:    health.StatusUnhealthy,
+			Timestamp: time.Now(),
+			Components: map[string]health.ComponentHealth{
+				"test": {
+					Name:   "test",
+					Status: health.StatusUnhealthy,
+				},
+			},
+		},
+	}
+
+	server := newTestServer(metricsProvider, healthProvider)
+	if err := server.Start(); err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+	defer server.Stop()
+
+	url := "http://" + server.GetAddress() + "/ready"
+	resp, err := http.Get(url)
+	if err != nil {
+		t.Fatalf("Failed to GET /ready: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Errorf("Expected status 503 for unhealthy readiness, got %d", resp.StatusCode)
+	}
+}
+
+func TestReadinessEndpointDegraded(t *testing.T) {
+	metricsProvider := &mockMetricsProvider{}
+	healthProvider := &mockHealthProvider{
+		health: health.OverallHealth{
+			Status:    health.StatusDegraded,
+			Timestamp: time.Now(),
+			Components: map[string]health.ComponentHealth{
+				"test": {
+					Name:   "test",
+					Status: health.StatusDegraded,
+				},
+			},
+		},
+	}
+
+	server := newTestServer(metricsProvider, healthProvider)
+	if err := server.Start(); err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+	defer server.Stop()
+
+	url := "http://" + server.GetAddress() + "/ready"
+	resp, err := http.Get(url)
+	if err != nil {
+		t.Fatalf("Failed to GET /ready: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Degraded should still be ready (can serve traffic)
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200 for degraded readiness, got %d", resp.StatusCode)
+	}
+}
+
+func TestLivenessWithProbeProvider(t *testing.T) {
+	metricsProvider := &mockMetricsProvider{}
+	healthProvider := &mockHealthProvider{}
+	probeProvider := &mockProbeProvider{
+		livenessResult: health.ProbeResult{
+			Type:    health.ProbeLiveness,
+			Healthy: true,
+			Message: "Custom liveness check passed",
+		},
+	}
+
+	server := newTestServer(metricsProvider, healthProvider)
+	server.SetProbeProvider(probeProvider)
+	if err := server.Start(); err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+	defer server.Stop()
+
+	url := "http://" + server.GetAddress() + "/live"
+	resp, err := http.Get(url)
+	if err != nil {
+		t.Fatalf("Failed to GET /live: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", resp.StatusCode)
+	}
+
+	var result health.ProbeResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+
+	if result.Message != "Custom liveness check passed" {
+		t.Errorf("Expected custom message, got: %s", result.Message)
+	}
+}
+
+func TestReadinessWithProbeProvider(t *testing.T) {
+	metricsProvider := &mockMetricsProvider{}
+	healthProvider := &mockHealthProvider{}
+	probeProvider := &mockProbeProvider{
+		readinessResult: health.ProbeResult{
+			Type:    health.ProbeReadiness,
+			Healthy: false,
+			Message: "Not ready - waiting for dependencies",
+		},
+	}
+
+	server := newTestServer(metricsProvider, healthProvider)
+	server.SetProbeProvider(probeProvider)
+	if err := server.Start(); err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+	defer server.Stop()
+
+	url := "http://" + server.GetAddress() + "/ready"
+	resp, err := http.Get(url)
+	if err != nil {
+		t.Fatalf("Failed to GET /ready: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Errorf("Expected status 503, got %d", resp.StatusCode)
+	}
+
+	var result health.ProbeResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+
+	if result.Message != "Not ready - waiting for dependencies" {
+		t.Errorf("Expected custom message, got: %s", result.Message)
+	}
+}
+
+func TestLivenessMethodNotAllowed(t *testing.T) {
+	metricsProvider := &mockMetricsProvider{}
+	healthProvider := &mockHealthProvider{}
+
+	server := newTestServer(metricsProvider, healthProvider)
+	if err := server.Start(); err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+	defer server.Stop()
+
+	url := "http://" + server.GetAddress() + "/live"
+	resp, err := http.Post(url, "text/plain", strings.NewReader("test"))
+	if err != nil {
+		t.Fatalf("Failed to POST /live: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusMethodNotAllowed {
+		t.Errorf("Expected status 405, got %d", resp.StatusCode)
+	}
+}
+
+func TestReadinessMethodNotAllowed(t *testing.T) {
+	metricsProvider := &mockMetricsProvider{}
+	healthProvider := &mockHealthProvider{}
+
+	server := newTestServer(metricsProvider, healthProvider)
+	if err := server.Start(); err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+	defer server.Stop()
+
+	url := "http://" + server.GetAddress() + "/ready"
+	resp, err := http.Post(url, "text/plain", strings.NewReader("test"))
+	if err != nil {
+		t.Fatalf("Failed to POST /ready: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusMethodNotAllowed {
+		t.Errorf("Expected status 405, got %d", resp.StatusCode)
+	}
+}
+
+func TestIndexEndpointIncludesProbeLinks(t *testing.T) {
+	metricsProvider := &mockMetricsProvider{}
+	healthProvider := &mockHealthProvider{}
+
+	server := newTestServer(metricsProvider, healthProvider)
+	if err := server.Start(); err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+	defer server.Stop()
+
+	url := "http://" + server.GetAddress() + "/"
+	resp, err := http.Get(url)
+	if err != nil {
+		t.Fatalf("Failed to GET /: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("Failed to read response body: %v", err)
+	}
+
+	bodyStr := string(body)
+
+	// Check for new probe endpoint links
+	if !strings.Contains(bodyStr, "/live") {
+		t.Error("Expected /live link in index page")
+	}
+	if !strings.Contains(bodyStr, "/ready") {
+		t.Error("Expected /ready link in index page")
+	}
+}
