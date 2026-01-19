@@ -15,6 +15,7 @@ import (
 
 	"github.com/gofrs/flock"
 	"github.com/opd-ai/go-tor/pkg/logger"
+	"github.com/opd-ai/go-tor/pkg/metrics"
 )
 
 // CheckpointState represents the recoverable runtime state of the Tor client.
@@ -117,10 +118,11 @@ func DefaultCheckpointConfig(filePath string) *CheckpointConfig {
 
 // StateCheckpointer manages periodic state checkpointing with atomic writes.
 type StateCheckpointer struct {
-	config *CheckpointConfig
-	logger *logger.Logger
-	flock  *flock.Flock
-	mu     sync.Mutex
+	config  *CheckpointConfig
+	logger  *logger.Logger
+	metrics *metrics.Metrics
+	flock   *flock.Flock
+	mu      sync.Mutex
 
 	// Current state protected by stateMu
 	stateMu sync.RWMutex
@@ -135,6 +137,11 @@ type StateCheckpointer struct {
 
 // NewStateCheckpointer creates a new state checkpointer.
 func NewStateCheckpointer(config *CheckpointConfig, log *logger.Logger) *StateCheckpointer {
+	return NewStateCheckpointerWithMetrics(config, log, nil)
+}
+
+// NewStateCheckpointerWithMetrics creates a new state checkpointer with metrics support.
+func NewStateCheckpointerWithMetrics(config *CheckpointConfig, log *logger.Logger, m *metrics.Metrics) *StateCheckpointer {
 	if log == nil {
 		log = logger.NewDefault()
 	}
@@ -143,9 +150,10 @@ func NewStateCheckpointer(config *CheckpointConfig, log *logger.Logger) *StateCh
 	}
 
 	return &StateCheckpointer{
-		config: config,
-		logger: log.Component("checkpoint"),
-		flock:  flock.New(config.FilePath + ".lock"),
+		config:  config,
+		logger:  log.Component("checkpoint"),
+		metrics: m,
+		flock:   flock.New(config.FilePath + ".lock"),
 		state: &CheckpointState{
 			Version: currentSchemaVersion,
 			Bootstrap: BootstrapState{
@@ -216,6 +224,7 @@ func copyFile(src, dst string) error {
 }
 
 // rotateBackups creates a backup of the current checkpoint file.
+// It also cleans up any old backups beyond the configured count.
 func (sc *StateCheckpointer) rotateBackups() error {
 	path := sc.config.FilePath
 	keepN := sc.config.BackupCount
@@ -227,6 +236,19 @@ func (sc *StateCheckpointer) rotateBackups() error {
 	// Check if source file exists
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return nil // Nothing to back up
+	}
+
+	// Clean up any backups beyond the configured count (from previous runs with higher BackupCount)
+	for i := keepN + 1; ; i++ {
+		oldBackup := fmt.Sprintf("%s.backup.%d", path, i)
+		if _, err := os.Stat(oldBackup); os.IsNotExist(err) {
+			break // No more old backups
+		}
+		if err := os.Remove(oldBackup); err != nil {
+			sc.logger.Warn("Failed to remove old backup", "path", oldBackup, "error", err)
+		} else {
+			sc.logger.Debug("Removed old backup beyond configured count", "path", oldBackup)
+		}
 	}
 
 	// Rotate from oldest to newest: .backup.N -> .backup.N+1
@@ -256,6 +278,7 @@ func (sc *StateCheckpointer) Save(ctx context.Context) error {
 
 	// Acquire file lock
 	if err := sc.acquireLock(ctx); err != nil {
+		sc.recordMetric(func(m *metrics.Metrics) { m.RecordCheckpointFailed() })
 		return err
 	}
 	defer func() {
@@ -283,6 +306,7 @@ func (sc *StateCheckpointer) Save(ctx context.Context) error {
 	stateCopy.Checksum = ""
 	dataWithoutChecksum, err := json.Marshal(stateCopy)
 	if err != nil {
+		sc.recordMetric(func(m *metrics.Metrics) { m.RecordCheckpointFailed() })
 		return fmt.Errorf("failed to marshal checkpoint state: %w", err)
 	}
 
@@ -292,27 +316,40 @@ func (sc *StateCheckpointer) Save(ctx context.Context) error {
 	// Marshal with checksum
 	data, err := json.MarshalIndent(stateCopy, "", "  ")
 	if err != nil {
+		sc.recordMetric(func(m *metrics.Metrics) { m.RecordCheckpointFailed() })
 		return fmt.Errorf("failed to marshal checkpoint state with checksum: %w", err)
 	}
 
 	// Write to temporary file first, then rename for atomic update
 	tmpFile := sc.config.FilePath + ".tmp"
 	if err := os.WriteFile(tmpFile, data, 0o600); err != nil {
+		sc.recordMetric(func(m *metrics.Metrics) { m.RecordCheckpointFailed() })
 		return fmt.Errorf("failed to write checkpoint state: %w", err)
 	}
 
 	if err := os.Rename(tmpFile, sc.config.FilePath); err != nil {
 		os.Remove(tmpFile) // Clean up temp file on rename failure
+		sc.recordMetric(func(m *metrics.Metrics) { m.RecordCheckpointFailed() })
 		return fmt.Errorf("failed to rename checkpoint state file: %w", err)
 	}
 
+	sc.recordMetric(func(m *metrics.Metrics) { m.RecordCheckpointSaved() })
 	sc.logger.Debug("Saved checkpoint state",
 		"bootstrap_phase", stateCopy.Bootstrap.Phase,
 		"circuit_builds", stateCopy.Circuits.TotalBuilds)
 	return nil
 }
 
+// recordMetric safely calls a metric recording function if metrics are available.
+func (sc *StateCheckpointer) recordMetric(fn func(*metrics.Metrics)) {
+	if sc.metrics != nil {
+		fn(sc.metrics)
+	}
+}
+
 // Load loads the checkpoint state from disk.
+// Note: The file lock is held during backup recovery to prevent concurrent
+// writes to the checkpoint file while we're reading backup files.
 func (sc *StateCheckpointer) Load(ctx context.Context) (*CheckpointState, error) {
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
@@ -348,6 +385,7 @@ func (sc *StateCheckpointer) Load(ctx context.Context) (*CheckpointState, error)
 	sc.state = &state
 	sc.stateMu.Unlock()
 
+	sc.recordMetric(func(m *metrics.Metrics) { m.RecordCheckpointLoaded() })
 	sc.logger.Info("Loaded checkpoint state",
 		"version", state.Version,
 		"bootstrap_phase", state.Bootstrap.Phase,
@@ -357,6 +395,7 @@ func (sc *StateCheckpointer) Load(ctx context.Context) (*CheckpointState, error)
 }
 
 // loadFromBackup attempts to load checkpoint state from backup files.
+// This is called while holding the checkpoint file lock to prevent concurrent writes.
 func (sc *StateCheckpointer) loadFromBackup() (*CheckpointState, error) {
 	for i := 1; i <= sc.config.BackupCount; i++ {
 		backupPath := fmt.Sprintf("%s.backup.%d", sc.config.FilePath, i)
@@ -386,6 +425,7 @@ func (sc *StateCheckpointer) loadFromBackup() (*CheckpointState, error) {
 		sc.state = &state
 		sc.stateMu.Unlock()
 
+		sc.recordMetric(func(m *metrics.Metrics) { m.RecordCheckpointRecovery() })
 		sc.logger.Info("Recovered checkpoint state from backup",
 			"path", backupPath,
 			"bootstrap_phase", state.Bootstrap.Phase)
@@ -448,13 +488,14 @@ func (sc *StateCheckpointer) RecordCircuitBuild(success bool, buildTimeMs int64)
 		sc.state.Circuits.LastBuildTime = time.Now()
 
 		// Update running average of build time using exponential moving average
+		// EMA formula: new_avg = old_avg * (1-alpha) + new_value * alpha
 		if sc.state.Circuits.TotalSuccesses == 1 {
 			sc.state.Circuits.AverageBuildTimeMs = buildTimeMs
 		} else {
-			// EMA formula: new_avg = old_avg * (1-alpha) + new_value * alpha
-			oldWeight := int64((1 - emaAlpha) * 10)
-			newWeight := int64(emaAlpha * 10)
-			sc.state.Circuits.AverageBuildTimeMs = (sc.state.Circuits.AverageBuildTimeMs*oldWeight + buildTimeMs*newWeight) / 10
+			oldAvg := float64(sc.state.Circuits.AverageBuildTimeMs)
+			newVal := float64(buildTimeMs)
+			newAvg := (1-emaAlpha)*oldAvg + emaAlpha*newVal
+			sc.state.Circuits.AverageBuildTimeMs = int64(newAvg)
 		}
 	} else {
 		sc.state.Circuits.TotalFailures++

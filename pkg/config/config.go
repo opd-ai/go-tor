@@ -3,6 +3,7 @@ package config
 
 import (
 	"fmt"
+	"path/filepath"
 	"time"
 
 	"github.com/opd-ai/go-tor/pkg/autoconfig"
@@ -455,4 +456,14 @@ func (c *Config) Clone() *Config {
 	clone.OnionServices = make([]OnionServiceConfig, len(c.OnionServices))
 	copy(clone.OnionServices, c.OnionServices)
 	return &clone
+}
+
+// GetCheckpointPath returns the resolved checkpoint file path.
+// If CrashRecoveryCheckpointPath is empty, it returns the default path
+// based on the DataDirectory.
+func (c *Config) GetCheckpointPath() string {
+	if c.CrashRecoveryCheckpointPath != "" {
+		return c.CrashRecoveryCheckpointPath
+	}
+	return filepath.Join(c.DataDirectory, "checkpoint.json")
 }

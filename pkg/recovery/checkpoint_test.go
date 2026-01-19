@@ -231,9 +231,10 @@ func TestStateCheckpointerBackupRotation(t *testing.T) {
 	filePath := filepath.Join(tmpDir, "checkpoint.json")
 
 	config := &CheckpointConfig{
-		FilePath:    filePath,
-		BackupCount: 2,
-		LockTimeout: 10 * time.Second,
+		FilePath:           filePath,
+		BackupCount:        2,
+		LockTimeout:        10 * time.Second,
+		CheckpointInterval: 0, // Disabled for this test
 	}
 	sc := NewStateCheckpointer(config, logger.NewDefault())
 
@@ -303,9 +304,10 @@ func TestStateCheckpointerCorruptedFile(t *testing.T) {
 	filePath := filepath.Join(tmpDir, "checkpoint.json")
 
 	config := &CheckpointConfig{
-		FilePath:    filePath,
-		BackupCount: 2,
-		LockTimeout: 10 * time.Second,
+		FilePath:           filePath,
+		BackupCount:        2,
+		LockTimeout:        10 * time.Second,
+		CheckpointInterval: 0, // Disabled for this test
 	}
 	sc := NewStateCheckpointer(config, logger.NewDefault())
 
@@ -649,9 +651,10 @@ func TestStateCheckpointerDisabledBackups(t *testing.T) {
 	filePath := filepath.Join(tmpDir, "checkpoint.json")
 
 	config := &CheckpointConfig{
-		FilePath:    filePath,
-		BackupCount: 0, // Disabled
-		LockTimeout: 10 * time.Second,
+		FilePath:           filePath,
+		BackupCount:        0, // Disabled
+		LockTimeout:        10 * time.Second,
+		CheckpointInterval: time.Second, // Set to ensure consistency
 	}
 	sc := NewStateCheckpointer(config, logger.NewDefault())
 
