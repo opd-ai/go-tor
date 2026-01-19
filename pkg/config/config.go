@@ -3,6 +3,7 @@ package config
 
 import (
 	"fmt"
+	"path/filepath"
 	"time"
 
 	"github.com/opd-ai/go-tor/pkg/autoconfig"
@@ -101,6 +102,12 @@ type Config struct {
 	MemoryMaxGoroutines       int    // Maximum goroutine count threshold (default: 10000)
 	MemoryCheckInterval       int    // Interval between memory checks in seconds (default: 30)
 	MemoryTriggerGCOnCritical bool   // Trigger GC when critical memory pressure is detected (default: true)
+
+	// Crash recovery checkpointing configuration (AUDIT LOW-008)
+	EnableCrashRecovery         bool   // Enable crash recovery checkpointing (default: true)
+	CrashRecoveryCheckpointPath string // Path to checkpoint file (default: "<DataDirectory>/checkpoint.json")
+	CrashRecoveryInterval       int    // Interval between checkpoints in seconds (default: 60)
+	CrashRecoveryBackupCount    int    // Number of checkpoint backup files to retain (default: 2)
 }
 
 // OnionServiceConfig represents configuration for a single onion service
@@ -206,6 +213,11 @@ func DefaultConfig() *Config {
 		MemoryMaxGoroutines:       10000,
 		MemoryCheckInterval:       30,
 		MemoryTriggerGCOnCritical: true,
+		// Crash recovery checkpointing defaults (AUDIT LOW-008 - enabled by default)
+		EnableCrashRecovery:         true,
+		CrashRecoveryCheckpointPath: "", // Will be set to DataDirectory/checkpoint.json if empty
+		CrashRecoveryInterval:       60, // 1 minute
+		CrashRecoveryBackupCount:    2,
 	}
 }
 
@@ -422,6 +434,16 @@ func (c *Config) Validate() error {
 		}
 	}
 
+	// Validate crash recovery configuration (AUDIT LOW-008)
+	if c.EnableCrashRecovery {
+		if c.CrashRecoveryInterval <= 0 {
+			return fmt.Errorf("CrashRecoveryInterval must be positive when crash recovery is enabled")
+		}
+		if c.CrashRecoveryBackupCount < 0 {
+			return fmt.Errorf("CrashRecoveryBackupCount must be non-negative")
+		}
+	}
+
 	return nil
 }
 
@@ -434,4 +456,14 @@ func (c *Config) Clone() *Config {
 	clone.OnionServices = make([]OnionServiceConfig, len(c.OnionServices))
 	copy(clone.OnionServices, c.OnionServices)
 	return &clone
+}
+
+// GetCheckpointPath returns the resolved checkpoint file path.
+// If CrashRecoveryCheckpointPath is empty, it returns the default path
+// based on the DataDirectory.
+func (c *Config) GetCheckpointPath() string {
+	if c.CrashRecoveryCheckpointPath != "" {
+		return c.CrashRecoveryCheckpointPath
+	}
+	return filepath.Join(c.DataDirectory, "checkpoint.json")
 }
