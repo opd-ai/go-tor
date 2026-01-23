@@ -753,13 +753,3 @@ const dashboardTemplate = `<!DOCTYPE html>
     </div>
 </body>
 </html>`
-
-// SetProfiler registers profiling endpoints with the metrics server.
-// This allows the profiler to expose pprof endpoints on the same port as metrics.
-func (s *Server) SetProfiler(profiler ProfilerProvider) {
-if profiler == nil {
-return
-}
-profiler.RegisterWithMux(s.mux)
-s.logger.Info("Profiler endpoints registered with metrics server")
-}
