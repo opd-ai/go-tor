@@ -3,6 +3,7 @@
 package metrics
 
 import (
+	"math"
 	"sort"
 	"sync"
 	"time"
@@ -48,14 +49,7 @@ type EnhancedHistogram struct {
 	observations []TimedObservation
 	options      HistogramOptions
 	mu           sync.RWMutex
-
-	// Cached aggregation values (invalidated on new observations)
-	cachedP50   time.Duration
-	cachedP95   time.Duration
-	cachedP99   time.Duration
-	cachedMean  time.Duration
-	cacheValid  bool
-	lastCleanup time.Time
+	lastCleanup  time.Time
 }
 
 // NewEnhancedHistogram creates a new enhanced histogram with specified options
@@ -84,9 +78,6 @@ func (h *EnhancedHistogram) Observe(d time.Duration) {
 		Value:     d,
 		Timestamp: now,
 	})
-
-	// Invalidate cache
-	h.cacheValid = false
 
 	// Apply retention policy if needed
 	h.applyRetentionLocked(now)
@@ -134,16 +125,15 @@ func (h *EnhancedHistogram) P99() time.Duration {
 }
 
 // Percentile returns the nth percentile (0.0 to 1.0)
-// Uses efficient sorting and caching for repeated calls
 func (h *EnhancedHistogram) Percentile(p float64) time.Duration {
-	h.mu.Lock()
-	defer h.mu.Unlock()
+	h.mu.RLock()
+	defer h.mu.RUnlock()
 
 	if len(h.observations) == 0 {
 		return 0
 	}
 
-	// Extract values and sort
+	// Extract values and sort (copy to avoid modifying original)
 	values := make([]time.Duration, len(h.observations))
 	for i, obs := range h.observations {
 		values[i] = obs.Value
@@ -274,7 +264,9 @@ func (h *EnhancedHistogram) calculateStdDevLocked(values []time.Duration, mean t
 	}
 
 	variance := sumSquares / float64(len(values))
-	return time.Duration(variance) // Approximation
+	// Standard deviation is square root of variance
+	stdDev := math.Sqrt(variance)
+	return time.Duration(stdDev)
 }
 
 // HistogramSnapshot represents a point-in-time statistical snapshot
@@ -356,11 +348,16 @@ func (a *AggregatedHistogram) cleanupOldWindowsLocked(now time.Time) {
 // AggregateAll returns aggregated statistics across all windows
 func (a *AggregatedHistogram) AggregateAll() HistogramSnapshot {
 	a.mu.RLock()
-	defer a.mu.RUnlock()
-
-	// Combine all observations from all windows
-	var allValues []time.Duration
+	// Collect histogram references while holding the lock
+	histograms := make([]*EnhancedHistogram, 0, len(a.windows))
 	for _, hist := range a.windows {
+		histograms = append(histograms, hist)
+	}
+	a.mu.RUnlock()
+
+	// Now access histograms without holding the aggregated lock
+	var allValues []time.Duration
+	for _, hist := range histograms {
 		hist.mu.RLock()
 		for _, obs := range hist.observations {
 			allValues = append(allValues, obs.Value)
