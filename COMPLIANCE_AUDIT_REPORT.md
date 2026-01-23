@@ -1,7 +1,7 @@
 # Tor Protocol Compliance Audit Report
 
 **Project:** go-tor (https://github.com/opd-ai/go-tor)  
-**Version:** 0.1.0 (Development)  
+**Version:** 0.1.0-dev (Development)  
 **Audit Date:** January 2026  
 **Audit Scope:** Protocol compliance against official Tor Project specifications  
 **Reference Specifications:** tor-spec.txt, dir-spec.txt, rend-spec-v3.txt, path-spec.txt, control-spec.txt
@@ -64,8 +64,9 @@ The go-tor implementation demonstrates good architectural alignment with Tor pro
 **Files:** `pkg/cell/cell.go`, `pkg/cell/relay.go`
 
 **Details:**
-- ✅ Fixed-size cells (514 bytes): All 12 command types implemented (PADDING, CREATE, CREATED, RELAY, DESTROY, CREATE_FAST, CREATED_FAST, VERSIONS, NETINFO, RELAY_EARLY, CREATE2, CREATED2)
-- ✅ Variable-length cells (≥128 bytes): All 5 types (VPADDING, CERTS, AUTH_CHALLENGE, AUTHENTICATE, AUTHORIZE)
+- ✅ Fixed-size cells (514 bytes): 11 fixed-size command types implemented (PADDING, CREATE, CREATED, RELAY, DESTROY, CREATE_FAST, CREATED_FAST, NETINFO, RELAY_EARLY, CREATE2, CREATED2)
+- ✅ VERSIONS cell: Implemented as a variable-length cell via a pre-negotiation special-case, matching `cell.Command.IsVariableLength()` behavior
+- ✅ Variable-length cells (≥128 bytes): All 5 standard variable-length types (VPADDING, CERTS, AUTH_CHALLENGE, AUTHENTICATE, AUTHORIZE)
 - ✅ Circuit ID handling: 4-byte circuit IDs for link protocol v4+
 - ✅ Relay cells: Complete 11-byte header (Command[1] + Recognized[2] + StreamID[2] + Digest[4] + Length[2])
 - ✅ 20 relay command types including onion service commands (INTRODUCE1/2, RENDEZVOUS1/2)
@@ -83,10 +84,10 @@ The go-tor implementation demonstrates good architectural alignment with Tor pro
 
 **Details:**
 - ✅ **AES-128-CTR** stream cipher (tor-spec.txt §5.1.1): Complete implementation
-- ✅ **ntor handshake** (tor-spec.txt §5.1.4): Full client-side implementation with Curve25519 DH
+- ⚠️ **ntor handshake** (tor-spec.txt §5.1.4): Partial implementation - `NtorClientHandshake` generates handshake data but returns placeholder shared secret; `NtorProcessResponse` implements full key derivation, but end-to-end handshake not yet wired into circuit creation
 - ✅ **KDF-TOR** legacy key derivation: Iterative SHA-1 hashing (K = K_0 | K_1 | K_2...)
 - ✅ **HKDF-SHA256** for ntor: Proper HKDF with protoid="ntor-curve25519-sha256-1"
-- ✅ **RSA-1024-OAEP** for legacy TAP handshake
+- ⚠️ **RSA-1024-OAEP** primitive implemented (not yet integrated into legacy TAP circuit handshake; current TAP handling in `pkg/circuit/extension.go` uses random 144-byte placeholder data)
 - ✅ **Ed25519** identity keys for v3 onion services
 - ✅ Derives all required keys: Kf (forward), Kb (backward), Df (digest forward), Db (digest backward) per tor-spec.txt §5.2.2
 
@@ -139,21 +140,25 @@ The go-tor implementation demonstrates good architectural alignment with Tor pro
 
 **Details:**
 - ✅ HTTP GET from directory authorities (6 hardcoded fallbacks)
-- ✅ Consensus document parsing (network-status-version 3)
-- ✅ Relay metadata extraction: Nickname, fingerprint, address, ORPort, DirPort
+- ✅ Consensus document download; header metadata (`network-status-version`, `valid-after`, `fresh-until`, `valid-until`) not yet parsed
+- ✅ Relay metadata extraction from consensus body: Nickname, fingerprint, address, ORPort, DirPort
 - ✅ Relay flag parsing: Guard, Exit, Valid, Running, Stable
-- ✅ Ed25519 identity keys (32 bytes) - SPEC-001
-- ✅ Ntor onion keys (Curve25519, 32 bytes) - SPEC-001
+- ❌ Ed25519 identity keys (32 bytes) - Field defined in struct but not populated from consensus/descriptor data
+- ❌ Ntor onion keys (Curve25519, 32 bytes) - Field defined in struct but not populated from consensus/descriptor data
 - ✅ Compression support (gzip, deflate)
-- ✅ Clock skew validation (max 30 minutes)
-- ❌ **CRITICAL**: No consensus signature verification (SPEC-003)
+- ❌ Clock skew and validity interval validation not enforced (`ValidateConsensusMetadata` defined but not invoked)
+- ❌ **CRITICAL**: No consensus signature verification
 - ❌ Authority quorum not enforced (3 authorities mentioned, not validated)
 - ⚠️ TLS certificate verification disabled for IP-based authorities
 
-**Code Evidence:**
+**Code Evidence (illustrative):**
 ```go
-// pkg/directory/directory.go
-// TODO: SPEC-003 - Consensus signature verification not implemented
+// NOTE: Illustrative example only.
+// Actual implementation is in pkg/directory/directory.go and currently
+// fetches and parses consensus data without verifying signatures.
+//
+// TODO: Implement consensus signature verification and enforce
+//       authority quorum before accepting a consensus document.
 ```
 
 **Impact:** **MEDIUM-HIGH** - Cannot verify consensus authenticity, vulnerable to malicious directory information. While consensus is cryptographically signed per spec, this implementation accepts any data without validation.
@@ -236,7 +241,7 @@ The go-tor implementation demonstrates good architectural alignment with Tor pro
 **Files:** `pkg/protocol/protocol.go`, `pkg/connection/connection.go`
 
 **Details:**
-- ✅ Link protocol versions 3-5 supported (prefers v4 with 4-byte circuit IDs)
+- ✅ Link protocol versions 4-5 supported (uses 4-byte circuit IDs; v3 with 2-byte circuit IDs is not yet supported)
 - ✅ VERSIONS cell exchange and version negotiation
 - ✅ NETINFO cell exchange (timestamp + address validation)
 - ✅ TLS 1.2+ minimum enforced
