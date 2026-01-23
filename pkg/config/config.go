@@ -108,6 +108,17 @@ type Config struct {
 	CrashRecoveryCheckpointPath string // Path to checkpoint file (default: "<DataDirectory>/checkpoint.json")
 	CrashRecoveryInterval       int    // Interval between checkpoints in seconds (default: 60)
 	CrashRecoveryBackupCount    int    // Number of checkpoint backup files to retain (default: 2)
+
+	// Profiling configuration (Phase 3.8)
+	EnableProfiling     bool   // Enable pprof HTTP endpoints (default: false - security sensitive)
+	ProfilingPort       int    // Port for pprof endpoints (default: 0 = use metrics port)
+	ProfilingPath       string // Path prefix for pprof endpoints (default: "/debug/pprof")
+	EnableCPUProfiling  bool   // Enable CPU profiling capability (default: true when profiling enabled)
+	EnableHeapProfiling bool   // Enable heap profiling capability (default: true when profiling enabled)
+	EnableMutexProfile  bool   // Enable mutex contention profiling (default: false - high overhead)
+	EnableBlockProfile  bool   // Enable blocking profiling (default: false - high overhead)
+	MutexProfileRate    int    // Mutex profiling sample rate (default: 0 = disabled)
+	BlockProfileRate    int    // Block profiling sample rate in nanoseconds (default: 0 = disabled)
 }
 
 // OnionServiceConfig represents configuration for a single onion service
@@ -218,6 +229,16 @@ func DefaultConfig() *Config {
 		CrashRecoveryCheckpointPath: "", // Will be set to DataDirectory/checkpoint.json if empty
 		CrashRecoveryInterval:       60, // 1 minute
 		CrashRecoveryBackupCount:    2,
+		// Profiling defaults (Phase 3.8 - disabled by default for security)
+		EnableProfiling:     false,
+		ProfilingPort:       0, // 0 = use metrics port
+		ProfilingPath:       "/debug/pprof",
+		EnableCPUProfiling:  true, // Enabled when profiling is enabled
+		EnableHeapProfiling: true, // Enabled when profiling is enabled
+		EnableMutexProfile:  false,
+		EnableBlockProfile:  false,
+		MutexProfileRate:    0, // Disabled by default (high overhead)
+		BlockProfileRate:    0, // Disabled by default (high overhead)
 	}
 }
 
