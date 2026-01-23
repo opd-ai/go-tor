@@ -78,7 +78,6 @@ type ProfilerProvider interface {
 	RegisterWithMux(mux *http.ServeMux)
 }
 
-
 // NewServer creates a new HTTP metrics server
 func NewServer(address string, metricsProvider MetricsProvider, healthProvider HealthProvider, log *logger.Logger) *Server {
 	ctx, cancel := context.WithCancel(context.Background())
