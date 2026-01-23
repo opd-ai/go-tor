@@ -72,6 +72,13 @@ type Server struct {
 	mu     sync.RWMutex // Protects probeProvider
 }
 
+// ProfilerProvider interface for getting profiler instance.
+// This interface is optional - if not implemented, profiling endpoints will not be registered.
+type ProfilerProvider interface {
+	RegisterWithMux(mux *http.ServeMux)
+}
+
+
 // NewServer creates a new HTTP metrics server
 func NewServer(address string, metricsProvider MetricsProvider, healthProvider HealthProvider, log *logger.Logger) *Server {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -216,6 +223,16 @@ func (s *Server) SetProbeProvider(provider ProbeProvider) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.probeProvider = provider
+}
+
+// SetProfiler registers profiling endpoints with the metrics server.
+// This allows the profiler to expose pprof endpoints on the same port as metrics.
+func (s *Server) SetProfiler(profiler ProfilerProvider) {
+	if profiler == nil {
+		return
+	}
+	profiler.RegisterWithMux(s.mux)
+	s.logger.Info("Profiler endpoints registered with metrics server")
 }
 
 // getProbeProvider safely retrieves the current probe provider.
@@ -736,3 +753,13 @@ const dashboardTemplate = `<!DOCTYPE html>
     </div>
 </body>
 </html>`
+
+// SetProfiler registers profiling endpoints with the metrics server.
+// This allows the profiler to expose pprof endpoints on the same port as metrics.
+func (s *Server) SetProfiler(profiler ProfilerProvider) {
+if profiler == nil {
+return
+}
+profiler.RegisterWithMux(s.mux)
+s.logger.Info("Profiler endpoints registered with metrics server")
+}
