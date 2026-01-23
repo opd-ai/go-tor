@@ -508,6 +508,99 @@ watch -n 5 'curl -s http://localhost:9052/metrics/json | jq .'
 
 ---
 
+## Advanced Histogram Features (Phase 3.11)
+
+The metrics package now includes enhanced histogram capabilities with percentile calculations, time-window aggregation, and retention policies for detailed latency and performance analysis.
+
+### Enhanced Histogram
+
+The `EnhancedHistogram` type provides advanced statistical analysis:
+
+```go
+import "github.com/opd-ai/go-tor/pkg/metrics"
+
+// Create histogram with custom options
+opts := metrics.HistogramOptions{
+    MaxObservations:   1000,              // Keep last 1000 observations
+    TimeWindow:        5 * time.Minute,   // Keep 5 minutes of data
+    BucketCount:       20,                // Number of buckets for aggregation
+    EnableAggregation: true,              // Enable time-window aggregation
+}
+hist := metrics.NewEnhancedHistogram(opts)
+
+// Record observations
+hist.Observe(50 * time.Millisecond)
+hist.Observe(100 * time.Millisecond)
+
+// Get percentiles
+p50 := hist.P50()  // Median
+p95 := hist.P95()  // 95th percentile
+p99 := hist.P99()  // 99th percentile
+
+// Get statistical snapshot
+snapshot := hist.Snapshot()
+fmt.Printf("Mean: %v, Min: %v, Max: %v\n", snapshot.Mean, snapshot.Min, snapshot.Max)
+fmt.Printf("P50: %v, P95: %v, P99: %v, P999: %v\n", 
+    snapshot.P50, snapshot.P95, snapshot.P99, snapshot.P999)
+```
+
+### Time-Window Aggregation
+
+The `AggregatedHistogram` type provides time-based aggregation:
+
+```go
+// Create aggregated histogram
+// windowDuration: 1 minute windows
+// maxWindows: keep last 60 windows (1 hour of data)
+agg := metrics.NewAggregatedHistogram(
+    time.Minute,  // Window duration
+    60,           // Max windows to keep
+    opts,         // Histogram options
+)
+
+// Record observations (automatically grouped by time window)
+agg.Observe(latency)
+
+// Get aggregated statistics across all windows
+snapshot := agg.AggregateAll()
+
+// Get statistics for a specific time window
+windowHist := agg.GetWindow(time.Now())
+if windowHist != nil {
+    fmt.Printf("Current window P95: %v\n", windowHist.P95())
+}
+```
+
+### Retention Policies
+
+Histograms support two retention policies:
+
+1. **Count-based**: Keep only the last N observations (via `MaxObservations`)
+2. **Time-based**: Keep only observations within a time window (via `TimeWindow`)
+
+Both policies work together to prevent unbounded memory growth while maintaining statistical accuracy.
+
+### Use Cases
+
+- **Circuit build latency analysis**: Track P50/P95/P99 build times
+- **Connection establishment timing**: Analyze TLS handshake performance
+- **Stream performance**: Monitor data transfer latencies
+- **Time-series analysis**: Track performance trends over time windows
+- **Resource usage profiling**: Analyze operation durations with percentiles
+
+### Performance Characteristics
+
+- Thread-safe concurrent access
+- Efficient sorting using Go's standard library
+- Automatic cleanup of old observations
+- Low memory overhead (configurable limits)
+- Benchmark results on AMD EPYC 7763:
+  - Observe: ~113 ns/op, 171 B/op
+  - P95 calculation: ~4.2 µs/op, 8.2 KB/op
+  - Snapshot: ~5.5 µs/op, 8.2 KB/op
+
+---
+
 ## See Also
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture

@@ -63,9 +63,9 @@ func TestEnhancedHistogram_Percentiles(t *testing.T) {
 	}
 
 	tests := []struct {
-		name     string
-		method   func() time.Duration
-		expected time.Duration
+		name      string
+		method    func() time.Duration
+		expected  time.Duration
 		tolerance time.Duration
 	}{
 		{"P50", h.P50, 50 * time.Millisecond, 5 * time.Millisecond},
