@@ -4,6 +4,7 @@ package circuit
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha1" // #nosec G505 - SHA-1 required by Tor protocol (tor-spec.txt §6.1)
 	"encoding/binary"
 	"fmt"
 	"time"
@@ -410,8 +411,17 @@ func (e *Extension) ProcessCreated2(created2Cell *cell.Cell) error {
 		return fmt.Errorf("insufficient key material: got %d bytes, need 72", len(keyMaterial))
 	}
 
-	// Set up encryption for this hop using derived keys
-	// In production, this would call circuit.AddHop() or similar to configure encryption
+	// Derive cryptographic state from key material
+	hop, err := e.deriveHopFromKeyMaterial(keyMaterial)
+	if err != nil {
+		return fmt.Errorf("failed to derive hop crypto state: %w", err)
+	}
+
+	// Add the first hop to circuit with cryptographic state
+	if err := e.circuit.AddHop(hop); err != nil {
+		return fmt.Errorf("failed to add first hop to circuit: %w", err)
+	}
+
 	e.logger.Info("CREATED2 processed successfully with verified keys",
 		"circuit_id", e.circuit.ID,
 		"key_material_size", len(keyMaterial))
@@ -479,13 +489,84 @@ func (e *Extension) ProcessExtended2(extended2Cell *cell.RelayCell) error {
 		return fmt.Errorf("insufficient key material: got %d bytes, need 72", len(keyMaterial))
 	}
 
-	// Set up encryption for the new hop using derived keys
-	// In production, this would call circuit.AddHop() or similar to add encryption layer
+	// Derive cryptographic state from key material
+	hop, err := e.deriveHopFromKeyMaterial(keyMaterial)
+	if err != nil {
+		return fmt.Errorf("failed to derive hop crypto state: %w", err)
+	}
+
+	// Add the new hop to circuit with cryptographic state
+	if err := e.circuit.AddHop(hop); err != nil {
+		return fmt.Errorf("failed to add hop to circuit: %w", err)
+	}
+
 	e.logger.Info("EXTENDED2 processed successfully with verified keys",
 		"circuit_id", e.circuit.ID,
 		"key_material_size", len(keyMaterial))
 
 	return nil
+}
+
+// deriveHopFromKeyMaterial creates a Hop with cryptographic state from key material
+// Per tor-spec.txt §5.2, key material layout is:
+// - Df (20 bytes): forward digest key
+// - Db (20 bytes): backward digest key
+// - Kf (16 bytes): forward cipher key (AES-128)
+// - Kb (16 bytes): backward cipher key (AES-128)
+func (e *Extension) deriveHopFromKeyMaterial(keyMaterial []byte) (*Hop, error) {
+	if len(keyMaterial) < 72 {
+		return nil, fmt.Errorf("insufficient key material: got %d bytes, need 72", len(keyMaterial))
+	}
+
+	// Extract keys from key material per tor-spec.txt §5.2
+	dfKey := keyMaterial[0:20]   // Forward digest key
+	dbKey := keyMaterial[20:40]  // Backward digest key
+	kfKey := keyMaterial[40:56]  // Forward cipher key (AES-128)
+	kbKey := keyMaterial[56:72]  // Backward cipher key (AES-128)
+
+	// Create forward cipher (client → relay)
+	// Per tor-spec.txt §5.1.1, use AES-128-CTR with zero IV
+	zeroIV := make([]byte, 16)
+	forwardCipherWrapper, err := crypto.NewAESCTRCipher(kfKey, zeroIV)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create forward cipher: %w", err)
+	}
+
+	// Create backward cipher (relay → client)
+	backwardCipherWrapper, err := crypto.NewAESCTRCipher(kbKey, zeroIV)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create backward cipher: %w", err)
+	}
+
+	// Extract the underlying cipher.Stream from the wrappers
+	forwardCipher := forwardCipherWrapper.Stream()
+	backwardCipher := backwardCipherWrapper.Stream()
+
+	// Create digest hashes per tor-spec.txt §6.1
+	// SHA-1 running digests for relay cell verification
+	// Initialize with the digest keys (Df, Db)
+	forwardDigest := sha1.New() // #nosec G401 - SHA-1 required by Tor spec
+	forwardDigest.Write(dfKey)  // #nosec G104 - hash.Hash.Write never fails
+	
+	backwardDigest := sha1.New() // #nosec G401 - SHA-1 required by Tor spec
+	backwardDigest.Write(dbKey)  // #nosec G104 - hash.Hash.Write never fails
+
+	// Create hop with cryptographic state
+	hop := &Hop{
+		ForwardCipher:  forwardCipher,
+		BackwardCipher: backwardCipher,
+		ForwardDigest:  forwardDigest,
+		BackwardDigest: backwardDigest,
+	}
+
+	e.logger.Debug("Derived hop cryptographic state from key material",
+		"circuit_id", e.circuit.ID,
+		"df_len", len(dfKey),
+		"db_len", len(dbKey),
+		"kf_len", len(kfKey),
+		"kb_len", len(kbKey))
+
+	return hop, nil
 }
 
 // DeriveKeys derives encryption keys for a circuit hop using KDF-TOR

@@ -123,6 +123,12 @@ func (c *AESCTRCipher) Decrypt(ciphertext []byte) {
 	c.stream.XORKeyStream(ciphertext, ciphertext)
 }
 
+// Stream returns the underlying cipher.Stream for direct use
+// This is useful when the cipher needs to be used with the cipher.Stream interface
+func (c *AESCTRCipher) Stream() cipher.Stream {
+	return c.stream
+}
+
 // RSAPublicKey wraps an RSA public key
 type RSAPublicKey struct {
 	key *rsa.PublicKey
