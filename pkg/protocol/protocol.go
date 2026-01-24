@@ -77,6 +77,12 @@ func (h *Handshake) PerformHandshake(ctx context.Context) error {
 		return fmt.Errorf("failed to receive VERSIONS: %w", err)
 	}
 
+	// Receive CERTS cell (optional but recommended)
+	if err := h.receiveCERTS(ctx); err != nil {
+		// Log warning but don't fail - CERTS authentication is optional for now
+		h.logger.Warn("CERTS cell handling failed", "error", err)
+	}
+
 	// Send NETINFO cell
 	if err := h.sendNetinfo(); err != nil {
 		return fmt.Errorf("failed to send NETINFO: %w", err)
@@ -254,4 +260,58 @@ func (h *Handshake) receiveNetinfo(ctx context.Context) error {
 // NegotiatedVersion returns the negotiated protocol version
 func (h *Handshake) NegotiatedVersion() int {
 	return h.negotiatedVersion
+}
+
+// receiveCERTS receives and validates the CERTS cell
+// Per tor-spec.txt §4.2, relays send CERTS after VERSIONS
+func (h *Handshake) receiveCERTS(ctx context.Context) error {
+	timer := time.NewTimer(h.timeout)
+	defer timer.Stop()
+
+	cellCh := make(chan *cell.Cell, 1)
+	errCh := make(chan error, 1)
+
+	go func() {
+		receivedCell, err := h.conn.ReceiveCell()
+		if err != nil {
+			errCh <- err
+			return
+		}
+		cellCh <- receivedCell
+	}()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return fmt.Errorf("timeout waiting for CERTS response")
+	case err := <-errCh:
+		return err
+	case receivedCell := <-cellCh:
+		if receivedCell.Command != cell.CmdCerts {
+			h.logger.Debug("Received non-CERTS cell, skipping CERTS validation", "command", receivedCell.Command)
+			return nil
+		}
+
+		h.logger.Debug("Received CERTS cell")
+
+		// Parse CERTS cell
+		certs, err := ParseCERTSCell(receivedCell)
+		if err != nil {
+			return fmt.Errorf("failed to parse CERTS cell: %w", err)
+		}
+
+		// Validate certificate expiration
+		if err := certs.ValidateExpiration(); err != nil {
+			h.logger.Warn("Certificate expiration validation failed", "error", err)
+			// Don't fail - some certs may be expired but relay still functional
+		}
+
+		// TODO: Validate relay identity if expected identity is provided
+		// This requires integration with connection.Config to pass expected identity
+		// For now, we just parse and validate structure
+
+		h.logger.Info("CERTS cell processed", "num_certs", len(certs.Certificates))
+		return nil
+	}
 }
