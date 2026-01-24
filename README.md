@@ -106,6 +106,7 @@ func main() {
     
     // Get SOCKS5 proxy URL
     proxyURL := torClient.ProxyURL()  // "socks5://127.0.0.1:9050"
+    _ = proxyURL // avoid unused variable error in this minimal example
     
     // Configure your HTTP client to use proxyURL
 }
