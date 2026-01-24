@@ -41,6 +41,10 @@ go.work
 # Temporary files
 /tmp/
 
+# Backup files
+*_BACKUP.*
+README_ORIGINAL_BACKUP.md
+
 # Profiling results
 /profiles/
 errors-demo
