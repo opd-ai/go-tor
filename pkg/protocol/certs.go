@@ -373,7 +373,7 @@ func (c *CERTSCell) ValidateExpiration() error {
 	return nil
 }
 
-// VerifyEd25519Signature verifies the Ed25519 signature on a certificate
+// VerifySignature verifies the Ed25519 signature on a certificate.
 // Per cert-spec.txt, the signature is over all bytes of the certificate
 // before the signature field itself.
 //

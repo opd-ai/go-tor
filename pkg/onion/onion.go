@@ -31,16 +31,20 @@ import (
 )
 
 const (
-	// V3 onion address constants
+	// V3AddressLength is the length of a v3 onion address in base32 characters
 	V3AddressLength = 56 // 56 base32 characters
+	// V3Suffix is the domain suffix for onion addresses
 	V3Suffix        = ".onion"
+	// V3Version is the version byte for v3 onion addresses
 	V3Version       = 0x03
+	// V3ChecksumLen is the length of the checksum in v3 onion addresses
 	V3ChecksumLen   = 2
+	// V3PubkeyLen is the length of the ed25519 public key in bytes
 	V3PubkeyLen     = 32 // ed25519 public key
 
-	// LOW-006 FIX: Maximum descriptor size to prevent resource exhaustion
-	// Per rend-spec-v3.txt, descriptors are typically under 50KB
-	// We set a generous limit of 100KB to allow for padding and extensions
+	// MaxDescriptorSize is the maximum descriptor size to prevent resource exhaustion.
+	// Per rend-spec-v3.txt, descriptors are typically under 50KB.
+	// We set a generous limit of 100KB to allow for padding and extensions (LOW-006 FIX).
 	MaxDescriptorSize = 100 * 1024 // 100 KB
 )
 
@@ -319,8 +323,9 @@ type CellSender interface {
 	ReceiveRelayCell(ctx context.Context, circuitID uint32, timeout time.Duration) ([]byte, error)
 }
 
-// Client provides onion service client functionality
-// RendezvousState stores the cryptographic state for a rendezvous in progress (AUDIT-006)
+// RendezvousState stores the cryptographic state for a rendezvous in progress (AUDIT-006).
+// It contains the client's ephemeral key pair and associated circuit information
+// for completing the rendezvous protocol per rend-spec-v3.txt.
 type RendezvousState struct {
 	EphemeralPrivate [32]byte // Client's ephemeral private key (x)
 	EphemeralPublic  [32]byte // Client's ephemeral public key (X)
@@ -328,6 +333,8 @@ type RendezvousState struct {
 	CircuitID        uint32   // Rendezvous circuit ID
 }
 
+// Client provides onion service client functionality for connecting to .onion addresses.
+// It manages descriptor fetching, caching, rendezvous protocol, and introduction point selection.
 type Client struct {
 	cache           *DescriptorCache
 	logger          *logger.Logger
@@ -1931,10 +1938,10 @@ func (ip *IntroductionProtocol) SendIntroduce1(ctx context.Context, circuitID ui
 
 	// If we have a cell sender, use it to send the cell
 	if cellSender != nil {
-		const RELAY_COMMAND_INTRODUCE1 = 0x22 // Per Tor spec
+		const relayCommandIntroduce1 = 0x22 // Per Tor spec
 
 		// Send the INTRODUCE1 cell over the circuit
-		if err := cellSender.SendRelayCell(ctx, circuitID, RELAY_COMMAND_INTRODUCE1, introduce1Data); err != nil {
+		if err := cellSender.SendRelayCell(ctx, circuitID, relayCommandIntroduce1, introduce1Data); err != nil {
 			ip.logger.Error("Failed to send INTRODUCE1 cell", "error", err)
 			return fmt.Errorf("failed to send INTRODUCE1: %w", err)
 		}
@@ -2144,10 +2151,10 @@ func (rp *RendezvousProtocol) SendEstablishRendezvous(ctx context.Context, circu
 
 	// If we have a cell sender, use it to send the cell
 	if cellSender != nil {
-		const RELAY_COMMAND_ESTABLISH_RENDEZVOUS = 0x21 // Per Tor spec
+		const relayCommandEstablishRendezvous = 0x21 // Per Tor spec
 
 		// Send the ESTABLISH_RENDEZVOUS cell over the circuit
-		if err := cellSender.SendRelayCell(ctx, circuitID, RELAY_COMMAND_ESTABLISH_RENDEZVOUS, establishData); err != nil {
+		if err := cellSender.SendRelayCell(ctx, circuitID, relayCommandEstablishRendezvous, establishData); err != nil {
 			rp.logger.Error("Failed to send ESTABLISH_RENDEZVOUS cell", "error", err)
 			return fmt.Errorf("failed to send ESTABLISH_RENDEZVOUS: %w", err)
 		}
@@ -2156,7 +2163,7 @@ func (rp *RendezvousProtocol) SendEstablishRendezvous(ctx context.Context, circu
 		ackCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
 
-		const RELAY_COMMAND_RENDEZVOUS_ESTABLISHED = 0x27
+		const relayCommandRendezvousEstablished = 0x27
 		ackData, err := cellSender.ReceiveRelayCell(ackCtx, circuitID, 5*time.Second)
 		if err != nil {
 			rp.logger.Warn("Did not receive RENDEZVOUS_ESTABLISHED (continuing anyway)", "error", err)
@@ -2246,7 +2253,7 @@ func (rp *RendezvousProtocol) WaitForRendezvous2(ctx context.Context, circuitID 
 	// If we have a cell sender, use it to receive the cell
 	if cellSender != nil {
 		// Wait for RENDEZVOUS2 cell with 30 second timeout (onion services can be slow)
-		const RELAY_COMMAND_RENDEZVOUS2 = 0x25
+		const relayCommandRendezvous2 = 0x25
 
 		waitCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()

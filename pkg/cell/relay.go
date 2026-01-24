@@ -43,7 +43,7 @@ type RelayCell struct {
 	Data       []byte  // Relay data
 }
 
-// RelayCell header size: Command(1) + Recognized(2) + StreamID(2) + Digest(4) + Length(2) = 11 bytes
+// RelayCellHeaderLen is the relay cell header size: Command(1) + Recognized(2) + StreamID(2) + Digest(4) + Length(2) = 11 bytes
 const RelayCellHeaderLen = 11
 
 // NewRelayCell creates a new relay cell

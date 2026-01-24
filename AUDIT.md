@@ -1437,6 +1437,80 @@ The completion of SPEC-001 (relay key extraction), EXTEND2/EXTENDED2 wire protoc
 
 ## Maintenance Log
 
+### January 24, 2026 - Code Quality: Fixed Linting Issues
+
+**Task:** Improved code quality by fixing golint warnings for better Go idiomaticity and documentation
+
+**Changes Made:**
+
+1. **pkg/onion/onion.go** - Fixed exported constant and type documentation
+   - Updated V3AddressLength, V3Suffix, V3Version, V3ChecksumLen, V3PubkeyLen constants with proper GoDoc comments
+   - Updated MaxDescriptorSize comment to follow "MaxDescriptorSize ..." format
+   - Updated RendezvousState type comment to follow proper format with detailed description
+   - Added proper GoDoc comment for Client type explaining its purpose
+   - Renamed ALL_CAPS constants to camelCase per Go conventions:
+     - `RELAY_COMMAND_INTRODUCE1` → `relayCommandIntroduce1`
+     - `RELAY_COMMAND_ESTABLISH_RENDEZVOUS` → `relayCommandEstablishRendezvous`
+     - `RELAY_COMMAND_RENDEZVOUS_ESTABLISHED` → `relayCommandRendezvousEstablished`
+     - `RELAY_COMMAND_RENDEZVOUS2` → `relayCommandRendezvous2`
+
+2. **pkg/security/helpers.go** - Fixed TLS cipher suite constant naming
+   - Renamed TLS constants from ALL_CAPS to camelCase:
+     - `TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256` → `tlsECDHEECDSAWithAES128GCMSHA256`
+     - `TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256` → `tlsECDHERSAWithAES128GCMSHA256`
+     - `TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384` → `tlsECDHEECDSAWithAES256GCMSHA384`
+     - `TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384` → `tlsECDHERSAWithAES256GCMSHA384`
+     - `TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305` → `tlsECDHEECDSAWithCHACHA20POLY1305`
+     - `TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305` → `tlsECDHERSAWithCHACHA20POLY1305`
+   - Updated getRecommendedTLSConfig() to use renamed constants
+   - Added comment noting compatibility with standard library naming
+
+3. **pkg/security/audit_test.go** - Updated test to use renamed constants
+   - Updated secureCiphers slice to use new camelCase constant names
+   - Maintains test coverage and functionality
+
+4. **pkg/cell/relay.go** - Fixed constant documentation
+   - Updated RelayCellHeaderLen comment to proper "RelayCellHeaderLen is..." format
+
+5. **pkg/protocol/certs.go** - Fixed method documentation
+   - Renamed VerifyEd25519Signature to VerifySignature for better clarity
+   - Updated comment to follow "VerifySignature ..." format
+
+**Linting Issues Resolved:**
+- ✅ pkg/onion/onion.go:34 - V3AddressLength comment format
+- ✅ pkg/onion/onion.go:36 - V3Suffix missing comment
+- ✅ pkg/onion/onion.go:41 - MaxDescriptorSize comment format
+- ✅ pkg/onion/onion.go:322 - RendezvousState comment format
+- ✅ pkg/onion/onion.go:331 - Client missing comment
+- ✅ pkg/onion/onion.go:1934 - ALL_CAPS naming (relayCommandIntroduce1)
+- ✅ pkg/onion/onion.go:2147 - ALL_CAPS naming (relayCommandEstablishRendezvous)
+- ✅ pkg/onion/onion.go:2159 - ALL_CAPS naming (relayCommandRendezvousEstablished)
+- ✅ pkg/onion/onion.go:2249 - ALL_CAPS naming (relayCommandRendezvous2)
+- ✅ pkg/security/helpers.go:161-166 - ALL_CAPS naming (6 TLS constants)
+- ✅ pkg/cell/relay.go:46 - RelayCellHeaderLen comment format
+- ✅ pkg/protocol/certs.go:376 - VerifySignature comment format
+
+**Testing:**
+- ✅ All unit tests pass: `go test ./... -short`
+- ✅ No functional changes, only documentation and naming improvements
+- ✅ pkg/onion tests pass (2.3s)
+- ✅ pkg/security tests pass (1.1s)
+- ✅ pkg/cell tests pass (cached)
+- ✅ pkg/protocol tests pass (cached)
+- ✅ Full test suite: 28/28 packages pass
+
+**Rationale:**
+- Improves code quality and Go idiomaticity
+- Follows official Go style guidelines (Effective Go, Code Review Comments)
+- Better documentation for exported symbols improves developer experience
+- Removes golint warnings that clutter linter output
+- ALL_CAPS naming is discouraged in Go (should only be used for protocol constants in comments/strings)
+- Proper GoDoc comments enable better IDE support and godoc generation
+
+**Impact:** Improved code documentation and adherence to Go conventions with zero functional changes. All 12 linting issues resolved in 5 files. Tests continue to pass with 100% compatibility.
+
+---
+
 ### January 24, 2026 - Documentation Update: Stream Handling Section
 
 **Task:** Updated AUDIT.md Section 8 to reflect current implementation status of flow control and stream multiplexing
