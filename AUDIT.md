@@ -988,12 +988,13 @@ Prioritized list of compliance issues affecting core functionality:
    - **Status:** Core protocol complete, integration testing remaining
    - **Spec Reference:** tor-spec.txt §5.1-5.2
 
-2. **Implement Onion Service Data Relay**
-   - Complete rendezvous circuit traffic forwarding
-   - Implement RENDEZVOUS2 cell handling
-   - Add end-to-end .onion connection testing
-   - **Estimated Effort:** 2-3 weeks
+2. ~~**Implement Onion Service Data Relay**~~ ✅ **COMPLETED (Jan 24, 2026)**
+   - ✅ Complete rendezvous circuit traffic forwarding
+   - ✅ Implement RENDEZVOUS2 cell handling (data relay via RELAY_DATA cells)
+   - ✅ Add end-to-end .onion connection testing (**NEW: Jan 24, 2026**)
+   - **Status:** Data relay complete, integration testing implemented
    - **Spec Reference:** rend-spec-v3.txt §4
+   - **Tests:** pkg/socks/onion_integration_test.go (2 integration tests)
 
 ### High Priority (Security and Robustness)
 
@@ -1047,12 +1048,21 @@ Prioritized list of compliance issues affecting core functionality:
 
 ### Testing and Validation
 
-9. **Integration Testing**
-   - Test with real Tor network (testnet recommended)
-   - Validate circuit building end-to-end
-   - Test .onion service connections
-   - Measure compliance against reference implementation
+9. **Integration Testing** ~~(ONGOING)~~ ✅ **SUBSTANTIALLY COMPLETE (Jan 24, 2026)**
+   - ✅ Test with real Tor network (integration tests implemented)
+   - ✅ Validate circuit building end-to-end
+   - ✅ Test .onion service connections (**NEW: Jan 24, 2026**)
+   - ⏳ Measure compliance against reference implementation (ongoing)
    - **Estimated Effort:** Ongoing
+   - **New Tests (Jan 24, 2026):**
+     - `TestIntegrationOnionServiceSOCKS` - End-to-end .onion SOCKS5 connection
+     - `TestIntegrationOnionServiceDescriptor` - Descriptor creation validation
+   - **Coverage:**
+     - ✅ Consensus fetching from real Tor network
+     - ✅ .onion service creation and addressing
+     - ✅ Descriptor management and caching
+     - ✅ SOCKS5 proxy .onion protocol handling
+     - ✅ Connection establishment flow validation
 
 10. **Security Audit**
     - Formal cryptographic review
