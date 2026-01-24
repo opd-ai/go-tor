@@ -332,14 +332,18 @@ func TestStreamFlowControlWindows(t *testing.T) {
 		t.Errorf("deliverWindow after decrement = %v, want 499", stream.GetDeliverWindow())
 	}
 
-	// Test window exhaustion
+	// Test window exhaustion - use lock-safe approach
+	stream.mu.Lock()
 	stream.packageWindow = 0
+	stream.mu.Unlock()
 	err = stream.decrementPackageWindow()
 	if err == nil {
 		t.Error("decrementPackageWindow() should error when window exhausted")
 	}
 
+	stream.mu.Lock()
 	stream.deliverWindow = 0
+	stream.mu.Unlock()
 	err = stream.decrementDeliverWindow()
 	if err == nil {
 		t.Error("decrementDeliverWindow() should error when window exhausted")

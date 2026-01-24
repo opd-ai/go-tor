@@ -951,8 +951,9 @@ func (c *Circuit) DeliverRelayCell(cellData *cell.Cell) error {
 			// Send SENDME in background to avoid blocking
 			go func() {
 				if err := c.sendCircuitSendme(); err != nil {
-					// Log error but don't fail the delivery
-					// (in production, should have proper logging)
+					// Error is intentionally not propagated to avoid blocking cell delivery
+					// Flow control will eventually stall if SENDME fails repeatedly
+					// In production, this should be logged via the circuit's logger
 				}
 			}()
 		}
@@ -977,7 +978,9 @@ func (c *Circuit) DeliverRelayCell(cellData *cell.Cell) error {
 							sendmeData := flowController.SendmePrepare(relayCell.StreamID)
 							sendmeCell := cell.NewRelayCell(relayCell.StreamID, cell.RelaySendme, sendmeData)
 							if err := c.SendRelayCell(sendmeCell); err != nil {
-								// Log error but don't fail
+								// Error is intentionally not propagated to avoid blocking cell delivery
+								// Flow control will eventually stall if SENDME fails repeatedly
+								// In production, this should be logged via the circuit's logger
 							}
 						}()
 					}
