@@ -763,8 +763,14 @@ func (c *Circuit) shouldSendCircuitSendme() bool {
 }
 
 // sendCircuitSendme sends a circuit-level SENDME cell
-func (c *Circuit) sendCircuitSendme() error {
+// Returns true if SENDME was actually sent, false if another goroutine already handled it
+func (c *Circuit) sendCircuitSendme() (bool, error) {
 	c.mu.Lock()
+	// Double-check the condition while holding the lock to prevent race conditions
+	if c.sendmeReceived < 100 {
+		c.mu.Unlock()
+		return false, nil // Another goroutine already sent the SENDME
+	}
 	c.sendmeReceived = 0
 	c.sendmeSent++
 	c.deliverWindow += 100 // Increment our deliver window
@@ -772,7 +778,7 @@ func (c *Circuit) sendCircuitSendme() error {
 
 	// Send SENDME cell (stream ID 0 indicates circuit-level)
 	sendmeCell := cell.NewRelayCell(0, cell.RelaySendme, []byte{})
-	return c.SendRelayCell(sendmeCell)
+	return true, c.SendRelayCell(sendmeCell)
 }
 
 // SendRelayCell sends a relay cell through the circuit
@@ -950,7 +956,7 @@ func (c *Circuit) DeliverRelayCell(cellData *cell.Cell) error {
 		if c.shouldSendCircuitSendme() {
 			// Send SENDME in background to avoid blocking
 			go func() {
-				if err := c.sendCircuitSendme(); err != nil {
+				if _, err := c.sendCircuitSendme(); err != nil {
 					// Error is intentionally not propagated to avoid blocking cell delivery
 					// Flow control will eventually stall if SENDME fails repeatedly
 					// In production, this should be logged via the circuit's logger
@@ -974,15 +980,17 @@ func (c *Circuit) DeliverRelayCell(cellData *cell.Cell) error {
 					// Check if we should send a stream-level SENDME
 					if flowController.ShouldSendStreamSendme(relayCell.StreamID) {
 						// Send stream-level SENDME in background
-						go func() {
-							sendmeData := flowController.SendmePrepare(relayCell.StreamID)
-							sendmeCell := cell.NewRelayCell(relayCell.StreamID, cell.RelaySendme, sendmeData)
+						// Capture streamID to avoid race conditions with relayCell reuse
+						streamID := relayCell.StreamID
+						go func(sid uint16) {
+							sendmeData := flowController.SendmePrepare(sid)
+							sendmeCell := cell.NewRelayCell(sid, cell.RelaySendme, sendmeData)
 							if err := c.SendRelayCell(sendmeCell); err != nil {
 								// Error is intentionally not propagated to avoid blocking cell delivery
 								// Flow control will eventually stall if SENDME fails repeatedly
 								// In production, this should be logged via the circuit's logger
 							}
-						}()
+						}(streamID)
 					}
 				}
 			}

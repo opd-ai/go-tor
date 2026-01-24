@@ -173,6 +173,20 @@ func (s *Stream) Close() error {
 	return nil
 }
 
+// GetSendmeReceived returns the sendmeReceived counter (for testing only)
+func (s *Stream) GetSendmeReceived() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.sendmeReceived
+}
+
+// GetSendmeSent returns the sendmeSent counter (for testing only)
+func (s *Stream) GetSendmeSent() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.sendmeSent
+}
+
 // Manager manages multiple streams across circuits
 type Manager struct {
 	streams   map[uint16]*Stream
@@ -318,6 +332,9 @@ func (m *Manager) DecrementDeliverWindow(streamID uint16) error {
 func (m *Manager) ShouldSendStreamSendme(streamID uint16) bool {
 	stream, err := m.GetStream(streamID)
 	if err != nil {
+		// Stream not found - likely already closed. This is normal during cleanup.
+		// Don't log at error level to avoid noise, but track at debug level.
+		m.logger.Debug("Stream not found when checking for SENDME", "stream_id", streamID)
 		return false
 	}
 	return stream.shouldSendStreamSendme()
@@ -328,6 +345,8 @@ func (m *Manager) ShouldSendStreamSendme(streamID uint16) bool {
 func (m *Manager) SendmePrepare(streamID uint16) []byte {
 	stream, err := m.GetStream(streamID)
 	if err != nil {
+		// Stream not found - log as this could indicate a flow control issue
+		m.logger.Error("Failed to prepare SENDME for stream", "function", "SendmePrepare", "stream_id", streamID, "error", err)
 		return []byte{}
 	}
 	return stream.SendmePrepare()
@@ -335,9 +354,13 @@ func (m *Manager) SendmePrepare(streamID uint16) []byte {
 
 // IncrementPackageWindow increments the stream's package window when SENDME received
 // Implements circuit.StreamFlowController interface
+// Note: Silently ignores errors if stream is not found. This can occur when a SENDME
+// arrives for a recently closed stream, which is a normal race condition.
 func (m *Manager) IncrementPackageWindow(streamID uint16) {
 	stream, err := m.GetStream(streamID)
 	if err != nil {
+		// Stream not found - likely closed before SENDME arrived. This is normal.
+		m.logger.Debug("Stream not found when incrementing package window", "stream_id", streamID)
 		return
 	}
 	stream.incrementPackageWindow()

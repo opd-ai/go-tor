@@ -324,10 +324,36 @@ func TestCircuitSendCircuitSendme(t *testing.T) {
 	c := NewCircuit(1)
 	c.SetState(StateOpen)
 
-	// sendCircuitSendme requires a connection, test error case
-	err := c.sendCircuitSendme()
+	// Test that sendCircuitSendme returns false when counter is below threshold
+	sent, err := c.sendCircuitSendme()
+	if sent {
+		t.Error("sendCircuitSendme() should return sent=false when counter is below threshold")
+	}
+	if err != nil {
+		t.Errorf("sendCircuitSendme() should not return error when counter is below threshold: %v", err)
+	}
+
+	// Increment counter to threshold
+	for i := 0; i < 100; i++ {
+		c.decrementDeliverWindow()
+	}
+
+	// sendCircuitSendme requires a connection, test error case when threshold is met
+	sent, err = c.sendCircuitSendme()
 	if err == nil {
 		t.Error("sendCircuitSendme() should return error when conn is nil")
+	}
+	if !sent {
+		t.Error("sendCircuitSendme() should return sent=true when threshold is met")
+	}
+
+	// After sending, counter should be reset and next call should return false
+	sent, err = c.sendCircuitSendme()
+	if sent {
+		t.Error("sendCircuitSendme() should return sent=false after counter was reset")
+	}
+	if err != nil {
+		t.Errorf("sendCircuitSendme() should not return error when counter is below threshold: %v", err)
 	}
 }
 

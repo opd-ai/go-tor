@@ -362,7 +362,9 @@ func TestStreamShouldSendSendme(t *testing.T) {
 
 	// Decrement deliver window by 50 cells
 	for i := 0; i < 50; i++ {
-		stream.decrementDeliverWindow()
+		if err := stream.decrementDeliverWindow(); err != nil {
+			t.Fatalf("decrementDeliverWindow() error at iteration %d: %v", i, err)
+		}
 	}
 
 	// Should now need SENDME
@@ -378,7 +380,9 @@ func TestStreamSendmePrepare(t *testing.T) {
 
 	// Simulate receiving 50 DATA cells
 	for i := 0; i < 50; i++ {
-		stream.decrementDeliverWindow()
+		if err := stream.decrementDeliverWindow(); err != nil {
+			t.Fatalf("decrementDeliverWindow() error at iteration %d: %v", i, err)
+		}
 	}
 
 	initialDeliverWindow := stream.GetDeliverWindow()
@@ -392,13 +396,13 @@ func TestStreamSendmePrepare(t *testing.T) {
 	}
 
 	// Verify sendmeReceived counter was reset
-	if stream.sendmeReceived != 0 {
-		t.Errorf("sendmeReceived = %v after SendmePrepare, want 0", stream.sendmeReceived)
+	if stream.GetSendmeReceived() != 0 {
+		t.Errorf("sendmeReceived = %v after SendmePrepare, want 0", stream.GetSendmeReceived())
 	}
 
 	// Verify sendmeSent counter was incremented
-	if stream.sendmeSent != 1 {
-		t.Errorf("sendmeSent = %v after SendmePrepare, want 1", stream.sendmeSent)
+	if stream.GetSendmeSent() != 1 {
+		t.Errorf("sendmeSent = %v after SendmePrepare, want 1", stream.GetSendmeSent())
 	}
 
 	// Verify deliver window was incremented by 50
@@ -427,7 +431,9 @@ func TestManagerFlowControlInterface(t *testing.T) {
 
 	// Test ShouldSendStreamSendme
 	for i := 0; i < 49; i++ {
-		mgr.DecrementDeliverWindow(stream.ID)
+		if err := mgr.DecrementDeliverWindow(stream.ID); err != nil {
+			t.Fatalf("DecrementDeliverWindow() error at iteration %d: %v", i, err)
+		}
 	}
 	if !mgr.ShouldSendStreamSendme(stream.ID) {
 		t.Error("ShouldSendStreamSendme() = false after 50 cells, want true")
