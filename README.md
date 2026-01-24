@@ -2,11 +2,29 @@
 
 A pure Go implementation of the Tor protocol providing client functionality and bridge relay capabilities for educational and research purposes.
 
+## ⚠️ IMPORTANT SAFETY NOTICE
+
+**THIS IS UNOFFICIAL SOFTWARE** that has been developed without the supervision or endorsement of [The Tor Project](https://www.torproject.org/). This software should **NOT** be considered safe or production-ready.
+
+**For actual privacy and anonymity needs, please use official Tor software:**
+
+- **For users**: Use [Tor Browser](https://www.torproject.org/download/) - the only recommended way to safely browse anonymously
+- **For developers**: Use [Arti](https://gitlab.torproject.org/tpo/core/arti) - the official Tor implementation in Rust, or the [reference C implementation](https://github.com/torproject/tor)
+
+**Do not rely on this software for:**
+- Personal safety or anonymity
+- Protection from surveillance
+- Accessing sensitive information
+- Any production use case
+- Any situation where your safety depends on anonymity
+
+This project is an **experimental implementation** for learning and research purposes only.
+
+---
+
 ## Description
 
 go-tor is a cross-platform Tor client written entirely in Go without CGo dependencies. The package implements the core Tor protocol specifications including circuit management, cryptographic operations, SOCKS5 proxy serving, and v3 onion service support. This implementation prioritizes portability and embedded optimization while maintaining client feature parity with the reference C implementation.
-
-**IMPORTANT**: This is an unofficial, experimental implementation not affiliated with The Tor Project. For production anonymity and privacy needs, use official [Tor Browser](https://www.torproject.org/download/) or [Arti](https://gitlab.torproject.org/tpo/core/arti).
 
 ---
 
