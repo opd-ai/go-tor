@@ -78,9 +78,8 @@ func (b *Builder) BuildCircuit(ctx context.Context, p *path.Path, timeout time.D
 	// Create extension handler for this circuit
 	ext := NewExtension(circuit, b.logger)
 
-	// Set relay keys if available (SPEC-001)
-	// TODO: Extract keys from p.Guard when directory integration is complete
-	// For now, extension will use placeholder keys for testing
+	// Set relay keys from guard for first hop (SPEC-001)
+	ext.SetTargetRelay(p.Guard)
 
 	// Create first hop using CREATE2 protocol
 	if err := ext.CreateFirstHop(buildCtx, HandshakeTypeNTor); err != nil {
@@ -90,28 +89,22 @@ func (b *Builder) BuildCircuit(ctx context.Context, p *path.Path, timeout time.D
 
 	b.logger.Info("First hop created with ntor handshake", "guard", p.Guard.Nickname)
 
-	// Add middle hop (simulated for now - EXTEND2 to be implemented next)
-	if err := circuit.AddHop(&Hop{
-		Fingerprint: p.Middle.Fingerprint,
-		Address:     fmt.Sprintf("%s:%d", p.Middle.Address, p.Middle.ORPort),
-		IsGuard:     false,
-		IsExit:      false,
-	}); err != nil {
+	// Extend to middle relay using EXTEND2 protocol
+	ext.SetTargetRelay(p.Middle)
+	middleAddr := fmt.Sprintf("%s:%d", p.Middle.Address, p.Middle.ORPort)
+	if err := ext.ExtendCircuit(buildCtx, middleAddr, HandshakeTypeNTor); err != nil {
 		circuit.SetState(StateFailed)
-		return nil, fmt.Errorf("failed to add middle hop: %w", err)
+		return nil, fmt.Errorf("failed to extend to middle hop: %w", err)
 	}
 
 	b.logger.Info("Extended to middle", "middle", p.Middle.Nickname)
 
-	// Add exit hop (simulated for now - EXTEND2 to be implemented next)
-	if err := circuit.AddHop(&Hop{
-		Fingerprint: p.Exit.Fingerprint,
-		Address:     fmt.Sprintf("%s:%d", p.Exit.Address, p.Exit.ORPort),
-		IsGuard:     false,
-		IsExit:      true,
-	}); err != nil {
+	// Extend to exit relay using EXTEND2 protocol
+	ext.SetTargetRelay(p.Exit)
+	exitAddr := fmt.Sprintf("%s:%d", p.Exit.Address, p.Exit.ORPort)
+	if err := ext.ExtendCircuit(buildCtx, exitAddr, HandshakeTypeNTor); err != nil {
 		circuit.SetState(StateFailed)
-		return nil, fmt.Errorf("failed to add exit hop: %w", err)
+		return nil, fmt.Errorf("failed to extend to exit hop: %w", err)
 	}
 
 	b.logger.Info("Extended to exit", "exit", p.Exit.Nickname)
