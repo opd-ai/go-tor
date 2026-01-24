@@ -1,22 +1,76 @@
 # Repository Cleanup Summary
-Date: 2025-12-12
+**Latest Update:** 2026-01-24  
+**Previous Cleanup:** 2025-12-12
 
-## Results
+## Summary - January 2026 Iteration
+- **Files reorganized**: 28 implementation/task files moved from root to docs/implementation/
+- **Root directory MD files**: Reduced from 31 to 3 (README.md, AUDIT.md, CLEANUP_SUMMARY.md)
+- **New directory created**: docs/implementation/ for all technical implementation reports
+- **LLM prompts preserved**: 0 (none found - no structured prompt templates identified)
+- **Organization approach**: Consolidation rather than deletion - all content preserved
+
+## Results - December 2025 Iteration
 - **Files deleted**: 4
 - **Storage recovered**: ~68KB from root directory
-- **Files consolidated**: 4 phase reports → 0 (info preserved in ROADMAP.md)
-- **Files remaining**: 3 root MD files (README.md, ROADMAP.md, AUDIT.md) + 28 docs
+- **Files consolidated**: 4 phase reports → 0 (info preserved in ROADMAP.md - now deleted)
+- **Files remaining**: 3 root MD files (README.md, AUDIT.md, CLEANUP_SUMMARY.md)
 - **LLM prompts preserved**: 0 (none found - no structured prompt templates identified)
 - **Files de-bloated**: 9
 - **Average size reduction from de-bloating**: 42.3%
 
-## Deletion Criteria Used
+## January 2026 Cleanup Details
+
+### Files Moved to docs/implementation/
+All 28 implementation/summary/task files moved from root directory:
+
+**Implementation Reports (13):**
+- BANDWIDTH_WEIGHTED_SELECTION.md
+- CERTS_IMPLEMENTATION.md
+- CONSENSUS_METHOD_33_IMPLEMENTATION.md
+- CONTROL_AUTH_IMPLEMENTATION.md
+- CONTROL_CONFIG_IMPLEMENTATION.md
+- EXTEND2_IMPLEMENTATION.md
+- FAMILY_VALIDATION_IMPLEMENTATION.md
+- FLOW_CONTROL_IMPLEMENTATION.md
+- HOP_CRYPTO_IMPLEMENTATION.md
+- HSDIR_PUBLISHING_IMPLEMENTATION.md
+- INTEGRATION_TESTS_IMPLEMENTATION.md
+- ONION_RELAY_IMPLEMENTATION.md
+- STREAM_MULTIPLEXING_IMPLEMENTATION.md
+
+**Summary Reports (7):**
+- CERTS_TASK_SUMMARY.md
+- DIVERSITY_INTEGRATION_SUMMARY.md
+- FAMILY_VALIDATION_TASK_SUMMARY.md
+- FLOW_CONTROL_SUMMARY.md
+- IMPLEMENTATION_SUMMARY_FLOW_CONTROL.md
+- MULTIHOP_IMPLEMENTATION_SUMMARY.md
+- MULTIHOP_VALIDATION_SUMMARY.md
+
+**Additional Files (8):**
+- CONTROL_GETINFO_ENHANCEMENT.md
+- DIVERSITY_INTEGRATION.md
+- ONION_SERVICE_INTEGRATION_TESTS.md
+- SPEC-001_IMPLEMENTATION.md
+- SPEC-003_IMPLEMENTATION.md
+- STREAM_FLOW_CONTROL_INTEGRATION.md
+- TASK_COMPLETE.md
+- TASK_ONION_INTEGRATION_COMPLETE.md
+
+### Rationale
+These files are valuable technical implementation documentation but were cluttering the root directory. Moving them to docs/implementation/ provides:
+- **Cleaner root directory**: Only essential files remain (README, AUDIT, CLEANUP_SUMMARY)
+- **Better organization**: Implementation details grouped in dedicated directory
+- **Preserved history**: Files moved with git mv to maintain version control history
+- **Improved discoverability**: Clear structure for finding specific implementation details
+
+## Deletion Criteria Used (December 2025)
 - **Age threshold**: Not applicable (all files recent, deleted based on redundancy)
 - **File types targeted**: Redundant completion reports, superseded documentation
 - **Redundancy**: Deleted files whose information was already captured in ROADMAP.md
 - **LLM prompt preservation rules**: Applied - no LLM prompt templates found in repository
 
-## Files Deleted
+## Files Deleted (December 2025)
 1. **PHASE_9_13_IMPLEMENTATION_REPORT_OLD.md** (21KB) - Explicitly marked as OLD, superseded
 2. **PHASE_1_3_COMPLETION_REPORT.md** (14KB) - Phase 1.3 completion info already in ROADMAP.md
 3. **PHASE_9_13_SUMMARY.md** (19KB) - Phase 9.13 info already in ROADMAP.md
@@ -24,7 +78,7 @@ Date: 2025-12-12
 
 **Rationale**: All deleted reports were historical completion documents whose information is already captured in ROADMAP.md, which serves as the single source of truth for project status.
 
-## De-bloating Summary
+## De-bloating Summary (December 2025)
 
 ### Files Processed
 | File | Original Lines | New Lines | Reduction | Original Words | New Words | Word Reduction |
@@ -56,19 +110,48 @@ Date: 2025-12-12
 2. **TROUBLESHOOTING.md**: 817 → 364 lines (55.4% reduction, ~1,127 words saved)
 3. **ROADMAP.md**: 1,799 → 896 lines (50.2% reduction, ~4,876 words saved)
 
-## New Repository Structure
+## New Repository Structure (Updated January 2026)
 ```
 /
 ├── README.md                    # Main project documentation
-├── ROADMAP.md                   # Production readiness roadmap (de-bloated)
-├── AUDIT.md                     # Security audit report (de-bloated)
-├── CLEANUP_SUMMARY.md          # This file
-├── docs/                        # Technical documentation (de-bloated)
-│   ├── API.md
+├── AUDIT.md                     # Security audit report (de-bloated Dec 2025)
+├── CLEANUP_SUMMARY.md          # This file - cleanup history
+├── docs/                        # Technical documentation
+│   ├── implementation/          # NEW: Implementation reports & summaries (28 files)
+│   │   ├── BANDWIDTH_WEIGHTED_SELECTION.md
+│   │   ├── CERTS_IMPLEMENTATION.md
+│   │   ├── CERTS_TASK_SUMMARY.md
+│   │   ├── CONSENSUS_METHOD_33_IMPLEMENTATION.md
+│   │   ├── CONTROL_AUTH_IMPLEMENTATION.md
+│   │   ├── CONTROL_CONFIG_IMPLEMENTATION.md
+│   │   ├── CONTROL_GETINFO_ENHANCEMENT.md
+│   │   ├── DIVERSITY_INTEGRATION.md
+│   │   ├── DIVERSITY_INTEGRATION_SUMMARY.md
+│   │   ├── EXTEND2_IMPLEMENTATION.md
+│   │   ├── FAMILY_VALIDATION_IMPLEMENTATION.md
+│   │   ├── FAMILY_VALIDATION_TASK_SUMMARY.md
+│   │   ├── FLOW_CONTROL_IMPLEMENTATION.md
+│   │   ├── FLOW_CONTROL_SUMMARY.md
+│   │   ├── HOP_CRYPTO_IMPLEMENTATION.md
+│   │   ├── HSDIR_PUBLISHING_IMPLEMENTATION.md
+│   │   ├── IMPLEMENTATION_SUMMARY_FLOW_CONTROL.md
+│   │   ├── INTEGRATION_TESTS_IMPLEMENTATION.md
+│   │   ├── MULTIHOP_IMPLEMENTATION_SUMMARY.md
+│   │   ├── MULTIHOP_VALIDATION_SUMMARY.md
+│   │   ├── ONION_RELAY_IMPLEMENTATION.md
+│   │   ├── ONION_SERVICE_INTEGRATION_TESTS.md
+│   │   ├── SPEC-001_IMPLEMENTATION.md
+│   │   ├── SPEC-003_IMPLEMENTATION.md
+│   │   ├── STREAM_FLOW_CONTROL_INTEGRATION.md
+│   │   ├── STREAM_MULTIPLEXING_IMPLEMENTATION.md
+│   │   ├── TASK_COMPLETE.md
+│   │   └── TASK_ONION_INTEGRATION_COMPLETE.md
+│   ├── ALERTS.md
+│   ├── API.md (de-bloated Dec 2025)
 │   ├── ARCHITECTURE.md
 │   ├── BENCHMARKING.md
-│   ├── CIRCUIT_ISOLATION.md
-│   ├── CONFIGURATION.md
+│   ├── CIRCUIT_ISOLATION.md (de-bloated Dec 2025)
+│   ├── CONFIGURATION.md (de-bloated Dec 2025)
 │   ├── CONTAINERIZATION.md
 │   ├── CONTROL_PROTOCOL.md
 │   ├── DEVELOPMENT.md
@@ -76,37 +159,56 @@ Date: 2025-12-12
 │   ├── DNS_RESOLUTION.md
 │   ├── ERROR_RECOVERY.md
 │   ├── HOT_RELOAD.md
+│   ├── INCIDENT_RESPONSE.md
 │   ├── LOGGING.md
 │   ├── METRICS.md
+│   ├── MICRODESCRIPTOR_FETCHING.md
+│   ├── MONITORING_GUIDE.md
 │   ├── NTOR_HANDSHAKE.md
 │   ├── ONION_SERVICE_INTEGRATION.md
 │   ├── PERFORMANCE.md
 │   ├── PRODUCTION.md
+│   ├── PROFILING.md
 │   ├── REPLAY_PROTECTION.md
-│   ├── RESOURCE_PROFILES.md
+│   ├── RESOURCE_PROFILES.md (de-bloated Dec 2025)
+│   ├── RUNBOOK.md
+│   ├── SECURITY_LIMITATIONS.md
 │   ├── SHUTDOWN.md
 │   ├── STREAM_ISOLATION.md
 │   ├── STREAM_PROTOCOL_STATUS.md
-│   ├── TESTING.md
+│   ├── TESTING.md (de-bloated Dec 2025)
 │   ├── TLS_PINNING.md
 │   ├── TRACING.md
-│   ├── TROUBLESHOOTING.md
-│   ├── TUTORIAL.md
+│   ├── TROUBLESHOOTING.md (de-bloated Dec 2025)
+│   ├── TUTORIAL.md (de-bloated Dec 2025)
 │   └── ZERO_CONFIG.md
 ├── examples/                    # Example code (unchanged)
 └── [source code directories]
 ```
 
 ## Quality Criteria Met
+**January 2026 Iteration:**
+✅ **Clear, simplified repository structure**: Root directory reduced from 31 MD files to 3  
+✅ **Better organization**: 28 implementation files now in dedicated docs/implementation/ directory  
+✅ **Content preserved**: All files moved (not deleted) maintaining git history  
+✅ **LLM prompts and templates preserved**: N/A - no LLM prompts found in repository  
+✅ **Cleanup completed efficiently**: Completed in single session  
+
+**December 2025 Iteration:**
 ✅ **Significant storage space recovered**: ~68KB deleted, ~44KB saved through de-bloating (total ~112KB)  
 ✅ **Duplicate files eliminated**: 4 redundant phase reports removed  
-✅ **Clear, simplified repository structure**: Root now has only 3 core MD files  
+✅ **Clear, simplified repository structure**: Root reduced to core MD files  
 ✅ **Only recent/active materials retained**: All deleted files were redundant historical reports  
-✅ **LLM prompts and templates preserved**: N/A - no LLM prompts found in repository  
-✅ **Remaining documentation streamlined through de-bloating**: 9 files de-bloated with 42.3% average reduction  
-✅ **Cleanup completed efficiently**: Completed in single session
+✅ **Remaining documentation streamlined through de-bloating**: 9 files de-bloated with 42.3% average reduction
 
 ## Quality Checks Performed
+**January 2026:**
+- ✅ Verified all 28 files successfully moved to docs/implementation/
+- ✅ Confirmed root directory contains only essential files (README, AUDIT, CLEANUP_SUMMARY)
+- ✅ Used git mv to preserve file history
+- ✅ No broken references (implementation files are self-contained)
+
+**December 2025:**
 - ✅ Verified all section headers preserved in de-bloated documents
 - ✅ Confirmed technical accuracy maintained (no code/spec changes)
 - ✅ Validated table structures remain intact
@@ -114,12 +216,21 @@ Date: 2025-12-12
 - ✅ Confirmed no broken cross-references created
 
 ## Recommendations
-1. **Maintain ROADMAP.md as single source of truth** for project status
-2. **Avoid creating separate completion reports** - update ROADMAP.md directly
-3. **Consider documentation review process** to prevent re-bloating
-4. **Establish documentation style guide** to maintain concise technical writing
+**For Ongoing Maintenance:**
+1. **Keep implementation reports in docs/implementation/** - Don't create new files in root
+2. **Use docs/implementation/ for all technical implementation details** - Maintain clean root directory
+3. **Root directory should only contain**: README.md, AUDIT.md, CLEANUP_SUMMARY.md, LICENSE, config files
+4. **Consider documentation review process** to prevent re-bloating
+5. **Establish documentation style guide** to maintain concise technical writing
 
 ## Technical Details
+**January 2026:**
+- Files moved using git mv to preserve version control history
+- New directory: docs/implementation/ created
+- All 28 implementation/summary/task files consolidated in single location
+- Root directory decluttered: 31 MD files → 3 MD files
+
+**December 2025:**
 - De-bloating performed using Python scripts with pattern matching
 - Preserved all: headers, tables, lists, code examples (1-2 per section)
 - Removed: verbose explanations, redundant examples, transitional phrases, proof-of-concept code blocks
