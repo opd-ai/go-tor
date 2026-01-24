@@ -24,49 +24,49 @@ func newMockDirectoryClient() *mockDirectoryClient {
 			{
 				Nickname:    "GuardRelay1",
 				Fingerprint: "AAAA1111",
-				Address:     "192.168.1.1",
+				Address:     "10.0.1.1", // Different /16 subnet
 				ORPort:      9001,
 				Flags:       []string{"Running", "Valid", "Guard", "Stable", "Fast"},
 			},
 			{
 				Nickname:    "GuardRelay2",
 				Fingerprint: "AAAA2222",
-				Address:     "192.168.1.2",
+				Address:     "10.1.1.2", // Different /16 subnet
 				ORPort:      9001,
 				Flags:       []string{"Running", "Valid", "Guard", "Stable"},
 			},
 			{
 				Nickname:    "MiddleRelay1",
 				Fingerprint: "BBBB1111",
-				Address:     "192.168.2.1",
+				Address:     "172.16.2.1", // Different /16 subnet
 				ORPort:      9001,
 				Flags:       []string{"Running", "Valid", "Fast"},
 			},
 			{
 				Nickname:    "MiddleRelay2",
 				Fingerprint: "BBBB2222",
-				Address:     "192.168.2.2",
+				Address:     "172.17.2.2", // Different /16 subnet
 				ORPort:      9001,
 				Flags:       []string{"Running", "Valid"},
 			},
 			{
 				Nickname:    "ExitRelay1",
 				Fingerprint: "CCCC1111",
-				Address:     "192.168.3.1",
+				Address:     "192.168.3.1", // Different /16 subnet
 				ORPort:      9001,
 				Flags:       []string{"Running", "Valid", "Exit", "Fast"},
 			},
 			{
 				Nickname:    "ExitRelay2",
 				Fingerprint: "CCCC2222",
-				Address:     "192.168.3.2",
+				Address:     "192.169.3.2", // Different /16 subnet
 				ORPort:      9001,
 				Flags:       []string{"Running", "Valid", "Exit"},
 			},
 			{
 				Nickname:    "InvalidRelay",
 				Fingerprint: "DDDD1111",
-				Address:     "192.168.4.1",
+				Address:     "192.170.4.1", // Different /16 subnet
 				ORPort:      9001,
 				Flags:       []string{"Running"}, // Not Valid
 			},

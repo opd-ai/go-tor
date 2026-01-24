@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
+	"strings"
 	"sync"
 
 	"github.com/opd-ai/go-tor/pkg/directory"
@@ -205,28 +206,51 @@ func (s *Selector) ConfirmGuard(fingerprint string) {
 }
 
 // selectExit selects an exit relay that allows the specified port
+// Ensures the exit is not in the same family or subnet as the guard (path-spec.txt §2.2.1)
 func (s *Selector) selectExit(port int, avoid *directory.Relay) (*directory.Relay, error) {
-	// For now, select any exit that's not the guard
-	// In production, this would check exit policies for the port
+	// Select exit that's not the guard and doesn't share family/subnet
 	exits := make([]*directory.Relay, 0)
 
 	for _, relay := range s.relays {
-		if relay.IsExit() && relay.Fingerprint != avoid.Fingerprint {
+		// Skip if same relay
+		if relay.Fingerprint == avoid.Fingerprint {
+			continue
+		}
+
+		// Skip if in same family (bidirectional family relationship)
+		if relay.InSameFamily(avoid) {
+			s.logger.Debug("Skipping exit in same family as guard",
+				"exit", relay.Nickname, "guard", avoid.Nickname)
+			continue
+		}
+
+		// Skip if in same /16 subnet
+		if relay.InSameSubnet(avoid) {
+			s.logger.Debug("Skipping exit in same subnet as guard",
+				"exit", relay.Nickname, "guard", avoid.Nickname,
+				"subnet", relay.Address[:strings.LastIndex(relay.Address, ".")])
+			continue
+		}
+
+		// Prefer exits with Exit flag
+		if relay.IsExit() {
 			exits = append(exits, relay)
 		}
 	}
 
+	// Fallback: any relay that's not the guard and doesn't share family/subnet
 	if len(exits) == 0 {
-		// Fallback: any relay that's not the guard
 		for _, relay := range s.relays {
-			if relay.Fingerprint != avoid.Fingerprint {
+			if relay.Fingerprint != avoid.Fingerprint &&
+				!relay.InSameFamily(avoid) &&
+				!relay.InSameSubnet(avoid) {
 				exits = append(exits, relay)
 			}
 		}
 	}
 
 	if len(exits) == 0 {
-		return nil, fmt.Errorf("no suitable exit relays available")
+		return nil, fmt.Errorf("no suitable exit relays available (family/subnet constraints)")
 	}
 
 	idx, err := randomIndex(len(exits))
@@ -238,17 +262,49 @@ func (s *Selector) selectExit(port int, avoid *directory.Relay) (*directory.Rela
 }
 
 // selectMiddle selects a middle relay that is neither guard nor exit
+// Ensures the middle relay doesn't share family or subnet with guard or exit (path-spec.txt §2.2.1)
 func (s *Selector) selectMiddle(guard, exit *directory.Relay) (*directory.Relay, error) {
 	candidates := make([]*directory.Relay, 0)
 
 	for _, relay := range s.relays {
-		if relay.Fingerprint != guard.Fingerprint && relay.Fingerprint != exit.Fingerprint {
-			candidates = append(candidates, relay)
+		// Skip if same as guard or exit
+		if relay.Fingerprint == guard.Fingerprint || relay.Fingerprint == exit.Fingerprint {
+			continue
 		}
+
+		// Skip if in same family as guard
+		if relay.InSameFamily(guard) {
+			s.logger.Debug("Skipping middle in same family as guard",
+				"middle", relay.Nickname, "guard", guard.Nickname)
+			continue
+		}
+
+		// Skip if in same family as exit
+		if relay.InSameFamily(exit) {
+			s.logger.Debug("Skipping middle in same family as exit",
+				"middle", relay.Nickname, "exit", exit.Nickname)
+			continue
+		}
+
+		// Skip if in same /16 subnet as guard
+		if relay.InSameSubnet(guard) {
+			s.logger.Debug("Skipping middle in same subnet as guard",
+				"middle", relay.Nickname, "guard", guard.Nickname)
+			continue
+		}
+
+		// Skip if in same /16 subnet as exit
+		if relay.InSameSubnet(exit) {
+			s.logger.Debug("Skipping middle in same subnet as exit",
+				"middle", relay.Nickname, "exit", exit.Nickname)
+			continue
+		}
+
+		candidates = append(candidates, relay)
 	}
 
 	if len(candidates) == 0 {
-		return nil, fmt.Errorf("no suitable middle relays available")
+		return nil, fmt.Errorf("no suitable middle relays available (family/subnet constraints)")
 	}
 
 	idx, err := randomIndex(len(candidates))

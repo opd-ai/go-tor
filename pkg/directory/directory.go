@@ -115,12 +115,13 @@ type Relay struct {
 	Fingerprint     string
 	Address         string
 	ORPort          int
-	DirPort         int
+	DirPort          int
 	Flags           []string
 	Published       time.Time
-	IdentityKey     []byte // Ed25519 identity key (32 bytes) - SPEC-001
-	NtorOnionKey    []byte // Curve25519 ntor onion key (32 bytes) - SPEC-001
-	MicrodescDigest string // SHA256 digest of microdescriptor (base64) - SPEC-001
+	IdentityKey     []byte   // Ed25519 identity key (32 bytes) - SPEC-001
+	NtorOnionKey    []byte   // Curve25519 ntor onion key (32 bytes) - SPEC-001
+	MicrodescDigest string   // SHA256 digest of microdescriptor (base64) - SPEC-001
+	Family          []string // Relay family members (fingerprints) - Path Selection Enhancement
 }
 
 // Client provides directory protocol operations
@@ -550,6 +551,53 @@ func (r *Relay) HasValidKeys() bool {
 	return len(r.IdentityKey) == 32 && len(r.NtorOnionKey) == 32
 }
 
+// InSameFamily checks if this relay is in the same family as another relay
+// Family relationships are bidirectional - both relays must list each other
+// This implements family validation per path-spec.txt §2.2.1
+func (r *Relay) InSameFamily(other *Relay) bool {
+	if r.Fingerprint == other.Fingerprint {
+		return true // Same relay
+	}
+
+	// Check if other relay is in this relay's family
+	thisHasOther := false
+	for _, member := range r.Family {
+		// Family members can be listed as fingerprints or nicknames
+		if member == other.Fingerprint || member == other.Nickname {
+			thisHasOther = true
+			break
+		}
+	}
+
+	// Check if this relay is in other relay's family
+	otherHasThis := false
+	for _, member := range other.Family {
+		if member == r.Fingerprint || member == r.Nickname {
+			otherHasThis = true
+			break
+		}
+	}
+
+	// Family relationship is valid only if bidirectional
+	return thisHasOther && otherHasThis
+}
+
+// InSameSubnet checks if this relay shares a /16 subnet with another relay
+// This is a heuristic for detecting relays operated by the same entity
+// per path-spec.txt §2.2.1 "Do not use the same /16 subnet"
+func (r *Relay) InSameSubnet(other *Relay) bool {
+	return getSubnet16(r.Address) == getSubnet16(other.Address)
+}
+
+// getSubnet16 extracts the /16 subnet from an IP address
+func getSubnet16(address string) string {
+	parts := strings.Split(address, ".")
+	if len(parts) >= 2 {
+		return parts[0] + "." + parts[1]
+	}
+	return address
+}
+
 // SPEC-003: Enhanced consensus validation infrastructure
 // These types and methods provide hooks for implementing full multi-signature
 // threshold validation per dir-spec.txt section 3.4
@@ -871,6 +919,7 @@ func (c *Client) parseMicrodescriptors(data []byte, digestMap map[string][]*Rela
 	var currentMD struct {
 		ntorKey     []byte
 		identityKey []byte
+		family      []string
 		lines       []string
 	}
 
@@ -910,6 +959,17 @@ func (c *Client) parseMicrodescriptors(data []byte, digestMap map[string][]*Rela
 			}
 		}
 
+		// Parse family line (dir-spec.txt §3.3)
+		// Format: "family" SP nickname SP nickname ...
+		// Family members are identified by fingerprints or nicknames
+		if strings.HasPrefix(line, "family ") {
+			parts := strings.Fields(line)
+			if len(parts) > 1 {
+				// Store family members (excluding the "family" keyword)
+				currentMD.family = parts[1:]
+			}
+		}
+
 		// End of microdescriptor (blank line or start of next)
 		if line == "" || strings.HasPrefix(line, "onion-key") {
 			if len(currentMD.ntorKey) == 32 && len(currentMD.identityKey) == 32 {
@@ -919,6 +979,7 @@ func (c *Client) parseMicrodescriptors(data []byte, digestMap map[string][]*Rela
 					for _, relay := range relays {
 						relay.NtorOnionKey = currentMD.ntorKey
 						relay.IdentityKey = currentMD.identityKey
+						relay.Family = currentMD.family
 					}
 				}
 			}
@@ -926,6 +987,7 @@ func (c *Client) parseMicrodescriptors(data []byte, digestMap map[string][]*Rela
 			// Reset for next microdescriptor
 			currentMD.ntorKey = nil
 			currentMD.identityKey = nil
+			currentMD.family = nil
 			currentMD.lines = nil
 		}
 	}
@@ -937,6 +999,7 @@ func (c *Client) parseMicrodescriptors(data []byte, digestMap map[string][]*Rela
 			for _, relay := range relays {
 				relay.NtorOnionKey = currentMD.ntorKey
 				relay.IdentityKey = currentMD.identityKey
+				relay.Family = currentMD.family
 			}
 		}
 	}

@@ -941,6 +941,52 @@ func (c *Circuit) incrementStreamPackageWindow(streamID uint16) {
 	stream.IncrementPackageWindow()
 }
 
+// deliverToStream delivers a relay cell to the appropriate stream via the stream manager
+func (c *Circuit) deliverToStream(relayCell *cell.RelayCell) error {
+	c.mu.RLock()
+	mgr := c.streamManager
+	c.mu.RUnlock()
+
+	if mgr == nil {
+		return fmt.Errorf("no stream manager configured")
+	}
+
+	// Type assert to stream manager interface
+	type streamGetter interface {
+		GetStream(uint16) (interface{}, error)
+	}
+	getter, ok := mgr.(streamGetter)
+	if !ok {
+		return fmt.Errorf("stream manager does not support GetStream")
+	}
+
+	streamIface, err := getter.GetStream(relayCell.StreamID)
+	if err != nil {
+		return fmt.Errorf("stream %d not found: %w", relayCell.StreamID, err)
+	}
+
+	// Type assert to stream with ReceiveData method
+	type dataReceiver interface {
+		ReceiveData([]byte) error
+	}
+	stream, ok := streamIface.(dataReceiver)
+	if !ok {
+		return fmt.Errorf("stream does not support ReceiveData")
+	}
+
+	// Handle different relay cell commands
+	switch relayCell.Command {
+	case cell.RelayData:
+		// Deliver data to stream's receive queue
+		return stream.ReceiveData(relayCell.Data)
+	case cell.RelayEnd:
+		// Signal stream closure by delivering EOF (empty data indicates END)
+		return stream.ReceiveData(nil)
+	default:
+		// Other commands can be handled here if needed
+		return nil
+	}
+}
 
 // SendRelayCell sends a relay cell through the circuit
 // This encrypts the relay cell with per-hop cryptography and sends it through the connection
@@ -1216,8 +1262,11 @@ func (c *Circuit) ReadFromStream(ctx context.Context, streamID uint16) ([]byte, 
 
 		// Filter for our stream
 		if relayCell.StreamID != streamID {
-			// Cell for different stream, skip
-			// TODO: Deliver to correct stream via stream manager
+			// Cell for different stream, deliver to stream manager
+			if err := c.deliverToStream(relayCell); err != nil {
+				// Log error but continue - stream might not exist yet or be closed
+				// In production, this should use proper logging
+			}
 			continue
 		}
 
