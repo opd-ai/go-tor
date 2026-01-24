@@ -243,15 +243,19 @@ func EndSpan(span *Span, err error, exporter Exporter) {
 // WithSpan is a helper function to add span to context with automatic cleanup
 func WithSpan(ctx context.Context, tracer *Tracer, name string, kind SpanKind, fn func(context.Context, *Span) error) error {
 	ctx, span := tracer.StartSpan(ctx, name, kind)
-	defer func() {
-		span.End()
-		if tracer.exporter != nil {
-			_ = tracer.exporter.Export(span)
-		}
-	}()
+	
+	// If sampling rejected the span, skip span operations but still execute function
+	if span != nil {
+		defer func() {
+			span.End()
+			if tracer.exporter != nil {
+				_ = tracer.exporter.Export(span)
+			}
+		}()
+	}
 
 	err := fn(ctx, span)
-	if err != nil {
+	if err != nil && span != nil {
 		span.RecordError(err)
 	}
 

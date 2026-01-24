@@ -339,3 +339,108 @@ func TestEndSpanHelperNil(t *testing.T) {
 	EndSpan(nil, nil, nil)
 	EndSpan(nil, errors.New("test"), nil)
 }
+
+func TestWithSpanNeverSample(t *testing.T) {
+	// Test that WithSpan works correctly when sampler rejects the span
+	tracer := NewTracer("test-service", NewNoopExporter(), NeverSample())
+	ctx := context.Background()
+
+	functionCalled := false
+	var receivedSpan *Span
+
+	err := WithSpan(ctx, tracer, "test-operation", SpanKindInternal, func(ctx context.Context, span *Span) error {
+		functionCalled = true
+		receivedSpan = span
+		return nil
+	})
+
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+
+	if !functionCalled {
+		t.Error("Expected function to be called even when span is nil")
+	}
+
+	if receivedSpan != nil {
+		t.Error("Expected span to be nil when sampler rejects")
+	}
+}
+
+func TestWithSpanNeverSampleWithError(t *testing.T) {
+	// Test that WithSpan handles errors correctly when span is nil
+	tracer := NewTracer("test-service", NewNoopExporter(), NeverSample())
+	ctx := context.Background()
+
+	testErr := errors.New("test error")
+	err := WithSpan(ctx, tracer, "test-operation", SpanKindInternal, func(ctx context.Context, span *Span) error {
+		if span != nil {
+			t.Error("Expected span to be nil when sampler rejects")
+		}
+		return testErr
+	})
+
+	if err != testErr {
+		t.Errorf("Expected error to be returned, got %v", err)
+	}
+}
+
+func TestWithSpanProbabilitySample(t *testing.T) {
+	// Test with probability sampler (0% sampling)
+	tracer := NewTracer("test-service", NewNoopExporter(), ProbabilitySample(0.0))
+	ctx := context.Background()
+
+	for i := 0; i < 10; i++ {
+		err := WithSpan(ctx, tracer, "test-operation", SpanKindInternal, func(ctx context.Context, span *Span) error {
+			// Should not panic regardless of span being nil or not
+			return nil
+		})
+		if err != nil {
+			t.Errorf("Iteration %d: Expected no error, got %v", i, err)
+		}
+	}
+}
+
+func TestWithSpanRateLimitSample(t *testing.T) {
+	// Test with rate limit sampler (very low limit)
+	tracer := NewTracer("test-service", NewNoopExporter(), RateLimitSample(1))
+	ctx := context.Background()
+
+	var nilCount, nonNilCount int
+
+	// First call should succeed (within rate limit)
+	err := WithSpan(ctx, tracer, "test-operation", SpanKindInternal, func(ctx context.Context, span *Span) error {
+		if span == nil {
+			nilCount++
+		} else {
+			nonNilCount++
+		}
+		return nil
+	})
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+
+	// Subsequent calls in same second should fail sampling
+	for i := 0; i < 5; i++ {
+		err := WithSpan(ctx, tracer, "test-operation", SpanKindInternal, func(ctx context.Context, span *Span) error {
+			if span == nil {
+				nilCount++
+			} else {
+				nonNilCount++
+			}
+			return nil
+		})
+		if err != nil {
+			t.Errorf("Iteration %d: Expected no error, got %v", i, err)
+		}
+	}
+
+	// Should have at least 1 sampled span and some rejected spans
+	if nonNilCount == 0 {
+		t.Error("Expected at least one span to be sampled")
+	}
+	if nilCount == 0 {
+		t.Error("Expected some spans to be rejected by rate limiter")
+	}
+}
