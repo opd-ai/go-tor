@@ -36,21 +36,23 @@ func TestPortSelectionGap(t *testing.T) {
 	}
 	t.Logf("FindAvailablePort correctly found alternative: %d", availablePort)
 
-	// AUDIT-005: DefaultConfig now uses fixed standard ports (9050, 9051)
-	// Port availability is checked at startup, not at config creation
-	// This provides predictable configuration while allowing runtime flexibility
+	// AUDIT-005: DefaultConfig uses auto-detection to find available ports
+	// This provides true zero-configuration by avoiding port conflicts
 	cfg := config.DefaultConfig()
-	t.Logf("DefaultConfig SocksPort: %d (standard default)", cfg.SocksPort)
+	t.Logf("DefaultConfig SocksPort: %d (auto-detected)", cfg.SocksPort)
 
-	// Verify the defaults are standard Tor ports
-	if cfg.SocksPort != 9050 {
-		t.Errorf("DefaultConfig SocksPort = %d, want 9050 (standard default)", cfg.SocksPort)
+	// Verify the ports are in valid range and different from each other
+	if cfg.SocksPort < 1024 || cfg.SocksPort > 65535 {
+		t.Errorf("DefaultConfig SocksPort = %d, want valid port 1024-65535", cfg.SocksPort)
 	}
-	if cfg.ControlPort != 9051 {
-		t.Errorf("DefaultConfig ControlPort = %d, want 9051 (standard default)", cfg.ControlPort)
+	if cfg.ControlPort < 1024 || cfg.ControlPort > 65535 {
+		t.Errorf("DefaultConfig ControlPort = %d, want valid port 1024-65535", cfg.ControlPort)
+	}
+	if cfg.SocksPort == cfg.ControlPort {
+		t.Error("SocksPort and ControlPort should be different")
 	}
 
-	t.Log("AUDIT-005: Config uses fixed defaults, runtime handles port conflicts")
+	t.Log("AUDIT-005: Config uses auto-detection for zero-configuration deployment")
 }
 
 // TestCircuitTimeoutGap was demonstrating Gap #1 from IMPLEMENTATION_GAP_AUDIT.md

@@ -12,12 +12,16 @@ func TestDefaultConfig(t *testing.T) {
 		t.Fatal("DefaultConfig() returned nil")
 	}
 
-	// Verify some defaults
-	if cfg.SocksPort != 9050 {
-		t.Errorf("SocksPort = %v, want 9050", cfg.SocksPort)
+	// Verify ports are in valid range (auto-detection may use different ports)
+	if cfg.SocksPort < 1024 || cfg.SocksPort > 65535 {
+		t.Errorf("SocksPort = %v, want valid port in range 1024-65535", cfg.SocksPort)
 	}
-	if cfg.ControlPort != 9051 {
-		t.Errorf("ControlPort = %v, want 9051", cfg.ControlPort)
+	if cfg.ControlPort < 1024 || cfg.ControlPort > 65535 {
+		t.Errorf("ControlPort = %v, want valid port in range 1024-65535", cfg.ControlPort)
+	}
+	// Verify ports are different
+	if cfg.SocksPort == cfg.ControlPort {
+		t.Error("SocksPort and ControlPort should be different")
 	}
 	if cfg.UseEntryGuards != true {
 		t.Error("UseEntryGuards = false, want true")
