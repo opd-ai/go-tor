@@ -88,9 +88,17 @@ func main() {
 
 // mockClientGetter implements control.ClientInfoGetter for demo
 type mockClientGetter struct {
-	activeCircuits int
-	socksPort      int
-	controlPort    int
+	activeCircuits      int
+	socksPort           int
+	controlPort         int
+	circuitBuilds       int64
+	circuitBuildSuccess int64
+	circuitBuildFailure int64
+	guardsActive        int
+	guardsConfirmed     int
+	uptimeSeconds       int64
+	connectionAttempts  int64
+	dataDir             string
 }
 
 func (m *mockClientGetter) GetStats() control.StatsProvider {
@@ -107,6 +115,38 @@ func (m *mockClientGetter) GetSocksPort() int {
 
 func (m *mockClientGetter) GetControlPort() int {
 	return m.controlPort
+}
+
+func (m *mockClientGetter) GetCircuitBuilds() int64 {
+	return m.circuitBuilds
+}
+
+func (m *mockClientGetter) GetCircuitBuildSuccess() int64 {
+	return m.circuitBuildSuccess
+}
+
+func (m *mockClientGetter) GetCircuitBuildFailure() int64 {
+	return m.circuitBuildFailure
+}
+
+func (m *mockClientGetter) GetGuardsActive() int {
+	return m.guardsActive
+}
+
+func (m *mockClientGetter) GetGuardsConfirmed() int {
+	return m.guardsConfirmed
+}
+
+func (m *mockClientGetter) GetUptimeSeconds() int64 {
+	return m.uptimeSeconds
+}
+
+func (m *mockClientGetter) GetConnectionAttempts() int64 {
+	return m.connectionAttempts
+}
+
+func (m *mockClientGetter) GetDataDir() string {
+	return m.dataDir
 }
 
 func (m *mockClientGetter) GetConfig() control.ConfigProvider {

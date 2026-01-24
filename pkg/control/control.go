@@ -47,6 +47,14 @@ type StatsProvider interface {
 	GetActiveCircuits() int
 	GetSocksPort() int
 	GetControlPort() int
+	GetCircuitBuilds() int64
+	GetCircuitBuildSuccess() int64
+	GetCircuitBuildFailure() int64
+	GetGuardsActive() int
+	GetGuardsConfirmed() int
+	GetUptimeSeconds() int64
+	GetConnectionAttempts() int64
+	GetDataDir() string
 }
 
 // ConfigProvider provides access to configuration values
@@ -365,9 +373,74 @@ func (s *Server) getInfoValue(key string, stats StatsProvider) (string, bool) {
 		return "0", true
 	case "status/enough-dir-info":
 		return "1", true
+	
+	// Circuit statistics
+	case "status/circuits":
+		return fmt.Sprintf("%d", stats.GetActiveCircuits()), true
+	case "status/circuit-builds":
+		return fmt.Sprintf("%d", stats.GetCircuitBuilds()), true
+	case "status/circuit-build-success":
+		return fmt.Sprintf("%d", stats.GetCircuitBuildSuccess()), true
+	case "status/circuit-build-failure":
+		return fmt.Sprintf("%d", stats.GetCircuitBuildFailure()), true
+	
+	// Guard statistics
+	case "status/guards/active":
+		return fmt.Sprintf("%d", stats.GetGuardsActive()), true
+	case "status/guards/confirmed":
+		return fmt.Sprintf("%d", stats.GetGuardsConfirmed()), true
+	
+	// Connection statistics
+	case "status/connection-attempts":
+		return fmt.Sprintf("%d", stats.GetConnectionAttempts()), true
+	
+	// System information
+	case "status/uptime":
+		return fmt.Sprintf("%d", stats.GetUptimeSeconds()), true
+	case "config-file":
+		// Return data directory path (closest equivalent for client)
+		return stats.GetDataDir(), true
+	case "config-text":
+		// Not implemented - would require full config serialization
+		return "", false
+	
+	// Port information
+	case "net/listeners/socks":
+		return fmt.Sprintf("127.0.0.1:%d", stats.GetSocksPort()), true
+	case "net/listeners/control":
+		return fmt.Sprintf("127.0.0.1:%d", stats.GetControlPort()), true
+	
+	// Help information
+	case "info/names":
+		return s.getInfoNames(), true
+	
 	default:
 		return "", false
 	}
+}
+
+// getInfoNames returns a list of all supported GETINFO keys
+func (s *Server) getInfoNames() string {
+	keys := []string{
+		"version",
+		"traffic/read",
+		"traffic/written",
+		"status/circuit-established",
+		"status/enough-dir-info",
+		"status/circuits",
+		"status/circuit-builds",
+		"status/circuit-build-success",
+		"status/circuit-build-failure",
+		"status/guards/active",
+		"status/guards/confirmed",
+		"status/connection-attempts",
+		"status/uptime",
+		"config-file",
+		"net/listeners/socks",
+		"net/listeners/control",
+		"info/names",
+	}
+	return strings.Join(keys, " ")
 }
 
 // handleGetConf handles GETCONF command per control-spec.txt §3.1

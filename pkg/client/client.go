@@ -587,6 +587,7 @@ func (c *Client) GetStats() Stats {
 		ActiveCircuits:      len(c.circuits),
 		SocksPort:           c.config.SocksPort,
 		ControlPort:         c.config.ControlPort,
+		DataDir:             c.config.DataDirectory,
 		CircuitBuilds:       metricsSnap.CircuitBuilds,
 		CircuitBuildSuccess: metricsSnap.CircuitBuildSuccess,
 		CircuitBuildFailure: metricsSnap.CircuitBuildFailure,
@@ -618,6 +619,7 @@ type Stats struct {
 	ActiveCircuits int
 	SocksPort      int
 	ControlPort    int
+	DataDir        string
 
 	// Circuit metrics
 	CircuitBuilds       int64
@@ -658,6 +660,46 @@ func (s Stats) GetSocksPort() int {
 // GetControlPort returns the control protocol port
 func (s Stats) GetControlPort() int {
 	return s.ControlPort
+}
+
+// GetCircuitBuilds returns the total number of circuit build attempts
+func (s Stats) GetCircuitBuilds() int64 {
+	return s.CircuitBuilds
+}
+
+// GetCircuitBuildSuccess returns the number of successful circuit builds
+func (s Stats) GetCircuitBuildSuccess() int64 {
+	return s.CircuitBuildSuccess
+}
+
+// GetCircuitBuildFailure returns the number of failed circuit builds
+func (s Stats) GetCircuitBuildFailure() int64 {
+	return s.CircuitBuildFailure
+}
+
+// GetGuardsActive returns the number of active guards
+func (s Stats) GetGuardsActive() int {
+	return s.GuardsActive
+}
+
+// GetGuardsConfirmed returns the number of confirmed guards
+func (s Stats) GetGuardsConfirmed() int {
+	return s.GuardsConfirmed
+}
+
+// GetUptimeSeconds returns the uptime in seconds
+func (s Stats) GetUptimeSeconds() int64 {
+	return s.UptimeSeconds
+}
+
+// GetConnectionAttempts returns the total number of connection attempts
+func (s Stats) GetConnectionAttempts() int64 {
+	return s.ConnectionAttempts
+}
+
+// GetDataDir returns the data directory path
+func (s Stats) GetDataDir() string {
+	return s.DataDir
 }
 
 // PublishEvent publishes an event to the control protocol

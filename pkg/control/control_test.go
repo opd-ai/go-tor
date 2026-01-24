@@ -13,10 +13,18 @@ import (
 
 // mockClientGetter implements ClientInfoGetter for testing
 type mockClientGetter struct {
-	activeCircuits int
-	socksPort      int
-	controlPort    int
-	config         map[string]string
+	activeCircuits      int
+	socksPort           int
+	controlPort         int
+	circuitBuilds       int64
+	circuitBuildSuccess int64
+	circuitBuildFailure int64
+	guardsActive        int
+	guardsConfirmed     int
+	uptimeSeconds       int64
+	connectionAttempts  int64
+	dataDir             string
+	config              map[string]string
 }
 
 func (m *mockClientGetter) GetStats() StatsProvider {
@@ -48,9 +56,9 @@ func (m *mockConfigProvider) SetConfigValue(key, value string) error {
 	}
 	// Simulate read-only keys
 	readOnlyKeys := map[string]bool{
-		"SocksPort":    true,
-		"ControlPort":  true,
-		"MetricsPort":  true,
+		"SocksPort":   true,
+		"ControlPort": true,
+		"MetricsPort": true,
 	}
 	if readOnlyKeys[key] {
 		return fmt.Errorf("configuration option %s requires restart", key)
@@ -81,14 +89,54 @@ func (m *mockClientGetter) GetControlPort() int {
 	return m.controlPort
 }
 
+func (m *mockClientGetter) GetCircuitBuilds() int64 {
+	return m.circuitBuilds
+}
+
+func (m *mockClientGetter) GetCircuitBuildSuccess() int64 {
+	return m.circuitBuildSuccess
+}
+
+func (m *mockClientGetter) GetCircuitBuildFailure() int64 {
+	return m.circuitBuildFailure
+}
+
+func (m *mockClientGetter) GetGuardsActive() int {
+	return m.guardsActive
+}
+
+func (m *mockClientGetter) GetGuardsConfirmed() int {
+	return m.guardsConfirmed
+}
+
+func (m *mockClientGetter) GetUptimeSeconds() int64 {
+	return m.uptimeSeconds
+}
+
+func (m *mockClientGetter) GetConnectionAttempts() int64 {
+	return m.connectionAttempts
+}
+
+func (m *mockClientGetter) GetDataDir() string {
+	return m.dataDir
+}
+
 // Helper to create test server
 func setupTestServer(t *testing.T) (*Server, *mockClientGetter) {
 	t.Helper()
 
 	mockClient := &mockClientGetter{
-		activeCircuits: 3,
-		socksPort:      9050,
-		controlPort:    9051,
+		activeCircuits:      3,
+		socksPort:           9050,
+		controlPort:         9051,
+		circuitBuilds:       100,
+		circuitBuildSuccess: 95,
+		circuitBuildFailure: 5,
+		guardsActive:        3,
+		guardsConfirmed:     2,
+		uptimeSeconds:       3600,
+		connectionAttempts:  200,
+		dataDir:             "/tmp/go-tor",
 	}
 
 	log := logger.NewDefault()
@@ -644,5 +692,184 @@ func BenchmarkCommandProcessing(b *testing.B) {
 		writer.WriteString("GETINFO version\r\n")
 		writer.Flush()
 		reader.ReadString('\n')
+	}
+}
+
+// TestGetInfoExtendedKeys tests the new GETINFO keys added for enhanced monitoring
+func TestGetInfoExtendedKeys(t *testing.T) {
+	server, _ := setupTestServer(t)
+	conn := connectToServer(t, server)
+
+	reader := bufio.NewReader(conn)
+	writer := bufio.NewWriter(conn)
+
+	// Skip greeting
+	readResponse(t, reader)
+
+	// Authenticate
+	writer.WriteString("AUTHENTICATE\r\n")
+	writer.Flush()
+	response := readResponse(t, reader)
+	if !strings.HasPrefix(response, "250") {
+		t.Fatalf("Authentication failed: %s", response)
+	}
+
+	tests := []struct {
+		name     string
+		key      string
+		expected string
+	}{
+		{"Circuit count", "status/circuits", "3"},
+		{"Circuit builds", "status/circuit-builds", "100"},
+		{"Circuit build success", "status/circuit-build-success", "95"},
+		{"Circuit build failure", "status/circuit-build-failure", "5"},
+		{"Guards active", "status/guards/active", "3"},
+		{"Guards confirmed", "status/guards/confirmed", "2"},
+		{"Uptime", "status/uptime", "3600"},
+		{"Connection attempts", "status/connection-attempts", "200"},
+		{"SOCKS listener", "net/listeners/socks", "127.0.0.1:9050"},
+		{"Control listener", "net/listeners/control", "127.0.0.1:9051"},
+		{"Config file", "config-file", "/tmp/go-tor"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			writer.WriteString(fmt.Sprintf("GETINFO %s\r\n", tt.key))
+			writer.Flush()
+
+			response := readResponse(t, reader)
+			expectedPrefix := fmt.Sprintf("250 %s=%s", tt.key, tt.expected)
+			if !strings.HasPrefix(response, expectedPrefix) {
+				t.Errorf("Expected response to start with %q, got: %s", expectedPrefix, response)
+			}
+		})
+	}
+}
+
+// TestGetInfoNames tests the info/names key that lists all available keys
+func TestGetInfoNames(t *testing.T) {
+	server, _ := setupTestServer(t)
+	conn := connectToServer(t, server)
+
+	reader := bufio.NewReader(conn)
+	writer := bufio.NewWriter(conn)
+
+	// Skip greeting
+	readResponse(t, reader)
+
+	// Authenticate
+	writer.WriteString("AUTHENTICATE\r\n")
+	writer.Flush()
+	readResponse(t, reader)
+
+	// Get info/names
+	writer.WriteString("GETINFO info/names\r\n")
+	writer.Flush()
+
+	response := readResponse(t, reader)
+	if !strings.HasPrefix(response, "250 info/names=") {
+		t.Fatalf("Expected info/names response, got: %s", response)
+	}
+
+	// Verify that the response contains expected keys
+	requiredKeys := []string{
+		"version",
+		"status/circuits",
+		"status/circuit-builds",
+		"status/guards/active",
+		"net/listeners/socks",
+		"info/names",
+	}
+
+	for _, key := range requiredKeys {
+		if !strings.Contains(response, key) {
+			t.Errorf("Expected info/names to contain %q, got: %s", key, response)
+		}
+	}
+}
+
+// TestGetInfoMultipleExtendedKeys tests requesting multiple new keys at once
+func TestGetInfoMultipleExtendedKeys(t *testing.T) {
+	server, _ := setupTestServer(t)
+	conn := connectToServer(t, server)
+
+	reader := bufio.NewReader(conn)
+	writer := bufio.NewWriter(conn)
+
+	// Skip greeting
+	readResponse(t, reader)
+
+	// Authenticate
+	writer.WriteString("AUTHENTICATE\r\n")
+	writer.Flush()
+	readResponse(t, reader)
+
+	// Request multiple keys
+	writer.WriteString("GETINFO status/circuits status/guards/active status/uptime\r\n")
+	writer.Flush()
+
+	// Read multi-line response
+	var responses []string
+	for {
+		line := readResponse(t, reader)
+		responses = append(responses, line)
+		if strings.HasPrefix(line, "250 ") { // Last line
+			break
+		}
+	}
+
+	if len(responses) != 3 {
+		t.Fatalf("Expected 3 response lines, got %d", len(responses))
+	}
+
+	// Verify each response
+	expectedPrefixes := []string{
+		"250-status/circuits=3",
+		"250-status/guards/active=3",
+		"250 status/uptime=3600",
+	}
+
+	for i, expected := range expectedPrefixes {
+		if !strings.HasPrefix(responses[i], expected) {
+			t.Errorf("Response %d: expected %q, got: %s", i, expected, responses[i])
+		}
+	}
+}
+
+// TestGetInfoBackwardCompatibility tests that original keys still work
+func TestGetInfoBackwardCompatibility(t *testing.T) {
+	server, _ := setupTestServer(t)
+	conn := connectToServer(t, server)
+
+	reader := bufio.NewReader(conn)
+	writer := bufio.NewWriter(conn)
+
+	// Skip greeting
+	readResponse(t, reader)
+
+	// Authenticate
+	writer.WriteString("AUTHENTICATE\r\n")
+	writer.Flush()
+	readResponse(t, reader)
+
+	originalKeys := []string{
+		"version",
+		"traffic/read",
+		"traffic/written",
+		"status/circuit-established",
+		"status/enough-dir-info",
+	}
+
+	for _, key := range originalKeys {
+		t.Run(key, func(t *testing.T) {
+			writer.WriteString(fmt.Sprintf("GETINFO %s\r\n", key))
+			writer.Flush()
+
+			response := readResponse(t, reader)
+			expectedPrefix := fmt.Sprintf("250 %s=", key)
+			if !strings.HasPrefix(response, expectedPrefix) {
+				t.Errorf("Expected response to start with %q, got: %s", expectedPrefix, response)
+			}
+		})
 	}
 }
