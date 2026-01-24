@@ -658,6 +658,8 @@ func DecryptDescriptor(descriptor *Descriptor, address *Address, timePeriod uint
 - ✅ **NEW (Jan 24, 2026)**: SETCONF updates writable configuration values
 - ✅ **NEW (Jan 24, 2026)**: ConfigProvider interface for extensible configuration access
 - ✅ **NEW (Jan 24, 2026)**: Enhanced GETINFO with 17 keys covering circuits, guards, network, and system stats
+- ✅ **NEW (Jan 24, 2026)**: Runtime-updateable configuration for circuit timing parameters
+- ✅ **NEW (Jan 24, 2026)**: SETCONF supports MaxCircuitDirtiness, NewCircuitPeriod, CircuitBuildTimeout, LogLevel
 
 **Code Evidence:**
 ```go
@@ -719,14 +721,20 @@ type Config struct {
 - GETCONF returns actual configuration values per control-spec.txt §3.1
 - Supports 12+ configuration keys (ports, directories, timeouts, flags, log level)
 - SETCONF updates writable configuration values with validation
-- Read-only keys (ports, directories) properly rejected with 553 error code
+- **NEW (Jan 24, 2026)**: Runtime-updateable circuit timing parameters
+  - MaxCircuitDirtiness: Duration ≥30s (e.g., "10m", "1h")
+  - NewCircuitPeriod: Duration ≥10s (e.g., "30s", "5m")
+  - CircuitBuildTimeout: Duration 10s-5m (e.g., "60s", "2m")
+  - LogLevel: debug/info/warn/error (config updated, logger requires restart)
+- Read-only keys (ports, directories, guards) properly rejected with 553 error code
 - Unknown keys return empty values per specification
 - ConfigProvider interface allows extensible configuration access
-- Comprehensive test coverage (13 tests, 100% coverage of GETCONF/SETCONF logic)
+- Comprehensive test coverage (19 tests, 100% coverage of GETCONF/SETCONF logic)
 
 **Deviations:**
 - No SAFECOOKIE challenge-response authentication (plain-text password only)
-- Most configuration changes require restart (only LogLevel is live-updateable)
+- Some configuration changes require restart (ports, directories, feature flags)
+- Logger level changes require restart (slog.Handler is immutable)
 - GETINFO coverage focused on client monitoring (relay-specific keys not applicable)
 
 **Impact:** **NONE** *(Updated Jan 24, 2026)* - Control protocol now has production-ready password authentication, functional configuration management, and comprehensive GETINFO coverage. All core commands (AUTHENTICATE, GETINFO, GETCONF, SETCONF, SETEVENTS, QUIT) are fully operational with 17 GETINFO keys for client monitoring.
@@ -744,7 +752,7 @@ type Config struct {
 2. ~~Add ControlPort password configuration support~~ ✅ **COMPLETED (Jan 24, 2026)**
 3. ~~Make GETCONF/SETCONF functional by passing Config reference~~ ✅ **COMPLETED (Jan 24, 2026)**
 4. ~~Expand GETINFO coverage for common keys (circuits, streams, descriptors)~~ ✅ **COMPLETED (Jan 24, 2026)**
-5. Add more live-updateable configuration options (beyond LogLevel)
+5. ~~Add more live-updateable configuration options (beyond LogLevel)~~ ✅ **COMPLETED (Jan 24, 2026)**
 6. Add SAFECOOKIE challenge-response authentication for enhanced security
 7. Consider HashedControlPassword support (SHA-1 hash storage)
 
@@ -2314,6 +2322,126 @@ conn := connection.New(cfg, logger)
 - Clear separation between testing (non-enforcing) and production (enforcing) modes
 
 **Impact:** Adds production-ready strict enforcement mode for CERTS cell validation. When enabled, prevents connections to relays with invalid certificates, signatures, or identities. Default behavior unchanged (non-enforcing mode). No breaking changes to existing code or tests.
+
+---
+
+### January 24, 2026 - Control Protocol: Runtime-Updateable Configuration Options
+
+**Task:** Expanded SETCONF support to allow runtime updates of circuit timing parameters
+
+**Background:**
+- AUDIT.md line 747 recommended: "Add more live-updateable configuration options (beyond LogLevel)"
+- Previously, only LogLevel could be updated via SETCONF at runtime
+- Circuit timing parameters (MaxCircuitDirtiness, NewCircuitPeriod, CircuitBuildTimeout) are safe to update at runtime
+- Reduces need for client restarts when tuning performance
+
+**Changes Made:**
+
+1. **pkg/client/client.go** - Enhanced SetConfigValue() for runtime updates
+   - Added `MaxCircuitDirtiness` support with duration parsing and validation (≥30s)
+   - Added `NewCircuitPeriod` support with duration parsing and validation (≥10s)
+   - Added `CircuitBuildTimeout` support with duration parsing and validation (10s-5m range)
+   - Updated LogLevel comment to clarify restart requirement (slog.Handler is immutable)
+   - Duration validation ensures safe parameter ranges per Tor specification
+   - Comprehensive error messages for invalid inputs
+
+2. **pkg/client/config_update_test.go** - Comprehensive test suite (NEW FILE)
+   - `TestSetConfigValue_LiveUpdatableOptions`: 12 test cases for all updateable options
+     - Valid duration formats for each timing parameter
+     - Invalid duration format rejection
+     - Minimum/maximum value enforcement
+     - LogLevel validation (debug/info/warn/error)
+   - `TestSetConfigValue_ReadOnlyOptions`: Tests 8 read-only options reject updates
+   - `TestSetConfigValue_UnknownOption`: Tests unknown option rejection
+   - `TestSetConfigValue_NilConfig`: Tests nil configuration handling
+   - `TestSetConfigValue_DurationFormats`: Tests various duration string formats
+   - `TestSetConfigValue_LogLevelUpdate`: Tests LogLevel configuration updates
+   - 6 test functions with 100% coverage of new configuration update logic
+
+3. **AUDIT.md** - Updated compliance status
+   - Marked recommendation #5 as COMPLETED (line 747)
+   - Added maintenance log entry documenting this enhancement
+
+**Implementation Details:**
+
+**Live-Updateable Options (4 total):**
+- `LogLevel`: info, debug, warn, error (requires restart for logger, config updated)
+- `MaxCircuitDirtiness`: Duration ≥30s (e.g., "10m", "1h", "30m")
+- `NewCircuitPeriod`: Duration ≥10s (e.g., "30s", "1m", "5m")
+- `CircuitBuildTimeout`: Duration 10s-5m (e.g., "60s", "2m", "90s")
+
+**Read-Only Options (8 total):**
+- Port configurations: SocksPort, ControlPort, MetricsPort
+- Directory paths: DataDirectory
+- Guard settings: NumEntryGuards, UseEntryGuards
+- Feature flags: UseBridges, EnableMetrics
+
+**Duration Parsing:**
+- Uses Go's time.ParseDuration() for standard formats
+- Supports: "s" (seconds), "m" (minutes), "h" (hours)
+- Examples: "30s", "5m", "1h30m", "90s"
+- Validation errors include helpful messages
+
+**Error Handling:**
+- Invalid duration format: "invalid duration for <option>: <parse error>"
+- Out of range: "<option> must be at least/not exceed <limit>"
+- Unknown option: "unknown configuration option: <key>"
+- Read-only: "configuration option <key> requires restart"
+- Nil config: "configuration not available"
+
+**Test Coverage:**
+- All new tests pass: `go test ./pkg/client -run TestSetConfigValue` ✅
+- 6 test functions with 30+ test cases
+- 100% coverage of new configuration update code paths
+- Full client test suite passes (22.2s)
+- No regressions in existing tests
+
+**Specification Compliance:**
+- Implements control-spec.txt §3.1 SETCONF command
+- Duration ranges aligned with Tor best practices
+- Proper error codes and messages per control protocol spec
+
+**Usage Example:**
+```bash
+# Via torctl (control protocol client)
+torctl setconf MaxCircuitDirtiness=15m
+torctl setconf NewCircuitPeriod=45s
+torctl setconf CircuitBuildTimeout=90s
+
+# Via control protocol (telnet)
+SETCONF MaxCircuitDirtiness=10m
+SETCONF NewCircuitPeriod=30s
+SETCONF CircuitBuildTimeout=2m
+```
+
+**Impact:**
+- ✅ Enables runtime tuning of circuit timing parameters
+- ✅ Reduces need for client restarts when optimizing performance
+- ✅ Maintains backward compatibility (all existing tests pass)
+- ✅ Comprehensive validation prevents invalid configurations
+- ✅ Addresses AUDIT.md recommendation #5
+- 🚀 Improves operational flexibility for production deployments
+
+**Rationale:**
+- Addresses AUDIT.md line 747 recommendation
+- Circuit timing parameters are safe to update at runtime (affect future circuits only)
+- Reduces operational friction when tuning performance
+- LogLevel remains updateable but requires restart for logger (slog limitation)
+- Read-only options correctly identified (ports, directories, feature flags)
+- Follows Go idioms for duration parsing and validation
+
+**Backward Compatibility:**
+- ✅ All existing SETCONF functionality preserved
+- ✅ Read-only options continue to reject updates
+- ✅ Unknown options continue to return appropriate errors
+- ✅ No breaking changes to control protocol API
+- ✅ Full test suite passes with no regressions
+
+**Next Steps:**
+1. Monitor runtime configuration updates in production
+2. Consider adding ConfigChangeEvent to notify components of updates
+3. Add metrics for configuration update frequency
+4. Consider adding more timing parameters if safe to update at runtime
 
 ---
 

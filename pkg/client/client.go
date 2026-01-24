@@ -877,7 +877,7 @@ func (p *clientConfigProvider) SetConfigValue(key, value string) error {
 	}
 
 	// Parse and set configuration values
-	// Note: Most config changes require restart to take effect
+	// Note: Some config changes require restart to take effect
 	switch key {
 	case "LogLevel":
 		// Validate log level
@@ -891,9 +891,45 @@ func (p *clientConfigProvider) SetConfigValue(key, value string) error {
 			return fmt.Errorf("invalid log level: %s", value)
 		}
 		cfg.LogLevel = value
+		// Note: Logger level changes require restart since slog.Handler is immutable
 		return nil
-	case "SocksPort", "ControlPort", "DataDirectory", "CircuitBuildTimeout",
-		"MaxCircuitDirtiness", "NewCircuitPeriod", "NumEntryGuards",
+	case "MaxCircuitDirtiness":
+		// Parse duration (e.g., "10m", "1h", "30s")
+		duration, err := time.ParseDuration(value)
+		if err != nil {
+			return fmt.Errorf("invalid duration for MaxCircuitDirtiness: %w", err)
+		}
+		if duration < 30*time.Second {
+			return fmt.Errorf("MaxCircuitDirtiness must be at least 30 seconds")
+		}
+		cfg.MaxCircuitDirtiness = duration
+		return nil
+	case "NewCircuitPeriod":
+		// Parse duration (e.g., "30s", "1m", "5m")
+		duration, err := time.ParseDuration(value)
+		if err != nil {
+			return fmt.Errorf("invalid duration for NewCircuitPeriod: %w", err)
+		}
+		if duration < 10*time.Second {
+			return fmt.Errorf("NewCircuitPeriod must be at least 10 seconds")
+		}
+		cfg.NewCircuitPeriod = duration
+		return nil
+	case "CircuitBuildTimeout":
+		// Parse duration (e.g., "60s", "2m")
+		duration, err := time.ParseDuration(value)
+		if err != nil {
+			return fmt.Errorf("invalid duration for CircuitBuildTimeout: %w", err)
+		}
+		if duration < 10*time.Second {
+			return fmt.Errorf("CircuitBuildTimeout must be at least 10 seconds")
+		}
+		if duration > 5*time.Minute {
+			return fmt.Errorf("CircuitBuildTimeout must not exceed 5 minutes")
+		}
+		cfg.CircuitBuildTimeout = duration
+		return nil
+	case "SocksPort", "ControlPort", "DataDirectory", "NumEntryGuards",
 		"UseEntryGuards", "UseBridges", "MetricsPort", "EnableMetrics":
 		// These settings require restart
 		return fmt.Errorf("configuration option %s requires restart", key)
