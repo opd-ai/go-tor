@@ -121,56 +121,44 @@ func (h *Handshake) sendVersions() error {
 
 // receiveVersions receives and processes the VERSIONS response
 func (h *Handshake) receiveVersions(ctx context.Context) error {
-	// Set a timeout for receiving (SEC-009: configurable timeout)
-	timer := time.NewTimer(h.timeout)
-	defer timer.Stop()
+	// Create context with timeout (SEC-009: configurable timeout)
+	ctx, cancel := context.WithTimeout(ctx, h.timeout)
+	defer cancel()
 
-	cellCh := make(chan *cell.Cell, 1)
-	errCh := make(chan error, 1)
-
-	go func() {
-		receivedCell, err := h.conn.ReceiveCell()
-		if err != nil {
-			errCh <- err
-			return
+	// Use context-aware receive to prevent goroutine leak on timeout
+	receivedCell, err := h.conn.ReceiveCellWithContext(ctx)
+	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return fmt.Errorf("timeout waiting for VERSIONS response")
 		}
-		cellCh <- receivedCell
-	}()
-
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timer.C:
-		return fmt.Errorf("timeout waiting for VERSIONS response")
-	case err := <-errCh:
 		return err
-	case receivedCell := <-cellCh:
-		if receivedCell.Command != cell.CmdVersions {
-			return fmt.Errorf("expected VERSIONS cell, got %s", receivedCell.Command)
-		}
-
-		// Parse versions from payload
-		if len(receivedCell.Payload)%2 != 0 {
-			return fmt.Errorf("invalid VERSIONS payload length: %d", len(receivedCell.Payload))
-		}
-
-		var versions []int
-		for i := 0; i < len(receivedCell.Payload); i += 2 {
-			version := int(receivedCell.Payload[i])<<8 | int(receivedCell.Payload[i+1])
-			versions = append(versions, version)
-		}
-
-		h.logger.Debug("Received VERSIONS cell", "versions", versions)
-
-		// Select highest mutually supported version
-		h.negotiatedVersion = h.selectVersion(versions)
-		if h.negotiatedVersion == 0 {
-			return fmt.Errorf("no compatible protocol version")
-		}
-
-		h.logger.Info("Negotiated protocol version", "version", h.negotiatedVersion)
-		return nil
 	}
+
+	if receivedCell.Command != cell.CmdVersions {
+		return fmt.Errorf("expected VERSIONS cell, got %s", receivedCell.Command)
+	}
+
+	// Parse versions from payload
+	if len(receivedCell.Payload)%2 != 0 {
+		return fmt.Errorf("invalid VERSIONS payload length: %d", len(receivedCell.Payload))
+	}
+
+	var versions []int
+	for i := 0; i < len(receivedCell.Payload); i += 2 {
+		version := int(receivedCell.Payload[i])<<8 | int(receivedCell.Payload[i+1])
+		versions = append(versions, version)
+	}
+
+	h.logger.Debug("Received VERSIONS cell", "versions", versions)
+
+	// Select highest mutually supported version
+	h.negotiatedVersion = h.selectVersion(versions)
+	if h.negotiatedVersion == 0 {
+		return fmt.Errorf("no compatible protocol version")
+	}
+
+	h.logger.Info("Negotiated protocol version", "version", h.negotiatedVersion)
+	return nil
 }
 
 // selectVersion selects the highest mutually supported version
@@ -223,38 +211,27 @@ func (h *Handshake) sendNetinfo() error {
 
 // receiveNetinfo receives and validates the NETINFO response
 func (h *Handshake) receiveNetinfo(ctx context.Context) error {
-	timer := time.NewTimer(h.timeout)
-	defer timer.Stop()
+	// Create context with timeout
+	ctx, cancel := context.WithTimeout(ctx, h.timeout)
+	defer cancel()
 
-	cellCh := make(chan *cell.Cell, 1)
-	errCh := make(chan error, 1)
-
-	go func() {
-		receivedCell, err := h.conn.ReceiveCell()
-		if err != nil {
-			errCh <- err
-			return
+	// Use context-aware receive to prevent goroutine leak on timeout
+	receivedCell, err := h.conn.ReceiveCellWithContext(ctx)
+	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return fmt.Errorf("timeout waiting for NETINFO response")
 		}
-		cellCh <- receivedCell
-	}()
-
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timer.C:
-		return fmt.Errorf("timeout waiting for NETINFO response")
-	case err := <-errCh:
 		return err
-	case receivedCell := <-cellCh:
-		if receivedCell.Command != cell.CmdNetinfo {
-			return fmt.Errorf("expected NETINFO cell, got %s", receivedCell.Command)
-		}
-
-		h.logger.Debug("Received NETINFO cell")
-		// For now, just validate we received it
-		// Full parsing would extract timestamp and addresses
-		return nil
 	}
+
+	if receivedCell.Command != cell.CmdNetinfo {
+		return fmt.Errorf("expected NETINFO cell, got %s", receivedCell.Command)
+	}
+
+	h.logger.Debug("Received NETINFO cell")
+	// For now, just validate we received it
+	// Full parsing would extract timestamp and addresses
+	return nil
 }
 
 // NegotiatedVersion returns the negotiated protocol version
@@ -265,86 +242,75 @@ func (h *Handshake) NegotiatedVersion() int {
 // receiveCERTS receives and validates the CERTS cell
 // Per tor-spec.txt §4.2, relays send CERTS after VERSIONS
 func (h *Handshake) receiveCERTS(ctx context.Context) error {
-	timer := time.NewTimer(h.timeout)
-	defer timer.Stop()
+	// Create context with timeout
+	ctx, cancel := context.WithTimeout(ctx, h.timeout)
+	defer cancel()
 
-	cellCh := make(chan *cell.Cell, 1)
-	errCh := make(chan error, 1)
-
-	go func() {
-		receivedCell, err := h.conn.ReceiveCell()
-		if err != nil {
-			errCh <- err
-			return
+	// Use context-aware receive to prevent goroutine leak on timeout
+	receivedCell, err := h.conn.ReceiveCellWithContext(ctx)
+	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return fmt.Errorf("timeout waiting for CERTS response")
 		}
-		cellCh <- receivedCell
-	}()
-
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timer.C:
-		return fmt.Errorf("timeout waiting for CERTS response")
-	case err := <-errCh:
 		return err
-	case receivedCell := <-cellCh:
-		if receivedCell.Command != cell.CmdCerts {
-			h.logger.Debug("Received non-CERTS cell, skipping CERTS validation", "command", receivedCell.Command)
-			return nil
-		}
+	}
 
-		h.logger.Debug("Received CERTS cell")
-
-		// Parse CERTS cell
-		certs, err := ParseCERTSCell(receivedCell)
-		if err != nil {
-			return fmt.Errorf("failed to parse CERTS cell: %w", err)
-		}
-
-		// Validate certificate expiration
-		if err := certs.ValidateExpiration(); err != nil {
-			if h.conn.RequireCERTS() {
-				return fmt.Errorf("certificate expiration validation failed (strict mode): %w", err)
-			}
-			h.logger.Warn("Certificate expiration validation failed", "error", err)
-			// Don't fail - some certs may be expired but relay still functional
-		}
-
-		// Validate Ed25519 certificate signatures
-		if err := certs.ValidateSignatures(); err != nil {
-			if h.conn.RequireCERTS() {
-				return fmt.Errorf("certificate signature validation failed (strict mode): %w", err)
-			}
-			h.logger.Warn("Certificate signature validation failed", "error", err)
-			// Don't fail - continue with non-enforcing mode for backward compatibility
-		} else {
-			h.logger.Info("Certificate signatures verified successfully")
-		}
-
-		// Validate relay identity if expected values are provided
-		expectedIdentity := h.conn.ExpectedIdentity()
-		expectedFingerprint := h.conn.ExpectedFingerprint()
-		
-		if expectedIdentity != nil || expectedFingerprint != "" {
-			if err := certs.ValidateRelayIdentity(expectedFingerprint, expectedIdentity); err != nil {
-				if h.conn.RequireCERTS() {
-					return fmt.Errorf("relay identity validation failed (strict mode): %w", err)
-				}
-				h.logger.Warn("Relay identity validation failed", 
-					"error", err,
-					"expected_identity_set", expectedIdentity != nil,
-					"expected_fingerprint_set", expectedFingerprint != "")
-				// Don't fail - continue with non-enforcing mode for backward compatibility
-			} else {
-				h.logger.Info("Relay identity verified successfully",
-					"identity_validated", expectedIdentity != nil,
-					"fingerprint_validated", expectedFingerprint != "")
-			}
-		} else {
-			h.logger.Debug("No expected identity configured - skipping relay identity validation")
-		}
-
-		h.logger.Info("CERTS cell processed", "num_certs", len(certs.Certificates))
+	if receivedCell.Command != cell.CmdCerts {
+		h.logger.Debug("Received non-CERTS cell, skipping CERTS validation", "command", receivedCell.Command)
 		return nil
 	}
+
+	h.logger.Debug("Received CERTS cell")
+
+	// Parse CERTS cell
+	certs, err := ParseCERTSCell(receivedCell)
+	if err != nil {
+		return fmt.Errorf("failed to parse CERTS cell: %w", err)
+	}
+
+	// Validate certificate expiration
+	if err := certs.ValidateExpiration(); err != nil {
+		if h.conn.RequireCERTS() {
+			return fmt.Errorf("certificate expiration validation failed (strict mode): %w", err)
+		}
+		h.logger.Warn("Certificate expiration validation failed", "error", err)
+		// Don't fail - some certs may be expired but relay still functional
+	}
+
+	// Validate Ed25519 certificate signatures
+	if err := certs.ValidateSignatures(); err != nil {
+		if h.conn.RequireCERTS() {
+			return fmt.Errorf("certificate signature validation failed (strict mode): %w", err)
+		}
+		h.logger.Warn("Certificate signature validation failed", "error", err)
+		// Don't fail - continue with non-enforcing mode for backward compatibility
+	} else {
+		h.logger.Info("Certificate signatures verified successfully")
+	}
+
+	// Validate relay identity if expected values are provided
+	expectedIdentity := h.conn.ExpectedIdentity()
+	expectedFingerprint := h.conn.ExpectedFingerprint()
+	
+	if expectedIdentity != nil || expectedFingerprint != "" {
+		if err := certs.ValidateRelayIdentity(expectedFingerprint, expectedIdentity); err != nil {
+			if h.conn.RequireCERTS() {
+				return fmt.Errorf("relay identity validation failed (strict mode): %w", err)
+			}
+			h.logger.Warn("Relay identity validation failed", 
+				"error", err,
+				"expected_identity_set", expectedIdentity != nil,
+				"expected_fingerprint_set", expectedFingerprint != "")
+			// Don't fail - continue with non-enforcing mode for backward compatibility
+		} else {
+			h.logger.Info("Relay identity verified successfully",
+				"identity_validated", expectedIdentity != nil,
+				"fingerprint_validated", expectedFingerprint != "")
+		}
+	} else {
+		h.logger.Debug("No expected identity configured - skipping relay identity validation")
+	}
+
+	h.logger.Info("CERTS cell processed", "num_certs", len(certs.Certificates))
+	return nil
 }

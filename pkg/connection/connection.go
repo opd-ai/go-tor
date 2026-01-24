@@ -363,6 +363,12 @@ func (c *Connection) SendCell(cell *cell.Cell) error {
 
 // ReceiveCell receives a cell from the connection
 func (c *Connection) ReceiveCell() (*cell.Cell, error) {
+	return c.ReceiveCellWithContext(context.Background())
+}
+
+// ReceiveCellWithContext receives a cell from the connection with context support.
+// The context allows cancellation of the blocking read operation, preventing goroutine leaks.
+func (c *Connection) ReceiveCellWithContext(ctx context.Context) (*cell.Cell, error) {
 	c.recvMu.Lock()
 	defer c.recvMu.Unlock()
 
@@ -376,19 +382,36 @@ func (c *Connection) ReceiveCell() (*cell.Cell, error) {
 	default:
 	}
 
-	receivedCell, err := cell.DecodeCell(c.tlsConn)
-	if err != nil {
-		if err == io.EOF {
-			c.logger.Info("Connection closed by remote")
-			c.Close()
-			return nil, err
-		}
-		c.logger.Error("Failed to receive cell", "error", err)
-		return nil, fmt.Errorf("failed to receive cell: %w", err)
+	// Use a goroutine to make the blocking read cancellable via context
+	type result struct {
+		cell *cell.Cell
+		err  error
 	}
+	resultCh := make(chan result, 1)
 
-	c.logger.Debug("Received cell", "command", receivedCell.Command, "circuit_id", receivedCell.CircID)
-	return receivedCell, nil
+	go func() {
+		receivedCell, err := cell.DecodeCell(c.tlsConn)
+		resultCh <- result{cell: receivedCell, err: err}
+	}()
+
+	select {
+	case <-ctx.Done():
+		// Context cancelled - close connection to unblock the read
+		c.tlsConn.Close()
+		return nil, ctx.Err()
+	case res := <-resultCh:
+		if res.err != nil {
+			if res.err == io.EOF {
+				c.logger.Info("Connection closed by remote")
+				c.Close()
+				return nil, res.err
+			}
+			c.logger.Error("Failed to receive cell", "error", res.err)
+			return nil, fmt.Errorf("failed to receive cell: %w", res.err)
+		}
+		c.logger.Debug("Received cell", "command", res.cell.Command, "circuit_id", res.cell.CircID)
+		return res.cell, nil
+	}
 }
 
 // Close closes the connection gracefully
