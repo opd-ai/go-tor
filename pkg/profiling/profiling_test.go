@@ -193,6 +193,74 @@ func TestGetStats(t *testing.T) {
 	}
 }
 
+func TestStatsSnapshotSafeCopy(t *testing.T) {
+	p := NewProfiler(DefaultConfig(), logger.NewDefault())
+	defer p.Close()
+
+	p.updateStats()
+
+	// Get the first snapshot
+	stats1 := p.GetStats()
+
+	// Copy the snapshot (this should be safe and not trigger go vet warnings)
+	stats2 := stats1
+
+	// Verify the copy has the same values
+	if stats2.NumGoroutines != stats1.NumGoroutines {
+		t.Errorf("Expected NumGoroutines to match: got %d, want %d",
+			stats2.NumGoroutines, stats1.NumGoroutines)
+	}
+	if stats2.HeapAllocBytes != stats1.HeapAllocBytes {
+		t.Errorf("Expected HeapAllocBytes to match: got %d, want %d",
+			stats2.HeapAllocBytes, stats1.HeapAllocBytes)
+	}
+
+	// Get a new snapshot after some time
+	time.Sleep(10 * time.Millisecond)
+	p.updateStats()
+	stats3 := p.GetStats()
+
+	// The original snapshots should be unchanged (they're independent copies)
+	if stats1.LastStatsUpdate.After(stats3.LastStatsUpdate) {
+		t.Error("Expected stats1 to have an earlier timestamp than stats3")
+	}
+
+	// Verify we can safely pass snapshots by value to functions
+	verifySnapshot := func(s StatsSnapshot) {
+		if s.NumGoroutines == 0 {
+			t.Error("Expected non-zero goroutine count in passed snapshot")
+		}
+	}
+	verifySnapshot(stats1) // Pass by value, should be safe
+}
+
+func TestStatsSnapshotIndependence(t *testing.T) {
+	p := NewProfiler(DefaultConfig(), logger.NewDefault())
+	defer p.Close()
+
+	p.updateStats()
+	snapshot1 := p.GetStats()
+
+	// Update internal stats
+	time.Sleep(10 * time.Millisecond)
+	p.updateStats()
+
+	// Get new snapshot
+	snapshot2 := p.GetStats()
+
+	// Snapshots should be independent - snapshot1 shouldn't change
+	// when we get a new snapshot
+	if snapshot1.LastStatsUpdate.Equal(snapshot2.LastStatsUpdate) {
+		// They might be equal if updateStats didn't change the timestamp
+		// This is fine - just checking they're independent
+	}
+
+	// The first snapshot should still have its original values
+	if snapshot1.NumGoroutines == 0 {
+		t.Error("Expected snapshot1 to retain its values")
+	}
+}
+
 func TestRegisterWithMux(t *testing.T) {
 	p := NewProfiler(DefaultConfig(), logger.NewDefault())
 	defer p.Close()

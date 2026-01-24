@@ -63,8 +63,23 @@ type Profiler struct {
 }
 
 // Stats tracks profiling statistics and goroutine information.
+// This is an internal type that includes a mutex for concurrent access.
 type Stats struct {
 	mu                sync.RWMutex
+	NumGoroutines     int       // Current number of goroutines
+	PeakGoroutines    int       // Peak number of goroutines observed
+	HeapAllocBytes    uint64    // Current heap allocation in bytes
+	PeakHeapBytes     uint64    // Peak heap allocation in bytes
+	TotalAllocBytes   uint64    // Total bytes allocated (cumulative)
+	NumGC             uint32    // Number of GC cycles completed
+	LastGCTime        time.Time // Time of last GC
+	GoroutineLeakRate float64   // Goroutine leak detection rate (goroutines/sec)
+	LastStatsUpdate   time.Time // Time when stats were last updated
+}
+
+// StatsSnapshot is a read-only snapshot of profiling statistics.
+// This type does not contain a mutex and is safe to copy and return by value.
+type StatsSnapshot struct {
 	NumGoroutines     int       // Current number of goroutines
 	PeakGoroutines    int       // Peak number of goroutines observed
 	HeapAllocBytes    uint64    // Current heap allocation in bytes
@@ -242,10 +257,22 @@ func (p *Profiler) updateStats() {
 }
 
 // GetStats returns a snapshot of current profiling statistics.
-func (p *Profiler) GetStats() Stats {
+// This returns a StatsSnapshot which is safe to copy and does not contain a mutex.
+func (p *Profiler) GetStats() StatsSnapshot {
 	p.stats.mu.RLock()
 	defer p.stats.mu.RUnlock()
-	return *p.stats
+	
+	return StatsSnapshot{
+		NumGoroutines:     p.stats.NumGoroutines,
+		PeakGoroutines:    p.stats.PeakGoroutines,
+		HeapAllocBytes:    p.stats.HeapAllocBytes,
+		PeakHeapBytes:     p.stats.PeakHeapBytes,
+		TotalAllocBytes:   p.stats.TotalAllocBytes,
+		NumGC:             p.stats.NumGC,
+		LastGCTime:        p.stats.LastGCTime,
+		GoroutineLeakRate: p.stats.GoroutineLeakRate,
+		LastStatsUpdate:   p.stats.LastStatsUpdate,
+	}
 }
 
 // handleStats serves runtime statistics as JSON.

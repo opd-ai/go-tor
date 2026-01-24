@@ -1437,6 +1437,77 @@ The completion of SPEC-001 (relay key extraction), EXTEND2/EXTENDED2 wire protoc
 
 ## Maintenance Log
 
+### January 24, 2026 - Code Quality: Fixed Mutex Copy Bug in Profiling Package
+
+**Task:** Fixed `go vet` warning about copying lock value in `pkg/profiling` package
+
+**Issue:**
+- `go vet` reported: "return copies lock value: Stats contains sync.RWMutex"
+- The `GetStats()` method was returning a `Stats` struct by value, which contains a `sync.RWMutex`
+- Copying a mutex violates Go's synchronization contract and can lead to undefined behavior
+
+**Changes Made:**
+
+1. **pkg/profiling/profiling.go** - Introduced `StatsSnapshot` type
+   - Created new `StatsSnapshot` struct without the mutex for safe copying
+   - Contains same fields as `Stats` except the `mu sync.RWMutex` field
+   - Updated `GetStats()` to return `StatsSnapshot` instead of `Stats`
+   - Method now explicitly copies each field individually while holding the read lock
+   - Added documentation clarifying `Stats` is internal and `StatsSnapshot` is the public API
+
+**Code Changes:**
+```go
+// Before:
+type Stats struct {
+    mu sync.RWMutex  // ⚠️ Cannot be safely copied
+    NumGoroutines int
+    // ... other fields
+}
+
+func (p *Profiler) GetStats() Stats {
+    p.stats.mu.RLock()
+    defer p.stats.mu.RUnlock()
+    return *p.stats  // ⚠️ Copies the mutex!
+}
+
+// After:
+type StatsSnapshot struct {
+    NumGoroutines int  // ✅ Safe to copy
+    // ... other fields (no mutex)
+}
+
+func (p *Profiler) GetStats() StatsSnapshot {
+    p.stats.mu.RLock()
+    defer p.stats.mu.RUnlock()
+    return StatsSnapshot{
+        NumGoroutines: p.stats.NumGoroutines,
+        // ... copy each field explicitly
+    }
+}
+```
+
+**Testing:**
+- ✅ All profiling tests pass: `go test ./pkg/profiling -v`
+- ✅ Full test suite passes: `go test ./... -short`
+- ✅ `go vet ./...` now passes with zero warnings
+- ✅ No functional changes, only type safety improvement
+
+**Impact:**
+- Eliminates potential data race and undefined behavior from mutex copying
+- Improves type safety by making the API contract explicit
+- Better separation of concerns (internal Stats vs public StatsSnapshot)
+- No breaking changes to existing functionality
+- All tests continue to pass
+
+**Rationale:**
+- Detected by `go vet` static analysis tool
+- Critical correctness issue that could cause subtle bugs
+- Aligns with Go best practices (never copy a mutex)
+- Makes the intended usage pattern explicit through types
+- Follows Go community guidance on mutex handling
+
+---
+
 ### January 24, 2026 - Code Quality: Fixed Linting Issues
 
 **Task:** Improved code quality by fixing golint warnings for better Go idiomaticity and documentation
