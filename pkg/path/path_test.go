@@ -392,3 +392,130 @@ func TestConcurrentAccess(t *testing.T) {
 		}
 	}
 }
+
+func TestDiversityIntegration(t *testing.T) {
+log := logger.NewDefault()
+
+diverseRelays := []*directory.Relay{
+{
+Nickname:    "Guard1",
+Fingerprint: "G1",
+Address:     "10.0.1.1",
+ORPort:      9001,
+Flags:       []string{"Running", "Valid", "Guard", "Stable"},
+},
+{
+Nickname:    "Middle1",
+Fingerprint: "M1",
+Address:     "172.16.2.1",
+ORPort:      9001,
+Flags:       []string{"Running", "Valid"},
+},
+{
+Nickname:    "Exit1",
+Fingerprint: "E1",
+Address:     "192.168.3.1",
+ORPort:      9001,
+Flags:       []string{"Running", "Valid", "Exit"},
+},
+{
+Nickname:    "Guard2",
+Fingerprint: "G2",
+Address:     "10.1.1.1",
+ORPort:      9001,
+Flags:       []string{"Running", "Valid", "Guard", "Stable"},
+},
+{
+Nickname:    "Middle2",
+Fingerprint: "M2",
+Address:     "172.17.2.1",
+ORPort:      9001,
+Flags:       []string{"Running", "Valid"},
+},
+{
+Nickname:    "Exit2",
+Fingerprint: "E2",
+Address:     "192.169.3.1",
+ORPort:      9001,
+Flags:       []string{"Running", "Valid", "Exit"},
+},
+}
+
+selector := NewSelector(directory.NewClient(log), log)
+selector.guards = []*directory.Relay{diverseRelays[0], diverseRelays[3]}
+selector.relays = diverseRelays
+
+path, err := selector.SelectPath(80)
+if err != nil {
+t.Fatalf("SelectPath failed: %v", err)
+}
+
+if path == nil || path.Guard == nil || path.Middle == nil || path.Exit == nil {
+t.Fatal("Invalid path returned")
+}
+
+stats := selector.GetDiversityStats()
+if stats.PathsAnalyzed < 1 {
+t.Error("Diversity analyzer should have analyzed at least one path")
+}
+
+if path.Guard.Fingerprint == path.Middle.Fingerprint ||
+path.Guard.Fingerprint == path.Exit.Fingerprint ||
+path.Middle.Fingerprint == path.Exit.Fingerprint {
+t.Error("Path contains duplicate relays")
+}
+
+t.Logf("Selected path with diversity stats: analyzed=%d, avgScore=%.2f",
+stats.PathsAnalyzed, stats.AverageScore)
+}
+
+func TestGetDiversityStats(t *testing.T) {
+log := logger.NewDefault()
+selector := NewSelector(directory.NewClient(log), log)
+
+stats := selector.GetDiversityStats()
+if stats.PathsAnalyzed != 0 {
+t.Error("PathsAnalyzed should be 0 initially")
+}
+
+relays := []*directory.Relay{
+{
+Nickname:    "Guard1",
+Fingerprint: "G1",
+Address:     "10.0.1.1",
+ORPort:      9001,
+Flags:       []string{"Running", "Valid", "Guard", "Stable"},
+},
+{
+Nickname:    "Middle1",
+Fingerprint: "M1",
+Address:     "172.16.2.1",
+ORPort:      9001,
+Flags:       []string{"Running", "Valid"},
+},
+{
+Nickname:    "Exit1",
+Fingerprint: "E1",
+Address:     "192.168.3.1",
+ORPort:      9001,
+Flags:       []string{"Running", "Valid", "Exit"},
+},
+}
+
+selector.guards = []*directory.Relay{relays[0]}
+selector.relays = relays
+
+_, err := selector.SelectPath(80)
+if err != nil {
+t.Fatalf("SelectPath failed: %v", err)
+}
+
+stats = selector.GetDiversityStats()
+if stats.PathsAnalyzed < 1 {
+t.Error("PathsAnalyzed should be at least 1 after selecting a path")
+}
+
+if stats.AverageScore < 0 || stats.AverageScore > 1 {
+t.Errorf("AverageScore should be between 0 and 1, got %.2f", stats.AverageScore)
+}
+}

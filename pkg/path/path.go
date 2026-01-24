@@ -23,12 +23,13 @@ type Path struct {
 
 // Selector provides path selection for Tor circuits
 type Selector struct {
-	logger       *logger.Logger
-	dirClient    *directory.Client
-	guardManager *GuardManager
-	mu           sync.RWMutex
-	guards       []*directory.Relay
-	relays       []*directory.Relay
+	logger          *logger.Logger
+	dirClient       *directory.Client
+	guardManager    *GuardManager
+	diversityAnalyzer *DiversityAnalyzer
+	mu              sync.RWMutex
+	guards          []*directory.Relay
+	relays          []*directory.Relay
 }
 
 // NewSelector creates a new path selector
@@ -38,10 +39,11 @@ func NewSelector(dirClient *directory.Client, log *logger.Logger) *Selector {
 	}
 
 	return &Selector{
-		logger:    log.Component("path"),
-		dirClient: dirClient,
-		guards:    make([]*directory.Relay, 0),
-		relays:    make([]*directory.Relay, 0),
+		logger:            log.Component("path"),
+		dirClient:         dirClient,
+		diversityAnalyzer: NewDiversityAnalyzer(log),
+		guards:            make([]*directory.Relay, 0),
+		relays:            make([]*directory.Relay, 0),
 	}
 }
 
@@ -52,11 +54,12 @@ func NewSelectorWithGuards(dirClient *directory.Client, guardMgr *GuardManager, 
 	}
 
 	return &Selector{
-		logger:       log.Component("path"),
-		dirClient:    dirClient,
-		guardManager: guardMgr,
-		guards:       make([]*directory.Relay, 0),
-		relays:       make([]*directory.Relay, 0),
+		logger:            log.Component("path"),
+		dirClient:         dirClient,
+		guardManager:      guardMgr,
+		diversityAnalyzer: NewDiversityAnalyzer(log),
+		guards:            make([]*directory.Relay, 0),
+		relays:            make([]*directory.Relay, 0),
 	}
 }
 
@@ -110,6 +113,7 @@ func (s *Selector) GetRelays() []*directory.Relay {
 }
 
 // SelectPath selects a complete path (guard, middle, exit) for a circuit
+// Uses diversity analysis to prefer paths with good geographic and network distribution
 func (s *Selector) SelectPath(exitPort int) (*Path, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -118,34 +122,72 @@ func (s *Selector) SelectPath(exitPort int) (*Path, error) {
 		return nil, fmt.Errorf("no relays available, call UpdateConsensus first")
 	}
 
-	// Select guard
-	guard, err := s.selectGuard()
-	if err != nil {
-		return nil, fmt.Errorf("failed to select guard: %w", err)
+	// Try up to 5 times to find a path with at least medium diversity
+	const maxAttempts = 5
+	var bestPath *Path
+	var bestScore *PathScore
+
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		// Select guard
+		guard, err := s.selectGuard()
+		if err != nil {
+			return nil, fmt.Errorf("failed to select guard: %w", err)
+		}
+
+		// Select exit (must allow the port and not be the guard)
+		exit, err := s.selectExit(exitPort, guard)
+		if err != nil {
+			return nil, fmt.Errorf("failed to select exit: %w", err)
+		}
+
+		// Select middle (must not be guard or exit)
+		middle, err := s.selectMiddle(guard, exit)
+		if err != nil {
+			return nil, fmt.Errorf("failed to select middle: %w", err)
+		}
+
+		path := &Path{
+			Guard:  guard,
+			Middle: middle,
+			Exit:   exit,
+		}
+
+		// Analyze diversity of this path
+		score := s.diversityAnalyzer.AnalyzePath(path)
+
+		// If this is our first path or a better path, save it
+		if bestPath == nil || score.Overall > bestScore.Overall {
+			bestPath = path
+			bestScore = score
+		}
+
+		// If we found a path with at least medium diversity, use it
+		if score.Level >= DiversityMedium {
+			s.logger.Info("Path selected",
+				"guard", guard.Nickname,
+				"middle", middle.Nickname,
+				"exit", exit.Nickname,
+				"diversity", score.Level.String(),
+				"score", score.Overall,
+				"attempt", attempt+1)
+			return path, nil
+		}
+
+		s.logger.Debug("Path diversity below threshold, retrying",
+			"diversity", score.Level.String(),
+			"score", score.Overall,
+			"attempt", attempt+1)
 	}
 
-	// Select exit (must allow the port and not be the guard)
-	exit, err := s.selectExit(exitPort, guard)
-	if err != nil {
-		return nil, fmt.Errorf("failed to select exit: %w", err)
-	}
+	// Use the best path we found, even if diversity is low
+	s.logger.Info("Path selected (best of attempts)",
+		"guard", bestPath.Guard.Nickname,
+		"middle", bestPath.Middle.Nickname,
+		"exit", bestPath.Exit.Nickname,
+		"diversity", bestScore.Level.String(),
+		"score", bestScore.Overall)
 
-	// Select middle (must not be guard or exit)
-	middle, err := s.selectMiddle(guard, exit)
-	if err != nil {
-		return nil, fmt.Errorf("failed to select middle: %w", err)
-	}
-
-	s.logger.Info("Path selected",
-		"guard", guard.Nickname,
-		"middle", middle.Nickname,
-		"exit", exit.Nickname)
-
-	return &Path{
-		Guard:  guard,
-		Middle: middle,
-		Exit:   exit,
-	}, nil
+	return bestPath, nil
 }
 
 // selectGuard selects a guard relay, preferring persistent guards
@@ -327,4 +369,12 @@ func randomIndex(max int) (int, error) {
 	}
 
 	return int(n.Int64()), nil
+}
+
+// GetDiversityStats returns statistics about path diversity analysis
+func (s *Selector) GetDiversityStats() DiversityStats {
+	if s.diversityAnalyzer == nil {
+		return DiversityStats{}
+	}
+	return s.diversityAnalyzer.GetStats()
 }
