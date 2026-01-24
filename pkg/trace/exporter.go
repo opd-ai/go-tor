@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"sync"
 )
 
@@ -86,6 +87,10 @@ func (e *FileExporter) Export(span *Span) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
+	if e.file == nil {
+		return fmt.Errorf("exporter is closed")
+	}
+
 	var data []byte
 	var err error
 
@@ -107,28 +112,51 @@ func (e *FileExporter) Export(span *Span) error {
 	return nil
 }
 
-// Close closes the file
+// Close closes the file and clears the finalizer (idempotent)
 func (e *FileExporter) Close() error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
+	runtime.SetFinalizer(e, nil) // Clear finalizer on explicit close
 	if e.file != nil {
-		return e.file.Close()
+		err := e.file.Close()
+		e.file = nil // Mark as closed to make Close() idempotent
+		return err
 	}
 	return nil
 }
 
-// NewFileExporter creates a new file exporter
+// NewFileExporter creates a new file exporter.
+// IMPORTANT: The caller MUST call Close() when done to prevent file descriptor leaks.
+// The file is opened in append mode with 0644 permissions.
+// A finalizer is registered as a defensive measure, but explicit Close() is required.
+//
+// Example usage:
+//
+//	exporter, err := NewFileExporter("trace.json", false)
+//	if err != nil {
+//	    return err
+//	}
+//	defer exporter.Close()
 func NewFileExporter(filename string, pretty bool) (*FileExporter, error) {
 	file, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open trace file: %w", err)
 	}
 
-	return &FileExporter{
+	exporter := &FileExporter{
 		file:   file,
 		pretty: pretty,
-	}, nil
+	}
+
+	// Register finalizer as defensive measure (but explicit Close() is still required)
+	runtime.SetFinalizer(exporter, func(e *FileExporter) {
+		if e.file != nil {
+			_ = e.file.Close()
+		}
+	})
+
+	return exporter, nil
 }
 
 // WriterExporter exports spans to an io.Writer

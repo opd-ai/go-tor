@@ -4,6 +4,7 @@ import (
 	"crypto/subtle"
 	"fmt"
 	"math"
+	"sync"
 	"time"
 )
 
@@ -65,8 +66,9 @@ func validateCellInput(data []byte) error {
 	return nil
 }
 
-// RateLimiter implements token bucket rate limiting
+// RateLimiter implements token bucket rate limiting with thread-safe operations
 type RateLimiter struct {
+	mu        sync.Mutex
 	tokens    int
 	maxTokens int
 	refillAt  time.Time
@@ -83,8 +85,11 @@ func newRateLimiter(maxTokens int, interval time.Duration) *RateLimiter {
 	}
 }
 
-// Allow checks if an operation is allowed
+// Allow checks if an operation is allowed (thread-safe)
 func (rl *RateLimiter) Allow() bool {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
 	now := time.Now()
 	if now.After(rl.refillAt) {
 		rl.tokens = rl.maxTokens
