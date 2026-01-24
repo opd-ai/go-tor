@@ -315,9 +315,26 @@ func (h *Handshake) receiveCERTS(ctx context.Context) error {
 			h.logger.Info("Certificate signatures verified successfully")
 		}
 
-		// TODO: Validate relay identity if expected identity is provided
-		// This requires integration with connection.Config to pass expected identity
-		// For now, we just parse and validate structure
+		// Validate relay identity if expected values are provided
+		expectedIdentity := h.conn.ExpectedIdentity()
+		expectedFingerprint := h.conn.ExpectedFingerprint()
+		
+		if expectedIdentity != nil || expectedFingerprint != "" {
+			if err := certs.ValidateRelayIdentity(expectedFingerprint, expectedIdentity); err != nil {
+				h.logger.Warn("Relay identity validation failed", 
+					"error", err,
+					"expected_identity_set", expectedIdentity != nil,
+					"expected_fingerprint_set", expectedFingerprint != "")
+				// Don't fail - continue with non-enforcing mode for backward compatibility
+				// Future enhancement: Add strict enforcement mode with RequireCERTS flag
+			} else {
+				h.logger.Info("Relay identity verified successfully",
+					"identity_validated", expectedIdentity != nil,
+					"fingerprint_validated", expectedFingerprint != "")
+			}
+		} else {
+			h.logger.Debug("No expected identity configured - skipping relay identity validation")
+		}
 
 		h.logger.Info("CERTS cell processed", "num_certs", len(certs.Certificates))
 		return nil

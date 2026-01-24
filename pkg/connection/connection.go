@@ -52,16 +52,18 @@ func (s State) String() string {
 
 // Connection represents a TLS connection to a Tor relay
 type Connection struct {
-	address   string
-	conn      net.Conn
-	tlsConn   *tls.Conn
-	state     State
-	stateMu   sync.RWMutex
-	closeCh   chan struct{}
-	closeOnce sync.Once
-	sendMu    sync.Mutex
-	recvMu    sync.Mutex
-	logger    *logger.Logger
+	address             string
+	conn                net.Conn
+	tlsConn             *tls.Conn
+	state               State
+	stateMu             sync.RWMutex
+	closeCh             chan struct{}
+	closeOnce           sync.Once
+	sendMu              sync.Mutex
+	recvMu              sync.Mutex
+	logger              *logger.Logger
+	expectedIdentity    []byte // Expected relay Ed25519 identity key (32 bytes) - for CERTS validation
+	expectedFingerprint string // Expected relay RSA fingerprint - for CERTS validation
 }
 
 // Config holds connection configuration
@@ -273,10 +275,12 @@ func New(cfg *Config, log *logger.Logger) *Connection {
 	}
 
 	return &Connection{
-		address: cfg.Address,
-		state:   StateConnecting,
-		closeCh: make(chan struct{}),
-		logger:  log.With("address", cfg.Address),
+		address:             cfg.Address,
+		state:               StateConnecting,
+		closeCh:             make(chan struct{}),
+		logger:              log.With("address", cfg.Address),
+		expectedIdentity:    cfg.ExpectedIdentity,
+		expectedFingerprint: cfg.ExpectedFingerprint,
 	}
 }
 
@@ -467,3 +471,16 @@ func (c *Connection) Ping() bool {
 
 	return true
 }
+
+// ExpectedIdentity returns the expected Ed25519 identity key for CERTS validation.
+// Returns nil if no expected identity was configured.
+func (c *Connection) ExpectedIdentity() []byte {
+	return c.expectedIdentity
+}
+
+// ExpectedFingerprint returns the expected RSA fingerprint for CERTS validation.
+// Returns empty string if no expected fingerprint was configured.
+func (c *Connection) ExpectedFingerprint() string {
+	return c.expectedFingerprint
+}
+
