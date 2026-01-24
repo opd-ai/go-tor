@@ -456,7 +456,10 @@ func (pm *PaddingMachine) sendDummyData() error {
 	// Stream ID 0 is typically used for circuit-level control/padding.
 	// Exit relays should drop DATA cells with stream ID 0 since they
 	// don't correspond to any established stream.
-	dummyCell := cell.NewRelayCell(0, cell.RelayData, dummyData)
+	dummyCell, err := cell.NewRelayCell(0, cell.RelayData, dummyData)
+	if err != nil {
+		return fmt.Errorf("failed to create padding cell: %w", err)
+	}
 
 	// Send through circuit
 	if err := pm.circuit.SendRelayCell(dummyCell); err != nil {

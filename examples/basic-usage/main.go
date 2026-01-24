@@ -52,7 +52,10 @@ func demonstrateCells() {
 	fmt.Printf("  Decoded cell: %s (ID: %d)\n", decoded.Command.String(), decoded.CircID)
 
 	// Create a relay cell
-	relayCell := cell.NewRelayCell(42, cell.RelayBegin, []byte("www.example.com:80"))
+	relayCell, err := cell.NewRelayCell(42, cell.RelayBegin, []byte("www.example.com:80"))
+	if err != nil {
+		log.Fatalf("Failed to create relay cell: %v", err)
+	}
 	payload, err := relayCell.Encode()
 	if err != nil {
 		log.Fatalf("Failed to encode relay cell: %v", err)

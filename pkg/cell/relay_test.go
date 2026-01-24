@@ -10,7 +10,10 @@ func TestNewRelayCell(t *testing.T) {
 	cmd := RelayBegin
 	data := []byte("test data")
 
-	rc := NewRelayCell(streamID, cmd, data)
+	rc, err := NewRelayCell(streamID, cmd, data)
+	if err != nil {
+		t.Fatalf("NewRelayCell() error = %v", err)
+	}
 
 	if rc.StreamID != streamID {
 		t.Errorf("StreamID = %v, want %v", rc.StreamID, streamID)
@@ -40,7 +43,10 @@ func TestRelayCellEncodeDecode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			original := NewRelayCell(tt.streamID, tt.cmd, tt.data)
+			original, err := NewRelayCell(tt.streamID, tt.cmd, tt.data)
+			if err != nil {
+				t.Fatalf("NewRelayCell() error = %v", err)
+			}
 
 			encoded, err := original.Encode()
 			if err != nil {
@@ -76,11 +82,43 @@ func TestRelayCellEncodeTooLarge(t *testing.T) {
 	maxDataLen := PayloadLen - RelayCellHeaderLen
 	tooLargeData := make([]byte, maxDataLen+1)
 
-	rc := NewRelayCell(1, RelayData, tooLargeData)
+	rc, err := NewRelayCell(1, RelayData, tooLargeData)
+	if err != nil {
+		t.Fatalf("NewRelayCell() error = %v", err)
+	}
 
-	_, err := rc.Encode()
+	_, err = rc.Encode()
 	if err == nil {
 		t.Error("Encode() expected error for data too large, got nil")
+	}
+}
+
+func TestNewRelayCellDataTooLarge(t *testing.T) {
+	// Test data larger than uint16 max (65535 bytes)
+	tooLargeData := make([]byte, 65536)
+
+	_, err := NewRelayCell(1, RelayData, tooLargeData)
+	if err == nil {
+		t.Error("NewRelayCell() expected error for data > 65535 bytes, got nil")
+	}
+}
+
+func TestNewRelayCellMaxSize(t *testing.T) {
+	// Test data at exactly uint16 max (65535 bytes) - should succeed in constructor
+	maxData := make([]byte, 65535)
+
+	rc, err := NewRelayCell(1, RelayData, maxData)
+	if err != nil {
+		t.Errorf("NewRelayCell() unexpected error for 65535 bytes: %v", err)
+	}
+	if rc.Length != 65535 {
+		t.Errorf("Length = %v, want 65535", rc.Length)
+	}
+
+	// But should fail in Encode() because it exceeds PayloadLen - RelayCellHeaderLen
+	_, err = rc.Encode()
+	if err == nil {
+		t.Error("Encode() expected error for data exceeding payload capacity")
 	}
 }
 

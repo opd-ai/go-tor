@@ -238,7 +238,10 @@ func TestCircuitDeliverRelayCell(t *testing.T) {
 	c.SetState(StateOpen)
 
 	// Create a mock Cell with relay payload
-	relayCell := cell.NewRelayCell(1, cell.RelayData, []byte("test data"))
+	relayCell, err := cell.NewRelayCell(1, cell.RelayData, []byte("test data"))
+	if err != nil {
+		t.Fatalf("Failed to create relay cell: %v", err)
+	}
 	payload, err := relayCell.Encode()
 	if err != nil {
 		t.Fatalf("Failed to encode relay cell: %v", err)

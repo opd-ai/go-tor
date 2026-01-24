@@ -55,7 +55,10 @@ func (c *Circuit) ResolveHostname(ctx context.Context, hostname string) (*DNSRes
 	payload := append([]byte(hostname), 0x00)
 
 	// Use stream ID 0 for DNS queries (they don't need a stream)
-	resolveCell := cell.NewRelayCell(0, cell.RelayResolve, payload)
+	resolveCell, err := cell.NewRelayCell(0, cell.RelayResolve, payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create RELAY_RESOLVE cell: %w", err)
+	}
 
 	// Send RELAY_RESOLVE cell
 	if err := c.SendRelayCell(resolveCell); err != nil {
@@ -117,7 +120,10 @@ func (c *Circuit) ResolveIP(ctx context.Context, ipAddr net.IP) (*DNSResult, err
 	}
 
 	// Use stream ID 0 for DNS queries
-	resolveCell := cell.NewRelayCell(0, cell.RelayResolve, payload)
+	resolveCell, err := cell.NewRelayCell(0, cell.RelayResolve, payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create RELAY_RESOLVE cell: %w", err)
+	}
 
 	// Send RELAY_RESOLVE cell
 	if err := c.SendRelayCell(resolveCell); err != nil {

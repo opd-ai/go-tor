@@ -47,12 +47,11 @@ type RelayCell struct {
 const RelayCellHeaderLen = 11
 
 // NewRelayCell creates a new relay cell
-func NewRelayCell(streamID uint16, cmd byte, data []byte) *RelayCell {
+func NewRelayCell(streamID uint16, cmd byte, data []byte) (*RelayCell, error) {
 	// Safely convert data length to uint16
 	length, err := security.SafeLenToUint16(data)
 	if err != nil {
-		// Data is too large, truncate to max uint16
-		length = 65535
+		return nil, fmt.Errorf("relay cell data too large: %w", err)
 	}
 
 	return &RelayCell{
@@ -62,7 +61,7 @@ func NewRelayCell(streamID uint16, cmd byte, data []byte) *RelayCell {
 		Digest:     [4]byte{0, 0, 0, 0},
 		Length:     length,
 		Data:       data,
-	}
+	}, nil
 }
 
 // Encode encodes the relay cell into a byte slice

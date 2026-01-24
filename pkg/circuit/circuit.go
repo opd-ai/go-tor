@@ -756,7 +756,10 @@ func (c *Circuit) sendCircuitSendme() error {
 	c.mu.Unlock()
 
 	// Send SENDME cell (stream ID 0 indicates circuit-level)
-	sendmeCell := cell.NewRelayCell(0, cell.RelaySendme, []byte{})
+	sendmeCell, err := cell.NewRelayCell(0, cell.RelaySendme, []byte{})
+	if err != nil {
+		return fmt.Errorf("failed to create SENDME cell: %w", err)
+	}
 	return c.SendRelayCell(sendmeCell)
 }
 
@@ -903,7 +906,10 @@ func (c *Circuit) sendStreamSendme(streamID uint16) error {
 	stream.RecordStreamSendmeSent()
 
 	// Send SENDME cell with stream ID
-	sendmeCell := cell.NewRelayCell(streamID, cell.RelaySendme, []byte{})
+	sendmeCell, err := cell.NewRelayCell(streamID, cell.RelaySendme, []byte{})
+	if err != nil {
+		return fmt.Errorf("failed to create stream SENDME cell: %w", err)
+	}
 	return c.SendRelayCell(sendmeCell)
 }
 
@@ -1210,7 +1216,10 @@ func (c *Circuit) DeliverRelayCell(cellData *cell.Cell) error {
 func (c *Circuit) OpenStream(streamID uint16, target string, port uint16) error {
 	// Send RELAY_BEGIN cell
 	beginPayload := []byte(fmt.Sprintf("%s:%d\x00", target, port))
-	beginCell := cell.NewRelayCell(streamID, cell.RelayBegin, beginPayload)
+	beginCell, err := cell.NewRelayCell(streamID, cell.RelayBegin, beginPayload)
+	if err != nil {
+		return fmt.Errorf("failed to create RELAY_BEGIN cell: %w", err)
+	}
 
 	if err := c.SendRelayCell(beginCell); err != nil {
 		return fmt.Errorf("failed to send RELAY_BEGIN: %w", err)
@@ -1284,13 +1293,19 @@ func (c *Circuit) ReadFromStream(ctx context.Context, streamID uint16) ([]byte, 
 // WriteToStream writes data to a specific stream
 // This is used by the SOCKS proxy to send data to the exit node
 func (c *Circuit) WriteToStream(streamID uint16, data []byte) error {
-	dataCell := cell.NewRelayCell(streamID, cell.RelayData, data)
+	dataCell, err := cell.NewRelayCell(streamID, cell.RelayData, data)
+	if err != nil {
+		return fmt.Errorf("failed to create RELAY_DATA cell: %w", err)
+	}
 	return c.SendRelayCell(dataCell)
 }
 
 // EndStream sends a RELAY_END cell for a stream
 func (c *Circuit) EndStream(streamID uint16, reason byte) error {
-	endCell := cell.NewRelayCell(streamID, cell.RelayEnd, []byte{reason})
+	endCell, err := cell.NewRelayCell(streamID, cell.RelayEnd, []byte{reason})
+	if err != nil {
+		return fmt.Errorf("failed to create RELAY_END cell: %w", err)
+	}
 	return c.SendRelayCell(endCell)
 }
 

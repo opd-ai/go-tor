@@ -424,7 +424,11 @@ func MockCircuitForDNS(t *testing.T, responseData []byte) *Circuit {
 		time.Sleep(10 * time.Millisecond)
 
 		// Send back RELAY_RESOLVED response
-		resolvedCell := cell.NewRelayCell(0, cell.RelayResolved, responseData)
+		resolvedCell, err := cell.NewRelayCell(0, cell.RelayResolved, responseData)
+		if err != nil {
+			t.Errorf("Failed to create relay cell: %v", err)
+			return
+		}
 		c.relayReceiveChan <- resolvedCell
 	}()
 
