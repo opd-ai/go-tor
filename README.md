@@ -197,12 +197,13 @@ func main() {
 
 ### Go Dependencies
 
-Core dependencies from `go.mod`:
+Key dependencies from `go.mod`:
 
 - `go.opentelemetry.io/otel` - Distributed tracing and observability
 - `golang.org/x/crypto` - Cryptographic primitives
 - `golang.org/x/net` - Network protocol utilities
 - `github.com/gofrs/flock` - File locking for guard persistence
+- `github.com/cretz/bine` - Tor controller library
 
 ---
 
