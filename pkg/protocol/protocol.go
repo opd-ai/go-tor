@@ -307,6 +307,14 @@ func (h *Handshake) receiveCERTS(ctx context.Context) error {
 			// Don't fail - some certs may be expired but relay still functional
 		}
 
+		// Validate Ed25519 certificate signatures
+		if err := certs.ValidateSignatures(); err != nil {
+			h.logger.Warn("Certificate signature validation failed", "error", err)
+			// Don't fail - continue with non-enforcing mode for backward compatibility
+		} else {
+			h.logger.Info("Certificate signatures verified successfully")
+		}
+
 		// TODO: Validate relay identity if expected identity is provided
 		// This requires integration with connection.Config to pass expected identity
 		// For now, we just parse and validate structure

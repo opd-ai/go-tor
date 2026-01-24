@@ -107,6 +107,21 @@ func (m *mockTLSRelay) handleHandshake(conn net.Conn) {
 		return
 	}
 
+	// Send CERTS cell (minimal - just an empty CERTS cell to satisfy protocol)
+	// Per tor-spec.txt §4.2, CERTS cell should be sent after VERSIONS
+	certsCell := cell.NewCell(0, cell.CmdCerts)
+	certsCell.Payload = []byte{0} // Zero certificates (minimal valid CERTS cell)
+	var certsBuf bytes.Buffer
+	if err := certsCell.Encode(&certsBuf); err != nil {
+		m.logger.Debug("Failed to encode CERTS response", "error", err)
+		return
+	}
+
+	if _, err := conn.Write(certsBuf.Bytes()); err != nil {
+		m.logger.Debug("Failed to write CERTS response", "error", err)
+		return
+	}
+
 	// Read NETINFO cell
 	netinfoCell, err := cell.DecodeCell(conn)
 	if err != nil {

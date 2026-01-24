@@ -2,6 +2,7 @@
 package protocol
 
 import (
+	"crypto/ed25519"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
@@ -365,6 +366,125 @@ func (c *CERTSCell) ValidateExpiration() error {
 		if cert.Ed25519Cert != nil {
 			if now.After(cert.Ed25519Cert.ExpiresAt) {
 				return fmt.Errorf("Ed25519 certificate type %s expired at %v", cert.CertType, cert.Ed25519Cert.ExpiresAt)
+			}
+		}
+	}
+	
+	return nil
+}
+
+// VerifyEd25519Signature verifies the Ed25519 signature on a certificate
+// Per cert-spec.txt, the signature is over all bytes of the certificate
+// before the signature field itself.
+//
+// Parameters:
+//   - signingKey: The Ed25519 public key used to create the signature (32 bytes)
+//     For self-signed certs, this is the certified key itself.
+//     For cross-signed certs, this is the signing authority's key.
+//
+// Returns:
+//   - error if verification fails, nil if signature is valid
+func (e *Ed25519Certificate) VerifySignature(signingKey []byte) error {
+	if len(signingKey) != ed25519.PublicKeySize {
+		return fmt.Errorf("invalid signing key length: %d, expected %d", len(signingKey), ed25519.PublicKeySize)
+	}
+	
+	if len(e.Signature) != ed25519.SignatureSize {
+		return fmt.Errorf("invalid signature length: %d, expected %d", len(e.Signature), ed25519.SignatureSize)
+	}
+	
+	// Reconstruct the signed message (all fields before signature)
+	// Per cert-spec.txt: Version || CertType || ExpirationDate || CertKeyType || 
+	// CertifiedKey || NumExtensions || Extensions
+	signedData := make([]byte, 0, 256)
+	
+	// Version (1 byte)
+	signedData = append(signedData, e.Version)
+	
+	// CertType (1 byte)
+	signedData = append(signedData, e.CertType)
+	
+	// ExpirationDate (4 bytes, hours since epoch)
+	expirationHours := uint32(e.ExpiresAt.Unix() / 3600)
+	expBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(expBytes, expirationHours)
+	signedData = append(signedData, expBytes...)
+	
+	// CertKeyType (1 byte)
+	signedData = append(signedData, e.CertKeyType)
+	
+	// CertifiedKey (32 bytes)
+	signedData = append(signedData, e.CertifiedKey...)
+	
+	// Number of extensions (1 byte)
+	signedData = append(signedData, byte(len(e.Extensions)))
+	
+	// Extensions
+	for _, ext := range e.Extensions {
+		// ExtLength (2 bytes) - length of (ExtType + ExtFlags + ExtData)
+		extLen := uint16(2 + len(ext.ExtData))
+		extLenBytes := make([]byte, 2)
+		binary.BigEndian.PutUint16(extLenBytes, extLen)
+		signedData = append(signedData, extLenBytes...)
+		
+		// ExtType (1 byte)
+		signedData = append(signedData, ext.ExtType)
+		
+		// ExtFlags (1 byte)
+		signedData = append(signedData, ext.Flags)
+		
+		// ExtData
+		signedData = append(signedData, ext.ExtData...)
+	}
+	
+	// Verify signature using Ed25519
+	if !ed25519.Verify(ed25519.PublicKey(signingKey), signedData, e.Signature) {
+		return fmt.Errorf("Ed25519 signature verification failed")
+	}
+	
+	return nil
+}
+
+// ValidateSignatures verifies Ed25519 certificate signatures in the CERTS cell
+// This implements cryptographic signature verification per cert-spec.txt
+//
+// For Type 4 (Ed25519 signing key), the certificate should be self-signed
+// or signed by the identity key found in another certificate.
+func (c *CERTSCell) ValidateSignatures() error {
+	for _, cert := range c.Certificates {
+		if cert.Ed25519Cert == nil {
+			continue
+		}
+		
+		switch cert.CertType {
+		case CertTypeEd25519Signing:
+			// Type 4: Ed25519 signing key certificate
+			// This is typically signed by the identity key (certified key itself for self-signed)
+			// For initial handshake, we verify it's self-signed
+			if err := cert.Ed25519Cert.VerifySignature(cert.Ed25519Cert.CertifiedKey); err != nil {
+				return fmt.Errorf("type 4 (Ed25519 signing key) signature verification failed: %w", err)
+			}
+			
+		case CertTypeEd25519TLSLink:
+			// Type 5: Ed25519 TLS link certificate
+			// Signed by the Ed25519 signing key (type 4)
+			signingKeyCert := c.FindCertificate(CertTypeEd25519Signing)
+			if signingKeyCert == nil || signingKeyCert.Ed25519Cert == nil {
+				return fmt.Errorf("type 5 (Ed25519 TLS link) requires type 4 signing key cert")
+			}
+			if err := cert.Ed25519Cert.VerifySignature(signingKeyCert.Ed25519Cert.CertifiedKey); err != nil {
+				return fmt.Errorf("type 5 (Ed25519 TLS link) signature verification failed: %w", err)
+			}
+			
+		case CertTypeEd25519Auth:
+			// Type 6: Ed25519 authentication certificate
+			// Signed by the Ed25519 signing key (type 4)
+			signingKeyCert := c.FindCertificate(CertTypeEd25519Signing)
+			if signingKeyCert == nil || signingKeyCert.Ed25519Cert == nil {
+				return fmt.Errorf("type 6 (Ed25519 auth) requires type 4 signing key cert")
+			}
+			if err := cert.Ed25519Cert.VerifySignature(signingKeyCert.Ed25519Cert.CertifiedKey); err != nil {
+				return fmt.Errorf("type 6 (Ed25519 auth) signature verification failed: %w", err)
 			}
 		}
 	}
