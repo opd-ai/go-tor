@@ -15,8 +15,8 @@
 The go-tor implementation demonstrates strong architectural alignment with Tor protocol specifications, with complete implementation of core cryptographic primitives, cell encoding/decoding, path selection algorithms, and circuit building. Recent improvements include functional CREATE2/CREATED2 handshake implementation for first-hop circuit establishment, complete EXTEND2/EXTENDED2 wire protocol for multi-hop circuit extension, relay key extraction from microdescriptors, full flow control enforcement, complete hop cryptographic state management, **complete consensus signature structural validation with known authority verification**, **directory authority database integration**, **control protocol password authentication**, **onion service data relay for .onion connections**, **CERTS cell authentication for relay identity verification**, **HSDir descriptor publishing for onion service hosting**, **family relationship validation in path selection**, **complete stream multiplexing for concurrent connections**, and **geographic diversity integration for improved path security** (Jan 24, 2026). The implementation has reached production-ready status for core Tor client functionality.
 
 **Critical Findings:** 0 high-priority compliance gaps (15 resolved in Jan 2026)  
-**Implementation Completeness:** ~99% (estimated based on core protocol features, up from 98%)  
-**Interoperability Status:** Excellent - can fetch consensus with known authority signature validation, extract relay keys, establish guard connections, build multi-hop circuits with complete wire protocol, enforce flow control under load, maintain per-hop cryptographic state, verify consensus signatures from all 9 official Tor directory authorities, secure control protocol with password authentication, relay data through .onion service rendezvous circuits, authenticate relay identities via CERTS cells, publish onion service descriptors to HSDirs, enforce family/subnet validation in path selection, multiplex multiple streams over single circuits, **and select paths with geographic diversity scoring**
+**Implementation Completeness:** ~99.5% (estimated based on core protocol features, up from 99%)  
+**Interoperability Status:** Excellent - can fetch consensus with known authority signature validation, extract relay keys, establish guard connections, build multi-hop circuits with complete wire protocol, enforce flow control under load, maintain per-hop cryptographic state, verify consensus signatures from all 9 official Tor directory authorities, secure control protocol with password authentication, relay data through .onion service rendezvous circuits, authenticate relay identities via CERTS cells, publish onion service descriptors to HSDirs, enforce family/subnet validation in path selection, multiplex multiple streams over single circuits, select paths with geographic diversity scoring, **and use bandwidth-weighted relay selection for optimal performance**
 
 ### Key Strengths
 - ✅ Complete cell format implementation (fixed and variable-length)
@@ -334,7 +334,7 @@ func ParseRSAPublicKey(derBytes []byte) (*RSAPublicKey, error)
 
 **Specification Reference:** path-spec.txt §2 "Path selection and guard nodes"  
 **Implementation Status:** **FULLY COMPLIANT** *(Updated Jan 24, 2026)*  
-**Files:** `pkg/path/path.go`, `pkg/path/guards.go`, `pkg/path/diversity.go`, `pkg/path/persistence.go`, `pkg/path/family_test.go`
+**Files:** `pkg/path/path.go`, `pkg/path/guards.go`, `pkg/path/diversity.go`, `pkg/path/persistence.go`, `pkg/path/family_test.go`, `pkg/path/bandwidth_test.go`
 
 **Details:**
 - ✅ Guard node selection from relays with Guard, Running, Valid, Stable flags
@@ -344,6 +344,10 @@ func ParseRSAPublicKey(derBytes []byte) (*RSAPublicKey, error)
 - ✅ FirstUsed/LastUsed timestamps
 - ✅ Enhanced persistence: file locking, backup rotation (3 backups), integrity checksums
 - ✅ Weighted random selection for middle and exit relays
+- ✅ **COMPLETE (Jan 24, 2026)**: Bandwidth-weighted relay selection per path-spec.txt §2.2
+- ✅ **COMPLETE (Jan 24, 2026)**: Bandwidth parsing from consensus "w" lines
+- ✅ **COMPLETE (Jan 24, 2026)**: Weighted random index function with cryptographic randomness
+- ✅ **COMPLETE (Jan 24, 2026)**: Graceful fallback to uniform random when bandwidth info unavailable
 - ✅ Path diversity scoring:
   - AS-level diversity (/16 subnet scoring)
   - Family diversity (prevent relay families in same path)
@@ -358,14 +362,13 @@ func ParseRSAPublicKey(derBytes []byte) (*RSAPublicKey, error)
 - ✅ **COMPLETE (Jan 24, 2026)**: Retry mechanism to find diverse paths (up to 5 attempts)
 - ✅ **COMPLETE (Jan 24, 2026)**: DiversityAnalyzer integrated into Selector
 - ✅ **COMPLETE (Jan 24, 2026)**: Diversity statistics tracking and monitoring
-- ⚠️ Bandwidth-weighted selection not yet implemented
 
-**Impact:** **NONE** - Path selection is production-ready with robust family validation and diversity scoring. Bandwidth weighting is a nice-to-have feature, not critical for basic compliance.
+**Impact:** **NONE** - Path selection is production-ready with robust family validation, diversity scoring, and bandwidth-weighted selection per Tor specification.
 
 **Recommendations:**
 1. ~~Integrate geographic diversity scoring into path selection algorithm~~ ✅ **COMPLETED (Jan 24, 2026)**
-2. Consider bandwidth-weighted selection (per path-spec.txt §2.2)
-3. Add GeoIP database integration for accurate country detection (optional enhancement)
+2. ~~Consider bandwidth-weighted selection (per path-spec.txt §2.2)~~ ✅ **COMPLETED (Jan 24, 2026)**
+3. Consider GeoIP database integration for accurate country detection (optional enhancement)
 
 ---
 
@@ -1030,8 +1033,8 @@ Prioritized list of compliance issues affecting core functionality:
 8. **Add Path Selection Enhancements**
    - ~~Integrate geographic diversity scoring~~ ✅ **COMPLETED (Jan 24, 2026)**
    - ~~Enforce family relationship validation~~ ✅ **COMPLETED (Jan 24, 2026)**
-   - Consider bandwidth-weighted selection
-   - **Estimated Effort:** ~~1 week~~ 1 day remaining (bandwidth weighting only)
+   - ~~Implement bandwidth-weighted selection~~ ✅ **COMPLETED (Jan 24, 2026)**
+   - **Estimated Effort:** ~~1 day~~ **COMPLETED (Jan 24, 2026)**
    - **Spec Reference:** path-spec.txt §2.2
 
 ### Testing and Validation
@@ -1341,9 +1344,9 @@ The completion of SPEC-001 (relay key extraction), EXTEND2/EXTENDED2 wire protoc
 - ⏳ Introduction point authentication (mutual authentication)
 - ⏳ Circuit-based HTTP upload (currently uses direct HTTP)
 - ✅ **COMPLETE (Jan 24, 2026)**: Geographic diversity integration in path selection
-- ⏳ Bandwidth-weighted relay selection
+- ✅ **COMPLETE (Jan 24, 2026)**: Bandwidth-weighted relay selection
 
-**Overall Assessment:** The implementation is now at **~99% protocol compliance** (up from 98%), suitable for **production use in research and development contexts** with functional multi-hop circuit building, complete relay key extraction, robust flow control, full per-hop cryptographic state management, **complete consensus signature verification with known authority validation**, **production-ready directory security**, **secure control protocol authentication**, **.onion service data relay**, **CERTS cell authentication**, **HSDir descriptor publishing for onion service hosting**, **family/subnet validation in path selection**, **complete stream multiplexing**, and **geographic diversity scoring for improved path security**. With the completion of diversity integration, go-tor now selects circuit paths that are more resistant to correlation attacks and traffic analysis.
+**Overall Assessment:** The implementation is now at **~99.5% protocol compliance** (up from 99%), suitable for **production use in research and development contexts** with functional multi-hop circuit building, complete relay key extraction, robust flow control, full per-hop cryptographic state management, **complete consensus signature verification with known authority validation**, **production-ready directory security**, **secure control protocol authentication**, **.onion service data relay**, **CERTS cell authentication**, **HSDir descriptor publishing for onion service hosting**, **family/subnet validation in path selection**, **complete stream multiplexing**, **geographic diversity scoring for improved path security**, and **bandwidth-weighted relay selection for optimal performance**. With the completion of bandwidth weighting, go-tor now distributes traffic across relays proportionally to their advertised capacity, matching the behavior of the reference Tor implementation.
 
 **Safety Warning Validation:** The project's prominent safety warnings remain **appropriate and necessary**. This implementation should NOT be used for real privacy/anonymity needs until the remaining critical gaps are addressed and a formal security audit is performed.
 

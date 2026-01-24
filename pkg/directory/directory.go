@@ -122,6 +122,7 @@ type Relay struct {
 	NtorOnionKey    []byte   // Curve25519 ntor onion key (32 bytes) - SPEC-001
 	MicrodescDigest string   // SHA256 digest of microdescriptor (base64) - SPEC-001
 	Family          []string // Relay family members (fingerprints) - Path Selection Enhancement
+	Bandwidth       uint64   // Advertised bandwidth in bytes/sec (from "w" line) - path-spec.txt §2.2
 }
 
 // Client provides directory protocol operations
@@ -442,6 +443,23 @@ func (c *Client) parseConsensusWithMetadata(r io.Reader) ([]*Relay, *ConsensusMe
 		if strings.HasPrefix(line, "s ") && currentRelay != nil {
 			flags := strings.Fields(line[2:]) // Skip "s "
 			currentRelay.Flags = flags
+		}
+
+		// Parse "w" lines (bandwidth weights) - path-spec.txt §2.2
+		// Format: "w Bandwidth=12345" where value is in bytes/second
+		if strings.HasPrefix(line, "w ") && currentRelay != nil {
+			parts := strings.Fields(line[2:]) // Skip "w "
+			for _, part := range parts {
+				if strings.HasPrefix(part, "Bandwidth=") {
+					bwStr := strings.TrimPrefix(part, "Bandwidth=")
+					var bw uint64
+					if _, err := fmt.Sscanf(bwStr, "%d", &bw); err == nil {
+						currentRelay.Bandwidth = bw
+						c.logger.Debug("Parsed bandwidth", "relay", currentRelay.Nickname, "bandwidth", currentRelay.Bandwidth)
+					}
+					break
+				}
+			}
 		}
 	}
 

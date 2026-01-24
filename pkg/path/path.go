@@ -214,8 +214,8 @@ func (s *Selector) selectGuard() (*directory.Relay, error) {
 		s.logger.Debug("No persistent guards available, selecting new guard")
 	}
 
-	// Select a random guard from available guards
-	idx, err := randomIndex(len(s.guards))
+	// Select a random guard from available guards (bandwidth-weighted)
+	idx, err := weightedRandomIndex(s.guards)
 	if err != nil {
 		return nil, err
 	}
@@ -295,7 +295,7 @@ func (s *Selector) selectExit(port int, avoid *directory.Relay) (*directory.Rela
 		return nil, fmt.Errorf("no suitable exit relays available (family/subnet constraints)")
 	}
 
-	idx, err := randomIndex(len(exits))
+	idx, err := weightedRandomIndex(exits)
 	if err != nil {
 		return nil, err
 	}
@@ -349,7 +349,7 @@ func (s *Selector) selectMiddle(guard, exit *directory.Relay) (*directory.Relay,
 		return nil, fmt.Errorf("no suitable middle relays available (family/subnet constraints)")
 	}
 
-	idx, err := randomIndex(len(candidates))
+	idx, err := weightedRandomIndex(candidates)
 	if err != nil {
 		return nil, err
 	}
@@ -369,6 +369,46 @@ func randomIndex(max int) (int, error) {
 	}
 
 	return int(n.Int64()), nil
+}
+
+// weightedRandomIndex returns a weighted random index based on relay bandwidths
+// Implements bandwidth-weighted selection per path-spec.txt §2.2
+// If all relays have zero bandwidth, falls back to uniform random selection
+func weightedRandomIndex(relays []*directory.Relay) (int, error) {
+	if len(relays) == 0 {
+		return 0, fmt.Errorf("empty relay list")
+	}
+
+	// Calculate total bandwidth
+	var totalBandwidth uint64
+	for _, relay := range relays {
+		totalBandwidth += relay.Bandwidth
+	}
+
+	// Fallback to uniform random if no bandwidth info available
+	if totalBandwidth == 0 {
+		return randomIndex(len(relays))
+	}
+
+	// Generate random value in [0, totalBandwidth)
+	randVal, err := rand.Int(rand.Reader, big.NewInt(int64(totalBandwidth)))
+	if err != nil {
+		return 0, fmt.Errorf("failed to generate random number: %w", err)
+	}
+
+	// Select relay based on weighted probability
+	var cumulative uint64
+	target := randVal.Uint64()
+	
+	for i, relay := range relays {
+		cumulative += relay.Bandwidth
+		if cumulative > target {
+			return i, nil
+		}
+	}
+
+	// Fallback to last relay (should not happen due to rounding)
+	return len(relays) - 1, nil
 }
 
 // GetDiversityStats returns statistics about path diversity analysis

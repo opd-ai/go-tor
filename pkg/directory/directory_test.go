@@ -90,6 +90,57 @@ s Running Valid
 	}
 }
 
+func TestParseBandwidthWeights(t *testing.T) {
+	// Test parsing of "w" lines (bandwidth weights) per path-spec.txt §2.2
+	consensusData := `network-status-version 3
+vote-status consensus
+r HighBW AAAAAAAAAAAAAAAAAAAAAA BBBBBBBBBBBBB 2024-01-01 00:00:00 192.168.1.1 9001 0
+s Fast Guard Running Stable Valid
+w Bandwidth=10000000
+r MediumBW CCCCCCCCCCCCCCCCCCCCCC DDDDDDDDDDDDD 2024-01-01 00:00:00 192.168.1.2 9002 0
+s Running Valid
+w Bandwidth=5000000
+r NoBW EEEEEEEEEEEEEEEEEEEEEE FFFFFFFFFFFFF 2024-01-01 00:00:00 192.168.1.3 9003 0
+s Running Valid
+`
+
+	client := NewClient(nil)
+	reader := strings.NewReader(consensusData)
+
+	relays, err := client.parseConsensus(reader)
+	if err != nil {
+		t.Fatalf("parseConsensus() error = %v", err)
+	}
+
+	if len(relays) != 3 {
+		t.Fatalf("parseConsensus() returned %d relays, want 3", len(relays))
+	}
+
+	// Test first relay with bandwidth
+	if relays[0].Nickname != "HighBW" {
+		t.Errorf("relay[0].Nickname = %s, want HighBW", relays[0].Nickname)
+	}
+	if relays[0].Bandwidth != 10000000 {
+		t.Errorf("relay[0].Bandwidth = %d, want 10000000", relays[0].Bandwidth)
+	}
+
+	// Test second relay with bandwidth
+	if relays[1].Nickname != "MediumBW" {
+		t.Errorf("relay[1].Nickname = %s, want MediumBW", relays[1].Nickname)
+	}
+	if relays[1].Bandwidth != 5000000 {
+		t.Errorf("relay[1].Bandwidth = %d, want 5000000", relays[1].Bandwidth)
+	}
+
+	// Test third relay without bandwidth line
+	if relays[2].Nickname != "NoBW" {
+		t.Errorf("relay[2].Nickname = %s, want NoBW", relays[2].Nickname)
+	}
+	if relays[2].Bandwidth != 0 {
+		t.Errorf("relay[2].Bandwidth = %d, want 0 (no w line)", relays[2].Bandwidth)
+	}
+}
+
 func TestParseConsensusEmpty(t *testing.T) {
 	client := NewClient(nil)
 	reader := strings.NewReader("")
