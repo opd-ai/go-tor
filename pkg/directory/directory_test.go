@@ -797,6 +797,11 @@ func TestConsensusSignatureStructure(t *testing.T) {
 }
 
 func TestVerifyConsensusSignatures(t *testing.T) {
+	// Create valid-length signature (128 bytes for RSA-1024)
+	validSig128 := base64.StdEncoding.EncodeToString(make([]byte, 128))
+	validSig256 := base64.StdEncoding.EncodeToString(make([]byte, 256))
+	shortSig := base64.StdEncoding.EncodeToString(make([]byte, 64))
+
 	tests := []struct {
 		name          string
 		consensusBody []byte
@@ -809,7 +814,7 @@ func TestVerifyConsensusSignatures(t *testing.T) {
 			consensusBody: []byte{},
 			meta: &ConsensusMetadata{
 				Signatures: []*ConsensusSignature{
-					{Algorithm: "sha256", Identity: "ABC", SigningKeyDigest: "DEF", Signature: base64.StdEncoding.EncodeToString([]byte("sig"))},
+					{Algorithm: "sha256", Identity: "ABC", SigningKeyDigest: "DEF", Signature: validSig128},
 				},
 			},
 			wantErr: true,
@@ -823,17 +828,46 @@ func TestVerifyConsensusSignatures(t *testing.T) {
 			errMsg:        "no signatures",
 		},
 		{
-			name:          "Sufficient valid signatures",
+			name:          "Sufficient known authority signatures",
 			consensusBody: []byte("network-status-version 3\ntest consensus body"),
 			meta: &ConsensusMetadata{
 				SignatureCount: 3,
 				Signatures: []*ConsensusSignature{
-					{Algorithm: "sha256", Identity: "ID1", SigningKeyDigest: "KEY1", Signature: base64.StdEncoding.EncodeToString([]byte("sig1"))},
-					{Algorithm: "sha256", Identity: "ID2", SigningKeyDigest: "KEY2", Signature: base64.StdEncoding.EncodeToString([]byte("sig2"))},
-					{Algorithm: "sha256", Identity: "ID3", SigningKeyDigest: "KEY3", Signature: base64.StdEncoding.EncodeToString([]byte("sig3"))},
+					{Algorithm: "sha256", Identity: "ED03BB616EB2F60BEC80151114BB25CEF515B226", SigningKeyDigest: "KEY1", Signature: validSig128}, // gabelmoo
+					{Algorithm: "sha256", Identity: "F533C81CEF0BC0267857C99B2F471ADF249FA232", SigningKeyDigest: "KEY2", Signature: validSig256}, // moria1
+					{Algorithm: "sha256", Identity: "23D15D965BC35114467363C165C4F724B64B4F66", SigningKeyDigest: "KEY3", Signature: validSig128}, // longclaw
 				},
 			},
 			wantErr: false,
+		},
+		{
+			name:          "Unknown authority signatures",
+			consensusBody: []byte("test body"),
+			meta: &ConsensusMetadata{
+				SignatureCount: 3,
+				Signatures: []*ConsensusSignature{
+					{Algorithm: "sha256", Identity: "UNKNOWN1111111111111111111111111111111111", SigningKeyDigest: "KEY1", Signature: validSig128},
+					{Algorithm: "sha256", Identity: "UNKNOWN2222222222222222222222222222222222", SigningKeyDigest: "KEY2", Signature: validSig128},
+					{Algorithm: "sha256", Identity: "UNKNOWN3333333333333333333333333333333333", SigningKeyDigest: "KEY3", Signature: validSig128},
+				},
+			},
+			wantErr: true,
+			errMsg:  "insufficient known authorities",
+		},
+		{
+			name:          "Mixed known and unknown authorities",
+			consensusBody: []byte("test body"),
+			meta: &ConsensusMetadata{
+				SignatureCount: 5,
+				Signatures: []*ConsensusSignature{
+					{Algorithm: "sha256", Identity: "ED03BB616EB2F60BEC80151114BB25CEF515B226", SigningKeyDigest: "KEY1", Signature: validSig128}, // gabelmoo (known)
+					{Algorithm: "sha256", Identity: "UNKNOWN1111111111111111111111111111111111", SigningKeyDigest: "KEY2", Signature: validSig128}, // unknown
+					{Algorithm: "sha256", Identity: "F533C81CEF0BC0267857C99B2F471ADF249FA232", SigningKeyDigest: "KEY3", Signature: validSig128}, // moria1 (known)
+					{Algorithm: "sha256", Identity: "23D15D965BC35114467363C165C4F724B64B4F66", SigningKeyDigest: "KEY4", Signature: validSig128}, // longclaw (known)
+					{Algorithm: "sha256", Identity: "UNKNOWN2222222222222222222222222222222222", SigningKeyDigest: "KEY5", Signature: validSig128}, // unknown
+				},
+			},
+			wantErr: false, // Should pass with 3 known authorities
 		},
 		{
 			name:          "Insufficient valid signatures",
@@ -841,11 +875,11 @@ func TestVerifyConsensusSignatures(t *testing.T) {
 			meta: &ConsensusMetadata{
 				SignatureCount: 1,
 				Signatures: []*ConsensusSignature{
-					{Algorithm: "sha256", Identity: "ID1", SigningKeyDigest: "KEY1", Signature: base64.StdEncoding.EncodeToString([]byte("sig1"))},
+					{Algorithm: "sha256", Identity: "ED03BB616EB2F60BEC80151114BB25CEF515B226", SigningKeyDigest: "KEY1", Signature: validSig128},
 				},
 			},
 			wantErr: true,
-			errMsg:  "insufficient valid signatures",
+			errMsg:  "insufficient known authorities",
 		},
 		{
 			name:          "Invalid base64 signature",
@@ -853,12 +887,26 @@ func TestVerifyConsensusSignatures(t *testing.T) {
 			meta: &ConsensusMetadata{
 				SignatureCount: 3,
 				Signatures: []*ConsensusSignature{
-					{Algorithm: "sha256", Identity: "ID1", SigningKeyDigest: "KEY1", Signature: "!!!invalid-base64!!!"},
-					{Algorithm: "sha256", Identity: "ID2", SigningKeyDigest: "KEY2", Signature: base64.StdEncoding.EncodeToString([]byte("sig2"))},
-					{Algorithm: "sha256", Identity: "ID3", SigningKeyDigest: "KEY3", Signature: base64.StdEncoding.EncodeToString([]byte("sig3"))},
+					{Algorithm: "sha256", Identity: "ED03BB616EB2F60BEC80151114BB25CEF515B226", SigningKeyDigest: "KEY1", Signature: "!!!invalid-base64!!!"},
+					{Algorithm: "sha256", Identity: "F533C81CEF0BC0267857C99B2F471ADF249FA232", SigningKeyDigest: "KEY2", Signature: validSig128},
+					{Algorithm: "sha256", Identity: "23D15D965BC35114467363C165C4F724B64B4F66", SigningKeyDigest: "KEY3", Signature: validSig128},
 				},
 			},
-			wantErr: false, // Should pass with 2 valid signatures out of 3
+			wantErr: true, // Only 2 valid signatures, need 3 authorities
+		},
+		{
+			name:          "Signature too short",
+			consensusBody: []byte("test body"),
+			meta: &ConsensusMetadata{
+				SignatureCount: 4,
+				Signatures: []*ConsensusSignature{
+					{Algorithm: "sha256", Identity: "ED03BB616EB2F60BEC80151114BB25CEF515B226", SigningKeyDigest: "KEY1", Signature: shortSig},      // too short
+					{Algorithm: "sha256", Identity: "F533C81CEF0BC0267857C99B2F471ADF249FA232", SigningKeyDigest: "KEY2", Signature: validSig128},   // valid
+					{Algorithm: "sha256", Identity: "23D15D965BC35114467363C165C4F724B64B4F66", SigningKeyDigest: "KEY3", Signature: validSig128},   // valid
+					{Algorithm: "sha256", Identity: "0232AF901C31A04EE9848595AF9BB7620D4C5B2E", SigningKeyDigest: "KEY4", Signature: validSig128},   // valid (dannenberg)
+				},
+			},
+			wantErr: false, // Should pass with 3 valid signatures
 		},
 	}
 
@@ -872,5 +920,79 @@ func TestVerifyConsensusSignatures(t *testing.T) {
 				t.Errorf("Error message = %v, want to contain %v", err, tt.errMsg)
 			}
 		})
+	}
+}
+
+func TestIsKnownAuthority(t *testing.T) {
+	tests := []struct {
+		name    string
+		v3ident string
+		want    bool
+	}{
+		{"gabelmoo", "ED03BB616EB2F60BEC80151114BB25CEF515B226", true},
+		{"moria1", "F533C81CEF0BC0267857C99B2F471ADF249FA232", true},
+		{"longclaw", "23D15D965BC35114467363C165C4F724B64B4F66", true},
+		{"lowercase gabelmoo", "ed03bb616eb2f60bec80151114bb25cef515b226", true},
+		{"unknown", "1111111111111111111111111111111111111111", false},
+		{"empty", "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isKnownAuthority(tt.v3ident); got != tt.want {
+				t.Errorf("isKnownAuthority(%v) = %v, want %v", tt.v3ident, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetAuthorityName(t *testing.T) {
+	tests := []struct {
+		name    string
+		v3ident string
+		want    string
+	}{
+		{"gabelmoo", "ED03BB616EB2F60BEC80151114BB25CEF515B226", "gabelmoo"},
+		{"moria1", "F533C81CEF0BC0267857C99B2F471ADF249FA232", "moria1"},
+		{"longclaw", "23D15D965BC35114467363C165C4F724B64B4F66", "longclaw"},
+		{"lowercase", "ed03bb616eb2f60bec80151114bb25cef515b226", "gabelmoo"},
+		{"unknown", "1111111111111111111111111111111111111111", "unknown"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := getAuthorityName(tt.v3ident); got != tt.want {
+				t.Errorf("getAuthorityName(%v) = %v, want %v", tt.v3ident, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestKnownAuthoritiesDatabase(t *testing.T) {
+	// Verify all known authorities are properly configured
+	if len(KnownAuthorities) < 9 {
+		t.Errorf("Expected at least 9 known authorities, got %d", len(KnownAuthorities))
+	}
+
+	// Verify each authority has required fields
+	for _, auth := range KnownAuthorities {
+		if auth.Nickname == "" {
+			t.Errorf("Authority missing nickname: %+v", auth)
+		}
+		if len(auth.V3Ident) != 40 {
+			t.Errorf("Authority %s has invalid v3ident length: %d (expected 40)", auth.Nickname, len(auth.V3Ident))
+		}
+		if auth.Address == "" {
+			t.Errorf("Authority %s missing address", auth.Nickname)
+		}
+	}
+
+	// Verify no duplicate v3idents
+	seen := make(map[string]string)
+	for _, auth := range KnownAuthorities {
+		if existing, found := seen[auth.V3Ident]; found {
+			t.Errorf("Duplicate v3ident %s found in authorities %s and %s", auth.V3Ident, existing, auth.Nickname)
+		}
+		seen[auth.V3Ident] = auth.Nickname
 	}
 }
