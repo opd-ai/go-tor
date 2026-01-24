@@ -58,13 +58,11 @@ func (b *Builder) BuildCircuit(ctx context.Context, p *path.Path, timeout time.D
 		circuit.SetState(StateFailed)
 		return nil, fmt.Errorf("failed to connect to guard: %w", err)
 	}
-	defer func() {
-		if err := guardConn.Close(); err != nil {
-			b.logger.Error("Failed to close guard connection", "function", "BuildCircuit", "error", err)
-		}
-	}()
+	
+	// Store connection in circuit for cell I/O
+	circuit.SetConnection(guardConn)
 
-	// Add guard hop
+	// Add guard hop structure
 	if err := circuit.AddHop(&Hop{
 		Fingerprint: p.Guard.Fingerprint,
 		Address:     guardAddr,
@@ -77,7 +75,22 @@ func (b *Builder) BuildCircuit(ctx context.Context, p *path.Path, timeout time.D
 
 	b.logger.Info("Connected to guard", "guard", p.Guard.Nickname)
 
-	// Add middle hop (simulated for now)
+	// Create extension handler for this circuit
+	ext := NewExtension(circuit, b.logger)
+
+	// Set relay keys if available (SPEC-001)
+	// TODO: Extract keys from p.Guard when directory integration is complete
+	// For now, extension will use placeholder keys for testing
+
+	// Create first hop using CREATE2 protocol
+	if err := ext.CreateFirstHop(buildCtx, HandshakeTypeNTor); err != nil {
+		circuit.SetState(StateFailed)
+		return nil, fmt.Errorf("failed to create first hop: %w", err)
+	}
+
+	b.logger.Info("First hop created with ntor handshake", "guard", p.Guard.Nickname)
+
+	// Add middle hop (simulated for now - EXTEND2 to be implemented next)
 	if err := circuit.AddHop(&Hop{
 		Fingerprint: p.Middle.Fingerprint,
 		Address:     fmt.Sprintf("%s:%d", p.Middle.Address, p.Middle.ORPort),
@@ -90,7 +103,7 @@ func (b *Builder) BuildCircuit(ctx context.Context, p *path.Path, timeout time.D
 
 	b.logger.Info("Extended to middle", "middle", p.Middle.Nickname)
 
-	// Add exit hop (simulated for now)
+	// Add exit hop (simulated for now - EXTEND2 to be implemented next)
 	if err := circuit.AddHop(&Hop{
 		Fingerprint: p.Exit.Fingerprint,
 		Address:     fmt.Sprintf("%s:%d", p.Exit.Address, p.Exit.ORPort),

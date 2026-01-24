@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
+	"time"
 
 	"github.com/opd-ai/go-tor/pkg/cell"
 	"github.com/opd-ai/go-tor/pkg/crypto"
@@ -52,6 +53,12 @@ func (e *Extension) CreateFirstHop(ctx context.Context, handshakeType HandshakeT
 		"circuit_id", e.circuit.ID,
 		"handshake_type", handshakeType)
 
+	// Get the connection from the circuit
+	conn, err := e.getConnection()
+	if err != nil {
+		return fmt.Errorf("no connection available: %w", err)
+	}
+
 	// Generate handshake data
 	handshakeData, err := e.generateHandshakeData(handshakeType)
 	if err != nil {
@@ -81,9 +88,21 @@ func (e *Extension) CreateFirstHop(ctx context.Context, handshakeType HandshakeT
 		"circuit_id", e.circuit.ID,
 		"handshake_size", len(handshakeData))
 
-	// In a real implementation, this would send the cell and wait for CREATED2
-	// For now, we'll simulate the response
-	_ = create2Cell
+	// Send CREATE2 cell
+	if err := conn.SendCell(create2Cell); err != nil {
+		return fmt.Errorf("failed to send CREATE2 cell: %w", err)
+	}
+
+	// Wait for CREATED2 response
+	created2Cell, err := e.receiveCreated2(ctx, conn)
+	if err != nil {
+		return fmt.Errorf("failed to receive CREATED2: %w", err)
+	}
+
+	// Process CREATED2 response to derive keys
+	if err := e.ProcessCreated2(created2Cell); err != nil {
+		return fmt.Errorf("failed to process CREATED2: %w", err)
+	}
 
 	e.logger.Info("First hop created successfully", "circuit_id", e.circuit.ID)
 
@@ -477,4 +496,69 @@ func (e *Extension) DeriveKeys(sharedSecret []byte) (forwardKey, backwardKey []b
 		"backward_key_len", len(backwardKey))
 
 	return forwardKey, backwardKey, nil
+}
+
+// getConnection retrieves the connection from the circuit
+// Returns an interface that implements SendCell and ReceiveCell methods
+func (e *Extension) getConnection() (CellConnection, error) {
+	e.circuit.mu.RLock()
+	conn := e.circuit.conn
+	e.circuit.mu.RUnlock()
+
+	if conn == nil {
+		return nil, fmt.Errorf("circuit has no connection")
+	}
+
+	// Type assert to CellConnection interface
+	cellConn, ok := conn.(CellConnection)
+	if !ok {
+		return nil, fmt.Errorf("connection does not implement CellConnection interface")
+	}
+
+	return cellConn, nil
+}
+
+// receiveCreated2 waits for and receives a CREATED2 cell
+func (e *Extension) receiveCreated2(ctx context.Context, conn CellConnection) (*cell.Cell, error) {
+	// Create a timeout for receiving the response
+	timeout := 30 * time.Second
+	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	// Receive cells until we get CREATED2 or timeout
+	for {
+		select {
+		case <-timeoutCtx.Done():
+			return nil, fmt.Errorf("timeout waiting for CREATED2: %w", timeoutCtx.Err())
+		default:
+			receivedCell, err := conn.ReceiveCell()
+			if err != nil {
+				return nil, fmt.Errorf("failed to receive cell: %w", err)
+			}
+
+			// Check if it's the CREATED2 we're waiting for
+			if receivedCell.CircID != e.circuit.ID {
+				e.logger.Debug("Received cell for different circuit",
+					"expected_circuit", e.circuit.ID,
+					"received_circuit", receivedCell.CircID)
+				continue
+			}
+
+			if receivedCell.Command == cell.CmdCreated2 {
+				e.logger.Debug("Received CREATED2 cell", "circuit_id", receivedCell.CircID)
+				return receivedCell, nil
+			}
+
+			// Log unexpected cells
+			e.logger.Warn("Received unexpected cell while waiting for CREATED2",
+				"command", receivedCell.Command,
+				"circuit_id", receivedCell.CircID)
+		}
+	}
+}
+
+// CellConnection defines the interface required for sending and receiving cells
+type CellConnection interface {
+	SendCell(c *cell.Cell) error
+	ReceiveCell() (*cell.Cell, error)
 }

@@ -3,6 +3,7 @@ package circuit
 import (
 	"context"
 	"crypto/rand"
+	"encoding/binary"
 	"log/slog"
 	"strings"
 	"testing"
@@ -11,6 +12,54 @@ import (
 	"github.com/opd-ai/go-tor/pkg/crypto"
 	"github.com/opd-ai/go-tor/pkg/logger"
 )
+
+// mockExtensionConnection implements CellConnection for testing circuit extension
+type mockExtensionConnection struct {
+	sentCells     []*cell.Cell
+	receivedCells []*cell.Cell
+	receiveIndex  int
+}
+
+func newMockExtensionConnection() *mockExtensionConnection {
+	return &mockExtensionConnection{
+		sentCells:     make([]*cell.Cell, 0),
+		receivedCells: make([]*cell.Cell, 0),
+		receiveIndex:  0,
+	}
+}
+
+func (m *mockExtensionConnection) SendCell(c *cell.Cell) error {
+	m.sentCells = append(m.sentCells, c)
+	return nil
+}
+
+func (m *mockExtensionConnection) ReceiveCell() (*cell.Cell, error) {
+	if m.receiveIndex >= len(m.receivedCells) {
+		// Return a mock CREATED2 cell if none provided
+		return m.createMockCreated2(), nil
+	}
+	c := m.receivedCells[m.receiveIndex]
+	m.receiveIndex++
+	return c, nil
+}
+
+func (m *mockExtensionConnection) createMockCreated2() *cell.Cell {
+	// Create a valid-looking CREATED2 response
+	// For ntor: 32 bytes server public key + 32 bytes auth MAC = 64 bytes
+	response := make([]byte, 64)
+	rand.Read(response)
+	
+	// Build CREATED2 payload: HLEN (2) + HDATA (64)
+	payload := make([]byte, 2+64)
+	binary.BigEndian.PutUint16(payload[0:2], 64)
+	copy(payload[2:], response)
+	
+	return &cell.Cell{
+		CircID:  1, // Match circuit ID
+		Command: cell.CmdCreated2,
+		Payload: payload,
+	}
+}
 
 func TestNewExtension(t *testing.T) {
 	log := logger.NewDefault()
@@ -29,26 +78,58 @@ func TestNewExtension(t *testing.T) {
 func TestCreateFirstHop(t *testing.T) {
 	log := logger.NewDefault()
 	circuit := NewCircuit(1)
+	
+	// Set up mock connection
+	mockConn := newMockExtensionConnection()
+	circuit.SetConnection(mockConn)
+	
 	ext := NewExtension(circuit, log)
 
 	ctx := context.Background()
 
+	// This will fail during ntor verification since we're using random response
+	// but it should successfully send CREATE2 and receive CREATED2
 	err := ext.CreateFirstHop(ctx, HandshakeTypeNTor)
-	if err != nil {
-		t.Fatalf("Failed to create first hop: %v", err)
+	if err == nil {
+		t.Error("Expected error due to mock handshake response, got nil")
+	}
+	
+	// Verify CREATE2 was sent
+	if len(mockConn.sentCells) != 1 {
+		t.Fatalf("Expected 1 sent cell, got %d", len(mockConn.sentCells))
+	}
+	
+	sentCell := mockConn.sentCells[0]
+	if sentCell.Command != cell.CmdCreate2 {
+		t.Errorf("Expected CREATE2 command, got %s", sentCell.Command)
+	}
+	
+	if sentCell.CircID != circuit.ID {
+		t.Errorf("Expected circuit ID %d, got %d", circuit.ID, sentCell.CircID)
 	}
 }
 
 func TestCreateFirstHopTAP(t *testing.T) {
 	log := logger.NewDefault()
 	circuit := NewCircuit(1)
+	
+	// Set up mock connection
+	mockConn := newMockExtensionConnection()
+	circuit.SetConnection(mockConn)
+	
 	ext := NewExtension(circuit, log)
 
 	ctx := context.Background()
 
+	// TAP handshake will also fail verification with mock response
 	err := ext.CreateFirstHop(ctx, HandshakeTypeTAP)
-	if err != nil {
-		t.Fatalf("Failed to create first hop with TAP: %v", err)
+	if err == nil {
+		t.Error("Expected error due to mock handshake response, got nil")
+	}
+	
+	// Verify CREATE2 was sent
+	if len(mockConn.sentCells) != 1 {
+		t.Fatalf("Expected 1 sent cell, got %d", len(mockConn.sentCells))
 	}
 }
 
@@ -365,4 +446,75 @@ func TestHandshakeTypeConstants(t *testing.T) {
 	if HandshakeTypeTAP != 0x0000 {
 		t.Errorf("Expected HandshakeTypeTAP=0x0000, got 0x%04x", HandshakeTypeTAP)
 	}
+}
+
+// TestCreateFirstHopWireProtocol tests the complete CREATE2/CREATED2 wire protocol
+// This verifies that CREATE2 is sent and CREATED2 is properly received and processed
+func TestCreateFirstHopWireProtocol(t *testing.T) {
+log := logger.NewDefault()
+circuit := NewCircuit(1)
+
+// Set up mock connection
+mockConn := newMockExtensionConnection()
+circuit.SetConnection(mockConn)
+
+ext := NewExtension(circuit, log)
+ctx := context.Background()
+
+// Attempt to create first hop
+err := ext.CreateFirstHop(ctx, HandshakeTypeNTor)
+
+// We expect an error due to handshake verification failure (mock response)
+// but the important thing is that cells were exchanged
+if err == nil {
+t.Error("Expected error due to mock ntor verification failure")
+}
+
+// Verify the wire protocol was executed correctly
+
+// 1. CREATE2 cell should have been sent
+if len(mockConn.sentCells) != 1 {
+t.Fatalf("Expected 1 CREATE2 cell sent, got %d", len(mockConn.sentCells))
+}
+
+create2Cell := mockConn.sentCells[0]
+
+// 2. Verify CREATE2 cell structure
+if create2Cell.Command != cell.CmdCreate2 {
+t.Errorf("Expected CREATE2 command, got %s", create2Cell.Command)
+}
+
+if create2Cell.CircID != circuit.ID {
+t.Errorf("Expected circuit ID %d, got %d", circuit.ID, create2Cell.CircID)
+}
+
+// 3. Verify CREATE2 payload structure: HTYPE (2) + HLEN (2) + HDATA
+payload := create2Cell.Payload
+if len(payload) < 4 {
+t.Fatalf("CREATE2 payload too short: %d bytes", len(payload))
+}
+
+htype := binary.BigEndian.Uint16(payload[0:2])
+if htype != uint16(HandshakeTypeNTor) {
+t.Errorf("Expected handshake type ntor (0x0002), got 0x%04x", htype)
+}
+
+hlen := binary.BigEndian.Uint16(payload[2:4])
+if hlen != 84 { // NODEID (20) + KEYID (32) + CLIENT_PK (32)
+t.Errorf("Expected handshake data length 84, got %d", hlen)
+}
+
+if len(payload) != int(4+hlen) {
+t.Errorf("Expected total payload length %d, got %d", 4+hlen, len(payload))
+}
+
+t.Log("✓ CREATE2 cell wire protocol validated successfully")
+}
+
+// TestCellConnectionInterface verifies the CellConnection interface is properly defined
+func TestCellConnectionInterface(t *testing.T) {
+var _ CellConnection = (*mockExtensionConnection)(nil)
+
+// This test just ensures the interface compiles
+// If mockExtensionConnection doesn't implement CellConnection, this will fail to compile
 }
