@@ -811,28 +811,21 @@ func (s *Service) sendEstablishIntro(ctx context.Context, circ *circuit.Circuit,
 
 // waitForIntroEstablished waits for an INTRO_ESTABLISHED acknowledgment
 func (s *Service) waitForIntroEstablished(ctx context.Context, circ *circuit.Circuit) error {
-	// Create a channel to receive the response
-	responseChan := make(chan error, 1)
-
-	// Start a goroutine to wait for the response
-	go func() {
-		// Try to read a relay cell from the circuit
-		// This is simplified - in production, we'd need to integrate with
-		// the circuit's receive loop
-		// For now, we'll assume success after a short delay
-		select {
-		case <-time.After(100 * time.Millisecond):
-			responseChan <- nil
-		case <-ctx.Done():
-			responseChan <- ctx.Err()
-		}
-	}()
-
-	// Wait for response or timeout
-	select {
-	case err := <-responseChan:
-		return err
-	case <-ctx.Done():
-		return ctx.Err()
+	// Wait for INTRO_ESTABLISHED relay cell from the introduction point
+	// Per rend-spec-v3.txt §3.1.1, the relay responds with INTRO_ESTABLISHED
+	relayCell, err := circ.ReceiveRelayCell(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to receive INTRO_ESTABLISHED: %w", err)
 	}
+
+	// Validate that we received the correct cell type
+	if relayCell.Command != cell.RelayIntroEstdAck {
+		return fmt.Errorf("expected INTRO_ESTABLISHED (39) but got relay command %d", relayCell.Command)
+	}
+
+	s.logger.Debug("Received INTRO_ESTABLISHED acknowledgment",
+		"circuit_id", circ.ID,
+		"stream_id", relayCell.StreamID)
+
+	return nil
 }
