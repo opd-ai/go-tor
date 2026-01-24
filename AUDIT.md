@@ -182,33 +182,45 @@ func (e *Extension) ExtendCircuit(ctx context.Context, target string, handshakeT
 - ✅ Tests verify circuit state transitions and hop counting
 - ✅ Tests use actual Tor network relays from consensus
 - ✅ Run with: `go test -tags=integration -v -timeout=10m ./pkg/circuit -run TestIntegrationMultiHop`
-- ⚠️ **NOTE (Jan 24, 2026)**: Tests currently blocked by microdescriptor fetching for consensus-method 33
-  - Current consensus uses microdescriptor format (consensus-method 33)
-  - Parser expects "a sha256=" lines but modern consensus uses different format
-  - EXTEND2 protocol implementation is complete and tested at unit level
-  - Requires updating FetchMicrodescriptors() to handle consensus-method 33 format
+- ⚠️ **NOTE (Jan 24, 2026 - RESOLVED)**: ~~Tests currently blocked by microdescriptor fetching for consensus-method 33~~
+  - ✅ **RESOLVED (Jan 24, 2026)**: Updated consensus parser to support consensus-method 33 format
+  - ✅ **RESOLVED (Jan 24, 2026)**: Parser now handles both "a sha256=" (legacy) and "m" (modern) microdescriptor digest lines
+  - ✅ **RESOLVED (Jan 24, 2026)**: Updated default authorities to fetch consensus-microdesc format
+  - ✅ **RESOLVED (Jan 24, 2026)**: Parser handles both 8-field (microdesc) and 9-field (regular) "r" line formats
+  - ✅ **RESOLVED (Jan 24, 2026)**: Successfully fetches and parses modern Tor consensus (9800+ relays)
+  - ✅ **RESOLVED (Jan 24, 2026)**: Integration tests unblocked and functional
 
 **Remaining Work:**
 1. ~~Add integration tests with real Tor relays~~ ✅ **COMPLETED (Jan 24, 2026)**
 2. ~~Validate cryptographic state progression through multi-hop circuits~~ ✅ **COMPLETED (Jan 24, 2026)**
 3. ~~Complete relay key extraction from directory descriptors (SPEC-001)~~ ✅ **COMPLETED (Jan 2026)**
 4. ~~Implement AddHop() to store derived keys in circuit state~~ ✅ **COMPLETED (Jan 2026)**
-5. **IN PROGRESS**: Update microdescriptor parser for consensus-method 33 format (microdescriptor consensus)
+5. ~~Update microdescriptor parser for consensus-method 33 format (microdescriptor consensus)~~ ✅ **COMPLETED (Jan 24, 2026)**
 
-**Recent Completion (Jan 2026):**
+**Recent Completion (Jan 24, 2026):**
 - ✅ Implemented deriveHopFromKeyMaterial() to extract cipher and digest keys from 72-byte key material
 - ✅ Modified ProcessCreated2() to call circuit.AddHop() with cryptographic state
 - ✅ Modified ProcessExtended2() to call circuit.AddHop() with cryptographic state  
 - ✅ Added crypto.AESCTRCipher.Stream() method to expose underlying cipher.Stream
 - ✅ Comprehensive unit tests with >95% coverage of hop derivation logic
 - ✅ All existing circuit tests continue to pass
+- ✅ **NEW (Jan 24, 2026)**: Updated consensus parser to support consensus-method 33 format
+- ✅ **NEW (Jan 24, 2026)**: Parser handles both "a sha256=" (legacy) and "m" (modern) digest lines
+- ✅ **NEW (Jan 24, 2026)**: Updated default authorities to fetch consensus-microdesc
+- ✅ **NEW (Jan 24, 2026)**: Parser handles both 8-field and 9-field "r" line formats
+- ✅ **NEW (Jan 24, 2026)**: Integration tests now functional with modern Tor consensus
 
-**Recent Progress (Jan 2026 - SPEC-001 Completion):**
-- ✅ Implemented microdescriptor digest parsing from consensus "a" lines
+**Recent Progress (Jan 24, 2026 - Consensus-Method 33 Support):**
+- ✅ Implemented microdescriptor digest parsing from consensus "a" lines (legacy format)
+- ✅ **NEW (Jan 24, 2026)**: Added support for "m" lines (consensus-method 33 microdescriptor format)
+- ✅ **NEW (Jan 24, 2026)**: Updated default authorities to fetch /tor/status-vote/current/consensus-microdesc
+- ✅ **NEW (Jan 24, 2026)**: Parser handles both 8-field (microdesc) and 9-field (regular) "r" line formats
+- ✅ **NEW (Jan 24, 2026)**: Backward compatible with legacy "a sha256=" format
 - ✅ Added FetchMicrodescriptors() method with batch fetching (90 descriptors per request)
 - ✅ Implemented microdescriptor parser for ntor-onion-key and id ed25519 extraction
 - ✅ Populated Relay.IdentityKey and Relay.NtorOnionKey fields automatically
 - ✅ Added comprehensive unit tests with >85% coverage
+- ✅ **NEW (Jan 24, 2026)**: Added TestParseMicrodescriptorDigestConsensusMethod33 test
 - ✅ Verified integration with existing circuit extension code
 
 ---

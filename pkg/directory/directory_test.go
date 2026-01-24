@@ -429,6 +429,35 @@ s Fast Guard Running Stable Valid
 	}
 }
 
+func TestParseMicrodescriptorDigestConsensusMethod33(t *testing.T) {
+	// Test modern consensus-method 33 format with "m" lines
+	consensusData := `network-status-version 3
+vote-status consensus
+consensus-method 33
+r TestRelay AAAAAAAAAAAAAAAAAAAAAA 2038-01-01 00:00:00 192.168.1.1 9001 0
+m jauY803ygX19rw14B2x4suqNIIMIPPbtYBAwA9UegdI
+s Fast Guard Running Stable Valid
+v Tor 0.4.8.21
+`
+
+	client := NewClient(nil)
+	reader := strings.NewReader(consensusData)
+
+	relays, err := client.parseConsensus(reader)
+	if err != nil {
+		t.Fatalf("parseConsensus() error = %v", err)
+	}
+
+	if len(relays) != 1 {
+		t.Fatalf("Expected 1 relay, got %d", len(relays))
+	}
+
+	expectedDigest := "jauY803ygX19rw14B2x4suqNIIMIPPbtYBAwA9UegdI"
+	if relays[0].MicrodescDigest != expectedDigest {
+		t.Errorf("Expected microdesc digest '%s', got '%s'", expectedDigest, relays[0].MicrodescDigest)
+	}
+}
+
 func TestParseMicrodescriptors(t *testing.T) {
 	// Sample microdescriptor format per dir-spec.txt
 	mdData := `onion-key

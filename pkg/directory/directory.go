@@ -35,13 +35,14 @@ const (
 // Default directory authority addresses (hardcoded fallback directories)
 // Using HTTP instead of HTTPS for better compatibility with IP-based authorities
 // The Tor consensus is cryptographically signed, so transport encryption is not critical
+// Using consensus-microdesc format (consensus-method 33) which includes "m" lines with microdescriptor digests
 var DefaultAuthorities = []string{
-	"http://194.109.206.212/tor/status-vote/current/consensus",      // gabelmoo
-	"http://131.188.40.189/tor/status-vote/current/consensus",       // moria1
-	"http://128.31.0.34:9131/tor/status-vote/current/consensus",     // tor26
-	"http://86.59.21.38/tor/status-vote/current/consensus",          // longclaw
-	"http://199.58.81.140/tor/status-vote/current/consensus",        // bastet
-	"http://204.13.164.118:18080/tor/status-vote/current/consensus", // faravahar
+	"http://194.109.206.212/tor/status-vote/current/consensus-microdesc",      // gabelmoo
+	"http://131.188.40.189/tor/status-vote/current/consensus-microdesc",       // moria1
+	"http://128.31.0.34:9131/tor/status-vote/current/consensus-microdesc",     // tor26
+	"http://86.59.21.38/tor/status-vote/current/consensus-microdesc",          // longclaw
+	"http://199.58.81.140/tor/status-vote/current/consensus-microdesc",        // bastet
+	"http://204.13.164.118:18080/tor/status-vote/current/consensus-microdesc", // faravahar
 }
 
 // DirectoryAuthority represents a known Tor directory authority (SPEC-003)
@@ -355,6 +356,9 @@ func (c *Client) parseConsensusWithMetadata(r io.Reader) ([]*Relay, *ConsensusMe
 		}
 
 		// Parse "r" lines (router status entries)
+		// Two formats supported:
+		// 1. Regular consensus (9 fields): r nickname identity digest published IP ORPort DirPort
+		// 2. Microdescriptor consensus (8 fields): r nickname identity published IP ORPort DirPort
 		if strings.HasPrefix(line, "r ") {
 			totalEntries++
 
@@ -363,37 +367,73 @@ func (c *Client) parseConsensusWithMetadata(r io.Reader) ([]*Relay, *ConsensusMe
 			}
 
 			parts := strings.Fields(line)
-			if len(parts) < 9 {
+			if len(parts) < 8 {
 				malformedEntries++
 				c.logger.Debug("Skipping malformed relay entry", "line", line)
 				continue // Skip malformed entries
 			}
 
+			// Determine format based on field count
+			var nickname, fingerprint, address string
+			var orPortIdx, dirPortIdx int
+
+			if len(parts) >= 9 {
+				// Regular consensus format (9 fields)
+				nickname = parts[1]
+				fingerprint = parts[2]
+				// parts[3] is the digest (not used for microdescriptor-based relays)
+				// parts[4] is published date
+				// parts[5] is published time
+				address = parts[6]
+				orPortIdx = 7
+				dirPortIdx = 8
+			} else {
+				// Microdescriptor consensus format (8 fields)
+				nickname = parts[1]
+				fingerprint = parts[2]
+				// parts[3] is published date
+				// parts[4] is published time
+				address = parts[5]
+				orPortIdx = 6
+				dirPortIdx = 7
+			}
+
 			currentRelay = &Relay{
-				Nickname:    parts[1],
-				Fingerprint: parts[2],
-				Address:     parts[6],
+				Nickname:    nickname,
+				Fingerprint: fingerprint,
+				Address:     address,
 			}
 
 			// Parse ORPort (track errors for SEC-014)
-			if _, err := fmt.Sscanf(parts[7], "%d", &currentRelay.ORPort); err != nil {
+			if _, err := fmt.Sscanf(parts[orPortIdx], "%d", &currentRelay.ORPort); err != nil {
 				portParseErrors++
-				c.logger.Debug("Failed to parse ORPort", "error", err, "value", parts[7])
+				c.logger.Debug("Failed to parse ORPort", "error", err, "value", parts[orPortIdx])
 			}
 			// Parse DirPort (track errors for SEC-014)
-			if _, err := fmt.Sscanf(parts[8], "%d", &currentRelay.DirPort); err != nil {
+			if _, err := fmt.Sscanf(parts[dirPortIdx], "%d", &currentRelay.DirPort); err != nil {
 				portParseErrors++
-				c.logger.Debug("Failed to parse DirPort", "error", err, "value", parts[8])
+				c.logger.Debug("Failed to parse DirPort", "error", err, "value", parts[dirPortIdx])
 			}
 		}
 
-		// Parse "a" lines (microdescriptor digests) - SPEC-001
+		// Parse "a" lines (microdescriptor digests) - SPEC-001 (legacy format)
+		// Legacy format: "a sha256=base64digest"
 		if strings.HasPrefix(line, "a ") && currentRelay != nil {
 			parts := strings.Fields(line)
 			// Format: "a" SP algname "=" digest
 			// e.g., "a sha256=base64digest"
 			if len(parts) >= 2 && strings.HasPrefix(parts[1], "sha256=") {
 				currentRelay.MicrodescDigest = strings.TrimPrefix(parts[1], "sha256=")
+			}
+		}
+
+		// Parse "m" lines (microdescriptor digests) - SPEC-001 (consensus-method 33)
+		// Modern format per dir-spec.txt §3.4.1: "m" SP 32*Base64Character
+		// This is used in microdescriptor consensus (consensus-method 33+)
+		if strings.HasPrefix(line, "m ") && currentRelay != nil {
+			parts := strings.Fields(line)
+			if len(parts) >= 2 {
+				currentRelay.MicrodescDigest = parts[1]
 			}
 		}
 
@@ -742,8 +782,9 @@ func (c *Client) fetchMicrodescriptorBatch(ctx context.Context, digests []string
 	// Try each authority until one succeeds
 	var lastErr error
 	for _, authority := range c.authorities {
-		// Extract base URL from consensus URL
-		baseURL := strings.TrimSuffix(authority, "/tor/status-vote/current/consensus")
+		// Extract base URL from consensus URL (support both consensus and consensus-microdesc)
+		baseURL := strings.TrimSuffix(authority, "/tor/status-vote/current/consensus-microdesc")
+		baseURL = strings.TrimSuffix(baseURL, "/tor/status-vote/current/consensus")
 		mdURL := baseURL + urlPath
 
 		md, err := c.fetchMicrodescriptorsFromAuthority(ctx, mdURL)
