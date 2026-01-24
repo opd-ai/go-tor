@@ -223,7 +223,7 @@ func generateID() string {
 	return fmt.Sprintf("%d", time.Now().UnixNano())
 }
 
-// Helper function to end span with error handling
+// EndSpan is a helper function to end span with error handling
 func EndSpan(span *Span, err error, exporter Exporter) {
 	if span == nil {
 		return
@@ -240,7 +240,7 @@ func EndSpan(span *Span, err error, exporter Exporter) {
 	}
 }
 
-// Helper function to add span to context with automatic cleanup
+// WithSpan is a helper function to add span to context with automatic cleanup
 func WithSpan(ctx context.Context, tracer *Tracer, name string, kind SpanKind, fn func(context.Context, *Span) error) error {
 	ctx, span := tracer.StartSpan(ctx, name, kind)
 	defer func() {

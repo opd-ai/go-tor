@@ -1186,12 +1186,11 @@ func (c *Circuit) DeliverRelayCell(cellData *cell.Cell) error {
 			c.incrementPackageWindow()
 			// Don't deliver SENDME cells to the application layer
 			return nil
-		} else {
-			// Stream-level SENDME
-			c.incrementStreamPackageWindow(relayCell.StreamID)
-			// Don't deliver SENDME cells to the application layer
-			return nil
 		}
+		// Stream-level SENDME
+		c.incrementStreamPackageWindow(relayCell.StreamID)
+		// Don't deliver SENDME cells to the application layer
+		return nil
 	}
 
 	// Record activity

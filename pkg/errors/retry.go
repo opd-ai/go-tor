@@ -272,7 +272,7 @@ func RetryWithStats(ctx context.Context, policy *RetryPolicy, fn RetryableFunc) 
 	return stats, lastErr
 }
 
-// RetryWithCallback executes a function with retry logic and calls a callback after each attempt
+// RetryCallback is a function that executes a function with retry logic and calls a callback after each attempt
 type RetryCallback func(attempt int, err error, willRetry bool)
 
 // RetryWithCallbackFunc executes a function with retry and callback for monitoring

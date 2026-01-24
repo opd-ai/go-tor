@@ -32,7 +32,7 @@ const (
 	maxClockSkew            = 30 * time.Minute // Maximum allowed clock skew for consensus timestamps
 )
 
-// Default directory authority addresses (hardcoded fallback directories)
+// DefaultAuthorities is the default directory authority addresses (hardcoded fallback directories)
 // Using HTTP instead of HTTPS for better compatibility with IP-based authorities
 // The Tor consensus is cryptographically signed, so transport encryption is not critical
 // Using consensus-microdesc format (consensus-method 33) which includes "m" lines with microdescriptor digests
