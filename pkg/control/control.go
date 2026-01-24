@@ -21,6 +21,7 @@ type Server struct {
 	listener     net.Listener
 	logger       *logger.Logger
 	clientGetter ClientInfoGetter
+	password     string // Control password (empty = no auth required)
 
 	// Connection management
 	conns   map[net.Conn]*connection
@@ -59,12 +60,18 @@ type connection struct {
 
 // NewServer creates a new control protocol server
 func NewServer(address string, clientGetter ClientInfoGetter, log *logger.Logger) *Server {
+	return NewServerWithPassword(address, clientGetter, "", log)
+}
+
+// NewServerWithPassword creates a new control protocol server with authentication
+func NewServerWithPassword(address string, clientGetter ClientInfoGetter, password string, log *logger.Logger) *Server {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Server{
 		address:      address,
 		logger:       log.Component("control"),
 		clientGetter: clientGetter,
+		password:     password,
 		conns:        make(map[net.Conn]*connection),
 		dispatcher:   NewEventDispatcher(),
 		ctx:          ctx,
@@ -251,22 +258,53 @@ func (s *Server) handleCommand(conn *connection, line string) {
 
 // handleAuthenticate handles AUTHENTICATE command
 func (s *Server) handleAuthenticate(conn *connection, args []string) {
-	// For now, accept any authentication (including no password)
-	// In production, this should validate a cookie or password
+	// If no password is configured, accept any authentication
+	if s.password == "" {
+		conn.mu.Lock()
+		conn.authenticated = true
+		conn.mu.Unlock()
+		conn.writeReply(250, "OK")
+		s.logger.Info("Client authenticated (no password required)", "remote", conn.conn.RemoteAddr())
+		return
+	}
+
+	// Password authentication required
+	if len(args) == 0 {
+		conn.writeReply(515, "Authentication failed: password required")
+		s.logger.Warn("Authentication failed: no password provided", "remote", conn.conn.RemoteAddr())
+		return
+	}
+
+	// Get password from command (may be quoted)
+	password := strings.Join(args, " ")
+	password = strings.Trim(password, `"`)
+
+	// Validate password
+	if password != s.password {
+		conn.writeReply(515, "Authentication failed: incorrect password")
+		s.logger.Warn("Authentication failed: incorrect password", "remote", conn.conn.RemoteAddr())
+		return
+	}
+
+	// Authentication successful
 	conn.mu.Lock()
 	conn.authenticated = true
 	conn.mu.Unlock()
-
 	conn.writeReply(250, "OK")
 	s.logger.Info("Client authenticated", "remote", conn.conn.RemoteAddr())
 }
 
 // handleProtocolInfo handles PROTOCOLINFO command
 func (s *Server) handleProtocolInfo(conn *connection, args []string) {
-	// No authentication required for PROTOCOLINFO
+	// No authentication required for PROTOCOLINFO per control-spec.txt
+	authMethods := "NULL"
+	if s.password != "" {
+		authMethods = "HASHEDPASSWORD"
+	}
+
 	conn.writeDataReply([]string{
 		"250-PROTOCOLINFO 1",
-		"250-AUTH METHODS=NULL",
+		fmt.Sprintf("250-AUTH METHODS=%s", authMethods),
 		"250-VERSION Tor=\"go-tor-0.1.0\"",
 		"250 OK",
 	})

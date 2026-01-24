@@ -126,7 +126,11 @@ func New(cfg *config.Config, log *logger.Logger) (*Client, error) {
 
 	// Initialize control protocol server
 	controlAddr := fmt.Sprintf("127.0.0.1:%d", cfg.ControlPort)
-	client.controlServer = control.NewServer(controlAddr, &clientStatsAdapter{client: client}, log)
+	if cfg.ControlPassword != "" {
+		client.controlServer = control.NewServerWithPassword(controlAddr, &clientStatsAdapter{client: client}, cfg.ControlPassword, log)
+	} else {
+		client.controlServer = control.NewServer(controlAddr, &clientStatsAdapter{client: client}, log)
+	}
 
 	// Initialize HTTP metrics server if enabled
 	if cfg.EnableMetrics && cfg.MetricsPort > 0 {

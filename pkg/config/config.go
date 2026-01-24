@@ -12,9 +12,10 @@ import (
 // Config represents the Tor client configuration
 type Config struct {
 	// Network settings
-	SocksPort     int    // SOCKS5 proxy port (default: 9050)
-	ControlPort   int    // Control protocol port (default: 9051)
-	DataDirectory string // Directory for persistent state
+	SocksPort       int    // SOCKS5 proxy port (default: 9050)
+	ControlPort     int    // Control protocol port (default: 9051)
+	ControlPassword string // Control protocol password (default: "" = no authentication)
+	DataDirectory   string // Directory for persistent state
 
 	// Circuit settings
 	CircuitBuildTimeout time.Duration // Max time to build a circuit (default: 60s)
@@ -154,6 +155,7 @@ func DefaultConfig() *Config {
 	return &Config{
 		SocksPort:           socksPort,
 		ControlPort:         controlPort,
+		ControlPassword:     "", // No authentication by default
 		DataDirectory:       dataDir,
 		CircuitBuildTimeout: 60 * time.Second,
 		MaxCircuitDirtiness: 10 * time.Minute,

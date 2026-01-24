@@ -53,7 +53,7 @@ This project is an **experimental implementation** for learning and research pur
 - ✅ Component integration and orchestration
 - ✅ Functional Tor client application
 - ✅ Metrics and observability system
-- ✅ Control protocol server (basic commands)
+- ✅ Control protocol server with password authentication (Jan 24, 2026)
 - ✅ Event notification system (CIRC, STREAM, BW, ORCONN events)
 - ✅ Additional event types (NEWDESC, GUARD, NS events)
 - ✅ v3 onion address parsing and validation
