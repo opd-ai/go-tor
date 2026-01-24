@@ -336,9 +336,9 @@ func (s *Stream) GetIsolationKey() *circuit.IsolationKey {
 	return s.IsolationKey
 }
 
-// decrementPackageWindow decrements the stream-level package window
+// DecrementPackageWindow decrements the stream-level package window
 // Returns an error if the window is exhausted
-func (s *Stream) decrementPackageWindow() error {
+func (s *Stream) DecrementPackageWindow() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -350,9 +350,9 @@ func (s *Stream) decrementPackageWindow() error {
 	return nil
 }
 
-// incrementPackageWindow increments the stream-level package window
+// IncrementPackageWindow increments the stream-level package window
 // This is called when we receive a SENDME cell for this stream
-func (s *Stream) incrementPackageWindow() {
+func (s *Stream) IncrementPackageWindow() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -361,9 +361,9 @@ func (s *Stream) incrementPackageWindow() {
 	s.sendmeSent++
 }
 
-// decrementDeliverWindow decrements the stream-level deliver window
+// DecrementDeliverWindow decrements the stream-level deliver window
 // Returns an error if the window is exhausted
-func (s *Stream) decrementDeliverWindow() error {
+func (s *Stream) DecrementDeliverWindow() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -377,18 +377,18 @@ func (s *Stream) decrementDeliverWindow() error {
 	return nil
 }
 
-// shouldSendStreamSendme checks if we should send a stream-level SENDME
+// ShouldSendStreamSendme checks if we should send a stream-level SENDME
 // Per tor-spec.txt §7.4, send SENDME every 50 cells received
-func (s *Stream) shouldSendStreamSendme() bool {
+func (s *Stream) ShouldSendStreamSendme() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	return s.sendmeReceived >= 50
 }
 
-// recordStreamSendmeSent records that a stream-level SENDME was sent
+// RecordStreamSendmeSent records that a stream-level SENDME was sent
 // This resets the received counter and increments the deliver window
-func (s *Stream) recordStreamSendmeSent() {
+func (s *Stream) RecordStreamSendmeSent() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

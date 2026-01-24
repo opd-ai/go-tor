@@ -760,14 +760,204 @@ func (c *Circuit) sendCircuitSendme() error {
 	return c.SendRelayCell(sendmeCell)
 }
 
+// Stream-level flow control methods
+
+// decrementStreamPackageWindow decrements the stream-level package window
+func (c *Circuit) decrementStreamPackageWindow(streamID uint16) error {
+	c.mu.RLock()
+	mgr := c.streamManager
+	c.mu.RUnlock()
+
+	if mgr == nil {
+		// No stream manager, skip stream-level flow control
+		return nil
+	}
+
+	// Type assert to stream manager interface
+	type streamGetter interface {
+		GetStream(uint16) (interface{}, error)
+	}
+	getter, ok := mgr.(streamGetter)
+	if !ok {
+		return nil
+	}
+
+	streamIface, err := getter.GetStream(streamID)
+	if err != nil {
+		// Stream doesn't exist, skip flow control
+		return nil
+	}
+
+	// Type assert to stream with flow control methods
+	type flowControlStream interface {
+		DecrementPackageWindow() error
+	}
+	stream, ok := streamIface.(flowControlStream)
+	if !ok {
+		return nil
+	}
+
+	return stream.DecrementPackageWindow()
+}
+
+// decrementStreamDeliverWindow decrements the stream-level deliver window
+func (c *Circuit) decrementStreamDeliverWindow(streamID uint16) error {
+	c.mu.RLock()
+	mgr := c.streamManager
+	c.mu.RUnlock()
+
+	if mgr == nil {
+		return nil
+	}
+
+	type streamGetter interface {
+		GetStream(uint16) (interface{}, error)
+	}
+	getter, ok := mgr.(streamGetter)
+	if !ok {
+		return nil
+	}
+
+	streamIface, err := getter.GetStream(streamID)
+	if err != nil {
+		return nil
+	}
+
+	type flowControlStream interface {
+		DecrementDeliverWindow() error
+	}
+	stream, ok := streamIface.(flowControlStream)
+	if !ok {
+		return nil
+	}
+
+	return stream.DecrementDeliverWindow()
+}
+
+// shouldSendStreamSendme checks if we should send a stream-level SENDME
+func (c *Circuit) shouldSendStreamSendme(streamID uint16) bool {
+	c.mu.RLock()
+	mgr := c.streamManager
+	c.mu.RUnlock()
+
+	if mgr == nil {
+		return false
+	}
+
+	type streamGetter interface {
+		GetStream(uint16) (interface{}, error)
+	}
+	getter, ok := mgr.(streamGetter)
+	if !ok {
+		return false
+	}
+
+	streamIface, err := getter.GetStream(streamID)
+	if err != nil {
+		return false
+	}
+
+	type flowControlStream interface {
+		ShouldSendStreamSendme() bool
+	}
+	stream, ok := streamIface.(flowControlStream)
+	if !ok {
+		return false
+	}
+
+	return stream.ShouldSendStreamSendme()
+}
+
+// sendStreamSendme sends a stream-level SENDME cell
+func (c *Circuit) sendStreamSendme(streamID uint16) error {
+	c.mu.RLock()
+	mgr := c.streamManager
+	c.mu.RUnlock()
+
+	if mgr == nil {
+		return fmt.Errorf("no stream manager")
+	}
+
+	type streamGetter interface {
+		GetStream(uint16) (interface{}, error)
+	}
+	getter, ok := mgr.(streamGetter)
+	if !ok {
+		return fmt.Errorf("stream manager does not support GetStream")
+	}
+
+	streamIface, err := getter.GetStream(streamID)
+	if err != nil {
+		return fmt.Errorf("stream not found: %w", err)
+	}
+
+	type flowControlStream interface {
+		RecordStreamSendmeSent()
+	}
+	stream, ok := streamIface.(flowControlStream)
+	if !ok {
+		return fmt.Errorf("stream does not support flow control")
+	}
+
+	// Record that we're sending a SENDME
+	stream.RecordStreamSendmeSent()
+
+	// Send SENDME cell with stream ID
+	sendmeCell := cell.NewRelayCell(streamID, cell.RelaySendme, []byte{})
+	return c.SendRelayCell(sendmeCell)
+}
+
+// incrementStreamPackageWindow increments the stream-level package window
+func (c *Circuit) incrementStreamPackageWindow(streamID uint16) {
+	c.mu.RLock()
+	mgr := c.streamManager
+	c.mu.RUnlock()
+
+	if mgr == nil {
+		return
+	}
+
+	type streamGetter interface {
+		GetStream(uint16) (interface{}, error)
+	}
+	getter, ok := mgr.(streamGetter)
+	if !ok {
+		return
+	}
+
+	streamIface, err := getter.GetStream(streamID)
+	if err != nil {
+		return
+	}
+
+	type flowControlStream interface {
+		IncrementPackageWindow()
+	}
+	stream, ok := streamIface.(flowControlStream)
+	if !ok {
+		return
+	}
+
+	stream.IncrementPackageWindow()
+}
+
+
 // SendRelayCell sends a relay cell through the circuit
 // This encrypts the relay cell with per-hop cryptography and sends it through the connection
 func (c *Circuit) SendRelayCell(relayCell *cell.RelayCell) error {
 	// Check flow control for DATA cells
 	// Per tor-spec.txt §7.4, only DATA cells count against the package window
 	if relayCell.Command == cell.RelayData {
+		// Circuit-level flow control
 		if err := c.decrementPackageWindow(); err != nil {
-			return fmt.Errorf("flow control: %w", err)
+			return fmt.Errorf("circuit flow control: %w", err)
+		}
+		
+		// Stream-level flow control (if this is a stream-level DATA cell)
+		if relayCell.StreamID > 0 {
+			if err := c.decrementStreamPackageWindow(relayCell.StreamID); err != nil {
+				return fmt.Errorf("stream flow control: %w", err)
+			}
 		}
 	}
 
@@ -909,12 +1099,12 @@ func (c *Circuit) DeliverRelayCell(cellData *cell.Cell) error {
 	// Handle flow control per tor-spec.txt §7.4
 	switch relayCell.Command {
 	case cell.RelayData:
-		// DATA cells count against our deliver window
+		// Circuit-level flow control: DATA cells count against our deliver window
 		if err := c.decrementDeliverWindow(); err != nil {
-			return fmt.Errorf("flow control: %w", err)
+			return fmt.Errorf("circuit flow control: %w", err)
 		}
 
-		// Check if we should send a SENDME
+		// Check if we should send a circuit-level SENDME
 		if c.shouldSendCircuitSendme() {
 			// Send SENDME in background to avoid blocking
 			go func() {
@@ -925,6 +1115,24 @@ func (c *Circuit) DeliverRelayCell(cellData *cell.Cell) error {
 			}()
 		}
 
+		// Stream-level flow control (if this is a stream-level DATA cell)
+		if relayCell.StreamID > 0 {
+			if err := c.decrementStreamDeliverWindow(relayCell.StreamID); err != nil {
+				return fmt.Errorf("stream flow control: %w", err)
+			}
+			
+			// Check if we should send a stream-level SENDME
+			if c.shouldSendStreamSendme(relayCell.StreamID) {
+				// Send stream SENDME in background to avoid blocking
+				go func(streamID uint16) {
+					if err := c.sendStreamSendme(streamID); err != nil {
+						// Log error but don't fail the delivery
+						// (in production, should have proper logging)
+					}
+				}(relayCell.StreamID)
+			}
+		}
+
 	case cell.RelaySendme:
 		// SENDME cell increments our package window
 		if relayCell.StreamID == 0 {
@@ -932,9 +1140,12 @@ func (c *Circuit) DeliverRelayCell(cellData *cell.Cell) error {
 			c.incrementPackageWindow()
 			// Don't deliver SENDME cells to the application layer
 			return nil
+		} else {
+			// Stream-level SENDME
+			c.incrementStreamPackageWindow(relayCell.StreamID)
+			// Don't deliver SENDME cells to the application layer
+			return nil
 		}
-		// Stream-level SENDME - deliver to stream manager
-		// (handled below)
 	}
 
 	// Record activity
