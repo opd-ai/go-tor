@@ -9,6 +9,7 @@
 package crypto
 
 import (
+	"crypto"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/ed25519"
@@ -16,6 +17,7 @@ import (
 	"crypto/rsa"
 	"crypto/sha1" // #nosec G505 - SHA1 required by Tor protocol specification (tor-spec.txt)
 	"crypto/sha256"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"sync"
@@ -148,6 +150,16 @@ func GenerateRSAKey(bits int) (*RSAPrivateKey, error) {
 	return &RSAPrivateKey{key: key}, nil
 }
 
+// ParseRSAPublicKey parses an RSA public key from PKCS#1 DER format
+// This is used for parsing hardcoded Tor directory authority keys
+func ParseRSAPublicKey(derBytes []byte) (*RSAPublicKey, error) {
+	key, err := x509.ParsePKCS1PublicKey(derBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse RSA public key: %w", err)
+	}
+	return &RSAPublicKey{key: key}, nil
+}
+
 // PublicKey returns the public key corresponding to the private key
 func (k *RSAPrivateKey) PublicKey() *RSAPublicKey {
 	return &RSAPublicKey{key: &k.key.PublicKey}
@@ -173,6 +185,26 @@ func (k *RSAPrivateKey) Decrypt(ciphertext []byte) ([]byte, error) {
 		return nil, fmt.Errorf("RSA decryption failed: %w", err)
 	}
 	return plaintext, nil
+}
+
+// VerifySignatureSHA1 verifies an RSA-PKCS1v15 signature with SHA-1 hash
+// #nosec G401 - SHA1 with RSA-PKCS1v15 required by Tor specification (dir-spec.txt §3.4)
+// Tor directory signatures use SHA-1 or SHA-256 with RSA-PKCS1v15
+func (k *RSAPublicKey) VerifySignatureSHA1(message, signature []byte) error {
+	hash := sha1.Sum(message) // #nosec G401
+	if err := rsa.VerifyPKCS1v15(k.key, crypto.SHA1, hash[:], signature); err != nil {
+		return fmt.Errorf("RSA signature verification failed: %w", err)
+	}
+	return nil
+}
+
+// VerifySignatureSHA256 verifies an RSA-PKCS1v15 signature with SHA-256 hash
+func (k *RSAPublicKey) VerifySignatureSHA256(message, signature []byte) error {
+	hash := sha256.Sum256(message)
+	if err := rsa.VerifyPKCS1v15(k.key, crypto.SHA256, hash[:], signature); err != nil {
+		return fmt.Errorf("RSA signature verification failed: %w", err)
+	}
+	return nil
 }
 
 // DigestWriter wraps a hash writer for computing running digests

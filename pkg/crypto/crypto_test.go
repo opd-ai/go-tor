@@ -2,7 +2,12 @@ package crypto
 
 import (
 	"bytes"
+	"crypto"
 	"crypto/aes"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha1" // #nosec G505
+	"crypto/sha256"
 	"testing"
 )
 
@@ -168,6 +173,63 @@ func TestRSAEncryptDecrypt(t *testing.T) {
 	if !bytes.Equal(decrypted, plaintext) {
 		t.Errorf("decrypted = %v, want %v", decrypted, plaintext)
 	}
+}
+
+func TestRSASignatureVerification(t *testing.T) {
+	// Generate key pair
+	privateKey, err := GenerateRSAKey(2048)
+	if err != nil {
+		t.Fatalf("GenerateRSAKey() error = %v", err)
+	}
+
+	publicKey := privateKey.PublicKey()
+	message := []byte("Test message for signature verification")
+
+	// Test SHA-1 signature
+	t.Run("SHA1", func(t *testing.T) {
+		hash := sha1.Sum(message) // #nosec G401
+		signature, err := rsa.SignPKCS1v15(rand.Reader, privateKey.key, crypto.SHA1, hash[:])
+		if err != nil {
+			t.Fatalf("SignPKCS1v15() error = %v", err)
+		}
+
+		if err := publicKey.VerifySignatureSHA1(message, signature); err != nil {
+			t.Errorf("VerifySignatureSHA1() error = %v", err)
+		}
+
+		// Test with wrong message
+		wrongMessage := []byte("Wrong message")
+		if err := publicKey.VerifySignatureSHA1(wrongMessage, signature); err == nil {
+			t.Error("VerifySignatureSHA1() should fail with wrong message")
+		}
+
+		// Test with corrupted signature
+		corruptedSig := make([]byte, len(signature))
+		copy(corruptedSig, signature)
+		corruptedSig[0] ^= 0xFF
+		if err := publicKey.VerifySignatureSHA1(message, corruptedSig); err == nil {
+			t.Error("VerifySignatureSHA1() should fail with corrupted signature")
+		}
+	})
+
+	// Test SHA-256 signature
+	t.Run("SHA256", func(t *testing.T) {
+		hash := sha256.Sum256(message)
+		signature, err := rsa.SignPKCS1v15(rand.Reader, privateKey.key, crypto.SHA256, hash[:])
+		if err != nil {
+			t.Fatalf("SignPKCS1v15() error = %v", err)
+		}
+
+		if err := publicKey.VerifySignatureSHA256(message, signature); err != nil {
+			t.Errorf("VerifySignatureSHA256() error = %v", err)
+		}
+
+		// Test with wrong message
+		wrongMessage := []byte("Wrong message")
+		if err := publicKey.VerifySignatureSHA256(wrongMessage, signature); err == nil {
+			t.Error("VerifySignatureSHA256() should fail with wrong message")
+		}
+	})
 }
 
 func TestNewSHA1DigestWriter(t *testing.T) {

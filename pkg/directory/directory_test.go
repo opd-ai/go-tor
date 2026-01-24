@@ -2,6 +2,7 @@ package directory
 
 import (
 	"context"
+	"encoding/base64"
 	"strings"
 	"testing"
 	"time"
@@ -792,5 +793,84 @@ func TestConsensusSignatureStructure(t *testing.T) {
 	}
 	if !strings.Contains(sig.Signature, "BEGIN SIGNATURE") {
 		t.Error("Signature should contain PEM markers")
+	}
+}
+
+func TestVerifyConsensusSignatures(t *testing.T) {
+	tests := []struct {
+		name          string
+		consensusBody []byte
+		meta          *ConsensusMetadata
+		wantErr       bool
+		errMsg        string
+	}{
+		{
+			name:          "Empty consensus body",
+			consensusBody: []byte{},
+			meta: &ConsensusMetadata{
+				Signatures: []*ConsensusSignature{
+					{Algorithm: "sha256", Identity: "ABC", SigningKeyDigest: "DEF", Signature: base64.StdEncoding.EncodeToString([]byte("sig"))},
+				},
+			},
+			wantErr: true,
+			errMsg:  "empty consensus body",
+		},
+		{
+			name:          "No signatures",
+			consensusBody: []byte("test body"),
+			meta:          &ConsensusMetadata{Signatures: []*ConsensusSignature{}},
+			wantErr:       true,
+			errMsg:        "no signatures",
+		},
+		{
+			name:          "Sufficient valid signatures",
+			consensusBody: []byte("network-status-version 3\ntest consensus body"),
+			meta: &ConsensusMetadata{
+				SignatureCount: 3,
+				Signatures: []*ConsensusSignature{
+					{Algorithm: "sha256", Identity: "ID1", SigningKeyDigest: "KEY1", Signature: base64.StdEncoding.EncodeToString([]byte("sig1"))},
+					{Algorithm: "sha256", Identity: "ID2", SigningKeyDigest: "KEY2", Signature: base64.StdEncoding.EncodeToString([]byte("sig2"))},
+					{Algorithm: "sha256", Identity: "ID3", SigningKeyDigest: "KEY3", Signature: base64.StdEncoding.EncodeToString([]byte("sig3"))},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name:          "Insufficient valid signatures",
+			consensusBody: []byte("test body"),
+			meta: &ConsensusMetadata{
+				SignatureCount: 1,
+				Signatures: []*ConsensusSignature{
+					{Algorithm: "sha256", Identity: "ID1", SigningKeyDigest: "KEY1", Signature: base64.StdEncoding.EncodeToString([]byte("sig1"))},
+				},
+			},
+			wantErr: true,
+			errMsg:  "insufficient valid signatures",
+		},
+		{
+			name:          "Invalid base64 signature",
+			consensusBody: []byte("test body"),
+			meta: &ConsensusMetadata{
+				SignatureCount: 3,
+				Signatures: []*ConsensusSignature{
+					{Algorithm: "sha256", Identity: "ID1", SigningKeyDigest: "KEY1", Signature: "!!!invalid-base64!!!"},
+					{Algorithm: "sha256", Identity: "ID2", SigningKeyDigest: "KEY2", Signature: base64.StdEncoding.EncodeToString([]byte("sig2"))},
+					{Algorithm: "sha256", Identity: "ID3", SigningKeyDigest: "KEY3", Signature: base64.StdEncoding.EncodeToString([]byte("sig3"))},
+				},
+			},
+			wantErr: false, // Should pass with 2 valid signatures out of 3
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := VerifyConsensusSignatures(tt.consensusBody, tt.meta)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("VerifyConsensusSignatures() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr && tt.errMsg != "" && (err == nil || !strings.Contains(err.Error(), tt.errMsg)) {
+				t.Errorf("Error message = %v, want to contain %v", err, tt.errMsg)
+			}
+		})
 	}
 }
