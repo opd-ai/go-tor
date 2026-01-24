@@ -64,6 +64,7 @@ type Connection struct {
 	logger              *logger.Logger
 	expectedIdentity    []byte // Expected relay Ed25519 identity key (32 bytes) - for CERTS validation
 	expectedFingerprint string // Expected relay RSA fingerprint - for CERTS validation
+	requireCERTS        bool   // If true, fail handshake on CERTS validation failure
 }
 
 // Config holds connection configuration
@@ -74,6 +75,7 @@ type Config struct {
 	LinkProtocolV4      bool          // Use link protocol v4 (4-byte circuit IDs)
 	ExpectedIdentity    []byte        // Expected relay Ed25519 identity key (32 bytes) - for certificate pinning (AUDIT-004)
 	ExpectedFingerprint string        // Expected relay fingerprint - for additional validation (AUDIT-004)
+	RequireCERTS        bool          // If true, fail handshake on CERTS validation failure (strict mode)
 }
 
 // DefaultConfig returns a connection config with sensible defaults
@@ -83,8 +85,9 @@ func DefaultConfig(address string) *Config {
 		Timeout:             30 * time.Second,
 		TLSConfig:           nil, // Will be created in Connect() with pinning if ExpectedIdentity is set
 		LinkProtocolV4:      true,
-		ExpectedIdentity:    nil, // No pinning by default
-		ExpectedFingerprint: "",  // No fingerprint validation by default
+		ExpectedIdentity:    nil,   // No pinning by default
+		ExpectedFingerprint: "",    // No fingerprint validation by default
+		RequireCERTS:        false, // Non-enforcing mode by default (backward compatible)
 	}
 }
 
@@ -281,6 +284,7 @@ func New(cfg *Config, log *logger.Logger) *Connection {
 		logger:              log.With("address", cfg.Address),
 		expectedIdentity:    cfg.ExpectedIdentity,
 		expectedFingerprint: cfg.ExpectedFingerprint,
+		requireCERTS:        cfg.RequireCERTS,
 	}
 }
 
@@ -482,5 +486,12 @@ func (c *Connection) ExpectedIdentity() []byte {
 // Returns empty string if no expected fingerprint was configured.
 func (c *Connection) ExpectedFingerprint() string {
 	return c.expectedFingerprint
+}
+
+// RequireCERTS returns whether CERTS validation should be enforced.
+// If true, the handshake will fail on CERTS validation errors.
+// If false, CERTS validation errors are logged as warnings (backward compatible).
+func (c *Connection) RequireCERTS() bool {
+	return c.requireCERTS
 }
 

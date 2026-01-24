@@ -303,12 +303,18 @@ func (h *Handshake) receiveCERTS(ctx context.Context) error {
 
 		// Validate certificate expiration
 		if err := certs.ValidateExpiration(); err != nil {
+			if h.conn.RequireCERTS() {
+				return fmt.Errorf("certificate expiration validation failed (strict mode): %w", err)
+			}
 			h.logger.Warn("Certificate expiration validation failed", "error", err)
 			// Don't fail - some certs may be expired but relay still functional
 		}
 
 		// Validate Ed25519 certificate signatures
 		if err := certs.ValidateSignatures(); err != nil {
+			if h.conn.RequireCERTS() {
+				return fmt.Errorf("certificate signature validation failed (strict mode): %w", err)
+			}
 			h.logger.Warn("Certificate signature validation failed", "error", err)
 			// Don't fail - continue with non-enforcing mode for backward compatibility
 		} else {
@@ -321,12 +327,14 @@ func (h *Handshake) receiveCERTS(ctx context.Context) error {
 		
 		if expectedIdentity != nil || expectedFingerprint != "" {
 			if err := certs.ValidateRelayIdentity(expectedFingerprint, expectedIdentity); err != nil {
+				if h.conn.RequireCERTS() {
+					return fmt.Errorf("relay identity validation failed (strict mode): %w", err)
+				}
 				h.logger.Warn("Relay identity validation failed", 
 					"error", err,
 					"expected_identity_set", expectedIdentity != nil,
 					"expected_fingerprint_set", expectedFingerprint != "")
 				// Don't fail - continue with non-enforcing mode for backward compatibility
-				// Future enhancement: Add strict enforcement mode with RequireCERTS flag
 			} else {
 				h.logger.Info("Relay identity verified successfully",
 					"identity_validated", expectedIdentity != nil,
