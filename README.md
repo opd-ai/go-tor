@@ -66,7 +66,6 @@ First connection requires 60-90 seconds for consensus download and circuit build
 Simplest integration using zero-configuration API:
 
 ```go
-// filepath: examples/simple-client.go
 package main
 
 import (
@@ -83,7 +82,9 @@ func main() {
     defer torClient.Close()
     
     // Wait for circuit establishment
-    torClient.WaitUntilReady(90 * time.Second)
+    if err := torClient.WaitUntilReady(90 * time.Second); err != nil {
+        panic(err)
+    }
     
     // Get SOCKS5 proxy URL
     proxyURL := torClient.ProxyURL()  // "socks5://127.0.0.1:9050"
@@ -97,7 +98,6 @@ func main() {
 Custom configuration with control protocol and metrics:
 
 ```go
-// filepath: examples/advanced-client.go
 package main
 
 import (
@@ -134,24 +134,36 @@ func main() {
 Streamlined HTTP requests through Tor:
 
 ```go
-// filepath: examples/http-request.go
 package main
 
 import (
+    "time"
     "github.com/opd-ai/go-tor/pkg/client"
     "github.com/opd-ai/go-tor/pkg/helpers"
 )
 
 func main() {
-    torClient, _ := client.Connect()
+    torClient, err := client.Connect()
+    if err != nil {
+        panic(err)
+    }
     defer torClient.Close()
-    torClient.WaitUntilReady(90 * time.Second)
+    
+    if err := torClient.WaitUntilReady(90 * time.Second); err != nil {
+        panic(err)
+    }
     
     // Create HTTP client configured for Tor
-    httpClient, _ := helpers.NewHTTPClient(torClient, nil)
+    httpClient, err := helpers.NewHTTPClient(torClient, nil)
+    if err != nil {
+        panic(err)
+    }
     
     // Make requests through Tor network
-    resp, _ := httpClient.Get("https://check.torproject.org")
+    resp, err := httpClient.Get("https://check.torproject.org")
+    if err != nil {
+        panic(err)
+    }
     defer resp.Body.Close()
 }
 ```
