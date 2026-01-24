@@ -115,8 +115,8 @@ The go-tor implementation demonstrates strong architectural alignment with Tor p
 ### 3. Circuit Creation and Extension (tor-spec.txt §5)
 
 **Specification Reference:** tor-spec.txt §5 "Circuit management"  
-**Implementation Status:** **SUBSTANTIALLY COMPLIANT** *(Updated Jan 2026)*  
-**Files:** `pkg/circuit/builder.go`, `pkg/circuit/extension.go`
+**Implementation Status:** **SUBSTANTIALLY COMPLIANT** *(Updated Jan 24, 2026)*  
+**Files:** `pkg/circuit/builder.go`, `pkg/circuit/extension.go`, `pkg/circuit/circuit_relay_integration_test.go`
 
 **Details:**
 - ✅ Circuit state machine (StateBuilding → StateOpen)
@@ -131,7 +131,7 @@ The go-tor implementation demonstrates strong architectural alignment with Tor p
 - ✅ **NEW (Jan 2026)**: EXTEND2/EXTENDED2 wire protocol implemented
 - ✅ **NEW (Jan 2026)**: Multi-hop circuit extension functional
 - ✅ **NEW (Jan 2026)**: Ephemeral key cleanup with defer for security
-- ⚠️ Integration tests with real Tor relays pending
+- ✅ **NEW (Jan 24, 2026)**: Integration tests with real Tor relays implemented
 
 **Code Evidence:**
 ```go
@@ -169,9 +169,19 @@ func (e *Extension) ExtendCircuit(ctx context.Context, target string, handshakeT
 6. ✅ **NEW**: Implemented ProcessExtended2() with key derivation
 7. ✅ **NEW**: Added defer-based ephemeral key cleanup for security
 8. ✅ **NEW**: Comprehensive unit tests for EXTEND2/EXTENDED2 structure
+9. ✅ **NEW (Jan 24, 2026)**: Added integration tests with real Tor relays
+
+**Integration Test Coverage (Jan 24, 2026):**
+- ✅ `TestIntegrationCircuitBuildingWithRealRelays`: End-to-end circuit building with real consensus
+- ✅ `TestIntegrationFirstHopHandshake`: CREATE2/CREATED2 validation with live guard relay
+- ✅ `TestIntegrationFlowControlWithRealCircuit`: Flow control infrastructure validation
+- ✅ Tests validate first-hop cryptographic state establishment
+- ✅ Tests verify circuit state transitions and hop counting
+- ✅ Tests use actual Tor network relays from consensus
+- ✅ Run with: `go test -tags=integration -v -timeout=5m ./pkg/circuit -run TestIntegration`
 
 **Remaining Work:**
-1. Add integration tests with real Tor relays
+1. ~~Add integration tests with real Tor relays~~ ✅ **COMPLETED (Jan 24, 2026)**
 2. Validate cryptographic state progression through multi-hop circuits
 3. ~~Complete relay key extraction from directory descriptors (SPEC-001)~~ ✅ **COMPLETED (Jan 2026)**
 4. ~~Implement AddHop() to store derived keys in circuit state~~ ✅ **COMPLETED (Jan 2026)**
@@ -847,12 +857,12 @@ Prioritized list of compliance issues affecting core functionality:
 
 ### Immediate Actions (Critical for Interoperability)
 
-1. ~~**Complete Circuit Building Protocol**~~ ✅ **COMPLETED (Jan 2026)**
+1. ~~**Complete Circuit Building Protocol**~~ ✅ **COMPLETED (Jan 24, 2026)**
    - ✅ Implement CREATE2/CREATED2 handshake with ntor
    - ✅ Implement EXTEND2/EXTENDED2 relay commands
    - ✅ Complete relay key extraction from microdescriptors (SPEC-001)
-   - ⏳ Add integration tests with real Tor relays
-   - ⏳ Validate cryptographic state progression
+   - ✅ Add integration tests with real Tor relays (Jan 24, 2026)
+   - ⏳ Validate cryptographic state progression (remaining: multi-hop EXTEND2 validation)
    - **Status:** Core protocol complete, integration testing remaining
    - **Spec Reference:** tor-spec.txt §5.1-5.2
 
