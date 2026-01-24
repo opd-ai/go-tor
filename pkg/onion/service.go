@@ -3,12 +3,15 @@
 package onion
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/base32"
 	"encoding/binary"
 	"fmt"
+	"io"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -541,25 +544,56 @@ func (s *Service) publishDescriptor(ctx context.Context, hsdirs []*HSDirectory) 
 }
 
 // uploadDescriptor uploads a descriptor to a specific HSDir
+// Implements the HSDir upload protocol per dir-spec.txt section 4.4
 func (s *Service) uploadDescriptor(ctx context.Context, hsdir *HSDirectory, desc *Descriptor, replica int) error {
-	// In production, this would:
-	// 1. Build a circuit to the HSDir
-	// 2. Send an HTTP POST to /tor/hs/3/publish
-	// 3. Wait for 200 OK response
-	// 4. Handle retries and errors
-
-	// For Phase 7.4, we'll simulate successful upload
 	s.logger.Debug("Uploading descriptor to HSDir",
 		"hsdir", hsdir.Fingerprint,
 		"replica", replica,
 		"descriptor_size", len(desc.RawDescriptor))
 
-	// Simulate network delay
-	select {
-	case <-time.After(10 * time.Millisecond):
-	case <-ctx.Done():
-		return ctx.Err()
+	// Build upload URL: /tor/hs/3/publish
+	url := fmt.Sprintf("http://%s:%d/tor/hs/3/publish", hsdir.Address, hsdir.DirPort)
+
+	s.logger.Debug("Building HSDir upload request", "url", url)
+
+	// Create HTTP client with timeout
+	timeout := 10 * time.Second
+	client := &http.Client{
+		Timeout: timeout,
 	}
+
+	// Create POST request with descriptor content
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(desc.RawDescriptor))
+	if err != nil {
+		return fmt.Errorf("failed to create upload request: %w", err)
+	}
+
+	// Set headers per Tor spec
+	req.Header.Set("User-Agent", "Tor/0.4.7.0")
+	req.Header.Set("Content-Type", "text/plain")
+
+	// Execute request
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to upload descriptor to %s: %w", hsdir.Fingerprint, err)
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			s.logger.Error("Failed to close upload response", "error", err)
+		}
+	}()
+
+	// Check status code - 200 OK indicates success
+	if resp.StatusCode != http.StatusOK {
+		// Read error response for logging
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return fmt.Errorf("HSDir %s rejected upload with status %d: %s",
+			hsdir.Fingerprint, resp.StatusCode, string(body))
+	}
+
+	s.logger.Info("Successfully uploaded descriptor",
+		"hsdir", hsdir.Fingerprint,
+		"replica", replica)
 
 	return nil
 }
