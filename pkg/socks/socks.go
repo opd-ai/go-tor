@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/opd-ai/go-tor/pkg/cell"
 	"github.com/opd-ai/go-tor/pkg/circuit"
 	"github.com/opd-ai/go-tor/pkg/logger"
 	"github.com/opd-ai/go-tor/pkg/metrics"
@@ -485,10 +486,11 @@ func (s *Server) handleConnection(ctx context.Context, conn net.Conn) {
 		// Send success reply
 		s.sendReply(conn, replySuccess, conn.LocalAddr())
 
-		// TODO: In production, relay data through the rendezvous circuit
-		// Current implementation establishes connection but does not relay traffic
-		s.logger.Debug("Onion service connection established, awaiting traffic relay implementation")
-		time.Sleep(100 * time.Millisecond)
+		// Relay data through the rendezvous circuit
+		s.logger.Info("Starting onion service data relay", "circuit_id", circuitID)
+		if err := s.relayOnionServiceData(ctx, conn, circuitID); err != nil {
+			s.logger.Error("Onion service data relay failed", "circuit_id", circuitID, "error", err)
+		}
 		return
 	}
 
@@ -1006,6 +1008,150 @@ func (s *Server) relayDataThroughCircuit(ctx context.Context, socksConn net.Conn
 	wg.Wait()
 
 	s.logger.Info("Data relay finished", "stream_id", strm.ID)
+}
+
+// relayOnionServiceData relays data bidirectionally between SOCKS client and onion service rendezvous circuit
+// This implements data forwarding for .onion connections after the rendezvous protocol completes.
+// Per rend-spec-v3.txt, once the rendezvous circuit is established, RELAY_DATA cells are exchanged
+// between client and onion service through the rendezvous point.
+func (s *Server) relayOnionServiceData(ctx context.Context, socksConn net.Conn, circuitID uint32) error {
+	// Get the circuit from the circuit manager
+	circ, err := s.circuitMgr.GetCircuit(circuitID)
+	if err != nil {
+		return fmt.Errorf("failed to get rendezvous circuit %d: %w", circuitID, err)
+	}
+
+	// Create a stream for this connection
+	// For onion services, we use stream ID 1 for the initial connection
+	const onionStreamID = 1 // Stream ID for onion service connection
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	// SOCKS client -> Onion service (through rendezvous circuit)
+	go func() {
+		defer wg.Done()
+
+		// Maximum relay cell data size (509 bytes payload - 11 bytes relay header)
+		maxDataSize := 498
+		buf := make([]byte, maxDataSize)
+
+		for {
+			// Set read deadline to detect idle connections
+			if err := socksConn.SetReadDeadline(time.Now().Add(5 * time.Minute)); err != nil {
+				s.logger.Debug("Failed to set read deadline", "error", err)
+			}
+
+			n, err := socksConn.Read(buf)
+			if err != nil {
+				if err != io.EOF {
+					s.logger.Debug("SOCKS read error (onion service)", "circuit_id", circuitID, "error", err)
+				}
+				// Send RELAY_END to close the stream
+				endCell := &cell.RelayCell{
+					Command:  cell.RelayEnd,
+					StreamID: onionStreamID,
+					Data:     []byte{6}, // REASON_DONE
+				}
+				if sendErr := circ.SendRelayCell(endCell); sendErr != nil {
+					s.logger.Debug("Failed to send RELAY_END (onion service)", "circuit_id", circuitID, "error", sendErr)
+				}
+				return
+			}
+
+			if n == 0 {
+				continue
+			}
+
+			// Send data as RELAY_DATA cell
+			dataCell := &cell.RelayCell{
+				Command:  cell.RelayData,
+				StreamID: onionStreamID,
+				Data:     buf[:n],
+			}
+			if err := circ.SendRelayCell(dataCell); err != nil {
+				s.logger.Error("Failed to send RELAY_DATA (onion service)", "circuit_id", circuitID, "error", err)
+				return
+			}
+
+			s.logger.Debug("Sent data to onion service",
+				"circuit_id", circuitID,
+				"stream_id", onionStreamID,
+				"bytes", n)
+		}
+	}()
+
+	// Onion service -> SOCKS client (through rendezvous circuit)
+	go func() {
+		defer wg.Done()
+
+		for {
+			// Receive relay cell from circuit
+			relayCell, err := circ.ReceiveRelayCell(ctx)
+			if err != nil {
+				if err == io.EOF || err == context.Canceled {
+					s.logger.Debug("Onion service circuit closed", "circuit_id", circuitID)
+				} else {
+					s.logger.Debug("Onion service receive error", "circuit_id", circuitID, "error", err)
+				}
+				// Close SOCKS connection
+				if closeErr := socksConn.Close(); closeErr != nil {
+					s.logger.Debug("Failed to close SOCKS connection (onion service)", "circuit_id", circuitID, "error", closeErr)
+				}
+				return
+			}
+
+			// Check for RELAY_END (stream closed)
+			if relayCell.Command == cell.RelayEnd {
+				s.logger.Info("Onion service closed stream",
+					"circuit_id", circuitID,
+					"stream_id", relayCell.StreamID)
+				if closeErr := socksConn.Close(); closeErr != nil {
+					s.logger.Debug("Failed to close SOCKS connection on RELAY_END", "circuit_id", circuitID, "error", closeErr)
+				}
+				return
+			}
+
+			// Filter for RELAY_DATA cells for our stream
+			if relayCell.Command != cell.RelayData || relayCell.StreamID != onionStreamID {
+				// Not our data cell, skip (but don't return, continue reading)
+				s.logger.Debug("Received non-data cell for different stream (onion service)",
+					"circuit_id", circuitID,
+					"command", relayCell.Command,
+					"stream_id", relayCell.StreamID,
+					"expected_stream", onionStreamID)
+				continue
+			}
+
+			// Write data to SOCKS client
+			if len(relayCell.Data) > 0 {
+				if _, err := socksConn.Write(relayCell.Data); err != nil {
+					s.logger.Error("Failed to write to SOCKS client (onion service)", "circuit_id", circuitID, "error", err)
+					// Send RELAY_END to onion service
+					endCell := &cell.RelayCell{
+						Command:  cell.RelayEnd,
+						StreamID: onionStreamID,
+						Data:     []byte{6}, // REASON_DONE
+					}
+					if sendErr := circ.SendRelayCell(endCell); sendErr != nil {
+						s.logger.Debug("Failed to send RELAY_END (onion service)", "circuit_id", circuitID, "error", sendErr)
+					}
+					return
+				}
+
+				s.logger.Debug("Sent data to SOCKS client (onion service)",
+					"circuit_id", circuitID,
+					"stream_id", onionStreamID,
+					"bytes", len(relayCell.Data))
+			}
+		}
+	}()
+
+	// Wait for both goroutines to finish
+	wg.Wait()
+
+	s.logger.Info("Onion service data relay finished", "circuit_id", circuitID)
+	return nil
 }
 
 // Shutdown gracefully shuts down the server
