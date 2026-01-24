@@ -2,6 +2,7 @@ package control
 
 import (
 	"bufio"
+	"fmt"
 	"net"
 	"strings"
 	"testing"
@@ -15,10 +16,57 @@ type mockClientGetter struct {
 	activeCircuits int
 	socksPort      int
 	controlPort    int
+	config         map[string]string
 }
 
 func (m *mockClientGetter) GetStats() StatsProvider {
 	return m
+}
+
+func (m *mockClientGetter) GetConfig() ConfigProvider {
+	if m.config == nil {
+		return nil
+	}
+	return &mockConfigProvider{config: m.config}
+}
+
+type mockConfigProvider struct {
+	config map[string]string
+}
+
+func (m *mockConfigProvider) GetConfigValue(key string) (string, bool) {
+	if m.config == nil {
+		return "", false
+	}
+	val, ok := m.config[key]
+	return val, ok
+}
+
+func (m *mockConfigProvider) SetConfigValue(key, value string) error {
+	if m.config == nil {
+		m.config = make(map[string]string)
+	}
+	// Simulate read-only keys
+	readOnlyKeys := map[string]bool{
+		"SocksPort":    true,
+		"ControlPort":  true,
+		"MetricsPort":  true,
+	}
+	if readOnlyKeys[key] {
+		return fmt.Errorf("configuration option %s requires restart", key)
+	}
+	// Simulate unknown keys
+	knownKeys := map[string]bool{
+		"LogLevel":    true,
+		"SocksPort":   true,
+		"ControlPort": true,
+		"MetricsPort": true,
+	}
+	if !knownKeys[key] {
+		return fmt.Errorf("unknown configuration option: %s", key)
+	}
+	m.config[key] = value
+	return nil
 }
 
 func (m *mockClientGetter) GetActiveCircuits() int {

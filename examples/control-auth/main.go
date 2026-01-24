@@ -108,3 +108,7 @@ func (m *mockClientGetter) GetSocksPort() int {
 func (m *mockClientGetter) GetControlPort() int {
 	return m.controlPort
 }
+
+func (m *mockClientGetter) GetConfig() control.ConfigProvider {
+	return nil // No config needed for this demo
+}

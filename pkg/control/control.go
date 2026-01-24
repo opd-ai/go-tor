@@ -39,6 +39,7 @@ type Server struct {
 // ClientInfoGetter provides access to client information for control commands
 type ClientInfoGetter interface {
 	GetStats() StatsProvider
+	GetConfig() ConfigProvider
 }
 
 // StatsProvider provides statistics information
@@ -46,6 +47,12 @@ type StatsProvider interface {
 	GetActiveCircuits() int
 	GetSocksPort() int
 	GetControlPort() int
+}
+
+// ConfigProvider provides access to configuration values
+type ConfigProvider interface {
+	GetConfigValue(key string) (string, bool)
+	SetConfigValue(key, value string) error
 }
 
 // connection represents a single control protocol connection
@@ -363,9 +370,7 @@ func (s *Server) getInfoValue(key string, stats StatsProvider) (string, bool) {
 	}
 }
 
-// handleGetConf handles GETCONF command
-// TODO: Currently returns empty values. Full implementation requires access to client configuration.
-// To complete: pass Config reference to Server and return actual values like "250-SocksPort=9050"
+// handleGetConf handles GETCONF command per control-spec.txt §3.1
 func (s *Server) handleGetConf(conn *connection, args []string) {
 	if !conn.authenticated {
 		conn.writeReply(514, "Authentication required")
@@ -377,11 +382,29 @@ func (s *Server) handleGetConf(conn *connection, args []string) {
 		return
 	}
 
-	// TODO: Return actual configuration values when Config reference is available
-	// Currently returns empty values for all keys as Config is not yet passed to Server
+	configProvider := s.clientGetter.GetConfig()
+	if configProvider == nil {
+		// Fallback to empty values if config is not available
+		var replies []string
+		for _, key := range args {
+			replies = append(replies, fmt.Sprintf("250-%s=", key))
+		}
+		if len(replies) > 0 {
+			replies[len(replies)-1] = strings.Replace(replies[len(replies)-1], "250-", "250 ", 1)
+		}
+		conn.writeDataReply(replies)
+		return
+	}
+
 	var replies []string
 	for _, key := range args {
-		replies = append(replies, fmt.Sprintf("250-%s=", key))
+		value, exists := configProvider.GetConfigValue(key)
+		if !exists {
+			// Per control-spec.txt, unknown config keys return empty value
+			replies = append(replies, fmt.Sprintf("250-%s=", key))
+		} else {
+			replies = append(replies, fmt.Sprintf("250-%s=%s", key, value))
+		}
 	}
 
 	if len(replies) > 0 {
@@ -391,14 +414,42 @@ func (s *Server) handleGetConf(conn *connection, args []string) {
 	conn.writeDataReply(replies)
 }
 
-// handleSetConf handles SETCONF command
+// handleSetConf handles SETCONF command per control-spec.txt §3.1
 func (s *Server) handleSetConf(conn *connection, args []string) {
 	if !conn.authenticated {
 		conn.writeReply(514, "Authentication required")
 		return
 	}
 
-	// For now, just acknowledge
+	if len(args) == 0 {
+		conn.writeReply(552, "Missing argument")
+		return
+	}
+
+	configProvider := s.clientGetter.GetConfig()
+	if configProvider == nil {
+		// If config is not available, just acknowledge
+		conn.writeReply(250, "OK")
+		return
+	}
+
+	// Parse and set configuration values
+	for _, arg := range args {
+		parts := strings.SplitN(arg, "=", 2)
+		if len(parts) != 2 {
+			conn.writeReply(552, fmt.Sprintf("Invalid argument: %s", arg))
+			return
+		}
+
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+
+		if err := configProvider.SetConfigValue(key, value); err != nil {
+			conn.writeReply(553, fmt.Sprintf("Failed to set %s: %v", key, err))
+			return
+		}
+	}
+
 	conn.writeReply(250, "OK")
 }
 

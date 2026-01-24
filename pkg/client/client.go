@@ -774,6 +774,92 @@ func (a *clientStatsAdapter) GetStats() control.StatsProvider {
 	return a.client.GetStats()
 }
 
+func (a *clientStatsAdapter) GetConfig() control.ConfigProvider {
+	return &clientConfigProvider{client: a.client}
+}
+
+// clientConfigProvider implements control.ConfigProvider
+type clientConfigProvider struct {
+	client *Client
+}
+
+func (p *clientConfigProvider) GetConfigValue(key string) (string, bool) {
+	cfg := p.client.config
+	if cfg == nil {
+		return "", false
+	}
+
+	switch key {
+	case "SocksPort":
+		return fmt.Sprintf("%d", cfg.SocksPort), true
+	case "ControlPort":
+		return fmt.Sprintf("%d", cfg.ControlPort), true
+	case "DataDirectory":
+		return cfg.DataDirectory, true
+	case "CircuitBuildTimeout":
+		return cfg.CircuitBuildTimeout.String(), true
+	case "MaxCircuitDirtiness":
+		return cfg.MaxCircuitDirtiness.String(), true
+	case "NewCircuitPeriod":
+		return cfg.NewCircuitPeriod.String(), true
+	case "NumEntryGuards":
+		return fmt.Sprintf("%d", cfg.NumEntryGuards), true
+	case "UseEntryGuards":
+		if cfg.UseEntryGuards {
+			return "1", true
+		}
+		return "0", true
+	case "UseBridges":
+		if cfg.UseBridges {
+			return "1", true
+		}
+		return "0", true
+	case "LogLevel":
+		return cfg.LogLevel, true
+	case "MetricsPort":
+		return fmt.Sprintf("%d", cfg.MetricsPort), true
+	case "EnableMetrics":
+		if cfg.EnableMetrics {
+			return "1", true
+		}
+		return "0", true
+	default:
+		return "", false
+	}
+}
+
+func (p *clientConfigProvider) SetConfigValue(key, value string) error {
+	cfg := p.client.config
+	if cfg == nil {
+		return fmt.Errorf("configuration not available")
+	}
+
+	// Parse and set configuration values
+	// Note: Most config changes require restart to take effect
+	switch key {
+	case "LogLevel":
+		// Validate log level
+		validLevels := map[string]bool{
+			"debug": true,
+			"info":  true,
+			"warn":  true,
+			"error": true,
+		}
+		if !validLevels[value] {
+			return fmt.Errorf("invalid log level: %s", value)
+		}
+		cfg.LogLevel = value
+		return nil
+	case "SocksPort", "ControlPort", "DataDirectory", "CircuitBuildTimeout",
+		"MaxCircuitDirtiness", "NewCircuitPeriod", "NumEntryGuards",
+		"UseEntryGuards", "UseBridges", "MetricsPort", "EnableMetrics":
+		// These settings require restart
+		return fmt.Errorf("configuration option %s requires restart", key)
+	default:
+		return fmt.Errorf("unknown configuration option: %s", key)
+	}
+}
+
 // mergeContexts creates a context that respects both parent and child cancellation
 func (c *Client) mergeContexts(parent, child context.Context) context.Context {
 	ctx, cancel := context.WithCancel(parent)
