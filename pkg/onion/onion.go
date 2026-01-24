@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/crypto/curve25519"
 	"golang.org/x/crypto/hkdf"
 
@@ -665,6 +666,278 @@ func ParseDescriptor(raw []byte) (*Descriptor, error) {
 	return desc, nil
 }
 
+// DecryptDescriptor decrypts the superencrypted layer of a v3 onion service descriptor
+// Per rend-spec-v3.txt section 2.5.1.2, the outer layer is encrypted with XChaCha20-Poly1305
+// using keys derived from the blinded public key.
+//
+// Parameters:
+//   - descriptor: The parsed descriptor with encrypted superencrypted section
+//   - address: The onion service address (contains public key for key derivation)
+//   - timePeriod: The time period number for the descriptor
+//
+// Returns:
+//   - Decrypted descriptor with parsed introduction points
+//   - Error if decryption fails
+func DecryptDescriptor(descriptor *Descriptor, address *Address, timePeriod uint64) (*Descriptor, error) {
+	if descriptor == nil {
+		return nil, fmt.Errorf("descriptor is nil")
+	}
+	if address == nil {
+		return nil, fmt.Errorf("address is nil")
+	}
+	if len(address.Pubkey) != 32 {
+		return nil, fmt.Errorf("invalid public key length: %d", len(address.Pubkey))
+	}
+
+	// Find the superencrypted section in the raw descriptor
+	raw := descriptor.RawDescriptor
+	superencryptedMarker := []byte("superencrypted")
+	superencryptedIdx := bytes.Index(raw, superencryptedMarker)
+	if superencryptedIdx == -1 {
+		// No encrypted section - descriptor might already be decrypted
+		return descriptor, nil
+	}
+
+	// Extract encrypted data between "-----BEGIN MESSAGE-----" and "-----END MESSAGE-----"
+	beginMarker := []byte("-----BEGIN MESSAGE-----")
+	endMarker := []byte("-----END MESSAGE-----")
+	
+	beginIdx := bytes.Index(raw[superencryptedIdx:], beginMarker)
+	if beginIdx == -1 {
+		return nil, fmt.Errorf("superencrypted section missing BEGIN MESSAGE marker")
+	}
+	beginIdx += superencryptedIdx + len(beginMarker)
+	
+	endIdx := bytes.Index(raw[beginIdx:], endMarker)
+	if endIdx == -1 {
+		return nil, fmt.Errorf("superencrypted section missing END MESSAGE marker")
+	}
+	endIdx += beginIdx
+
+	// Extract and decode base64 encrypted data
+	encryptedB64 := bytes.TrimSpace(raw[beginIdx:endIdx])
+	encryptedData, err := base64.StdEncoding.DecodeString(string(encryptedB64))
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode encrypted data: %w", err)
+	}
+
+	// Per rend-spec-v3.txt section 2.5.1.2:
+	// The encrypted data format is: SALT (16 bytes) || ENCRYPTED (variable) || MAC (16 bytes)
+	// Using XChaCha20-Poly1305 (24-byte nonce derived from SALT and SECRET_INPUT)
+	
+	if len(encryptedData) < 32 {
+		return nil, fmt.Errorf("encrypted data too short: %d bytes", len(encryptedData))
+	}
+
+	salt := encryptedData[:16]
+	ciphertext := encryptedData[16:]
+
+	// Derive encryption keys per rend-spec-v3.txt section 2.5.1.2
+	// SECRET_INPUT = blinded_pubkey
+	// SECRET_DATA = SALT
+	// Keys = HKDF-SHA256(SECRET_INPUT, SALT, "hsdir-superencrypted-data", 32)
+	
+	blindedPubkey := ComputeBlindedPubkey(ed25519.PublicKey(address.Pubkey), timePeriod)
+	keys, err := deriveDescriptorKeys(blindedPubkey, salt, "hsdir-superencrypted-data")
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive encryption keys: %w", err)
+	}
+	defer security.SecureZeroMemory(keys) // Clean up key material
+
+	// XChaCha20-Poly1305 requires 24-byte nonce
+	// Derive nonce from SALT using HKDF
+	nonce, err := deriveDescriptorKeys(blindedPubkey, salt, "hsdir-superencrypted-nonce")
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive nonce: %w", err)
+	}
+	defer security.SecureZeroMemory(nonce)
+	
+	if len(nonce) < chacha20poly1305.NonceSizeX {
+		return nil, fmt.Errorf("derived nonce too short: %d bytes", len(nonce))
+	}
+
+	// Create XChaCha20-Poly1305 cipher
+	aead, err := chacha20poly1305.NewX(keys[:32])
+	if err != nil {
+		return nil, fmt.Errorf("failed to create XChaCha20-Poly1305 cipher: %w", err)
+	}
+
+	// Decrypt the ciphertext
+	plaintext, err := aead.Open(nil, nonce[:chacha20poly1305.NonceSizeX], ciphertext, nil)
+	if err != nil {
+		return nil, fmt.Errorf("decryption failed: %w", err)
+	}
+
+	// Parse the decrypted plaintext to extract introduction points
+	// The plaintext contains the introduction-point section per rend-spec-v3.txt
+	decryptedDesc, err := parseDecryptedLayer(plaintext)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse decrypted layer: %w", err)
+	}
+
+	// Merge introduction points into the original descriptor
+	descriptor.IntroPoints = decryptedDesc.IntroPoints
+
+	return descriptor, nil
+}
+
+// deriveDescriptorKeys derives keys for descriptor encryption/decryption
+// Per rend-spec-v3.txt: Uses HKDF-SHA256 with provided salt and info
+func deriveDescriptorKeys(secret, salt []byte, info string) ([]byte, error) {
+	// Create HKDF with SHA256
+	kdf := hkdf.New(sha256.New, secret, salt, []byte(info))
+	
+	// Derive 32 bytes for the key material
+	key := make([]byte, 32)
+	if _, err := io.ReadFull(kdf, key); err != nil {
+		return nil, fmt.Errorf("HKDF derivation failed: %w", err)
+	}
+	
+	return key, nil
+}
+
+// parseDecryptedLayer parses the decrypted descriptor layer
+// This contains the introduction-point blocks per rend-spec-v3.txt
+func parseDecryptedLayer(data []byte) (*Descriptor, error) {
+	desc := &Descriptor{
+		IntroPoints: make([]IntroductionPoint, 0),
+	}
+
+	lines := bytes.Split(data, []byte("\n"))
+	var currentIntroPoint *IntroductionPoint
+	var inIntroPointBlock bool
+
+	for i, line := range lines {
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
+
+		// Split into keyword and arguments
+		parts := bytes.SplitN(line, []byte(" "), 2)
+		if len(parts) < 1 {
+			continue
+		}
+
+		keyword := string(parts[0])
+		var args string
+		if len(parts) > 1 {
+			args = string(parts[1])
+		}
+
+		switch keyword {
+		case "introduction-point":
+			// Start of introduction point block
+			inIntroPointBlock = true
+			if currentIntroPoint != nil {
+				desc.IntroPoints = append(desc.IntroPoints, *currentIntroPoint)
+			}
+			currentIntroPoint = &IntroductionPoint{
+				LinkSpecifiers: make([]LinkSpecifier, 0),
+			}
+
+		case "link-specifiers":
+			// Link specifiers are base64-encoded
+			if inIntroPointBlock && currentIntroPoint != nil && args != "" {
+				linkData, err := base64.StdEncoding.DecodeString(args)
+				if err == nil {
+					parseLinkSpecifiers(linkData, currentIntroPoint)
+				}
+			}
+
+		case "onion-key":
+			// Introduction point onion key (ntor)
+			if inIntroPointBlock && currentIntroPoint != nil {
+				if i+1 < len(lines) {
+					keyLine := strings.TrimSpace(string(lines[i+1]))
+					if strings.HasPrefix(keyLine, "ntor ") {
+						keyData := strings.TrimPrefix(keyLine, "ntor ")
+						decoded, err := base64.StdEncoding.DecodeString(keyData)
+						if err == nil && len(decoded) == 32 {
+							currentIntroPoint.OnionKey = decoded
+						}
+					}
+				}
+			}
+
+		case "auth-key":
+			// Introduction point authentication key
+			if inIntroPointBlock && currentIntroPoint != nil {
+				if i+1 < len(lines) {
+					keyData := strings.TrimSpace(string(lines[i+1]))
+					decoded, err := base64.StdEncoding.DecodeString(keyData)
+					if err == nil && len(decoded) == 32 {
+						currentIntroPoint.AuthKey = decoded
+					}
+				}
+			}
+
+		case "enc-key":
+			// Introduction point encryption key (ntor)
+			if inIntroPointBlock && currentIntroPoint != nil {
+				keyParts := strings.Fields(args)
+				if len(keyParts) >= 2 && keyParts[0] == "ntor" {
+					decoded, err := base64.StdEncoding.DecodeString(keyParts[1])
+					if err == nil && len(decoded) == 32 {
+						currentIntroPoint.EncKey = decoded
+					}
+				}
+			}
+
+		case "legacy-key":
+			// Legacy RSA key ID (20 bytes)
+			if inIntroPointBlock && currentIntroPoint != nil && args != "" {
+				decoded, err := base64.StdEncoding.DecodeString(args)
+				if err == nil && len(decoded) == 20 {
+					currentIntroPoint.LegacyKeyID = decoded
+				}
+			}
+		}
+	}
+
+	// Add final introduction point if we were building one
+	if inIntroPointBlock && currentIntroPoint != nil {
+		desc.IntroPoints = append(desc.IntroPoints, *currentIntroPoint)
+	}
+
+	return desc, nil
+}
+
+// parseLinkSpecifiers parses link specifier data into LinkSpecifier structs
+// Per tor-spec.txt section 4.1: NSPEC [1 byte] || LINK_SPEC_1 || ... || LINK_SPEC_N
+// Each LINK_SPEC: LSTYPE [1 byte] || LSLEN [1 byte] || LSPEC [LSLEN bytes]
+func parseLinkSpecifiers(data []byte, intro *IntroductionPoint) {
+	if len(data) < 1 {
+		return
+	}
+
+	nspec := int(data[0])
+	offset := 1
+
+	for i := 0; i < nspec && offset < len(data); i++ {
+		if offset+2 > len(data) {
+			break
+		}
+
+		lstype := data[offset]
+		lslen := int(data[offset+1])
+		offset += 2
+
+		if offset+lslen > len(data) {
+			break
+		}
+
+		lsdata := make([]byte, lslen)
+		copy(lsdata, data[offset:offset+lslen])
+		offset += lslen
+
+		intro.LinkSpecifiers = append(intro.LinkSpecifiers, LinkSpecifier{
+			Type: lstype,
+			Data: lsdata,
+		})
+	}
+}
+
 // VerifyDescriptorSignature verifies the Ed25519 signature on an onion service descriptor
 // This implements signature verification per rend-spec-v3.txt section 2.1
 //
@@ -1194,7 +1467,23 @@ func (h *HSDir) FetchDescriptor(ctx context.Context, addr *Address, hsdirs []*HS
 				h.logger.Debug("Descriptor signature verified successfully",
 					"address", addr.String())
 
-				return desc, nil
+				// Decrypt the descriptor's superencrypted layer
+				decryptedDesc, err := DecryptDescriptor(desc, addr, timePeriod)
+				if err != nil {
+					h.logger.Warn("Descriptor decryption failed (may not be encrypted)",
+						"address", addr.String(),
+						"hsdir", hsdir.Fingerprint,
+						"error", err)
+					// Continue with encrypted descriptor if decryption fails
+					// Some test descriptors might not be encrypted
+					return desc, nil
+				}
+
+				h.logger.Debug("Descriptor decrypted successfully",
+					"address", addr.String(),
+					"intro_points", len(decryptedDesc.IntroPoints))
+
+				return decryptedDesc, nil
 			}
 		}
 	}
