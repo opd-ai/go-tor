@@ -135,10 +135,24 @@ func (e *Extension) ExtendCircuit(ctx context.Context, target string, handshakeT
 
 	e.logger.Debug("Sending EXTEND2 relay cell",
 		"circuit_id", e.circuit.ID,
-		"target", target)
+		"target", target,
+		"data_size", len(extend2Data))
 
-	// In a real implementation, this would send the relay cell and wait for EXTENDED2
-	_ = relayCell
+	// Send EXTEND2 relay cell through the circuit
+	if err := e.circuit.SendRelayCell(relayCell); err != nil {
+		return fmt.Errorf("failed to send EXTEND2: %w", err)
+	}
+
+	// Wait for EXTENDED2 response
+	extended2Cell, err := e.receiveExtended2(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to receive EXTENDED2: %w", err)
+	}
+
+	// Process EXTENDED2 response to derive keys
+	if err := e.ProcessExtended2(extended2Cell); err != nil {
+		return fmt.Errorf("failed to process EXTENDED2: %w", err)
+	}
 
 	e.logger.Info("Circuit extended successfully",
 		"circuit_id", e.circuit.ID,
@@ -418,6 +432,14 @@ func (e *Extension) ProcessExtended2(extended2Cell *cell.RelayCell) error {
 
 	e.logger.Debug("Processing EXTENDED2 relay cell", "circuit_id", e.circuit.ID)
 
+	// Ensure ephemeral key is cleared after processing (success or failure)
+	defer func() {
+		if e.ephemeralPrivate != nil {
+			security.SecureZeroMemory(e.ephemeralPrivate)
+			e.ephemeralPrivate = nil
+		}
+	}()
+
 	// Parse EXTENDED2 response (similar to CREATED2)
 	payload := extended2Cell.Data
 	if len(payload) < 2 {
@@ -462,10 +484,6 @@ func (e *Extension) ProcessExtended2(extended2Cell *cell.RelayCell) error {
 	e.logger.Info("EXTENDED2 processed successfully with verified keys",
 		"circuit_id", e.circuit.ID,
 		"key_material_size", len(keyMaterial))
-
-	// Zero out ephemeral private key after use (AUDIT-MED-4 related)
-	security.SecureZeroMemory(e.ephemeralPrivate)
-	e.ephemeralPrivate = nil
 
 	return nil
 }
@@ -553,6 +571,44 @@ func (e *Extension) receiveCreated2(ctx context.Context, conn CellConnection) (*
 			e.logger.Warn("Received unexpected cell while waiting for CREATED2",
 				"command", receivedCell.Command,
 				"circuit_id", receivedCell.CircID)
+		}
+	}
+}
+
+// receiveExtended2 waits for and receives an EXTENDED2 relay cell
+func (e *Extension) receiveExtended2(ctx context.Context) (*cell.RelayCell, error) {
+	// Create a timeout for receiving the response
+	timeout := 30 * time.Second
+	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	e.logger.Debug("Waiting for EXTENDED2 relay cell", "circuit_id", e.circuit.ID)
+
+	// Wait for EXTENDED2 relay cell
+	for {
+		select {
+		case <-timeoutCtx.Done():
+			return nil, fmt.Errorf("timeout waiting for EXTENDED2: %w", timeoutCtx.Err())
+		default:
+			receivedCell, err := e.circuit.ReceiveRelayCellTimeout(1 * time.Second)
+			if err != nil {
+				// Check if it's a timeout - if so, continue waiting
+				if err == context.DeadlineExceeded {
+					continue
+				}
+				return nil, fmt.Errorf("failed to receive relay cell: %w", err)
+			}
+
+			// Check if it's the EXTENDED2 we're waiting for
+			if receivedCell.Command == cell.RelayExtended2 {
+				e.logger.Debug("Received EXTENDED2 relay cell", "circuit_id", e.circuit.ID)
+				return receivedCell, nil
+			}
+
+			// Log unexpected cells
+			e.logger.Warn("Received unexpected relay cell while waiting for EXTENDED2",
+				"command", receivedCell.Command,
+				"circuit_id", e.circuit.ID)
 		}
 	}
 }
