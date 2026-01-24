@@ -360,9 +360,9 @@ func (m *CachedMonitor) CheckReadiness(ctx context.Context) ProbeResult {
 func (m *CachedMonitor) InvalidateCache() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.cache = make(map[string]*cachedResult)
-	m.livenessCache = make(map[string]*cachedProbeResult)
-	m.readinessCache = make(map[string]*cachedProbeResult)
+	clear(m.cache)
+	clear(m.livenessCache)
+	clear(m.readinessCache)
 }
 
 // InvalidateCacheFor clears cached results for a specific component.
