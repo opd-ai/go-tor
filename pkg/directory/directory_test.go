@@ -278,55 +278,86 @@ func TestValidateConsensusMetadata(t *testing.T) {
 		{
 			name: "valid_consensus",
 			meta: &ConsensusMetadata{
-				ValidAfter:  now.Add(-1 * time.Hour),
-				FreshUntil:  now.Add(1 * time.Hour),
-				ValidUntil:  now.Add(3 * time.Hour),
-				Signatures:  5,
-				Authorities: 9,
+				ValidAfter:     now.Add(-1 * time.Hour),
+				FreshUntil:     now.Add(1 * time.Hour),
+				ValidUntil:     now.Add(3 * time.Hour),
+				SignatureCount: 5,
+				AuthorityCount: 9,
+				Signatures: []*ConsensusSignature{
+					{Algorithm: "sha256", Identity: "A", SigningKeyDigest: "B", Signature: "s1"},
+					{Algorithm: "sha256", Identity: "C", SigningKeyDigest: "D", Signature: "s2"},
+					{Algorithm: "sha256", Identity: "E", SigningKeyDigest: "F", Signature: "s3"},
+					{Algorithm: "sha256", Identity: "G", SigningKeyDigest: "H", Signature: "s4"},
+					{Algorithm: "sha256", Identity: "I", SigningKeyDigest: "J", Signature: "s5"},
+				},
 			},
 			wantErr: false,
 		},
 		{
 			name: "insufficient_signatures",
 			meta: &ConsensusMetadata{
-				ValidAfter:  now.Add(-1 * time.Hour),
-				FreshUntil:  now.Add(1 * time.Hour),
-				ValidUntil:  now.Add(3 * time.Hour),
-				Signatures:  1,
-				Authorities: 9,
+				ValidAfter:     now.Add(-1 * time.Hour),
+				FreshUntil:     now.Add(1 * time.Hour),
+				ValidUntil:     now.Add(3 * time.Hour),
+				SignatureCount: 1,
+				AuthorityCount: 9,
+				Signatures: []*ConsensusSignature{
+					{Algorithm: "sha256", Identity: "A", SigningKeyDigest: "B", Signature: "s1"},
+				},
 			},
 			wantErr: true,
 		},
 		{
 			name: "insufficient_authorities",
 			meta: &ConsensusMetadata{
-				ValidAfter:  now.Add(-1 * time.Hour),
-				FreshUntil:  now.Add(1 * time.Hour),
-				ValidUntil:  now.Add(3 * time.Hour),
-				Signatures:  5,
-				Authorities: 2,
+				ValidAfter:     now.Add(-1 * time.Hour),
+				FreshUntil:     now.Add(1 * time.Hour),
+				ValidUntil:     now.Add(3 * time.Hour),
+				SignatureCount: 5,
+				AuthorityCount: 2,
+				Signatures: []*ConsensusSignature{
+					{Algorithm: "sha256", Identity: "A", SigningKeyDigest: "B", Signature: "s1"},
+					{Algorithm: "sha256", Identity: "C", SigningKeyDigest: "D", Signature: "s2"},
+					{Algorithm: "sha256", Identity: "E", SigningKeyDigest: "F", Signature: "s3"},
+					{Algorithm: "sha256", Identity: "G", SigningKeyDigest: "H", Signature: "s4"},
+					{Algorithm: "sha256", Identity: "I", SigningKeyDigest: "J", Signature: "s5"},
+				},
 			},
 			wantErr: true,
 		},
 		{
 			name: "expired_consensus",
 			meta: &ConsensusMetadata{
-				ValidAfter:  now.Add(-5 * time.Hour),
-				FreshUntil:  now.Add(-3 * time.Hour),
-				ValidUntil:  now.Add(-1 * time.Hour),
-				Signatures:  5,
-				Authorities: 9,
+				ValidAfter:     now.Add(-5 * time.Hour),
+				FreshUntil:     now.Add(-3 * time.Hour),
+				ValidUntil:     now.Add(-1 * time.Hour),
+				SignatureCount: 5,
+				AuthorityCount: 9,
+				Signatures: []*ConsensusSignature{
+					{Algorithm: "sha256", Identity: "A", SigningKeyDigest: "B", Signature: "s1"},
+					{Algorithm: "sha256", Identity: "C", SigningKeyDigest: "D", Signature: "s2"},
+					{Algorithm: "sha256", Identity: "E", SigningKeyDigest: "F", Signature: "s3"},
+					{Algorithm: "sha256", Identity: "G", SigningKeyDigest: "H", Signature: "s4"},
+					{Algorithm: "sha256", Identity: "I", SigningKeyDigest: "J", Signature: "s5"},
+				},
 			},
 			wantErr: true,
 		},
 		{
 			name: "future_consensus",
 			meta: &ConsensusMetadata{
-				ValidAfter:  now.Add(2 * time.Hour),
-				FreshUntil:  now.Add(3 * time.Hour),
-				ValidUntil:  now.Add(5 * time.Hour),
-				Signatures:  5,
-				Authorities: 9,
+				ValidAfter:     now.Add(2 * time.Hour),
+				FreshUntil:     now.Add(3 * time.Hour),
+				ValidUntil:     now.Add(5 * time.Hour),
+				SignatureCount: 5,
+				AuthorityCount: 9,
+				Signatures: []*ConsensusSignature{
+					{Algorithm: "sha256", Identity: "A", SigningKeyDigest: "B", Signature: "s1"},
+					{Algorithm: "sha256", Identity: "C", SigningKeyDigest: "D", Signature: "s2"},
+					{Algorithm: "sha256", Identity: "E", SigningKeyDigest: "F", Signature: "s3"},
+					{Algorithm: "sha256", Identity: "G", SigningKeyDigest: "H", Signature: "s4"},
+					{Algorithm: "sha256", Identity: "I", SigningKeyDigest: "J", Signature: "s5"},
+				},
 			},
 			wantErr: true,
 		},
@@ -345,18 +376,28 @@ func TestValidateConsensusMetadata(t *testing.T) {
 func TestConsensusMetadataStructure(t *testing.T) {
 	// Test that ConsensusMetadata can be created and used
 	meta := &ConsensusMetadata{
-		ValidAfter:  time.Now(),
-		FreshUntil:  time.Now().Add(1 * time.Hour),
-		ValidUntil:  time.Now().Add(3 * time.Hour),
-		Signatures:  5,
-		Authorities: 9,
+		ValidAfter:     time.Now(),
+		FreshUntil:     time.Now().Add(1 * time.Hour),
+		ValidUntil:     time.Now().Add(3 * time.Hour),
+		SignatureCount: 5,
+		AuthorityCount: 9,
+		Signatures: []*ConsensusSignature{
+			{Algorithm: "sha256", Identity: "A", SigningKeyDigest: "B", Signature: "s1"},
+			{Algorithm: "sha256", Identity: "C", SigningKeyDigest: "D", Signature: "s2"},
+			{Algorithm: "sha256", Identity: "E", SigningKeyDigest: "F", Signature: "s3"},
+			{Algorithm: "sha256", Identity: "G", SigningKeyDigest: "H", Signature: "s4"},
+			{Algorithm: "sha256", Identity: "I", SigningKeyDigest: "J", Signature: "s5"},
+		},
 	}
 
-	if meta.Signatures != 5 {
-		t.Errorf("Expected 5 signatures, got %d", meta.Signatures)
+	if meta.SignatureCount != 5 {
+		t.Errorf("Expected 5 signatures, got %d", meta.SignatureCount)
 	}
-	if meta.Authorities != 9 {
-		t.Errorf("Expected 9 authorities, got %d", meta.Authorities)
+	if meta.AuthorityCount != 9 {
+		t.Errorf("Expected 9 authorities, got %d", meta.AuthorityCount)
+	}
+	if len(meta.Signatures) != 5 {
+		t.Errorf("Expected 5 signature structures, got %d", len(meta.Signatures))
 	}
 }
 
@@ -548,4 +589,208 @@ func bytesEqual(a, b []byte) bool {
 		}
 	}
 	return true
+}
+
+// SPEC-003: Tests for consensus signature parsing
+
+func TestParseConsensusWithSignatures(t *testing.T) {
+	// Mock consensus with directory signatures
+	consensusData := `network-status-version 3
+valid-after 2026-01-24 12:00:00
+fresh-until 2026-01-24 13:00:00
+valid-until 2026-01-24 15:00:00
+r TestRelay1 AAAAAAAAAAAAAAAAAAAAAA BBBBBBBBBBBBB 2026-01-24 12:00:00 192.0.2.1 9001 9030
+s Fast Guard Running Stable Valid
+directory-signature sha256 AABBCCDD EEFF0011
+-----BEGIN SIGNATURE-----
+dGVzdHNpZ25hdHVyZTEyMzQ1Ng==
+-----END SIGNATURE-----
+directory-signature sha256 11223344 55667788
+-----BEGIN SIGNATURE-----
+YW5vdGhlcnNpZ25hdHVyZTc4OTA=
+-----END SIGNATURE-----
+directory-signature sha256 99AABBCC DDEEFF00
+-----BEGIN SIGNATURE-----
+dGhpcmRzaWduYXR1cmU5OTg4Nzc=
+-----END SIGNATURE-----
+`
+
+	client := NewClient(nil)
+	relays, metadata, err := client.parseConsensusWithMetadata(strings.NewReader(consensusData))
+	if err != nil {
+		t.Fatalf("parseConsensusWithMetadata() error = %v", err)
+	}
+
+	// Validate relay parsing still works
+	if len(relays) != 1 {
+		t.Errorf("Expected 1 relay, got %d", len(relays))
+	}
+
+	// Validate metadata was parsed
+	if metadata == nil {
+		t.Fatal("Expected metadata, got nil")
+	}
+
+	// Check signature count
+	if metadata.SignatureCount != 3 {
+		t.Errorf("SignatureCount = %d, want 3", metadata.SignatureCount)
+	}
+
+	// Check signatures were parsed
+	if len(metadata.Signatures) != 3 {
+		t.Errorf("len(Signatures) = %d, want 3", len(metadata.Signatures))
+	}
+
+	// Validate first signature
+	if len(metadata.Signatures) > 0 {
+		sig := metadata.Signatures[0]
+		if sig.Algorithm != "sha256" {
+			t.Errorf("Signature[0].Algorithm = %s, want sha256", sig.Algorithm)
+		}
+		if sig.Identity != "AABBCCDD" {
+			t.Errorf("Signature[0].Identity = %s, want AABBCCDD", sig.Identity)
+		}
+		if sig.SigningKeyDigest != "EEFF0011" {
+			t.Errorf("Signature[0].SigningKeyDigest = %s, want EEFF0011", sig.SigningKeyDigest)
+		}
+		if !strings.Contains(sig.Signature, "BEGIN SIGNATURE") {
+			t.Errorf("Signature[0].Signature missing BEGIN marker")
+		}
+	}
+
+	// Check timestamps
+	expectedValidAfter, _ := time.Parse("2006-01-02 15:04:05", "2026-01-24 12:00:00")
+	if !metadata.ValidAfter.Equal(expectedValidAfter) {
+		t.Errorf("ValidAfter = %v, want %v", metadata.ValidAfter, expectedValidAfter)
+	}
+
+	// Validate metadata passes validation
+	if err := ValidateConsensusMetadata(metadata); err != nil {
+		t.Errorf("ValidateConsensusMetadata() error = %v", err)
+	}
+}
+
+func TestParseConsensusWithoutSignatures(t *testing.T) {
+	consensusData := `network-status-version 3
+valid-after 2026-01-24 12:00:00
+fresh-until 2026-01-24 13:00:00
+valid-until 2026-01-24 15:00:00
+r TestRelay1 AAAAAAAAAAAAAAAAAAAAAA BBBBBBBBBBBBB 2026-01-24 12:00:00 192.0.2.1 9001 9030
+s Fast Guard Running Valid
+`
+
+	client := NewClient(nil)
+	_, metadata, err := client.parseConsensusWithMetadata(strings.NewReader(consensusData))
+	if err != nil {
+		t.Fatalf("parseConsensusWithMetadata() error = %v", err)
+	}
+
+	// Should fail validation due to insufficient signatures
+	if err := ValidateConsensusMetadata(metadata); err == nil {
+		t.Error("Expected validation error for consensus without signatures")
+	}
+}
+
+func TestValidateConsensusMetadataEnhanced(t *testing.T) {
+	now := time.Now()
+
+	tests := []struct {
+		name    string
+		meta    *ConsensusMetadata
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name: "valid_with_signatures",
+			meta: &ConsensusMetadata{
+				ValidAfter:     now.Add(-1 * time.Hour),
+				ValidUntil:     now.Add(3 * time.Hour),
+				SignatureCount: 3,
+				AuthorityCount: 6,
+				Signatures: []*ConsensusSignature{
+					{Algorithm: "sha256", Identity: "AAA", SigningKeyDigest: "BBB", Signature: "sig1"},
+					{Algorithm: "sha256", Identity: "CCC", SigningKeyDigest: "DDD", Signature: "sig2"},
+					{Algorithm: "sha256", Identity: "EEE", SigningKeyDigest: "FFF", Signature: "sig3"},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "signature_count_mismatch",
+			meta: &ConsensusMetadata{
+				ValidAfter:     now.Add(-1 * time.Hour),
+				ValidUntil:     now.Add(3 * time.Hour),
+				SignatureCount: 3,
+				AuthorityCount: 6,
+				Signatures: []*ConsensusSignature{
+					{Algorithm: "sha256", Identity: "AAA", SigningKeyDigest: "BBB", Signature: "sig1"},
+				},
+			},
+			wantErr: true,
+			errMsg:  "signature count mismatch",
+		},
+		{
+			name: "missing_signature_fields",
+			meta: &ConsensusMetadata{
+				ValidAfter:     now.Add(-1 * time.Hour),
+				ValidUntil:     now.Add(3 * time.Hour),
+				SignatureCount: 2,
+				AuthorityCount: 6,
+				Signatures: []*ConsensusSignature{
+					{Algorithm: "sha256", Identity: "AAA", SigningKeyDigest: "", Signature: "sig1"},
+					{Algorithm: "", Identity: "CCC", SigningKeyDigest: "DDD", Signature: "sig2"},
+				},
+			},
+			wantErr: true,
+			errMsg:  "missing required fields",
+		},
+		{
+			name: "missing_timestamps",
+			meta: &ConsensusMetadata{
+				SignatureCount: 3,
+				AuthorityCount: 6,
+				Signatures: []*ConsensusSignature{
+					{Algorithm: "sha256", Identity: "AAA", SigningKeyDigest: "BBB", Signature: "sig1"},
+					{Algorithm: "sha256", Identity: "CCC", SigningKeyDigest: "DDD", Signature: "sig2"},
+					{Algorithm: "sha256", Identity: "EEE", SigningKeyDigest: "FFF", Signature: "sig3"},
+				},
+			},
+			wantErr: true,
+			errMsg:  "missing required timestamp",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateConsensusMetadata(tt.meta)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateConsensusMetadata() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err != nil && tt.errMsg != "" && !strings.Contains(err.Error(), tt.errMsg) {
+				t.Errorf("Error message = %v, want to contain %v", err.Error(), tt.errMsg)
+			}
+		})
+	}
+}
+
+func TestConsensusSignatureStructure(t *testing.T) {
+	sig := &ConsensusSignature{
+		Algorithm:        "sha256",
+		Identity:         "1234567890ABCDEF",
+		SigningKeyDigest: "FEDCBA0987654321",
+		Signature:        "-----BEGIN SIGNATURE-----\nbase64data\n-----END SIGNATURE-----",
+	}
+
+	if sig.Algorithm != "sha256" {
+		t.Errorf("Algorithm = %s, want sha256", sig.Algorithm)
+	}
+	if sig.Identity == "" {
+		t.Error("Identity should not be empty")
+	}
+	if sig.SigningKeyDigest == "" {
+		t.Error("SigningKeyDigest should not be empty")
+	}
+	if !strings.Contains(sig.Signature, "BEGIN SIGNATURE") {
+		t.Error("Signature should contain PEM markers")
+	}
 }
