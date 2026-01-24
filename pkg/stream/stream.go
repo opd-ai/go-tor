@@ -61,6 +61,11 @@ type Stream struct {
 	closeOnce    sync.Once
 	mu           sync.RWMutex
 	logger       *logger.Logger
+	// Flow control per tor-spec.txt §7.4 (stream-level windows)
+	packageWindow  int // Stream-level package window (cells we can send)
+	deliverWindow  int // Stream-level deliver window (cells we can receive)
+	sendmeReceived int // Count of DATA cells received (for sending SENDME)
+	sendmeSent     int // Count of SENDME cells sent
 }
 
 // NewStream creates a new stream
@@ -70,16 +75,18 @@ func NewStream(id uint16, circuitID uint32, target string, port uint16, log *log
 	}
 
 	return &Stream{
-		ID:        id,
-		CircuitID: circuitID,
-		Target:    target,
-		Port:      port,
-		State:     StateNew,
-		CreatedAt: time.Now(),
-		sendQueue: make(chan []byte, 32),
-		recvQueue: make(chan []byte, 32),
-		closeChan: make(chan struct{}),
-		logger:    log.Component("stream"),
+		ID:            id,
+		CircuitID:     circuitID,
+		Target:        target,
+		Port:          port,
+		State:         StateNew,
+		CreatedAt:     time.Now(),
+		sendQueue:     make(chan []byte, 32),
+		recvQueue:     make(chan []byte, 32),
+		closeChan:     make(chan struct{}),
+		logger:        log.Component("stream"),
+		packageWindow: 500, // tor-spec.txt §7.4: Initial stream window is 500
+		deliverWindow: 500, // tor-spec.txt §7.4: Initial stream window is 500
 	}
 }
 
@@ -296,6 +303,56 @@ func (m *Manager) Count() int {
 	return len(m.streams)
 }
 
+// DecrementDeliverWindow decrements the stream's deliver window for received DATA cells
+// Implements circuit.StreamFlowController interface
+func (m *Manager) DecrementDeliverWindow(streamID uint16) error {
+	stream, err := m.GetStream(streamID)
+	if err != nil {
+		return err
+	}
+	return stream.decrementDeliverWindow()
+}
+
+// ShouldSendStreamSendme checks if we should send a stream-level SENDME
+// Implements circuit.StreamFlowController interface
+func (m *Manager) ShouldSendStreamSendme(streamID uint16) bool {
+	stream, err := m.GetStream(streamID)
+	if err != nil {
+		return false
+	}
+	return stream.shouldSendStreamSendme()
+}
+
+// SendmePrepare prepares to send a stream-level SENDME
+// Implements circuit.StreamFlowController interface
+func (m *Manager) SendmePrepare(streamID uint16) []byte {
+	stream, err := m.GetStream(streamID)
+	if err != nil {
+		return []byte{}
+	}
+	return stream.SendmePrepare()
+}
+
+// IncrementPackageWindow increments the stream's package window when SENDME received
+// Implements circuit.StreamFlowController interface
+func (m *Manager) IncrementPackageWindow(streamID uint16) {
+	stream, err := m.GetStream(streamID)
+	if err != nil {
+		return
+	}
+	stream.incrementPackageWindow()
+}
+
+// DecrementPackageWindow decrements the stream's package window before sending DATA cells
+// Implements circuit.StreamFlowController interface
+func (m *Manager) DecrementPackageWindow(streamID uint16) error {
+	stream, err := m.GetStream(streamID)
+	if err != nil {
+		return err
+	}
+	return stream.decrementPackageWindow()
+}
+
 // SetIsolationKey sets the isolation key for a stream
 func (s *Stream) SetIsolationKey(key *circuit.IsolationKey) {
 	s.mu.Lock()
@@ -308,4 +365,81 @@ func (s *Stream) GetIsolationKey() *circuit.IsolationKey {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.IsolationKey
+}
+
+// decrementPackageWindow decrements the stream-level package window
+// Returns an error if the window is exhausted
+func (s *Stream) decrementPackageWindow() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.packageWindow <= 0 {
+		return fmt.Errorf("stream %d package window exhausted: cannot send more cells until SENDME received", s.ID)
+	}
+
+	s.packageWindow--
+	return nil
+}
+
+// incrementPackageWindow increments the stream-level package window
+// This is called when we receive a stream-level SENDME cell
+func (s *Stream) incrementPackageWindow() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Per tor-spec.txt §7.4, each SENDME increments the window by 50
+	s.packageWindow += 50
+}
+
+// decrementDeliverWindow decrements the stream-level deliver window
+// Returns an error if the window is exhausted
+func (s *Stream) decrementDeliverWindow() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.deliverWindow <= 0 {
+		return fmt.Errorf("stream %d deliver window exhausted: cannot receive more cells until SENDME sent", s.ID)
+	}
+
+	s.deliverWindow--
+	s.sendmeReceived++
+
+	return nil
+}
+
+// shouldSendStreamSendme checks if we should send a stream-level SENDME
+// Per tor-spec.txt §7.4, send SENDME every 50 cells received
+func (s *Stream) shouldSendStreamSendme() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.sendmeReceived >= 50
+}
+
+// SendmePrepare prepares to send a stream-level SENDME and returns the data
+// This is called by the circuit layer to build the SENDME cell
+func (s *Stream) SendmePrepare() []byte {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.sendmeReceived = 0
+	s.sendmeSent++
+	s.deliverWindow += 50 // Increment our deliver window
+
+	// Per tor-spec.txt §7.4, stream-level SENDME has empty payload
+	return []byte{}
+}
+
+// GetPackageWindow returns the current package window (for testing/debugging)
+func (s *Stream) GetPackageWindow() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.packageWindow
+}
+
+// GetDeliverWindow returns the current deliver window (for testing/debugging)
+func (s *Stream) GetDeliverWindow() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.deliverWindow
 }

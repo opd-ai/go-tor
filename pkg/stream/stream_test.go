@@ -294,3 +294,166 @@ func TestStateString(t *testing.T) {
 		})
 	}
 }
+
+// TestStreamFlowControlWindows tests stream-level flow control window management
+func TestStreamFlowControlWindows(t *testing.T) {
+	log := logger.NewDefault()
+	stream := NewStream(1, 100, "example.com", 80, log)
+
+	// Test initial window values per tor-spec.txt §7.4
+	if stream.GetPackageWindow() != 500 {
+		t.Errorf("Initial packageWindow = %v, want 500", stream.GetPackageWindow())
+	}
+	if stream.GetDeliverWindow() != 500 {
+		t.Errorf("Initial deliverWindow = %v, want 500", stream.GetDeliverWindow())
+	}
+
+	// Test decrementPackageWindow
+	err := stream.decrementPackageWindow()
+	if err != nil {
+		t.Errorf("decrementPackageWindow() error = %v", err)
+	}
+	if stream.GetPackageWindow() != 499 {
+		t.Errorf("packageWindow after decrement = %v, want 499", stream.GetPackageWindow())
+	}
+
+	// Test incrementPackageWindow (adds 50 per tor-spec.txt §7.4)
+	stream.incrementPackageWindow()
+	if stream.GetPackageWindow() != 549 {
+		t.Errorf("packageWindow after increment = %v, want 549", stream.GetPackageWindow())
+	}
+
+	// Test decrementDeliverWindow
+	err = stream.decrementDeliverWindow()
+	if err != nil {
+		t.Errorf("decrementDeliverWindow() error = %v", err)
+	}
+	if stream.GetDeliverWindow() != 499 {
+		t.Errorf("deliverWindow after decrement = %v, want 499", stream.GetDeliverWindow())
+	}
+
+	// Test window exhaustion
+	stream.packageWindow = 0
+	err = stream.decrementPackageWindow()
+	if err == nil {
+		t.Error("decrementPackageWindow() should error when window exhausted")
+	}
+
+	stream.deliverWindow = 0
+	err = stream.decrementDeliverWindow()
+	if err == nil {
+		t.Error("decrementDeliverWindow() should error when window exhausted")
+	}
+}
+
+// TestStreamShouldSendSendme tests shouldSendStreamSendme
+func TestStreamShouldSendSendme(t *testing.T) {
+	log := logger.NewDefault()
+	stream := NewStream(1, 100, "example.com", 80, log)
+
+	// Initially should not need SENDME
+	if stream.shouldSendStreamSendme() {
+		t.Error("shouldSendStreamSendme() = true initially, want false")
+	}
+
+	// Decrement deliver window by 50 cells
+	for i := 0; i < 50; i++ {
+		stream.decrementDeliverWindow()
+	}
+
+	// Should now need SENDME
+	if !stream.shouldSendStreamSendme() {
+		t.Error("shouldSendStreamSendme() = false after 50 cells, want true")
+	}
+}
+
+// TestStreamSendmePrepare tests SendmePrepare
+func TestStreamSendmePrepare(t *testing.T) {
+	log := logger.NewDefault()
+	stream := NewStream(1, 100, "example.com", 80, log)
+
+	// Simulate receiving 50 DATA cells
+	for i := 0; i < 50; i++ {
+		stream.decrementDeliverWindow()
+	}
+
+	initialDeliverWindow := stream.GetDeliverWindow()
+
+	// Prepare SENDME
+	data := stream.SendmePrepare()
+
+	// Verify SENDME data is empty per tor-spec.txt §7.4
+	if len(data) != 0 {
+		t.Errorf("SendmePrepare() returned non-empty data: %v", data)
+	}
+
+	// Verify sendmeReceived counter was reset
+	if stream.sendmeReceived != 0 {
+		t.Errorf("sendmeReceived = %v after SendmePrepare, want 0", stream.sendmeReceived)
+	}
+
+	// Verify sendmeSent counter was incremented
+	if stream.sendmeSent != 1 {
+		t.Errorf("sendmeSent = %v after SendmePrepare, want 1", stream.sendmeSent)
+	}
+
+	// Verify deliver window was incremented by 50
+	expectedWindow := initialDeliverWindow + 50
+	if stream.GetDeliverWindow() != expectedWindow {
+		t.Errorf("deliverWindow = %v after SendmePrepare, want %v", stream.GetDeliverWindow(), expectedWindow)
+	}
+}
+
+// TestManagerFlowControlInterface tests that Manager implements StreamFlowController
+func TestManagerFlowControlInterface(t *testing.T) {
+	log := logger.NewDefault()
+	mgr := NewManager(log)
+
+	// Create a stream
+	stream, err := mgr.CreateStream(100, "example.com", 80)
+	if err != nil {
+		t.Fatalf("CreateStream() error = %v", err)
+	}
+
+	// Test DecrementDeliverWindow
+	err = mgr.DecrementDeliverWindow(stream.ID)
+	if err != nil {
+		t.Errorf("DecrementDeliverWindow() error = %v", err)
+	}
+
+	// Test ShouldSendStreamSendme
+	for i := 0; i < 49; i++ {
+		mgr.DecrementDeliverWindow(stream.ID)
+	}
+	if !mgr.ShouldSendStreamSendme(stream.ID) {
+		t.Error("ShouldSendStreamSendme() = false after 50 cells, want true")
+	}
+
+	// Test SendmePrepare
+	data := mgr.SendmePrepare(stream.ID)
+	if len(data) != 0 {
+		t.Errorf("SendmePrepare() returned non-empty data: %v", data)
+	}
+
+	// Test IncrementPackageWindow
+	initialWindow := stream.GetPackageWindow()
+	mgr.IncrementPackageWindow(stream.ID)
+	if stream.GetPackageWindow() != initialWindow+50 {
+		t.Errorf("packageWindow = %v after IncrementPackageWindow, want %v", stream.GetPackageWindow(), initialWindow+50)
+	}
+
+	// Test DecrementPackageWindow
+	err = mgr.DecrementPackageWindow(stream.ID)
+	if err != nil {
+		t.Errorf("DecrementPackageWindow() error = %v", err)
+	}
+
+	// Test with non-existent stream
+	err = mgr.DecrementDeliverWindow(9999)
+	if err == nil {
+		t.Error("DecrementDeliverWindow() should error for non-existent stream")
+	}
+
+	// Clean up
+	mgr.Close()
+}
