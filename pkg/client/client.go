@@ -204,9 +204,9 @@ func (c *Client) Start(ctx context.Context) error {
 		// AUDIT-R-005: Add panic recovery for goroutine resilience
 		defer func() {
 			if r := recover(); r != nil {
-				c.logger.Error("SOCKS5 server goroutine panic recovered",
-					"panic", r,
-					"stack", string(debug.Stack()))
+				c.logger.Error("SOCKS5 server goroutine panic recovered", "panic", r)
+				// Log full stack trace at Debug level only to avoid information disclosure
+				c.logger.Debug("Panic stack trace", "stack", string(debug.Stack()))
 			}
 		}()
 		defer c.wg.Done()
@@ -235,9 +235,9 @@ func (c *Client) Start(ctx context.Context) error {
 		// AUDIT-R-005: Add panic recovery for goroutine resilience
 		defer func() {
 			if r := recover(); r != nil {
-				c.logger.Error("Circuit maintenance goroutine panic recovered",
-					"panic", r,
-					"stack", string(debug.Stack()))
+				c.logger.Error("Circuit maintenance goroutine panic recovered", "panic", r)
+				// Log full stack trace at Debug level only to avoid information disclosure
+				c.logger.Debug("Panic stack trace", "stack", string(debug.Stack()))
 			}
 		}()
 		defer c.wg.Done()
@@ -250,9 +250,9 @@ func (c *Client) Start(ctx context.Context) error {
 		// AUDIT-R-005: Add panic recovery for goroutine resilience
 		defer func() {
 			if r := recover(); r != nil {
-				c.logger.Error("Bandwidth monitoring goroutine panic recovered",
-					"panic", r,
-					"stack", string(debug.Stack()))
+				c.logger.Error("Bandwidth monitoring goroutine panic recovered", "panic", r)
+				// Log full stack trace at Debug level only to avoid information disclosure
+				c.logger.Debug("Panic stack trace", "stack", string(debug.Stack()))
 			}
 		}()
 		defer c.wg.Done()
