@@ -49,12 +49,12 @@ func (m *mockExtensionConnection) createMockCreated2() *cell.Cell {
 	// For ntor: 32 bytes server public key + 32 bytes auth MAC = 64 bytes
 	response := make([]byte, 64)
 	rand.Read(response)
-	
+
 	// Build CREATED2 payload: HLEN (2) + HDATA (64)
 	payload := make([]byte, 2+64)
 	binary.BigEndian.PutUint16(payload[0:2], 64)
 	copy(payload[2:], response)
-	
+
 	return &cell.Cell{
 		CircID:  1, // Match circuit ID
 		Command: cell.CmdCreated2,
@@ -79,11 +79,11 @@ func TestNewExtension(t *testing.T) {
 func TestCreateFirstHop(t *testing.T) {
 	log := logger.NewDefault()
 	circuit := NewCircuit(1)
-	
+
 	// Set up mock connection
 	mockConn := newMockExtensionConnection()
 	circuit.SetConnection(mockConn)
-	
+
 	ext := NewExtension(circuit, log)
 
 	ctx := context.Background()
@@ -94,17 +94,17 @@ func TestCreateFirstHop(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error due to mock handshake response, got nil")
 	}
-	
+
 	// Verify CREATE2 was sent
 	if len(mockConn.sentCells) != 1 {
 		t.Fatalf("Expected 1 sent cell, got %d", len(mockConn.sentCells))
 	}
-	
+
 	sentCell := mockConn.sentCells[0]
 	if sentCell.Command != cell.CmdCreate2 {
 		t.Errorf("Expected CREATE2 command, got %s", sentCell.Command)
 	}
-	
+
 	if sentCell.CircID != circuit.ID {
 		t.Errorf("Expected circuit ID %d, got %d", circuit.ID, sentCell.CircID)
 	}
@@ -113,11 +113,11 @@ func TestCreateFirstHop(t *testing.T) {
 func TestCreateFirstHopTAP(t *testing.T) {
 	log := logger.NewDefault()
 	circuit := NewCircuit(1)
-	
+
 	// Set up mock connection
 	mockConn := newMockExtensionConnection()
 	circuit.SetConnection(mockConn)
-	
+
 	ext := NewExtension(circuit, log)
 
 	ctx := context.Background()
@@ -127,7 +127,7 @@ func TestCreateFirstHopTAP(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error due to mock handshake response, got nil")
 	}
-	
+
 	// Verify CREATE2 was sent
 	if len(mockConn.sentCells) != 1 {
 		t.Fatalf("Expected 1 sent cell, got %d", len(mockConn.sentCells))
@@ -168,17 +168,17 @@ func TestExtendCircuit(t *testing.T) {
 	// Test that ExtendCircuit validates inputs without actually sending
 	// We can't fully test the async flow without complex mocking
 	// Just verify the method exists and basic structure works
-	
+
 	// Test that building EXTEND2 data works
 	handshakeData := make([]byte, 84)
 	rand.Read(handshakeData)
-	
+
 	extend2Data := ext.buildExtend2Data("relay.example.com:9001", HandshakeTypeNTor, handshakeData)
-	
+
 	if len(extend2Data) < 20 {
 		t.Errorf("EXTEND2 data too short: %d bytes", len(extend2Data))
 	}
-	
+
 	// Verify NSPEC
 	if extend2Data[0] != 1 {
 		t.Errorf("Expected NSPEC=1, got %d", extend2Data[0])
@@ -464,72 +464,72 @@ func TestHandshakeTypeConstants(t *testing.T) {
 // TestCreateFirstHopWireProtocol tests the complete CREATE2/CREATED2 wire protocol
 // This verifies that CREATE2 is sent and CREATED2 is properly received and processed
 func TestCreateFirstHopWireProtocol(t *testing.T) {
-log := logger.NewDefault()
-circuit := NewCircuit(1)
+	log := logger.NewDefault()
+	circuit := NewCircuit(1)
 
-// Set up mock connection
-mockConn := newMockExtensionConnection()
-circuit.SetConnection(mockConn)
+	// Set up mock connection
+	mockConn := newMockExtensionConnection()
+	circuit.SetConnection(mockConn)
 
-ext := NewExtension(circuit, log)
-ctx := context.Background()
+	ext := NewExtension(circuit, log)
+	ctx := context.Background()
 
-// Attempt to create first hop
-err := ext.CreateFirstHop(ctx, HandshakeTypeNTor)
+	// Attempt to create first hop
+	err := ext.CreateFirstHop(ctx, HandshakeTypeNTor)
 
-// We expect an error due to handshake verification failure (mock response)
-// but the important thing is that cells were exchanged
-if err == nil {
-t.Error("Expected error due to mock ntor verification failure")
-}
+	// We expect an error due to handshake verification failure (mock response)
+	// but the important thing is that cells were exchanged
+	if err == nil {
+		t.Error("Expected error due to mock ntor verification failure")
+	}
 
-// Verify the wire protocol was executed correctly
+	// Verify the wire protocol was executed correctly
 
-// 1. CREATE2 cell should have been sent
-if len(mockConn.sentCells) != 1 {
-t.Fatalf("Expected 1 CREATE2 cell sent, got %d", len(mockConn.sentCells))
-}
+	// 1. CREATE2 cell should have been sent
+	if len(mockConn.sentCells) != 1 {
+		t.Fatalf("Expected 1 CREATE2 cell sent, got %d", len(mockConn.sentCells))
+	}
 
-create2Cell := mockConn.sentCells[0]
+	create2Cell := mockConn.sentCells[0]
 
-// 2. Verify CREATE2 cell structure
-if create2Cell.Command != cell.CmdCreate2 {
-t.Errorf("Expected CREATE2 command, got %s", create2Cell.Command)
-}
+	// 2. Verify CREATE2 cell structure
+	if create2Cell.Command != cell.CmdCreate2 {
+		t.Errorf("Expected CREATE2 command, got %s", create2Cell.Command)
+	}
 
-if create2Cell.CircID != circuit.ID {
-t.Errorf("Expected circuit ID %d, got %d", circuit.ID, create2Cell.CircID)
-}
+	if create2Cell.CircID != circuit.ID {
+		t.Errorf("Expected circuit ID %d, got %d", circuit.ID, create2Cell.CircID)
+	}
 
-// 3. Verify CREATE2 payload structure: HTYPE (2) + HLEN (2) + HDATA
-payload := create2Cell.Payload
-if len(payload) < 4 {
-t.Fatalf("CREATE2 payload too short: %d bytes", len(payload))
-}
+	// 3. Verify CREATE2 payload structure: HTYPE (2) + HLEN (2) + HDATA
+	payload := create2Cell.Payload
+	if len(payload) < 4 {
+		t.Fatalf("CREATE2 payload too short: %d bytes", len(payload))
+	}
 
-htype := binary.BigEndian.Uint16(payload[0:2])
-if htype != uint16(HandshakeTypeNTor) {
-t.Errorf("Expected handshake type ntor (0x0002), got 0x%04x", htype)
-}
+	htype := binary.BigEndian.Uint16(payload[0:2])
+	if htype != uint16(HandshakeTypeNTor) {
+		t.Errorf("Expected handshake type ntor (0x0002), got 0x%04x", htype)
+	}
 
-hlen := binary.BigEndian.Uint16(payload[2:4])
-if hlen != 84 { // NODEID (20) + KEYID (32) + CLIENT_PK (32)
-t.Errorf("Expected handshake data length 84, got %d", hlen)
-}
+	hlen := binary.BigEndian.Uint16(payload[2:4])
+	if hlen != 84 { // NODEID (20) + KEYID (32) + CLIENT_PK (32)
+		t.Errorf("Expected handshake data length 84, got %d", hlen)
+	}
 
-if len(payload) != int(4+hlen) {
-t.Errorf("Expected total payload length %d, got %d", 4+hlen, len(payload))
-}
+	if len(payload) != int(4+hlen) {
+		t.Errorf("Expected total payload length %d, got %d", 4+hlen, len(payload))
+	}
 
-t.Log("✓ CREATE2 cell wire protocol validated successfully")
+	t.Log("✓ CREATE2 cell wire protocol validated successfully")
 }
 
 // TestCellConnectionInterface verifies the CellConnection interface is properly defined
 func TestCellConnectionInterface(t *testing.T) {
-var _ CellConnection = (*mockExtensionConnection)(nil)
+	var _ CellConnection = (*mockExtensionConnection)(nil)
 
-// This test just ensures the interface compiles
-// If mockExtensionConnection doesn't implement CellConnection, this will fail to compile
+	// This test just ensures the interface compiles
+	// If mockExtensionConnection doesn't implement CellConnection, this will fail to compile
 }
 
 // mockCircuitForExtension provides a mock circuit that can send/receive relay cells
@@ -554,7 +554,7 @@ func newMockCircuitForExtension(id uint32) *mockCircuitForExtension {
 	circ := NewCircuit(id)
 	circ.State = StateOpen
 	circ.conn = &mockConnectionForRelay{sentCells: make([]*cell.Cell, 0)}
-	
+
 	return &mockCircuitForExtension{
 		Circuit:            circ,
 		sentRelayCells:     make([]*cell.RelayCell, 0),
@@ -611,85 +611,85 @@ func (m *mockCircuitForExtension) createMockExtended2() *cell.RelayCell {
 
 // TestBuildExtend2DataStructure tests the EXTEND2 data structure
 func TestBuildExtend2DataStructure(t *testing.T) {
-log := logger.NewDefault()
-circuit := NewCircuit(1)
-ext := NewExtension(circuit, log)
+	log := logger.NewDefault()
+	circuit := NewCircuit(1)
+	ext := NewExtension(circuit, log)
 
-// Generate handshake data
-handshakeData := make([]byte, 84) // NODEID (20) + KEYID (32) + CLIENT_PK (32)
-rand.Read(handshakeData)
+	// Generate handshake data
+	handshakeData := make([]byte, 84) // NODEID (20) + KEYID (32) + CLIENT_PK (32)
+	rand.Read(handshakeData)
 
-// Build EXTEND2 data
-extend2Data := ext.buildExtend2Data("192.0.2.1:9001", HandshakeTypeNTor, handshakeData)
+	// Build EXTEND2 data
+	extend2Data := ext.buildExtend2Data("192.0.2.1:9001", HandshakeTypeNTor, handshakeData)
 
-// Verify structure
-if len(extend2Data) < 1 {
-t.Fatalf("EXTEND2 data too short")
-}
+	// Verify structure
+	if len(extend2Data) < 1 {
+		t.Fatalf("EXTEND2 data too short")
+	}
 
-// Check NSPEC
-nspec := extend2Data[0]
-if nspec != 1 {
-t.Errorf("Expected NSPEC=1, got %d", nspec)
-}
+	// Check NSPEC
+	nspec := extend2Data[0]
+	if nspec != 1 {
+		t.Errorf("Expected NSPEC=1, got %d", nspec)
+	}
 
-// Verify minimum length (NSPEC + link spec + handshake type + handshake len + data)
-minLen := 1 + 8 + 2 + 2 + len(handshakeData) // Simplified link spec is 8 bytes
-if len(extend2Data) < minLen {
-t.Errorf("EXTEND2 data too short: got %d, want at least %d", len(extend2Data), minLen)
-}
+	// Verify minimum length (NSPEC + link spec + handshake type + handshake len + data)
+	minLen := 1 + 8 + 2 + 2 + len(handshakeData) // Simplified link spec is 8 bytes
+	if len(extend2Data) < minLen {
+		t.Errorf("EXTEND2 data too short: got %d, want at least %d", len(extend2Data), minLen)
+	}
 
-t.Log("✓ EXTEND2 data structure validated")
+	t.Log("✓ EXTEND2 data structure validated")
 }
 
 // TestProcessExtended2Structure tests EXTENDED2 processing with valid structure
 func TestProcessExtended2Structure(t *testing.T) {
-log := logger.NewDefault()
-circuit := NewCircuit(1)
-ext := NewExtension(circuit, log)
+	log := logger.NewDefault()
+	circuit := NewCircuit(1)
+	ext := NewExtension(circuit, log)
 
-// Set up handshake state
-ephemeral, err := crypto.GenerateNtorKeyPair()
-if err != nil {
-t.Fatalf("Failed to generate ephemeral key: %v", err)
-}
+	// Set up handshake state
+	ephemeral, err := crypto.GenerateNtorKeyPair()
+	if err != nil {
+		t.Fatalf("Failed to generate ephemeral key: %v", err)
+	}
 
-ext.ephemeralPrivate = make([]byte, 32)
-copy(ext.ephemeralPrivate, ephemeral.Private[:])
-ext.serverIdentity = make([]byte, 32)
-ext.serverNtorKey = make([]byte, 32)
-rand.Read(ext.serverIdentity)
-rand.Read(ext.serverNtorKey)
+	ext.ephemeralPrivate = make([]byte, 32)
+	copy(ext.ephemeralPrivate, ephemeral.Private[:])
+	ext.serverIdentity = make([]byte, 32)
+	ext.serverNtorKey = make([]byte, 32)
+	rand.Read(ext.serverIdentity)
+	rand.Read(ext.serverNtorKey)
 
-// Create EXTENDED2 relay cell
-handshakeResponse := make([]byte, 64)
-rand.Read(handshakeResponse)
+	// Create EXTENDED2 relay cell
+	handshakeResponse := make([]byte, 64)
+	rand.Read(handshakeResponse)
 
-payload := make([]byte, 2+len(handshakeResponse))
-binary.BigEndian.PutUint16(payload[0:2], 64)
-copy(payload[2:], handshakeResponse)
+	payload := make([]byte, 2+len(handshakeResponse))
+	binary.BigEndian.PutUint16(payload[0:2], 64)
+	copy(payload[2:], handshakeResponse)
 
-extended2Cell := &cell.RelayCell{
-Command:  cell.RelayExtended2,
-StreamID: 0,
-Data:     payload,
-}
+	extended2Cell := &cell.RelayCell{
+		Command:  cell.RelayExtended2,
+		StreamID: 0,
+		Data:     payload,
+	}
 
-// Process should fail verification but not crash
-err = ext.ProcessExtended2(extended2Cell)
-if err == nil {
-t.Log("Note: ProcessExtended2 succeeded (unlikely with random data)")
-} else if !strings.Contains(err.Error(), "ntor handshake verification failed") {
-t.Logf("Got expected verification error: %v", err)
-}
+	// Process should fail verification but not crash
+	err = ext.ProcessExtended2(extended2Cell)
+	if err == nil {
+		t.Log("Note: ProcessExtended2 succeeded (unlikely with random data)")
+	} else if !strings.Contains(err.Error(), "ntor handshake verification failed") {
+		t.Logf("Got expected verification error: %v", err)
+	}
 
-// Verify ephemeral key was cleared (unless it succeeded by chance)
-if err != nil {
-for _, b := range ext.ephemeralPrivate {
-if b != 0 {
-t.Error("Ephemeral private key should be cleared after use, even on error")
-break
-}
-}
-}
+	// Verify ephemeral key was cleared (unless it succeeded by chance)
+	if err != nil {
+		for _, b := range ext.ephemeralPrivate {
+			if b != 0 {
+				t.Error("Ephemeral private key should be cleared after use, even on error")
+				break
+			}
+		}
+	}
 }

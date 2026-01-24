@@ -1,4 +1,21 @@
 // Package stream provides Tor stream management for multiplexing connections over circuits.
+//
+// # Flow Control
+//
+// This package implements stream-level flow control per tor-spec.txt §7.4.
+// Both circuit-level and stream-level flow control use a sliding window protocol
+// to prevent buffer exhaustion.
+//
+// Stream-level flow control parameters:
+//   - Initial window size: 500 cells
+//   - SENDME threshold: 50 cells (send SENDME every 50 DATA cells received)
+//   - SENDME increment: 50 cells (each SENDME increases window by 50)
+//
+// The package window tracks outgoing cells (cells we can send), while the
+// deliver window tracks incoming cells (cells we can receive). When either
+// window is exhausted, data transmission is blocked until a SENDME is received.
+//
+// For circuit-level flow control, see pkg/circuit/circuit.go.
 package stream
 
 import (
@@ -61,6 +78,11 @@ type Stream struct {
 	closeOnce    sync.Once
 	mu           sync.RWMutex
 	logger       *logger.Logger
+	// Flow control per tor-spec.txt §7.4
+	packageWindow  int // Stream-level package window (cells we can send)
+	deliverWindow  int // Stream-level deliver window (cells we can receive)
+	sendmeReceived int // Count of DATA cells received (for sending SENDME)
+	sendmeSent     int // Count of SENDME cells sent
 }
 
 // NewStream creates a new stream
@@ -70,16 +92,20 @@ func NewStream(id uint16, circuitID uint32, target string, port uint16, log *log
 	}
 
 	return &Stream{
-		ID:        id,
-		CircuitID: circuitID,
-		Target:    target,
-		Port:      port,
-		State:     StateNew,
-		CreatedAt: time.Now(),
-		sendQueue: make(chan []byte, 32),
-		recvQueue: make(chan []byte, 32),
-		closeChan: make(chan struct{}),
-		logger:    log.Component("stream"),
+		ID:             id,
+		CircuitID:      circuitID,
+		Target:         target,
+		Port:           port,
+		State:          StateNew,
+		CreatedAt:      time.Now(),
+		sendQueue:      make(chan []byte, 32),
+		recvQueue:      make(chan []byte, 32),
+		closeChan:      make(chan struct{}),
+		logger:         log.Component("stream"),
+		packageWindow:  500, // tor-spec.txt §7.4: Initial stream window is 500
+		deliverWindow:  500, // tor-spec.txt §7.4: Initial stream window is 500
+		sendmeReceived: 0,
+		sendmeSent:     0,
 	}
 }
 
@@ -308,4 +334,78 @@ func (s *Stream) GetIsolationKey() *circuit.IsolationKey {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.IsolationKey
+}
+
+// decrementPackageWindow decrements the stream-level package window
+// Returns an error if the window is exhausted
+func (s *Stream) decrementPackageWindow() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.packageWindow <= 0 {
+		return fmt.Errorf("stream package window exhausted: cannot send more cells until SENDME received")
+	}
+
+	s.packageWindow--
+	return nil
+}
+
+// incrementPackageWindow increments the stream-level package window
+// This is called when we receive a SENDME cell for this stream
+func (s *Stream) incrementPackageWindow() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Per tor-spec.txt §7.4, each stream SENDME increments the window by 50
+	s.packageWindow += 50
+	s.sendmeSent++
+}
+
+// decrementDeliverWindow decrements the stream-level deliver window
+// Returns an error if the window is exhausted
+func (s *Stream) decrementDeliverWindow() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.deliverWindow <= 0 {
+		return fmt.Errorf("stream deliver window exhausted: cannot receive more cells until SENDME sent")
+	}
+
+	s.deliverWindow--
+	s.sendmeReceived++
+
+	return nil
+}
+
+// shouldSendStreamSendme checks if we should send a stream-level SENDME
+// Per tor-spec.txt §7.4, send SENDME every 50 cells received
+func (s *Stream) shouldSendStreamSendme() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.sendmeReceived >= 50
+}
+
+// recordStreamSendmeSent records that a stream-level SENDME was sent
+// This resets the received counter and increments the deliver window
+func (s *Stream) recordStreamSendmeSent() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.sendmeReceived = 0
+	s.deliverWindow += 50 // Increment our deliver window
+}
+
+// GetPackageWindow returns the current package window (for testing)
+func (s *Stream) GetPackageWindow() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.packageWindow
+}
+
+// GetDeliverWindow returns the current deliver window (for testing)
+func (s *Stream) GetDeliverWindow() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.deliverWindow
 }

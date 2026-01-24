@@ -359,3 +359,193 @@ func TestConsensusMetadataStructure(t *testing.T) {
 		t.Errorf("Expected 9 authorities, got %d", meta.Authorities)
 	}
 }
+
+// SPEC-001: Tests for microdescriptor parsing and key extraction
+
+func TestParseMicrodescriptorDigest(t *testing.T) {
+	consensusData := `network-status-version 3
+vote-status consensus
+r TestRelay AAAAAAAAAAAAAAAAAAAAAA BBBBBBBBBBBBB 2024-01-01 00:00:00 192.168.1.1 9001 0
+a sha256=dGVzdGRpZ2VzdA==
+s Fast Guard Running Stable Valid
+`
+
+	client := NewClient(nil)
+	reader := strings.NewReader(consensusData)
+
+	relays, err := client.parseConsensus(reader)
+	if err != nil {
+		t.Fatalf("parseConsensus() error = %v", err)
+	}
+
+	if len(relays) != 1 {
+		t.Fatalf("Expected 1 relay, got %d", len(relays))
+	}
+
+	if relays[0].MicrodescDigest != "dGVzdGRpZ2VzdA==" {
+		t.Errorf("Expected microdesc digest 'dGVzdGRpZ2VzdA==', got '%s'", relays[0].MicrodescDigest)
+	}
+}
+
+func TestParseMicrodescriptors(t *testing.T) {
+	// Sample microdescriptor format per dir-spec.txt
+	mdData := `onion-key
+-----BEGIN RSA PUBLIC KEY-----
+MIGJAoGBAKrJn...
+-----END RSA PUBLIC KEY-----
+ntor-onion-key hSDwCYkwp1R0i33ctD0CAwEAAaOCAZIwggGOMB0GA1UdDgQWBBSoSmpjBH3duubRObem
+id ed25519
+dGVzdGlkZW50aXR5a2V5MTIzNDU2Nzg5MDEy
+
+onion-key
+-----BEGIN RSA PUBLIC KEY-----
+MIGJAoGBAKrJn...
+-----END RSA PUBLIC KEY-----
+ntor-onion-key AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+id ed25519
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+`
+
+	client := NewClient(nil)
+	digestMap := make(map[string][]*Relay)
+
+	// Create test relay
+	relay := &Relay{
+		Nickname: "TestRelay",
+	}
+
+	// Calculate expected digest
+	testDigest := client.calculateMicrodescriptorDigest([]string{
+		"onion-key",
+		"-----BEGIN RSA PUBLIC KEY-----",
+		"MIGJAoGBAKrJn...",
+		"-----END RSA PUBLIC KEY-----",
+		"ntor-onion-key hSDwCYkwp1R0i33ctD0CAwEAAaOCAZIwggGOMB0GA1UdDgQWBBSoSmpjBH3duubRObem",
+		"id ed25519",
+		"dGVzdGlkZW50aXR5a2V5MTIzNDU2Nzg5MDEy",
+	})
+	digestMap[testDigest] = []*Relay{relay}
+
+	err := client.parseMicrodescriptors([]byte(mdData), digestMap)
+	if err != nil {
+		t.Fatalf("parseMicrodescriptors() error = %v", err)
+	}
+
+	if relay.NtorOnionKey != nil {
+		t.Logf("Ntor key populated: %d bytes", len(relay.NtorOnionKey))
+	}
+	if relay.IdentityKey != nil {
+		t.Logf("Identity key populated: %d bytes", len(relay.IdentityKey))
+	}
+}
+
+func TestRelayHasValidKeys(t *testing.T) {
+	tests := []struct {
+		name     string
+		relay    *Relay
+		expected bool
+	}{
+		{
+			name: "both_keys_valid",
+			relay: &Relay{
+				IdentityKey:  make([]byte, 32),
+				NtorOnionKey: make([]byte, 32),
+			},
+			expected: true,
+		},
+		{
+			name: "missing_identity_key",
+			relay: &Relay{
+				NtorOnionKey: make([]byte, 32),
+			},
+			expected: false,
+		},
+		{
+			name: "missing_ntor_key",
+			relay: &Relay{
+				IdentityKey: make([]byte, 32),
+			},
+			expected: false,
+		},
+		{
+			name: "wrong_identity_key_length",
+			relay: &Relay{
+				IdentityKey:  make([]byte, 16),
+				NtorOnionKey: make([]byte, 32),
+			},
+			expected: false,
+		},
+		{
+			name: "wrong_ntor_key_length",
+			relay: &Relay{
+				IdentityKey:  make([]byte, 32),
+				NtorOnionKey: make([]byte, 16),
+			},
+			expected: false,
+		},
+		{
+			name:     "both_keys_missing",
+			relay:    &Relay{},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.relay.HasValidKeys()
+			if got != tt.expected {
+				t.Errorf("HasValidKeys() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetIdentityKey(t *testing.T) {
+	key := make([]byte, 32)
+	for i := range key {
+		key[i] = byte(i)
+	}
+
+	relay := &Relay{
+		IdentityKey: key,
+	}
+
+	got := relay.GetIdentityKey()
+	if len(got) != 32 {
+		t.Errorf("GetIdentityKey() returned %d bytes, want 32", len(got))
+	}
+	if !bytesEqual(got, key) {
+		t.Error("GetIdentityKey() returned different key")
+	}
+}
+
+func TestGetNtorOnionKey(t *testing.T) {
+	key := make([]byte, 32)
+	for i := range key {
+		key[i] = byte(i + 100)
+	}
+
+	relay := &Relay{
+		NtorOnionKey: key,
+	}
+
+	got := relay.GetNtorOnionKey()
+	if len(got) != 32 {
+		t.Errorf("GetNtorOnionKey() returned %d bytes, want 32", len(got))
+	}
+	if !bytesEqual(got, key) {
+		t.Error("GetNtorOnionKey() returned different key")
+	}
+}
+
+func bytesEqual(a, b []byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}

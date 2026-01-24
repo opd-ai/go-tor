@@ -58,7 +58,7 @@ func (b *Builder) BuildCircuit(ctx context.Context, p *path.Path, timeout time.D
 		circuit.SetState(StateFailed)
 		return nil, fmt.Errorf("failed to connect to guard: %w", err)
 	}
-	
+
 	// Store connection in circuit for cell I/O
 	circuit.SetConnection(guardConn)
 
