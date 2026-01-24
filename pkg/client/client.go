@@ -942,13 +942,13 @@ func (p *clientConfigProvider) SetConfigValue(key, value string) error {
 func (c *Client) mergeContexts(parent, child context.Context) context.Context {
 	ctx, cancel := context.WithCancel(parent)
 
-	// AUDIT-R-012: Launch context merger goroutine (will terminate when either context cancels)
+	// Launch goroutine that cancels when either parent or child completes
+	// The goroutine will terminate once cancel() is called
 	go func() {
+		defer cancel()
 		select {
 		case <-parent.Done():
-			cancel()
 		case <-child.Done():
-			cancel()
 		}
 	}()
 

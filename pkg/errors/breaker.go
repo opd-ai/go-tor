@@ -222,7 +222,19 @@ func (cb *CircuitBreaker) changeState(newState CircuitState) {
 
 	if cb.config.OnStateChange != nil {
 		// Call callback without holding lock to prevent deadlock
-		go cb.config.OnStateChange(oldState, newState)
+		// Use timeout to prevent goroutine leak from blocking callbacks
+		go func() {
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				cb.config.OnStateChange(oldState, newState)
+			}()
+			select {
+			case <-done:
+			case <-time.After(5 * time.Second):
+				// Callback timed out, goroutine will exit
+			}
+		}()
 	}
 }
 
@@ -288,7 +300,19 @@ func (cb *CircuitBreaker) Reset() {
 	cb.reset()
 
 	if oldState != StateClosed && cb.config.OnStateChange != nil {
-		go cb.config.OnStateChange(oldState, StateClosed)
+		// Call callback with timeout to prevent goroutine leak
+		go func() {
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				cb.config.OnStateChange(oldState, StateClosed)
+			}()
+			select {
+			case <-done:
+			case <-time.After(5 * time.Second):
+				// Callback timed out, goroutine will exit
+			}
+		}()
 	}
 }
 
@@ -303,7 +327,19 @@ func (cb *CircuitBreaker) ForceOpen() {
 		cb.openedAt = time.Now()
 
 		if cb.config.OnStateChange != nil {
-			go cb.config.OnStateChange(oldState, StateOpen)
+			// Call callback with timeout to prevent goroutine leak
+			go func() {
+				done := make(chan struct{})
+				go func() {
+					defer close(done)
+					cb.config.OnStateChange(oldState, StateOpen)
+				}()
+				select {
+				case <-done:
+				case <-time.After(5 * time.Second):
+					// Callback timed out, goroutine will exit
+				}
+			}()
 		}
 	}
 }

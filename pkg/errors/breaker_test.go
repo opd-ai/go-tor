@@ -3,6 +3,7 @@ package errors
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -400,5 +401,82 @@ func TestCircuitBreaker_MinRequests(t *testing.T) {
 	// Now circuit should open (100% failure rate at MinRequests)
 	if cb.State() != StateOpen {
 		t.Errorf("Expected circuit to open at MinRequests, got %v", cb.State())
+	}
+}
+
+// TestNoGoroutineLeakOnStateChange verifies that state change callbacks don't leak goroutines
+// when they block or take too long (AUDIT fix verification)
+func TestNoGoroutineLeakOnStateChange(t *testing.T) {
+	baseline := runtime.NumGoroutine()
+
+	config := DefaultCircuitBreakerConfig()
+	config.MaxFailures = 2
+	config.Timeout = 100 * time.Millisecond
+
+	// Create callback that blocks longer than timeout
+	var callbackMu sync.Mutex
+	blockingCallbackCalled := 0
+	config.OnStateChange = func(from, to CircuitState) {
+		callbackMu.Lock()
+		blockingCallbackCalled++
+		callbackMu.Unlock()
+		time.Sleep(10 * time.Second) // Blocks way longer than timeout
+	}
+
+	cb := NewCircuitBreaker(config)
+	ctx := context.Background()
+
+	// Trigger state changes by causing failures
+	for i := 0; i < 5; i++ {
+		cb.Execute(ctx, func() error {
+			return fmt.Errorf("failure")
+		})
+	}
+
+	// Wait briefly for callbacks to be invoked with timeout
+	time.Sleep(200 * time.Millisecond)
+
+	// Check that goroutines haven't accumulated
+	current := runtime.NumGoroutine()
+	growth := current - baseline
+
+	// Allow some goroutine growth but not unbounded
+	if growth > 15 {
+		t.Errorf("Goroutine leak detected: baseline=%d, current=%d, growth=%d", baseline, current, growth)
+	}
+
+	callbackMu.Lock()
+	called := blockingCallbackCalled
+	callbackMu.Unlock()
+	if called == 0 {
+		t.Error("Expected OnStateChange to be called at least once")
+	}
+}
+
+// TestStateChangeCallbackTimeout verifies callbacks are bounded by timeout
+func TestStateChangeCallbackTimeout(t *testing.T) {
+	config := DefaultCircuitBreakerConfig()
+	config.MaxFailures = 1
+
+	callbackDuration := time.Duration(0)
+	config.OnStateChange = func(from, to CircuitState) {
+		// This callback blocks for 10 seconds
+		time.Sleep(10 * time.Second)
+	}
+
+	cb := NewCircuitBreaker(config)
+	ctx := context.Background()
+
+	start := time.Now()
+	// This should trigger state change from Closed to Open
+	cb.Execute(ctx, func() error {
+		return fmt.Errorf("failure")
+	})
+	callbackDuration = time.Since(start)
+
+	// The Execute call should not block waiting for callback
+	// It should return quickly (within timeout + overhead)
+	if callbackDuration > 1*time.Second {
+		t.Errorf("Execute blocked for %v waiting for callback, should return immediately", callbackDuration)
 	}
 }

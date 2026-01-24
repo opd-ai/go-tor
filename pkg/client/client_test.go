@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"runtime"
 	"testing"
 	"time"
 
@@ -537,5 +538,81 @@ func TestStatsSnapshot(t *testing.T) {
 	}
 	if stats.ActiveCircuits != 0 {
 		t.Errorf("Expected 0 ActiveCircuits, got %d", stats.ActiveCircuits)
+	}
+}
+
+// TestMergeContextsNoGoroutineLeak verifies that mergeContexts doesn't leak goroutines
+// (AUDIT fix verification)
+func TestMergeContextsNoGoroutineLeak(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.DataDirectory = t.TempDir()
+	log := logger.NewDefault()
+
+	client, err := New(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	baseline := runtime.NumGoroutine()
+
+	// Create many merged contexts and cancel them
+	for i := 0; i < 100; i++ {
+		parent, parentCancel := context.WithCancel(context.Background())
+		child, childCancel := context.WithCancel(context.Background())
+
+		merged := client.mergeContexts(parent, child)
+
+		// Verify merged context works
+		select {
+		case <-merged.Done():
+			t.Error("Merged context should not be done yet")
+		default:
+		}
+
+		// Cancel parent and verify merged is cancelled
+		parentCancel()
+		select {
+		case <-merged.Done():
+		case <-time.After(10 * time.Millisecond):
+			t.Error("Merged context should be cancelled when parent is cancelled")
+		}
+
+		childCancel()
+	}
+
+	// Allow goroutines to complete
+	time.Sleep(50 * time.Millisecond)
+
+	current := runtime.NumGoroutine()
+	growth := current - baseline
+
+	// Allow some growth but not 100+ goroutines
+	if growth > 10 {
+		t.Errorf("Goroutine leak detected: baseline=%d, current=%d, growth=%d", baseline, current, growth)
+	}
+}
+
+// TestMergeContextsChildCancellation verifies child cancellation also cancels merged context
+func TestMergeContextsChildCancellation(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.DataDirectory = t.TempDir()
+	log := logger.NewDefault()
+
+	client, err := New(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	parent := context.Background()
+	child, childCancel := context.WithCancel(context.Background())
+
+	merged := client.mergeContexts(parent, child)
+
+	// Cancel child and verify merged is cancelled
+	childCancel()
+	select {
+	case <-merged.Done():
+	case <-time.After(10 * time.Millisecond):
+		t.Error("Merged context should be cancelled when child is cancelled")
 	}
 }
