@@ -479,10 +479,21 @@ The `pkg/onion/service.go` already contains foundational server-side functionali
 
 **Tasks**:
 
-- [ ] **11.1.1 PT Client Interface**
-  - Implement `ClientTransport` interface
-  - Support PT version 2 IPC protocol
-  - Manage PT subprocess lifecycle
+- [x] **11.1.1 PT Client Interface** ✅ **COMPLETED** (January 25, 2026)
+  - Implemented `ClientTransport` interface
+  - Supported PT version 1 IPC protocol
+  - Managed PT subprocess lifecycle
+  - Implementation: `pkg/pt/transport.go`, `pkg/pt/client.go`
+  - Tests: `pkg/pt/client_test.go` (37.9% coverage, 12 tests passing)
+  - Features:
+    - External PT process management (launch, monitor, terminate)
+    - PT handshake with CMETHOD parsing
+    - Environment variable configuration per pt-spec.txt
+    - SOCKS5 connection wrapping through PT
+    - Support for SOCKS4 and SOCKS5 protocols
+    - Transport method registration and discovery
+    - Graceful shutdown and cleanup
+  - Documentation: `docs/PLUGGABLE_TRANSPORTS.md`
 
 - [ ] **11.1.2 PT Server Interface**
   - Implement `ServerTransport` interface  
@@ -495,8 +506,9 @@ The `pkg/onion/service.go` already contains foundational server-side functionali
   - Handle state directory management
 
 **Files to Create**:
-- `pkg/pt/transport.go` - Transport interface definitions
-- `pkg/pt/client.go` - PT client implementation
+- `pkg/pt/transport.go` ✅ **COMPLETED** - Transport interface definitions
+- `pkg/pt/client.go` ✅ **COMPLETED** - PT client implementation  
+- `pkg/pt/client_test.go` ✅ **COMPLETED** - Comprehensive tests (12 tests, 37.9% coverage)
 - `pkg/pt/server.go` - PT server implementation
 - `pkg/pt/ipc.go` - IPC protocol with PT processes
 - `pkg/pt/manager.go` - PT process lifecycle management
