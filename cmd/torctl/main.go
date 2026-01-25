@@ -354,9 +354,6 @@ func showInfo(conn net.Conn) error {
 	return nil
 }
 
-// getConfig is disabled - GETCONF currently returns empty values from control server
-// TODO: Implement full GETCONF support in pkg/control/control.go
-/*
 func getConfig(conn net.Conn, key string) error {
 	response, err := sendCommand(conn, fmt.Sprintf("GETCONF %s", key))
 	if err != nil {
@@ -376,7 +373,7 @@ func getConfig(conn net.Conn, key string) error {
 
 	return nil
 }
-*/
+
 
 func sendSignal(conn net.Conn, signal string) error {
 	signal = strings.ToUpper(signal)

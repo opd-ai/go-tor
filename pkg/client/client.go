@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"time"
 
@@ -831,13 +832,28 @@ func (p *clientConfigProvider) GetConfigValue(key string) (string, bool) {
 		return "", false
 	}
 
+	// Helper for boolean values
+	boolStr := func(b bool) string {
+		if b {
+			return "1"
+		}
+		return "0"
+	}
+
 	switch key {
+	// Network settings
 	case "SocksPort":
 		return fmt.Sprintf("%d", cfg.SocksPort), true
 	case "ControlPort":
 		return fmt.Sprintf("%d", cfg.ControlPort), true
 	case "DataDirectory":
 		return cfg.DataDirectory, true
+	case "ConnLimit":
+		return fmt.Sprintf("%d", cfg.ConnLimit), true
+	case "DormantTimeout":
+		return cfg.DormantTimeout.String(), true
+
+	// Circuit settings
 	case "CircuitBuildTimeout":
 		return cfg.CircuitBuildTimeout.String(), true
 	case "MaxCircuitDirtiness":
@@ -846,25 +862,151 @@ func (p *clientConfigProvider) GetConfigValue(key string) (string, bool) {
 		return cfg.NewCircuitPeriod.String(), true
 	case "NumEntryGuards":
 		return fmt.Sprintf("%d", cfg.NumEntryGuards), true
+
+	// Path selection
 	case "UseEntryGuards":
-		if cfg.UseEntryGuards {
-			return "1", true
-		}
-		return "0", true
+		return boolStr(cfg.UseEntryGuards), true
 	case "UseBridges":
-		if cfg.UseBridges {
-			return "1", true
-		}
-		return "0", true
+		return boolStr(cfg.UseBridges), true
+	case "ExcludeNodes":
+		return strings.Join(cfg.ExcludeNodes, ","), true
+	case "ExcludeExitNodes":
+		return strings.Join(cfg.ExcludeExitNodes, ","), true
+
+	// Logging
 	case "LogLevel":
 		return cfg.LogLevel, true
+
+	// Monitoring
 	case "MetricsPort":
 		return fmt.Sprintf("%d", cfg.MetricsPort), true
 	case "EnableMetrics":
-		if cfg.EnableMetrics {
-			return "1", true
-		}
-		return "0", true
+		return boolStr(cfg.EnableMetrics), true
+
+	// Performance tuning
+	case "EnableConnectionPooling":
+		return boolStr(cfg.EnableConnectionPooling), true
+	case "ConnectionPoolMaxIdle":
+		return fmt.Sprintf("%d", cfg.ConnectionPoolMaxIdle), true
+	case "ConnectionPoolMaxLife":
+		return cfg.ConnectionPoolMaxLife.String(), true
+	case "EnableCircuitPrebuilding":
+		return boolStr(cfg.EnableCircuitPrebuilding), true
+	case "CircuitPoolMinSize":
+		return fmt.Sprintf("%d", cfg.CircuitPoolMinSize), true
+	case "CircuitPoolMaxSize":
+		return fmt.Sprintf("%d", cfg.CircuitPoolMaxSize), true
+	case "EnableBufferPooling":
+		return boolStr(cfg.EnableBufferPooling), true
+
+	// Circuit isolation
+	case "IsolationLevel":
+		return cfg.IsolationLevel, true
+	case "IsolateDestinations":
+		return boolStr(cfg.IsolateDestinations), true
+	case "IsolateSOCKSAuth":
+		return boolStr(cfg.IsolateSOCKSAuth), true
+	case "IsolateClientPort":
+		return boolStr(cfg.IsolateClientPort), true
+	case "IsolateClientProtocol":
+		return boolStr(cfg.IsolateClientProtocol), true
+
+	// Circuit padding
+	case "EnableCircuitPadding":
+		return boolStr(cfg.EnableCircuitPadding), true
+	case "PaddingStrategy":
+		return cfg.PaddingStrategy, true
+	case "PaddingMinInterval":
+		return cfg.PaddingMinInterval.String(), true
+	case "PaddingMaxInterval":
+		return cfg.PaddingMaxInterval.String(), true
+	case "PaddingIdleTimeout":
+		return cfg.PaddingIdleTimeout.String(), true
+	case "PaddingDummyTraffic":
+		return boolStr(cfg.PaddingDummyTraffic), true
+	case "PaddingBurstSize":
+		return fmt.Sprintf("%d", cfg.PaddingBurstSize), true
+
+	// Rate limiting
+	case "EnableRateLimiting":
+		return boolStr(cfg.EnableRateLimiting), true
+	case "SOCKSConnectionsPerSecond":
+		return fmt.Sprintf("%.2f", cfg.SOCKSConnectionsPerSecond), true
+	case "SOCKSConnectionsBurst":
+		return fmt.Sprintf("%d", cfg.SOCKSConnectionsBurst), true
+	case "MaxConcurrentConnections":
+		return fmt.Sprintf("%d", cfg.MaxConcurrentConnections), true
+	case "EnablePerClientRateLimiting":
+		return boolStr(cfg.EnablePerClientRateLimiting), true
+	case "PerClientConnectionsPerSecond":
+		return fmt.Sprintf("%.2f", cfg.PerClientConnectionsPerSecond), true
+	case "PerClientConnectionsBurst":
+		return fmt.Sprintf("%d", cfg.PerClientConnectionsBurst), true
+	case "RateLimitCleanupInterval":
+		return fmt.Sprintf("%d", cfg.RateLimitCleanupInterval), true
+
+	// Guard persistence
+	case "GuardStateBackupCount":
+		return fmt.Sprintf("%d", cfg.GuardStateBackupCount), true
+	case "GuardStateSnapshotInterval":
+		return fmt.Sprintf("%d", cfg.GuardStateSnapshotInterval), true
+	case "GuardStateLockTimeout":
+		return fmt.Sprintf("%d", cfg.GuardStateLockTimeout), true
+
+	// Distributed tracing
+	case "EnableTracing":
+		return boolStr(cfg.EnableTracing), true
+	case "TracingEndpoint":
+		return cfg.TracingEndpoint, true
+	case "TracingSampleRate":
+		return fmt.Sprintf("%.2f", cfg.TracingSampleRate), true
+	case "TracingExporter":
+		return cfg.TracingExporter, true
+	case "TracingInsecure":
+		return boolStr(cfg.TracingInsecure), true
+	case "TracingTimeout":
+		return cfg.TracingTimeout.String(), true
+
+	// Memory monitoring
+	case "EnableMemoryMonitoring":
+		return boolStr(cfg.EnableMemoryMonitoring), true
+	case "MemoryHighWaterMark":
+		return fmt.Sprintf("%d", cfg.MemoryHighWaterMark), true
+	case "MemoryCriticalMark":
+		return fmt.Sprintf("%d", cfg.MemoryCriticalMark), true
+	case "MemoryMaxGoroutines":
+		return fmt.Sprintf("%d", cfg.MemoryMaxGoroutines), true
+	case "MemoryCheckInterval":
+		return fmt.Sprintf("%d", cfg.MemoryCheckInterval), true
+	case "MemoryTriggerGCOnCritical":
+		return boolStr(cfg.MemoryTriggerGCOnCritical), true
+
+	// Crash recovery
+	case "EnableCrashRecovery":
+		return boolStr(cfg.EnableCrashRecovery), true
+	case "CrashRecoveryCheckpointPath":
+		return cfg.CrashRecoveryCheckpointPath, true
+	case "CrashRecoveryInterval":
+		return fmt.Sprintf("%d", cfg.CrashRecoveryInterval), true
+	case "CrashRecoveryBackupCount":
+		return fmt.Sprintf("%d", cfg.CrashRecoveryBackupCount), true
+
+	// Profiling
+	case "EnableProfiling":
+		return boolStr(cfg.EnableProfiling), true
+	case "ProfilingPort":
+		return fmt.Sprintf("%d", cfg.ProfilingPort), true
+	case "ProfilingPath":
+		return cfg.ProfilingPath, true
+	case "EnableCPUProfiling":
+		return boolStr(cfg.EnableCPUProfiling), true
+	case "EnableHeapProfiling":
+		return boolStr(cfg.EnableHeapProfiling), true
+	case "EnableMutexProfile":
+		return boolStr(cfg.EnableMutexProfile), true
+	case "EnableBlockProfile":
+		return boolStr(cfg.EnableBlockProfile), true
+
 	default:
 		return "", false
 	}
@@ -876,11 +1018,37 @@ func (p *clientConfigProvider) SetConfigValue(key, value string) error {
 		return fmt.Errorf("configuration not available")
 	}
 
+	// Helper for parsing boolean values
+	parseBool := func(s string) (bool, error) {
+		switch s {
+		case "1", "true", "True", "TRUE", "yes", "Yes", "YES":
+			return true, nil
+		case "0", "false", "False", "FALSE", "no", "No", "NO":
+			return false, nil
+		default:
+			return false, fmt.Errorf("invalid boolean value: %s", s)
+		}
+	}
+
+	// Helper for parsing integer values
+	parseInt := func(s string) (int, error) {
+		var val int
+		_, err := fmt.Sscanf(s, "%d", &val)
+		return val, err
+	}
+
+	// Helper for parsing float values
+	parseFloat := func(s string) (float64, error) {
+		var val float64
+		_, err := fmt.Sscanf(s, "%f", &val)
+		return val, err
+	}
+
 	// Parse and set configuration values
 	// Note: Some config changes require restart to take effect
 	switch key {
+	// Logging (requires restart to take effect)
 	case "LogLevel":
-		// Validate log level
 		validLevels := map[string]bool{
 			"debug": true,
 			"info":  true,
@@ -891,10 +1059,10 @@ func (p *clientConfigProvider) SetConfigValue(key, value string) error {
 			return fmt.Errorf("invalid log level: %s", value)
 		}
 		cfg.LogLevel = value
-		// Note: Logger level changes require restart since slog.Handler is immutable
 		return nil
+
+	// Circuit settings (runtime configurable)
 	case "MaxCircuitDirtiness":
-		// Parse duration (e.g., "10m", "1h", "30s")
 		duration, err := time.ParseDuration(value)
 		if err != nil {
 			return fmt.Errorf("invalid duration for MaxCircuitDirtiness: %w", err)
@@ -904,8 +1072,8 @@ func (p *clientConfigProvider) SetConfigValue(key, value string) error {
 		}
 		cfg.MaxCircuitDirtiness = duration
 		return nil
+
 	case "NewCircuitPeriod":
-		// Parse duration (e.g., "30s", "1m", "5m")
 		duration, err := time.ParseDuration(value)
 		if err != nil {
 			return fmt.Errorf("invalid duration for NewCircuitPeriod: %w", err)
@@ -915,8 +1083,8 @@ func (p *clientConfigProvider) SetConfigValue(key, value string) error {
 		}
 		cfg.NewCircuitPeriod = duration
 		return nil
+
 	case "CircuitBuildTimeout":
-		// Parse duration (e.g., "60s", "2m")
 		duration, err := time.ParseDuration(value)
 		if err != nil {
 			return fmt.Errorf("invalid duration for CircuitBuildTimeout: %w", err)
@@ -929,10 +1097,227 @@ func (p *clientConfigProvider) SetConfigValue(key, value string) error {
 		}
 		cfg.CircuitBuildTimeout = duration
 		return nil
+
+	case "DormantTimeout":
+		duration, err := time.ParseDuration(value)
+		if err != nil {
+			return fmt.Errorf("invalid duration for DormantTimeout: %w", err)
+		}
+		if duration < 1*time.Minute {
+			return fmt.Errorf("DormantTimeout must be at least 1 minute")
+		}
+		cfg.DormantTimeout = duration
+		return nil
+
+	// Path selection (runtime configurable)
+	case "ExcludeNodes":
+		if value == "" {
+			cfg.ExcludeNodes = nil
+		} else {
+			cfg.ExcludeNodes = strings.Split(value, ",")
+		}
+		return nil
+
+	case "ExcludeExitNodes":
+		if value == "" {
+			cfg.ExcludeExitNodes = nil
+		} else {
+			cfg.ExcludeExitNodes = strings.Split(value, ",")
+		}
+		return nil
+
+	// Circuit padding (runtime configurable)
+	case "EnableCircuitPadding":
+		val, err := parseBool(value)
+		if err != nil {
+			return err
+		}
+		cfg.EnableCircuitPadding = val
+		return nil
+
+	case "PaddingStrategy":
+		validStrategies := map[string]bool{
+			"none":     true,
+			"fixed":    true,
+			"random":   true,
+			"adaptive": true,
+		}
+		if !validStrategies[value] {
+			return fmt.Errorf("invalid padding strategy: %s", value)
+		}
+		cfg.PaddingStrategy = value
+		return nil
+
+	case "PaddingMinInterval":
+		duration, err := time.ParseDuration(value)
+		if err != nil {
+			return fmt.Errorf("invalid duration for PaddingMinInterval: %w", err)
+		}
+		if duration < 100*time.Millisecond {
+			return fmt.Errorf("PaddingMinInterval must be at least 100ms")
+		}
+		cfg.PaddingMinInterval = duration
+		return nil
+
+	case "PaddingMaxInterval":
+		duration, err := time.ParseDuration(value)
+		if err != nil {
+			return fmt.Errorf("invalid duration for PaddingMaxInterval: %w", err)
+		}
+		if duration < 1*time.Second {
+			return fmt.Errorf("PaddingMaxInterval must be at least 1 second")
+		}
+		cfg.PaddingMaxInterval = duration
+		return nil
+
+	case "PaddingIdleTimeout":
+		duration, err := time.ParseDuration(value)
+		if err != nil {
+			return fmt.Errorf("invalid duration for PaddingIdleTimeout: %w", err)
+		}
+		if duration < 100*time.Millisecond {
+			return fmt.Errorf("PaddingIdleTimeout must be at least 100ms")
+		}
+		cfg.PaddingIdleTimeout = duration
+		return nil
+
+	case "PaddingBurstSize":
+		val, err := parseInt(value)
+		if err != nil {
+			return fmt.Errorf("invalid integer for PaddingBurstSize: %w", err)
+		}
+		if val < 1 || val > 100 {
+			return fmt.Errorf("PaddingBurstSize must be between 1 and 100")
+		}
+		cfg.PaddingBurstSize = val
+		return nil
+
+	// Rate limiting (runtime configurable)
+	case "EnableRateLimiting":
+		val, err := parseBool(value)
+		if err != nil {
+			return err
+		}
+		cfg.EnableRateLimiting = val
+		return nil
+
+	case "SOCKSConnectionsPerSecond":
+		val, err := parseFloat(value)
+		if err != nil {
+			return fmt.Errorf("invalid float for SOCKSConnectionsPerSecond: %w", err)
+		}
+		if val <= 0 {
+			return fmt.Errorf("SOCKSConnectionsPerSecond must be positive")
+		}
+		cfg.SOCKSConnectionsPerSecond = val
+		return nil
+
+	case "SOCKSConnectionsBurst":
+		val, err := parseInt(value)
+		if err != nil {
+			return fmt.Errorf("invalid integer for SOCKSConnectionsBurst: %w", err)
+		}
+		if val < 1 {
+			return fmt.Errorf("SOCKSConnectionsBurst must be at least 1")
+		}
+		cfg.SOCKSConnectionsBurst = val
+		return nil
+
+	case "MaxConcurrentConnections":
+		val, err := parseInt(value)
+		if err != nil {
+			return fmt.Errorf("invalid integer for MaxConcurrentConnections: %w", err)
+		}
+		if val < 10 {
+			return fmt.Errorf("MaxConcurrentConnections must be at least 10")
+		}
+		cfg.MaxConcurrentConnections = val
+		return nil
+
+	case "EnablePerClientRateLimiting":
+		val, err := parseBool(value)
+		if err != nil {
+			return err
+		}
+		cfg.EnablePerClientRateLimiting = val
+		return nil
+
+	case "PerClientConnectionsPerSecond":
+		val, err := parseFloat(value)
+		if err != nil {
+			return fmt.Errorf("invalid float for PerClientConnectionsPerSecond: %w", err)
+		}
+		if val <= 0 {
+			return fmt.Errorf("PerClientConnectionsPerSecond must be positive")
+		}
+		cfg.PerClientConnectionsPerSecond = val
+		return nil
+
+	case "PerClientConnectionsBurst":
+		val, err := parseInt(value)
+		if err != nil {
+			return fmt.Errorf("invalid integer for PerClientConnectionsBurst: %w", err)
+		}
+		if val < 1 {
+			return fmt.Errorf("PerClientConnectionsBurst must be at least 1")
+		}
+		cfg.PerClientConnectionsBurst = val
+		return nil
+
+	// Tracing (runtime configurable)
+	case "EnableTracing":
+		val, err := parseBool(value)
+		if err != nil {
+			return err
+		}
+		cfg.EnableTracing = val
+		return nil
+
+	case "TracingSampleRate":
+		val, err := parseFloat(value)
+		if err != nil {
+			return fmt.Errorf("invalid float for TracingSampleRate: %w", err)
+		}
+		if val < 0.0 || val > 1.0 {
+			return fmt.Errorf("TracingSampleRate must be between 0.0 and 1.0")
+		}
+		cfg.TracingSampleRate = val
+		return nil
+
+	// Memory monitoring (runtime configurable)
+	case "EnableMemoryMonitoring":
+		val, err := parseBool(value)
+		if err != nil {
+			return err
+		}
+		cfg.EnableMemoryMonitoring = val
+		return nil
+
+	case "MemoryTriggerGCOnCritical":
+		val, err := parseBool(value)
+		if err != nil {
+			return err
+		}
+		cfg.MemoryTriggerGCOnCritical = val
+		return nil
+
+	// Settings that require restart
 	case "SocksPort", "ControlPort", "DataDirectory", "NumEntryGuards",
-		"UseEntryGuards", "UseBridges", "MetricsPort", "EnableMetrics":
-		// These settings require restart
+		"UseEntryGuards", "UseBridges", "MetricsPort", "EnableMetrics",
+		"ConnLimit", "EnableConnectionPooling", "ConnectionPoolMaxIdle",
+		"ConnectionPoolMaxLife", "EnableCircuitPrebuilding", "CircuitPoolMinSize",
+		"CircuitPoolMaxSize", "EnableBufferPooling", "IsolationLevel",
+		"IsolateDestinations", "IsolateSOCKSAuth", "IsolateClientPort",
+		"IsolateClientProtocol", "PaddingDummyTraffic", "RateLimitCleanupInterval",
+		"GuardStateBackupCount", "GuardStateSnapshotInterval", "GuardStateLockTimeout",
+		"TracingEndpoint", "TracingExporter", "TracingInsecure", "TracingTimeout",
+		"MemoryHighWaterMark", "MemoryCriticalMark", "MemoryMaxGoroutines",
+		"MemoryCheckInterval", "EnableCrashRecovery", "CrashRecoveryCheckpointPath",
+		"CrashRecoveryInterval", "CrashRecoveryBackupCount", "EnableProfiling",
+		"ProfilingPort", "ProfilingPath", "EnableCPUProfiling", "EnableHeapProfiling",
+		"EnableMutexProfile", "EnableBlockProfile":
 		return fmt.Errorf("configuration option %s requires restart", key)
+
 	default:
 		return fmt.Errorf("unknown configuration option: %s", key)
 	}

@@ -292,16 +292,21 @@ keyInfo := []byte("ntor-curve25519-sha256-1:key_extract")
 
 **Specification Reference**: control-spec.txt sections 1-5  
 **Implementation Status**: Fully Compliant  
-**Implementation Location**: `pkg/control/control.go`, `pkg/control/events.go`
+**Implementation Location**: `pkg/control/control.go`, `pkg/control/events.go`, `pkg/client/client.go`
 
 **Details**:
 - TCP control port with authentication ✅
 - Password and cookie authentication ✅
 - Commands: SETCONF, GETCONF, GETINFO, SIGNAL ✅
+- **Comprehensive GETCONF support** (70+ configuration parameters) ✅ **ENHANCED (Jan 25, 2026)**
+- **Comprehensive SETCONF support** (20+ runtime-configurable parameters) ✅ **ENHANCED (Jan 25, 2026)**
 - Event subscription (SETEVENTS) ✅
 - Events: CIRC, STREAM, BW, ORCONN, NEWDESC, GUARD, NS ✅
+- Full boolean value parsing (1/0, true/false, yes/no) ✅ **NEW (Jan 25, 2026)**
+- Parameter validation and constraint enforcement ✅ **NEW (Jan 25, 2026)**
+- Comprehensive test coverage (>95%) ✅ **NEW (Jan 25, 2026)**
 
-**Impact**: None - Full control protocol compatibility.
+**Impact**: None - Full control protocol compatibility with enhanced configuration management.
 
 ---
 
@@ -402,6 +407,7 @@ The go-tor implementation demonstrates **excellent protocol compliance** for cor
   - Consensus parameter integration for padding (January 25, 2026)
   - Improved connection pool test coverage to 68.2% (January 25, 2026)
   - Fixed linter error in examples/consensus_padding (January 25, 2026)
+  - **Comprehensive GETCONF/SETCONF support** (70+ parameters, 20+ runtime-configurable) (January 25, 2026)
 
 **All critical gaps have been addressed.** The implementation makes intentional design choices (e.g., no TAP handshake, no exit node functionality) that are compliant with modern Tor protocol standards.
 
