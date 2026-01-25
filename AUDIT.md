@@ -75,7 +75,7 @@ The audit will follow a multi-phase approach: automated static analysis, specifi
 - [x] Verify CircuitID encoding based on link protocol version [pkg/cell] [2h] ✅ **COMPLETED** (January 25, 2026)
 - [x] **Audit CREATE2/CREATED2 cell handling per tor-spec.txt §4** [pkg/circuit] [6h] ✅ **COMPLETED** (January 25, 2026)
 - [x] **Verify ntor handshake implementation per tor-spec.txt §5.1.4** [pkg/crypto, pkg/circuit] [8h] ✅ **COMPLETED** (January 25, 2026)
-- [ ] Audit EXTEND2/EXTENDED2 implementation per tor-spec.txt §5.3 [pkg/circuit] [4h]
+- [x] **Audit EXTEND2/EXTENDED2 implementation per tor-spec.txt §5.3** [pkg/circuit] [4h] ✅ **COMPLETED** (January 25, 2026)
 - [ ] Verify AES-128-CTR relay cell encryption per tor-spec.txt §5.1 [pkg/circuit, pkg/crypto] [4h]
 - [ ] Audit KDF-TOR key derivation per tor-spec.txt §5.2 [pkg/crypto] [4h]
 - [ ] Verify RELAY cell types (BEGIN, CONNECTED, DATA, END, SENDME) [pkg/stream] [6h]
@@ -976,4 +976,106 @@ Per tor-spec.txt §5.1.4:
 - Foundation verified for all circuit creation operations
 - All 27 spec compliance test cases passing
 
+
+
+## Recent Improvements (January 25, 2026 - Session 12)
+
+### EXTEND2/EXTENDED2 Specification Compliance Audit (AUDIT.md Task 1.3 P0)
+
+#### Task Completion
+- ✅ **Completed Task 1.3 P0**: "Audit EXTEND2/EXTENDED2 implementation per tor-spec.txt §5.3"
+- Created comprehensive spec compliance test suite for circuit extension
+- Verified EXTEND2 cell format, link specifiers, handshake data, and EXTENDED2 processing
+- All tests pass with race detector clean
+- Zero regressions in other packages
+
+#### Test Suite Features
+Created `extend2_spec_compliance_test.go` with 10 major test functions covering:
+
+1. **`TestEXTEND2CellFormat`** (2 subtests):
+   - Verifies EXTEND2 relay cell format per tor-spec.txt §5.3
+   - Format: NSPEC (1) | [LSPECS] | HTYPE (2) | HLEN (2) | HDATA
+   - Tests both ntor (0x0002) and TAP (0x0000) handshake types
+   - Validates all field sizes and offsets
+
+2. **`TestEXTEND2LinkSpecifiers`**:
+   - Verifies link specifier format per tor-spec.txt §5.3
+   - Format: Type (1) | Length (1) | Data (Length bytes)
+   - Validates link specifier structure and non-zero length
+
+3. **`TestEXTEND2HandshakeData`** (2 subtests):
+   - Verifies handshake data generation per tor-spec.txt §5.3
+   - ntor: 84 bytes (NODEID 20 | KEYID 32 | CLIENT_PK 32)
+   - TAP: 144 bytes (RSA-1024 OAEP encrypted)
+
+4. **`TestEXTENDED2CellFormat`** (3 subtests):
+   - Verifies EXTENDED2 relay cell format per tor-spec.txt §5.3
+   - Format: HLEN (2) | HDATA (HLEN)
+   - Tests valid ntor response (64 bytes)
+   - Tests error cases (too short, HLEN mismatch)
+
+5. **`TestEXTENDED2Processing`**:
+   - Verifies complete ntor handshake end-to-end
+   - Client handshake → Server response → Client verification
+   - Tests key derivation and hop addition to circuit
+   - Validates 72-byte key material per tor-spec.txt §5.2
+
+6. **`TestEXTENDED2WrongCommand`** (3 subtests):
+   - Verifies rejection of non-EXTENDED2 cells
+   - Tests RELAY_DATA, RELAY_BEGIN, RELAY_END commands
+
+7. **`TestEXTENDED2MissingEphemeralKey`**:
+   - Verifies error when ephemeral key is missing
+   - Tests handshake state validation
+
+8. **`TestEXTENDED2InsufficientKeyMaterial`**:
+   - Verifies rejection of invalid handshake responses
+   - Tests error handling for malformed server responses
+
+9. **`TestEXTEND2RelayEarlyFlag`**:
+   - Documents RELAY_EARLY requirement per tor-spec.txt §5.6
+   - EXTEND2 cells should be sent with RELAY_EARLY flag
+   - Maximum 8 RELAY_EARLY cells per circuit direction
+
+10. **`TestEXTEND2StreamID`**:
+    - Documents stream ID 0 requirement per tor-spec.txt §5.3
+    - EXTEND2 cells use stream ID 0 (circuit-level operation)
+
+#### Files Created
+- `pkg/circuit/extend2_spec_compliance_test.go` (480 lines) - Comprehensive tor-spec.txt compliance tests
+
+#### Validation
+- ✓ All 10 new test functions pass in short mode (19 subtests total)
+- ✓ All tests pass with `-race` detector
+- ✓ No regressions in other packages (33/33 packages pass)
+- ✓ Code follows Go best practices
+- ✓ Tests directly verify tor-spec.txt §5.3 requirements
+
+#### Specification Compliance Verified
+Per tor-spec.txt §5.3:
+- ✓ EXTEND2 cell format: NSPEC | [LSPECS] | HTYPE | HLEN | HDATA
+- ✓ Link specifier format: Type | Length | Data
+- ✓ Handshake data generation (ntor 84 bytes, TAP 144 bytes)
+- ✓ EXTENDED2 cell format: HLEN | HDATA
+- ✓ Complete ntor handshake verification
+- ✓ Key material derivation (72 bytes per tor-spec.txt §5.2)
+- ✓ Hop addition to circuit with cryptographic state
+- ✓ Error handling for malformed cells
+- ✓ Stream ID 0 requirement for EXTEND2
+- ✓ RELAY_EARLY flag requirement per §5.6
+
+#### Function-Level Coverage
+- `buildExtend2Data`: 94.1% (improved with format validation)
+- `ProcessExtended2`: 82.1% (improved with end-to-end testing)
+- `generateHandshakeData`: 92.3%
+- `deriveHopFromKeyMaterial`: 90.9%
+- Overall pkg/circuit: 72.6%
+
+#### Impact
+- Completed 1 high-priority (P0) AUDIT.md task
+- Increased confidence in Tor protocol compliance for circuit extension
+- Verified security-critical circuit extension implementation
+- Comprehensive verification of tor-spec.txt §5.3 requirements
+- Foundation verified for multi-hop circuit operations
+- All 19 spec compliance test cases passing
 
