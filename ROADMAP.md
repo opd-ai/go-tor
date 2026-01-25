@@ -163,6 +163,14 @@ The project is currently in **maintenance mode** with all core features complete
 - Optional enhancements from the list above
 - Integration testing with live Tor network (optional)
 
+### Recent Improvements (January 25, 2026)
+
+- **Test Coverage**: Added startup tests for `pkg/client` to improve robustness testing
+  - Added `startup_test.go` with 9 test functions covering Connect wrappers, Start/Stop lifecycle, and options validation
+  - Tests verify graceful error handling, context cancellation, and timeout behavior
+  - All tests pass cleanly with race detector
+  - Note: Coverage metrics unchanged (63.9%) as functions require live network for full execution paths
+
 ## Non-Goals
 
 The following are explicitly **out of scope** for this implementation:
