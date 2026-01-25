@@ -295,28 +295,22 @@ The audit will follow a multi-phase approach: automated static analysis, specifi
 
 ### 4.1 Current Coverage Analysis
 
-| Package | Current Coverage | Target | Gap | Priority |
-|---------|------------------|--------|-----|----------|
-| `pkg/autoconfig` | 60.7% | 70% | 9.3% | P2 |
-| `pkg/benchmark` | 94.4% | 90% | ✓ | - |
-| `pkg/bine` | 0.0% | 60% | 60% | P3 |
-| `pkg/cell` | 83.4% | 85% | 1.6% | P1 |
-| `pkg/circuit` | 71.8% | 80% | 8.2% | P0 |
-| `pkg/client` | 63.9% | 75% | 11.1% | P1 |
-| `pkg/config` | 80.7% | 90% | 9.3% | P1 |
-| `pkg/connection` | 65.7% | 75% | 9.3% | P1 |
-| `pkg/control` | 94.7% | 90% | ✓ | - |
-| `pkg/crypto` | 86.5% | 95% | 8.5% | P0 |
-| `pkg/directory` | ~72% | 80% | ~8% | P1 |
-| `pkg/errors` | 100% | 100% | ✓ | - |
-| `pkg/health` | 96.5% | 90% | ✓ | - |
-| `pkg/helpers` | ~50% | 70% | ~20% | P2 |
-| `pkg/httpmetrics` | 88.2% | 85% | ✓ | - |
-| `pkg/logger` | 100% | 100% | ✓ | - |
-| `pkg/metrics` | 100% | 100% | ✓ | - |
-| `pkg/onion` | ~77% | 85% | ~8% | P0 |
-| `pkg/path` | 64.8% | 80% | 15.2% | P1 |
-| `pkg/pool` | 67.8% | 80% | 12.2% | P1 |
+To avoid coverage numbers drifting across documents, `docs/TESTING.md` is the **single source of truth** for per‑package coverage baselines and measurement methodology.
+
+Coverage is measured using Go’s built‑in testing and coverage tooling (for example, `go test` with coverage flags) as described in `docs/TESTING.md`. That document defines:
+
+- The exact commands and options used to compute coverage
+- The current per‑package coverage percentages
+- The target coverage thresholds for critical and non‑critical packages
+
+This audit plan uses those baselines to prioritize work:
+
+- **P0 (highest priority)**: Security‑critical packages that are below their documented coverage targets (e.g., `pkg/crypto`, `pkg/circuit`, `pkg/onion` as listed in `docs/TESTING.md`)
+- **P1**: Core protocol and client orchestration packages that are below target
+- **P2**: Supporting infrastructure packages that are below target
+- **Resolved / lower priority**: Packages that meet or exceed their target coverage in `docs/TESTING.md`
+
+When planning or reviewing test work, always refer to the “Current Coverage Analysis” table in `docs/TESTING.md` rather than this document for the actual numeric coverage values.
 | `pkg/profiling` | ~50% | 60% | ~10% | P3 |
 | `pkg/protocol` | 27.6% | 70% | 42.4% | P0 |
 | `pkg/ratelimit` | ~60% | 80% | ~20% | P2 |
