@@ -14,21 +14,28 @@ For actual Tor usage:
 
 ## Overview
 
-go-tor is a pure Go implementation of a Tor client with the planned bridge relay capabilities, designed for embedded systems **as an educational project**. This document provides an architectural overview of the system.
+go-tor is a pure Go implementation of the Tor protocol supporting three operating modes:
 
-**Note**: While this implementation attempts to follow Tor specifications, it has not undergone the extensive security review and testing that official Tor software receives. The project scope includes client functionality, onion service hosting, traffic relaying (bridge/non-exit relay), and pluggable transport support. Only exit node functionality is explicitly out of scope and will not be implemented.
+1. **Tor Client**: SOCKS5 proxy for anonymous browsing and onion service access
+2. **Onion Service Server**: Host v3 onion services with complete introduction/rendezvous protocol
+3. **Bridge/Non-Exit Relay**: Traffic relay without exit functionality (educational purposes only)
+
+This implementation is designed for embedded systems and educational purposes **as a research project**. This document provides an architectural overview of the system.
+
+**Note**: While this implementation follows Tor specifications, it has not undergone the extensive security review and testing that official Tor software receives. The project implements client functionality, onion service hosting (server-side), and traffic relaying (bridge/non-exit relay). Exit node functionality is explicitly out of scope.
 
 ## Design Principles
 
 1. **Pure Go**: No CGo dependencies for maximum portability
-2. **Client and Relay**: Full client functionality plus onion service hosting and traffic relaying (bridge/non-exit relay) with pluggable transport support
+2. **Three Operating Modes**: Full client, onion service hosting, and bridge/non-exit relay functionality
 3. **Embedded-Optimized**: Low memory footprint and efficient resource usage
 4. **Modular**: Clean separation of concerns between packages
-5. **Testable**: Comprehensive unit and integration tests
+5. **Testable**: Comprehensive unit and integration tests with >74% coverage
 6. **Educational**: Designed for learning about Tor protocols (NOT for real anonymity)
 
 ## System Architecture
 
+### Client Mode
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                     Application Layer                    │
@@ -66,6 +73,70 @@ go-tor is a pure Go implementation of a Tor client with the planned bridge relay
 └─────────────────────────────────────────────────────────┘
 ```
 
+### Relay Mode (Bridge/Non-Exit Relay)
+```
+┌─────────────────────────────────────────────────────────┐
+│                 Incoming OR Connections                  │
+│              (pkg/relay - TLS listener)                  │
+└─────────────────────────────────────────────────────────┘
+                            ▲
+                            │
+┌─────────────────────────────────────────────────────────┐
+│                Link Protocol Handler                     │
+│        (VERSIONS, CERTS, NETINFO exchange)               │
+└─────────────────────────────────────────────────────────┘
+                            ▲
+                            │
+┌─────────────────────────────────────────────────────────┐
+│                Circuit/Extension Handler                 │
+│     (CREATE2/CREATED2, EXTEND2/EXTENDED2)                │
+└─────────────────────────────────────────────────────────┘
+                            ▲
+                            │
+┌─────────────────────────────────────────────────────────┐
+│                  Forwarding Handler                      │
+│     (Cell routing, RELAY_EARLY limiting)                 │
+└─────────────────────────────────────────────────────────┘
+                            ▲
+                            │
+┌─────────────────────────────────────────────────────────┐
+│            Rate Limiting & DoS Protection                │
+│       (Circuit/connection/cell rate limits)              │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Onion Service Mode (Server)
+```
+┌─────────────────────────────────────────────────────────┐
+│                 Local Service Backend                    │
+│               (HTTP, SSH, etc. on localhost)             │
+└─────────────────────────────────────────────────────────┘
+                            ▲
+                            │
+┌─────────────────────────────────────────────────────────┐
+│               Service Stream Manager                     │
+│    (RELAY_BEGIN/CONNECTED/DATA/END handling)             │
+└─────────────────────────────────────────────────────────┘
+                            ▲
+                            │
+┌─────────────────────────────────────────────────────────┐
+│            Rendezvous Circuit Handler                    │
+│         (RENDEZVOUS1, end-to-end encryption)             │
+└─────────────────────────────────────────────────────────┘
+                            ▲
+                            │
+┌─────────────────────────────────────────────────────────┐
+│           Introduction Point Manager                     │
+│  (ESTABLISH_INTRO, INTRODUCE2 handling, rotation)        │
+└─────────────────────────────────────────────────────────┘
+                            ▲
+                            │
+┌─────────────────────────────────────────────────────────┐
+│            Descriptor Publisher                          │
+│         (Create/sign/publish to HSDirs)                  │
+└─────────────────────────────────────────────────────────┘
+```
+
 ### Supporting Systems
 
 ```
@@ -77,6 +148,11 @@ go-tor is a pure Go implementation of a Tor client with the planned bridge relay
 ┌─────────────────┐  ┌──────────────────┐  ┌─────────────────┐
 │ Onion Services  │  │ Control Protocol │  │  Configuration   │
 │   (pkg/onion)   │  │  (pkg/control)   │  │   (pkg/config)   │
+└─────────────────┘  └──────────────────┘  └─────────────────┘
+
+┌─────────────────┐  ┌──────────────────┐  ┌─────────────────┐
+│  Relay Server   │  │  Metrics/Logging │  │  State/Guards    │
+│   (pkg/relay)   │  │ (pkg/metrics)    │  │   (pkg/state)    │
 └─────────────────┘  └──────────────────┘  └─────────────────┘
 ```
 
@@ -184,10 +260,29 @@ Onion service functionality for v3 onion services.
 **Key Features:**
 - Client: .onion address resolution and connection
 - Server: Service hosting and descriptor publishing
-- Introduction point protocol
-- Rendezvous protocol
+- Introduction point protocol with health checking and rotation
+- Rendezvous protocol with circuit building
+- INTRODUCE2 cell parsing and decryption
+- Stream handling for incoming connections
+- Service persistence (keys and state)
 - Descriptor management and caching
 - Ed25519 cryptographic operations
+
+### pkg/relay ✅ (NEW in Phase 10)
+Bridge relay and non-exit relay functionality.
+
+**Key Features:**
+- OR protocol server with TLS connection acceptance
+- Link protocol server (VERSIONS, CERTS, NETINFO exchange)
+- Server-side circuit handling (CREATE2/CREATED2)
+- Circuit extension (EXTEND2/EXTENDED2)
+- Cell forwarding between circuits
+- RELAY_EARLY limiting (8 per direction)
+- Exit policy enforcement (reject-all for non-exit relays)
+- Server descriptor generation and publishing
+- Rate limiting (circuit creation, connections, cells)
+- DoS protection (per-IP, per-connection, global limits)
+- Comprehensive metrics tracking
 
 ### pkg/control ✅
 Tor control protocol implementation.
@@ -202,7 +297,7 @@ Tor control protocol implementation.
 
 ## Data Flow
 
-### Circuit Creation
+### Client Mode: Circuit Creation
 ```
 1. Application → SOCKS5 → Circuit Manager: Request circuit
 2. Circuit Manager → Path Selection: Select guards/middle/exit
@@ -212,7 +307,7 @@ Tor control protocol implementation.
 6. Circuit Manager: Mark circuit as ready
 ```
 
-### Stream Routing
+### Client Mode: Stream Routing
 ```
 1. SOCKS5: Accept connection
 2. SOCKS5 → Circuit Manager: Get available circuit
@@ -220,6 +315,48 @@ Tor control protocol implementation.
 4. Circuit → Network: Route through circuit hops
 5. Network → Circuit: RELAY_CONNECTED response
 6. SOCKS5 ↔ Circuit: Proxy data as RELAY_DATA cells
+```
+
+### Relay Mode: Circuit Extension
+```
+1. Client Connection → Link Handler: Receive EXTEND2 cell
+2. Extension Handler → Next Hop: Connect to specified relay
+3. Extension Handler → Next Hop: Forward CREATE2 cell
+4. Next Hop → Extension Handler: Return CREATED2 response
+5. Extension Handler → Client: Send EXTENDED2 cell
+6. Circuit Handler: Register extended circuit
+```
+
+### Relay Mode: Cell Forwarding
+```
+1. Client Connection → Circuit Handler: Receive RELAY cell
+2. Forwarding Handler: Lookup circuit mapping
+3. Forwarding Handler → Next Hop: Forward cell
+4. Next Hop → Forwarding Handler: Return cell
+5. Forwarding Handler → Client: Send cell back
+6. Rate Limiter: Check RELAY_EARLY count (max 8)
+```
+
+### Onion Service Mode: Introduction
+```
+1. Service → Circuit Manager: Build intro circuits
+2. Service → Intro Circuit: Send ESTABLISH_INTRO cell
+3. Intro Point → Service: INTRO_ESTABLISHED response
+4. Service → Descriptor: Sign descriptor with intro points
+5. Service → HSDirs: Publish descriptor
+6. Client → Intro Point: INTRODUCE2 cell (intercepted)
+7. Intro Point → Service: Forward INTRODUCE2
+8. Service: Parse rendezvous point, build circuit
+```
+
+### Onion Service Mode: Rendezvous
+```
+1. Service → Circuit Manager: Build rendezvous circuit
+2. Service → Rendezvous Circuit: Send RENDEZVOUS1 cell
+3. Service ↔ Client: End-to-end encrypted stream
+4. Client → Service: RELAY_BEGIN to virtual port
+5. Service → Backend: Connect to local service
+6. Service ↔ Backend: Bidirectional data forwarding
 ```
 
 ## Security Considerations
@@ -309,13 +446,40 @@ Tor control protocol implementation.
 ✅ Comprehensive testing and documentation
 ✅ Onion Service Infrastructure Completion
 
-### Phase 9: Relay Functionality with Pluggable Transport Support (Planned)
-- [ ] Bridge relay infrastructure (OR protocol, descriptor publishing)
-- [ ] Pluggable Transport framework (PT specification, obfs4 support)
-- [ ] Bridge distribution and BridgeDB integration
-- [ ] Relay security hardening (rate limiting, DoS protection)
-- [ ] Exit policy enforcement (reject all exit traffic)
-- [ ] Bridge relay testing and validation
+### Phase 9: Onion Service Hosting ✅ (Complete)
+✅ Introduction point protocol with circuit building
+✅ ESTABLISH_INTRO cell protocol
+✅ Introduction point rotation and health checking
+✅ INTRODUCE2 cell parsing and decryption
+✅ Rendezvous circuit building
+✅ RENDEZVOUS1 cell construction with ntor handshake
+✅ Stream handling for incoming connections
+✅ Service backend connection and data forwarding
+✅ Service metrics tracking
+✅ Key persistence with secure storage
+✅ State persistence across restarts
+
+### Phase 10: Bridge Relay Implementation ✅ (Complete)
+✅ TLS server setup with relay identity keys
+✅ Link protocol server (VERSIONS, CERTS, NETINFO)
+✅ Circuit handling (CREATE2/CREATED2)
+✅ Circuit extension handling (EXTEND2/EXTENDED2)
+✅ Cell forwarding between circuits
+✅ RELAY_EARLY limiting
+✅ Exit policy enforcement (reject-all)
+✅ Server descriptor generation
+✅ Bridge authority communication
+✅ Rate limiting (circuit creation, connections, cells)
+✅ DoS protection (per-IP, per-connection, global limits)
+✅ Comprehensive relay metrics
+
+### Phase 11: Pluggable Transport Support (Planned)
+- [ ] Pluggable Transport framework (PT specification)
+- [ ] PT client interface (subprocess lifecycle)
+- [ ] PT server interface (bridge configuration)
+- [ ] Built-in obfs4 transport
+- [ ] External PT integration (obfs4proxy, snowflake)
+- [ ] Bridge client integration
 
 **Note**: Only exit node functionality is explicitly out of scope and will not be implemented.
 

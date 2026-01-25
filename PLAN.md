@@ -593,7 +593,15 @@ Each new package should have comprehensive unit tests:
 
 ### Updates to Existing Docs
 
-- [ ] `docs/ARCHITECTURE.md` - Add relay and PT architecture
+- [x] `docs/ARCHITECTURE.md` - Add relay and onion service server architecture ✅ **COMPLETED** (January 25, 2026)
+  - Added relay mode system architecture diagram
+  - Added onion service mode system architecture diagram
+  - Added pkg/relay package description with all features
+  - Enhanced pkg/onion description with server features
+  - Added relay-specific data flows (circuit extension, cell forwarding)
+  - Added onion service data flows (introduction, rendezvous)
+  - Updated Phase 9 and Phase 10 completion status
+  - Updated overview to reflect all three operating modes
 - [ ] `docs/CONFIGURATION.md` - Add relay and PT configuration
 - [ ] `docs/API.md` - Add new public APIs
 - [ ] `ROADMAP.md` - Update with completion status
