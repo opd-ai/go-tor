@@ -65,7 +65,7 @@ The audit will follow a multi-phase approach: automated static analysis, specifi
 | `pkg/path` | tor-spec.txt §5.3, path-spec.txt (Guard selection, path building) | Partial | P1 |
 | `pkg/relay` | tor-spec.txt §4-5 (CREATE2, EXTEND2, cell forwarding) | Implemented | P1 |
 | `pkg/connection` | tor-spec.txt §1-2 (TLS requirements, certificate validation) | Implemented | P0 |
-| `pkg/circuit/padding` | padding-spec.txt (Circuit padding machines, APE) | Partial | P2 |
+| `pkg/circuit` | padding-spec.txt (Circuit padding machines, APE) | Partial | P2 |
 
 ### 1.3 Compliance Verification Tasks
 
