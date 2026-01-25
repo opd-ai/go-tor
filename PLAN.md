@@ -46,7 +46,7 @@ The audit will follow a multi-phase approach: automated static analysis, specifi
 | `pkg/security` | 2 | 4 | Security utilities (constant-time ops, memory zeroing) | CRITICAL |
 | `pkg/socks` | 1 | 3 | SOCKS5 proxy server (RFC 1928) | HIGH |
 | `pkg/stream` | 4 | 7 | Stream multiplexing and handling | HIGH |
-| `pkg/testing` | 0 | 1 | Testing utilities | LOW |
+| `pkg/testing` | 2 | 4 | Testing utilities (chaos + integration suites) | LOW |
 | `pkg/trace` | 4 | 5 | OpenTelemetry tracing integration | LOW |
 
 ### 1.2 Specification Mapping
