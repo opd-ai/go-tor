@@ -344,6 +344,7 @@ type Client struct {
 	cellSender      CellSender                  // Cell sender for relay communication
 	rendezvousState map[uint32]*RendezvousState // AUDIT-006: Track ephemeral keys per circuit
 	rendezvousMu    sync.Mutex                  // Protects rendezvousState map
+	authStore       *ClientAuthStore            // Client authorization credentials for private onion services
 }
 
 // NewClient creates a new onion service client
@@ -358,6 +359,7 @@ func NewClient(log *logger.Logger) *Client {
 		hsdir:           NewHSDir(log),
 		consensus:       make([]*HSDirectory, 0),
 		rendezvousState: make(map[uint32]*RendezvousState), // AUDIT-006
+		authStore:       NewClientAuthStore(),               // Client authorization support
 	}
 }
 
@@ -405,6 +407,41 @@ func (c *Client) RemoveRendezvousState(circuitID uint32) {
 	}
 }
 
+// AddClientAuth adds a client authorization credential for a private onion service
+// The privateKey should be a 32-byte x25519 private key provided by the onion service operator
+func (c *Client) AddClientAuth(onionAddress string, privateKey [32]byte) error {
+	if c.authStore == nil {
+		c.authStore = NewClientAuthStore()
+	}
+	
+	if err := c.authStore.AddCredential(onionAddress, privateKey); err != nil {
+		c.logger.Error("Failed to add client auth credential",
+			"address", onionAddress,
+			"error", err)
+		return err
+	}
+	
+	c.logger.Info("Client authorization credential added", "address", onionAddress)
+	return nil
+}
+
+// RemoveClientAuth removes a client authorization credential
+func (c *Client) RemoveClientAuth(onionAddress string) {
+	if c.authStore != nil {
+		c.authStore.RemoveCredential(onionAddress)
+		c.logger.Info("Client authorization credential removed", "address", onionAddress)
+	}
+}
+
+// HasClientAuth checks if a client authorization credential exists for an address
+func (c *Client) HasClientAuth(onionAddress string) bool {
+	if c.authStore == nil {
+		return false
+	}
+	_, exists := c.authStore.GetCredential(onionAddress)
+	return exists
+}
+
 // CacheDescriptor caches a descriptor for testing or manual management
 func (c *Client) CacheDescriptor(addr *Address, desc *Descriptor) {
 	c.cache.Put(addr, desc)
@@ -425,6 +462,26 @@ func (c *Client) GetDescriptor(ctx context.Context, addr *Address) (*Descriptor,
 	desc, err := c.fetchDescriptor(ctx, addr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch descriptor: %w", err)
+	}
+
+	// Try client authorization if descriptor appears to be authorized
+	// This happens when normal decryption fails in fetchDescriptor
+	if len(desc.IntroPoints) == 0 && c.authStore != nil {
+		c.logger.Debug("Descriptor has no intro points, trying client authorization",
+			"address", addr.String())
+		
+		authDesc, authErr := c.TryClientAuth(desc, addr)
+		if authErr != nil {
+			c.logger.Warn("Client authorization failed",
+				"address", addr.String(),
+				"error", authErr)
+			// Return original descriptor if auth fails
+		} else if len(authDesc.IntroPoints) > 0 {
+			c.logger.Info("Successfully decrypted authorized descriptor",
+				"address", addr.String(),
+				"intro_points", len(authDesc.IntroPoints))
+			desc = authDesc
+		}
 	}
 
 	// Cache the descriptor

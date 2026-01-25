@@ -23,23 +23,22 @@ For actual Tor usage:
 
 | Metric | Value |
 |--------|-------|
-| **Overall Compliance Status** | **Partial** |
-| **Critical Findings** | 3 |
-| **High Priority Findings** | 5 |
-| **Implementation Completeness** | ~85% |
+| **Overall Compliance Status** | **Strong** |
+| **Critical Findings** | 2 |
+| **High Priority Findings** | 4 |
+| **Implementation Completeness** | ~90% |
 
-The go-tor implementation demonstrates strong compliance with core Tor protocol specifications for client functionality. All essential protocol components are implemented, including cell encoding, circuit management, ntor cryptography, directory services, and v3 onion services. The implementation uses modern protocol versions (link protocol v5, CREATE2/EXTEND2, ntor handshake) and correctly deprecates obsolete mechanisms.
+The go-tor implementation demonstrates strong compliance with core Tor protocol specifications for client functionality. All essential protocol components are implemented, including cell encoding, circuit management, ntor cryptography, directory services, v3 onion services, and client authorization. The implementation uses modern protocol versions (link protocol v5, CREATE2/EXTEND2, ntor handshake) and correctly deprecates obsolete mechanisms.
 
 **Key Strengths:**
 - Full compliance with tor-spec.txt sections 0-6 (cells, links, circuits, relay protocol)
-- Complete v3 onion service client support (rend-spec-v3.txt)
+- Complete v3 onion service client support with authorization (rend-spec-v3.txt)
 - Proper cryptographic implementations (AES-CTR, ntor, Ed25519)
 - Full SOCKS5 protocol support with Tor extensions
 
-**Critical Gaps:**
-- No client authorization for private onion services (rend-spec-v3.txt §2.5)
-- Partial circuit padding implementation (padding-spec.txt)
-- No path bias detection (path-spec.txt §5.3)
+**Remaining Gaps:**
+- Partial circuit padding implementation (padding-spec.txt) - traffic analysis resistance
+- No path bias detection (path-spec.txt §5.3) - advanced attack detection
 
 ---
 
@@ -59,14 +58,14 @@ The go-tor implementation demonstrates strong compliance with core Tor protocol 
 | Directory Client | ⚠️ Partial | dir-spec §1-6 | 95% | Consensus, descriptors, authorities |
 | Guard Selection | ✅ Complete | path-spec §1 | 100% | Persistence and rotation |
 | Path Selection | ⚠️ Partial | path-spec §2-4 | 100% | Family/subnet conflict avoidance |
-| v3 Onion Client | ⚠️ Partial | rend-spec-v3 §1-4 | 95% | Full client connection workflow |
+| v3 Onion Client | ✅ Complete | rend-spec-v3 §1-4 | 100% | Full client connection workflow with authorization |
 | Descriptor Handling | ✅ Complete | rend-spec-v3 §2 | 100% | Parsing, caching, HSDir fetching |
 | Introduction Protocol | ✅ Complete | rend-spec-v3 §3 | 100% | INTRODUCE1/ACK |
 | Rendezvous Protocol | ✅ Complete | rend-spec-v3 §4 | 100% | ESTABLISH_RENDEZVOUS, RENDEZVOUS2 |
 | SOCKS5 Proxy | ✅ Complete | socks-extensions | 100% | RFC 1928 + Tor extensions |
 | Control Protocol | ✅ Complete | control-spec §1-5 | 100% | Commands and event notifications |
 | Circuit Padding | ⚠️ Partial | padding-spec §1 | 40% | Custom adaptive padding only |
-| Client Authorization | ❌ Missing | rend-spec-v3 §2.5 | 0% | Cannot access private services |
+| Client Authorization | ✅ Complete | rend-spec-v3 §2.5 | 100% | x25519-based auth for private services |
 | Path Bias Detection | ❌ Missing | path-spec §5.3 | 0% | Advanced security feature |
 
 ---
@@ -216,12 +215,15 @@ keyInfo := []byte("ntor-curve25519-sha256-1:key_extract")
 - ESTABLISH_RENDEZVOUS cell handling ✅
 - RENDEZVOUS2 completion ✅
 
-**CRITICAL Gap**:
-- **Client Authorization** (rend-spec-v3 §2.5): NOT IMPLEMENTED
-  - Cannot access onion services requiring client authentication
-  - This affects ~10-15% of onion services
+**Implementation Status**:
+- ✅ **Client Authorization** (rend-spec-v3 §2.5): **IMPLEMENTED** (January 2026)
+  - x25519 keypair support for client authorization
+  - ENCRYPTED layer decryption with client keys
+  - Parse `auth-client` fields in descriptors
+  - Can now access private/authenticated onion services
+  - See `docs/CLIENT_AUTHORIZATION.md` for usage details
 
-**Impact**: Medium - Cannot connect to private/authenticated onion services.
+**Impact**: None - Full support for private onion services now available.
 
 ---
 
@@ -287,25 +289,28 @@ keyInfo := []byte("ntor-curve25519-sha256-1:key_extract")
 
 ## Critical Gaps
 
-| Priority | Gap | Specification | Impact |
-|----------|-----|---------------|--------|
-| **P1** | Client Authorization | rend-spec-v3 §2.5 | Cannot access private onion services |
-| **P2** | Full Circuit Padding | padding-spec §1-3 | Reduced traffic analysis protection |
-| **P2** | Enhanced Consensus Validation | dir-spec §1.3 | Reduced trust verification |
-| **P3** | Path Bias Detection | path-spec §5.3 | Missing advanced attack detection |
-| **P3** | Certificate Pinning Enhancement | tor-spec §2 | Reduced MITM defense-in-depth |
+| Priority | Gap | Specification | Impact | Status |
+|----------|-----|---------------|--------|--------|
+| **P1** | ~~Client Authorization~~ | ~~rend-spec-v3 §2.5~~ | ~~Cannot access private onion services~~ | ✅ **COMPLETED** |
+| **P2** | Full Circuit Padding | padding-spec §1-3 | Reduced traffic analysis protection | Open |
+| **P2** | Enhanced Consensus Validation | dir-spec §1.3 | Reduced trust verification | Open |
+| **P3** | Path Bias Detection | path-spec §5.3 | Missing advanced attack detection | Open |
+| **P3** | Certificate Pinning Enhancement | tor-spec §2 | Reduced MITM defense-in-depth | Open |
 
 ---
 
 ## Recommendations
 
-### High Priority
+### Completed (January 2026)
 
-1. **Implement Client Authorization** (rend-spec-v3 §2.5)
-   - Add x25519 keypair support for client authorization
-   - Implement ENCRYPTED layer decryption with client keys
-   - Parse `auth-client` fields in descriptors
-   - Priority: P1 - Affects access to ~15% of onion services
+1. ✅ **Client Authorization** (rend-spec-v3 §2.5) - **IMPLEMENTED**
+   - ✅ x25519 keypair support for client authorization
+   - ✅ ENCRYPTED layer decryption with client keys
+   - ✅ Parse `auth-client` fields in descriptors
+   - ✅ Can now access ~15% of private onion services
+   - See `docs/CLIENT_AUTHORIZATION.md` for usage
+
+### High Priority
 
 2. **Enhance Consensus Signature Validation** (dir-spec §1.3)
    - Implement multi-authority threshold verification
@@ -338,12 +343,13 @@ keyInfo := []byte("ntor-curve25519-sha256-1:key_extract")
 
 ## Conclusion
 
-The go-tor implementation demonstrates **strong protocol compliance** for core Tor client functionality. All essential components required for anonymous network access are fully implemented according to official specifications.
+The go-tor implementation demonstrates **strong protocol compliance** for core Tor client functionality. All essential components required for anonymous network access, including private onion service support, are fully implemented according to official specifications.
 
 **Compliance Summary**:
-- **Fully Compliant**: 15 components (cells, circuits, crypto, streams, SOCKS, control)
-- **Partially Compliant**: 4 components (directory, onion services, path selection, padding)
+- **Fully Compliant**: 16 components (cells, circuits, crypto, streams, SOCKS, control, client auth)
+- **Partially Compliant**: 3 components (directory, path selection, padding)
 - **Non-Compliant**: 0 components (no fundamental violations)
+- **Recent Additions**: Client authorization for v3 onion services (January 2026)
 
 The identified gaps primarily affect advanced features (client authorization, padding) rather than core protocol operation. The implementation makes intentional design choices (e.g., no TAP handshake, no exit node functionality) that are compliant with modern Tor protocol standards.
 

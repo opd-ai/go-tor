@@ -200,6 +200,7 @@ func main() {
 - **Stream Multiplexing** - Multiple data streams over single circuits
 - **Control Protocol** - Password-authenticated control interface with event notifications
 - **Onion Services** - v3 onion address support including client connections and service hosting
+- **Client Authorization** - x25519-based authentication for accessing private onion services
 - **Metrics & Observability** - Prometheus, JSON, and HTML dashboard endpoints
 - **Health Monitoring** - Component-level health checks and status reporting
 - **Resource Pooling** - Circuit and connection pooling for performance optimization
