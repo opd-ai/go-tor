@@ -89,11 +89,16 @@ The project is currently in **maintenance mode** with all core features complete
 
 The following are explicitly **out of scope** for this implementation:
 
-- **Relay/Exit Node Functionality**: This is a client-only implementation
+- **Exit Node Functionality**: Exit relay operation is explicitly out of scope
 - **Directory Authority Operation**: Authority operations are out of scope
-- **Onion Service Hosting**: Server-side onion service hosting (only client-side connection support)
 - **Tor Browser Integration**: This is a library/client, not a browser
 - **TAP Handshake**: Deprecated protocol (RSA-1024) - ntor is required
+
+**In Scope** (included in the project):
+
+- **Onion Service Hosting**: Server-side onion service hosting is supported
+- **Traffic Relaying**: Bridge relay and non-exit relay functionality is in scope
+- **Pluggable Transports**: Pluggable transport support for censorship resistance is in scope
 
 ## Contributing
 

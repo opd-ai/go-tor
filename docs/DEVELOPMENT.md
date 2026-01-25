@@ -4,7 +4,7 @@
 
 This is an **unofficial, experimental project** developed without the supervision or endorsement of [The Tor Project](https://www.torproject.org/). This software is **not safe for production use** and should not be relied upon for anonymity or privacy.
 
-The project scope includes both Tor client functionality and Tor bridge relay with pluggable transport support. **Exit node functionality is explicitly out of scope and will not be implemented.**
+The project scope includes Tor client functionality, onion service hosting, traffic relaying (bridge/non-exit relay), and pluggable transport support. **Only exit node functionality is explicitly out of scope and will not be implemented.**
 
 **If you want to contribute to Tor:**
 

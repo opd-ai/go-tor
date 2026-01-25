@@ -16,12 +16,12 @@ For actual Tor usage:
 
 go-tor is a pure Go implementation of a Tor client with the planned bridge relay capabilities, designed for embedded systems **as an educational project**. This document provides an architectural overview of the system.
 
-**Note**: While this implementation attempts to follow Tor specifications, it has not undergone the extensive security review and testing that official Tor software receives. The project currently implements client functionality, with bridge relay operation and pluggable transport support planned for Phase 9. Exit node functionality is explicitly out of scope and will not be implemented.
+**Note**: While this implementation attempts to follow Tor specifications, it has not undergone the extensive security review and testing that official Tor software receives. The project scope includes client functionality, onion service hosting, traffic relaying (bridge/non-exit relay), and pluggable transport support. Only exit node functionality is explicitly out of scope and will not be implemented.
 
 ## Design Principles
 
 1. **Pure Go**: No CGo dependencies for maximum portability
-2. **Client and Bridge Relay**: Full client functionality plus Tor bridge relay with pluggable transport support
+2. **Client and Relay**: Full client functionality plus onion service hosting and traffic relaying (bridge/non-exit relay) with pluggable transport support
 3. **Embedded-Optimized**: Low memory footprint and efficient resource usage
 4. **Modular**: Clean separation of concerns between packages
 5. **Testable**: Comprehensive unit and integration tests
@@ -309,7 +309,7 @@ Tor control protocol implementation.
 ✅ Comprehensive testing and documentation
 ✅ Onion Service Infrastructure Completion
 
-### Phase 9: Tor Bridge Relay with Pluggable Transport Support (Planned)
+### Phase 9: Relay Functionality with Pluggable Transport Support (Planned)
 - [ ] Bridge relay infrastructure (OR protocol, descriptor publishing)
 - [ ] Pluggable Transport framework (PT specification, obfs4 support)
 - [ ] Bridge distribution and BridgeDB integration
@@ -317,7 +317,7 @@ Tor control protocol implementation.
 - [ ] Exit policy enforcement (reject all exit traffic)
 - [ ] Bridge relay testing and validation
 
-**Note**: Exit node functionality is explicitly out of scope and will not be implemented.
+**Note**: Only exit node functionality is explicitly out of scope and will not be implemented.
 
 ## References
 

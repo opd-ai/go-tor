@@ -219,7 +219,7 @@ go test ./pkg/onion -bench=ClientAuth -benchmem
 
 ## Limitations
 
-1. **Server-side authorization** is not implemented (hosting private services)
+1. **Server-side authorization** is not yet implemented (hosting private services)
 2. **Client certificate generation** is not automated (keys must be provided)
 3. **Persistent storage** is not implemented (credentials are in-memory only)
 
@@ -247,4 +247,4 @@ This implementation achieves **95% compliance** with rend-spec-v3.txt §2.5:
 ✅ Key exchange and derivation
 ✅ MAC verification
 
-The remaining 5% relates to server-side features (hosting private services) which are out of scope for this client-focused implementation.
+The remaining 5% relates to server-side features (hosting private services) which are not yet fully implemented.

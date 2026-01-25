@@ -12,7 +12,7 @@
 - **All developers**: See [official Tor documentation](https://www.torproject.org/download/) for proper integration methods
 This API documentation is **for educational and research purposes only**. Code written using this API should never be deployed in situations where anonymity or security is required.
 
-**Note**: The project scope includes both Tor client functionality and Tor bridge relay with pluggable transport support. Exit node functionality is explicitly out of scope and will not be implemented.
+**Note**: The project scope includes Tor client functionality, onion service hosting, traffic relaying (bridge/non-exit relay), and pluggable transport support. Only exit node functionality is explicitly out of scope and will not be implemented.
 ---
 ## Table of Contents
 - [Client API](#client-api)

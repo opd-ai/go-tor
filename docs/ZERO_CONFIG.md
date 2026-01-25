@@ -225,7 +225,7 @@ A: Use `-socks-port` flag or `Options.SocksPort` in code.
 A: The project is in active development. See [security notice](../README.md#security) in main README.
 
 **Q: Does this support bridge relay functionality?**  
-A: Bridge relay with pluggable transport support is planned for Phase 9. Currently, only client functionality is implemented. Exit node functionality is explicitly out of scope and will not be implemented.
+A: The project scope includes onion service hosting, traffic relaying (bridge/non-exit relay), and pluggable transport support. Bridge relay is planned for Phase 9. Only exit node functionality is explicitly out of scope and will not be implemented.
 
 ## Troubleshooting
 
