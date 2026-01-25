@@ -311,6 +311,11 @@ The `pkg/onion/service.go` already contains foundational server-side functionali
     - TRUNCATE cell handling
     - DESTROY cell forwarding and cleanup
     - Concurrent access protection with mutexes
+  - Integration: `pkg/relay/circuit_handler.go` integrated with `ForwardingHandler`
+    - CircuitHandler now forwards RELAY/RELAY_EARLY cells to ForwardingHandler
+    - DESTROY cells trigger cleanup in both CircuitHandler and ForwardingHandler
+    - CloseAll() properly shuts down both circuit and forwarding state
+    - Comprehensive integration tests (>79.7% overall relay package coverage)
 
 - [x] **10.2.3 Exit Policy (Reject All)** ✅ **COMPLETED** (January 25, 2026)
   - Implement reject-all exit policy

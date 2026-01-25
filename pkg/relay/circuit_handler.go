@@ -29,11 +29,12 @@ type ServerCircuit struct {
 
 // CircuitHandler manages server-side circuits for a relay
 type CircuitHandler struct {
-	keys     *RelayKeys
-	circuits map[uint32]*ServerCircuit
-	mu       sync.RWMutex
-	logger   *logger.Logger
-	ctx      context.Context
+	keys      *RelayKeys
+	circuits  map[uint32]*ServerCircuit
+	mu        sync.RWMutex
+	logger    *logger.Logger
+	ctx       context.Context
+	forwarder *ForwardingHandler
 }
 
 // NewCircuitHandler creates a new circuit handler
@@ -41,21 +42,24 @@ func NewCircuitHandler(keys *RelayKeys, log *logger.Logger) *CircuitHandler {
 	if log == nil {
 		log = logger.NewDefault()
 	}
-	return &CircuitHandler{
+	h := &CircuitHandler{
 		keys:     keys,
 		circuits: make(map[uint32]*ServerCircuit),
 		logger:   log.Component("circuit-handler"),
 		ctx:      context.Background(),
 	}
+	// Create forwarding handler
+	h.forwarder = NewForwardingHandler(h, log)
+	return h
 }
 
 // HandleCellFromConnection processes cells from a client connection
-// This handles CREATE2 cells for circuit creation
+// This handles CREATE2 cells for circuit creation and RELAY cells for forwarding
 func (h *CircuitHandler) HandleCellFromConnection(conn net.Conn, c *cell.Cell) error {
 	switch c.Command {
 	case cell.CmdCreate2:
 		return h.handleCreate2(conn, c)
-	case cell.CmdRelay:
+	case cell.CmdRelay, cell.CmdRelayEarly:
 		return h.handleRelay(conn, c)
 	case cell.CmdDestroy:
 		return h.handleDestroy(c)
@@ -182,7 +186,9 @@ func (h *CircuitHandler) sendCreated2(conn net.Conn, circuitID uint32, response 
 	return nil
 }
 
-// handleRelay processes RELAY cells (stub for now)
+// handleRelay processes RELAY and RELAY_EARLY cells
+// Per tor-spec.txt §5.5-5.6, relay cells are forwarded to the next hop
+// or handled locally if this is the end of the circuit
 func (h *CircuitHandler) handleRelay(conn net.Conn, c *cell.Cell) error {
 	h.mu.RLock()
 	circuit, exists := h.circuits[c.CircID]
@@ -198,8 +204,17 @@ func (h *CircuitHandler) handleRelay(conn net.Conn, c *cell.Cell) error {
 	circuit.LastActivity = time.Now()
 	circuit.mu.Unlock()
 
-	h.logger.Debug("Received RELAY cell", "circuit_id", c.CircID)
-	// TODO: Implement relay cell processing (Task 10.2)
+	h.logger.Debug("Received RELAY cell", "circuit_id", c.CircID, "command", c.Command)
+
+	// Forward relay cell using ForwardingHandler
+	// fromClient=true indicates this cell is from the client
+	if err := h.forwarder.ForwardRelayCell(h.ctx, true, c.CircID, c); err != nil {
+		h.logger.Error("Failed to forward RELAY cell",
+			"circuit_id", c.CircID,
+			"error", err)
+		return err
+	}
+
 	return nil
 }
 
@@ -207,6 +222,12 @@ func (h *CircuitHandler) handleRelay(conn net.Conn, c *cell.Cell) error {
 func (h *CircuitHandler) handleDestroy(c *cell.Cell) error {
 	h.logger.Info("Received DESTROY", "circuit_id", c.CircID)
 
+	// Clean up forwarding state if this is an extended circuit
+	if h.forwarder != nil {
+		h.forwarder.HandleDestroy(c.CircID)
+	}
+
+	// Remove circuit state
 	h.mu.Lock()
 	delete(h.circuits, c.CircID)
 	h.mu.Unlock()
@@ -256,10 +277,20 @@ func (h *CircuitHandler) CloseCircuit(circuitID uint32) {
 
 // CloseAll destroys all circuits
 func (h *CircuitHandler) CloseAll() {
+	// Close forwarding handler first
+	if h.forwarder != nil {
+		h.forwarder.CloseAll()
+	}
+
 	h.mu.Lock()
 	count := len(h.circuits)
 	h.circuits = make(map[uint32]*ServerCircuit)
 	h.mu.Unlock()
 
 	h.logger.Info("All circuits closed", "count", count)
+}
+
+// GetForwardingHandler returns the forwarding handler for extension operations
+func (h *CircuitHandler) GetForwardingHandler() *ForwardingHandler {
+	return h.forwarder
 }

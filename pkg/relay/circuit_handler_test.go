@@ -376,6 +376,167 @@ func TestCircuitHandler_HandleRelay_UnknownCircuit(t *testing.T) {
 	}
 }
 
+func TestCircuitHandler_HandleRelayEarly(t *testing.T) {
+	log := logger.NewDefault()
+
+	keys, err := GenerateRelayKeys()
+	if err != nil {
+		t.Fatalf("Failed to generate relay keys: %v", err)
+	}
+
+	handler := NewCircuitHandler(keys, log)
+
+	// Create a circuit
+	handler.mu.Lock()
+	handler.circuits[5] = &ServerCircuit{
+		CircuitID:    5,
+		Created:      time.Now(),
+		LastActivity: time.Now(),
+	}
+	handler.mu.Unlock()
+
+	// Send RELAY_EARLY cell
+	relayEarlyCell := &cell.Cell{
+		CircID:  5,
+		Command: cell.CmdRelayEarly,
+		Payload: make([]byte, 509),
+	}
+
+	conn := newMockConn()
+	err = handler.HandleCellFromConnection(conn, relayEarlyCell)
+	if err != nil {
+		t.Fatalf("HandleCellFromConnection failed: %v", err)
+	}
+
+	// Verify circuit activity was updated
+	circuit, _ := handler.GetCircuit(5)
+	if time.Since(circuit.LastActivity) > 1*time.Second {
+		t.Error("LastActivity was not updated")
+	}
+}
+
+func TestCircuitHandler_GetForwardingHandler(t *testing.T) {
+	log := logger.NewDefault()
+
+	keys, err := GenerateRelayKeys()
+	if err != nil {
+		t.Fatalf("Failed to generate relay keys: %v", err)
+	}
+
+	handler := NewCircuitHandler(keys, log)
+
+	// Verify forwarder is initialized
+	forwarder := handler.GetForwardingHandler()
+	if forwarder == nil {
+		t.Fatal("ForwardingHandler should not be nil")
+	}
+
+	// Verify it's the same instance
+	if forwarder != handler.forwarder {
+		t.Error("GetForwardingHandler returned different instance")
+	}
+}
+
+func TestCircuitHandler_HandleDestroy_WithExtendedCircuit(t *testing.T) {
+	log := logger.NewDefault()
+
+	keys, err := GenerateRelayKeys()
+	if err != nil {
+		t.Fatalf("Failed to generate relay keys: %v", err)
+	}
+
+	handler := NewCircuitHandler(keys, log)
+
+	// Create a circuit
+	handler.mu.Lock()
+	handler.circuits[10] = &ServerCircuit{
+		CircuitID: 10,
+		Created:   time.Now(),
+	}
+	handler.mu.Unlock()
+
+	// Register as extended circuit
+	mockNextHop := newMockConn()
+	err = handler.GetForwardingHandler().RegisterExtendedCircuit(10, 20, "127.0.0.1:9001", mockNextHop)
+	if err != nil {
+		t.Fatalf("Failed to register extended circuit: %v", err)
+	}
+
+	// Verify extended circuit exists
+	if handler.GetForwardingHandler().GetExtendedCircuitCount() != 1 {
+		t.Fatal("Extended circuit was not registered")
+	}
+
+	// Send DESTROY
+	destroyCell := &cell.Cell{
+		CircID:  10,
+		Command: cell.CmdDestroy,
+		Payload: []byte{cell.DestroyReasonNone},
+	}
+
+	conn := newMockConn()
+	err = handler.HandleCellFromConnection(conn, destroyCell)
+	if err != nil {
+		t.Fatalf("HandleCellFromConnection failed: %v", err)
+	}
+
+	// Circuit should be removed
+	_, exists := handler.GetCircuit(10)
+	if exists {
+		t.Error("Circuit should have been destroyed")
+	}
+
+	// Extended circuit should also be cleaned up
+	if handler.GetForwardingHandler().GetExtendedCircuitCount() != 0 {
+		t.Error("Extended circuit should have been cleaned up")
+	}
+}
+
+func TestCircuitHandler_CloseAll_WithExtendedCircuits(t *testing.T) {
+	log := logger.NewDefault()
+
+	keys, err := GenerateRelayKeys()
+	if err != nil {
+		t.Fatalf("Failed to generate relay keys: %v", err)
+	}
+
+	handler := NewCircuitHandler(keys, log)
+
+	// Create circuits
+	for i := uint32(1); i <= 3; i++ {
+		handler.mu.Lock()
+		handler.circuits[i] = &ServerCircuit{
+			CircuitID: i,
+			Created:   time.Now(),
+		}
+		handler.mu.Unlock()
+
+		// Register some as extended
+		if i%2 == 0 {
+			mockNextHop := newMockConn()
+			handler.GetForwardingHandler().RegisterExtendedCircuit(i, i+100, "127.0.0.1:9001", mockNextHop)
+		}
+	}
+
+	if handler.GetCircuitCount() != 3 {
+		t.Fatalf("Expected 3 circuits, got %d", handler.GetCircuitCount())
+	}
+
+	// Close all
+	handler.CloseAll()
+
+	// All circuits should be closed
+	if handler.GetCircuitCount() != 0 {
+		t.Errorf("Expected 0 circuits after CloseAll, got %d", handler.GetCircuitCount())
+	}
+
+	// All extended circuits should be closed
+	if handler.GetForwardingHandler().GetExtendedCircuitCount() != 0 {
+		t.Errorf("Expected 0 extended circuits after CloseAll, got %d",
+			handler.GetForwardingHandler().GetExtendedCircuitCount())
+	}
+}
+
 // Benchmark CREATE2 processing
 func BenchmarkHandleCreate2(b *testing.B) {
 	log := logger.NewDefault()
