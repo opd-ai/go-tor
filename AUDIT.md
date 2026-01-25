@@ -588,7 +588,7 @@ Each new package should have comprehensive unit tests:
 - [x] `docs/ONION_SERVICE_HOSTING.md` - Complete service hosting guide ✅ **COMPLETED** (January 25, 2026)
 - [x] `docs/LINK_PROTOCOL_SERVER.md` - Server-side link protocol implementation ✅ **COMPLETED** (January 25, 2026)
 - [x] `docs/RELAY_SECURITY.md` - Relay security hardening (rate limiting, DoS protection, metrics) ✅ **COMPLETED** (January 25, 2026)
-- [ ] `docs/BRIDGE_RELAY.md` - Bridge relay setup and operation
+- [x] `docs/BRIDGE_RELAY.md` - Bridge relay setup and operation ✅ **COMPLETED** (January 25, 2026)
 - [ ] `docs/PLUGGABLE_TRANSPORTS.md` - PT configuration and usage
 
 ### Updates to Existing Docs
