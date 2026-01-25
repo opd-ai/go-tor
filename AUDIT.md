@@ -495,10 +495,20 @@ The `pkg/onion/service.go` already contains foundational server-side functionali
     - Graceful shutdown and cleanup
   - Documentation: `docs/PLUGGABLE_TRANSPORTS.md`
 
-- [ ] **11.1.2 PT Server Interface**
-  - Implement `ServerTransport` interface  
-  - Support PT server configuration
-  - Handle SMETHOD/SMETHODS protocol
+- [x] **11.1.2 PT Server Interface** ✅ **COMPLETED** (January 25, 2026)
+  - Implemented `ServerTransport` interface for bridge relay PT support
+  - Supported PT server configuration and SMETHOD protocol parsing
+  - Handled SMETHOD/SMETHODS protocol per pt-spec.txt §3.3
+  - Implementation: `pkg/pt/server.go` (`ManagedServer`)
+  - Tests: `pkg/pt/server_test.go` (14 tests, 39.9% coverage)
+  - Features:
+    - External PT server process management (launch, monitor, terminate)
+    - PT server handshake with SMETHOD parsing
+    - Environment variable configuration per pt-spec.txt (SERVER_TRANSPORTS, BINDADDR, EXTENDED_SERVER_PORT)
+    - Server method registration and discovery
+    - Graceful shutdown and cleanup
+    - PT-specific options support (ARGS parsing)
+    - Listener interface for bridge relay integration
 
 - [ ] **11.1.3 PT Configuration**
   - Parse PT configuration from torrc
@@ -509,7 +519,8 @@ The `pkg/onion/service.go` already contains foundational server-side functionali
 - `pkg/pt/transport.go` ✅ **COMPLETED** - Transport interface definitions
 - `pkg/pt/client.go` ✅ **COMPLETED** - PT client implementation  
 - `pkg/pt/client_test.go` ✅ **COMPLETED** - Comprehensive tests (12 tests, 37.9% coverage)
-- `pkg/pt/server.go` - PT server implementation
+- `pkg/pt/server.go` ✅ **COMPLETED** - PT server implementation
+- `pkg/pt/server_test.go` ✅ **COMPLETED** - Comprehensive tests (14 tests, 39.9% coverage)
 - `pkg/pt/ipc.go` - IPC protocol with PT processes
 - `pkg/pt/manager.go` - PT process lifecycle management
 
