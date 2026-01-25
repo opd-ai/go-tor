@@ -49,6 +49,24 @@ const (
 	CmdAuthorize     Command = 132
 )
 
+// DESTROY cell reason codes (tor-spec.txt §5.4)
+const (
+	DestroyReasonNone          byte = 0  // No reason given
+	DestroyReasonProtocol      byte = 1  // Protocol violation
+	DestroyReasonInternal      byte = 2  // Internal error
+	DestroyReasonRequested     byte = 3  // Explicitly requested
+	DestroyReasonHibernating   byte = 4  // OR is hibernating
+	DestroyReasonResourceLimit byte = 5  // Resource limit reached
+	DestroyReasonConnectFailed byte = 6  // Connection failed
+	DestroyReasonNoRoute       byte = 7  // No route to host
+	DestroyReasonTimeout       byte = 8  // Connection timed out
+	DestroyReasonDestroyed     byte = 9  // Circuit destroyed
+	DestroyReasonNosuchservice byte = 10 // No such service
+)
+
+// CellSize is a convenience constant for the standard cell size
+const CellSize = CellLen
+
 // Cell represents a Tor protocol cell
 type Cell struct {
 	CircID  uint32  // Circuit ID
