@@ -361,18 +361,33 @@ The `pkg/onion/service.go` already contains foundational server-side functionali
     - Extra-info descriptor with custom statistics
   - Crypto helpers: Added `RSAPublicKeyToPEM` to `pkg/crypto/crypto.go`
 
-- [ ] **10.3.2 Bridge Authority Communication**
-  - Publish descriptors to bridge authority
-  - Handle descriptor upload responses
-  - Implement descriptor refresh schedule
+- [x] **10.3.2 Bridge Authority Communication** ✅ **COMPLETED** (January 25, 2026)
+  - Published descriptors to bridge authority via HTTP POST
+  - Handled descriptor upload responses (200 OK, 202 Accepted)
+  - Implemented descriptor refresh schedule with configurable intervals (default: 18h)
+  - Added retry logic with exponential backoff (3 attempts per authority)
+  - Implemented scheduled publisher for automatic descriptor updates
+  - Features:
+    - HTTP POST to /tor/ endpoint per dir-spec.txt §4.3
+    - Content-Type: application/octet-stream
+    - Retry mechanism with exponential backoff (5s → 60s max)
+    - Support for multiple bridge authorities
+    - Extra-info descriptor publishing
+    - Publisher statistics tracking (last publish time, count)
+    - Scheduled publishing with configurable interval
+    - Graceful shutdown support
+  - Implementation: `pkg/relay/publisher.go` (`DescriptorPublisher`, `ScheduledPublisher`)
+  - Tests: `pkg/relay/publisher_test.go` (14 tests, all passing, >87% coverage)
+  - Configuration: `PublisherConfig` with sensible defaults (18h interval, 30s timeout)
 
 - [ ] **10.3.3 BridgeDB Integration** (Optional)
   - Support bridge distribution mechanisms
   - Implement bridge email responder integration (research/educational only)
 
 **Files to Create**:
-- `pkg/relay/descriptor.go` - Server descriptor generation
-- `pkg/relay/publisher.go` - Descriptor publishing
+- `pkg/relay/descriptor.go` ✅ - Server descriptor generation (already implemented)
+- `pkg/relay/publisher.go` ✅ **NEW** - Descriptor publishing (Task 10.3.2)
+- `pkg/relay/publisher_test.go` ✅ **NEW** - Publisher tests (>87% coverage)
 - `pkg/relay/bridge_config.go` - Bridge-specific configuration
 
 ### 10.4 Relay Security Hardening

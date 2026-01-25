@@ -157,19 +157,137 @@ Run relay tests:
 go test ./pkg/relay/... -cover
 ```
 
-Current coverage: **84.7%**
+Current coverage: **84.7%** (keys, listener), **87%+** (publisher)
+
+## Descriptor Publishing
+
+### Overview
+
+Bridge relays publish server descriptors to bridge authorities via HTTP POST. The publisher handles automatic descriptor refresh and retry logic.
+
+### Basic Usage
+
+```go
+// Create publisher configuration
+pubConfig := relay.PublisherConfig{
+    Authorities: relay.DefaultBridgeAuthorities,
+    PublishInterval: 18 * time.Hour,  // Refresh every 18 hours
+    HTTPTimeout: 30 * time.Second,
+    RetryAttempts: 3,
+}
+
+// Create publisher
+publisher := relay.NewDescriptorPublisher(pubConfig, logger)
+
+// Generate descriptor
+descriptor, err := relay.GenerateServerDescriptor(keys, &relay.DescriptorConfig{
+    Nickname: "MyBridge",
+    Address:  "192.0.2.1",
+    ORPort:   9001,
+    DirPort:  0,  // Bridges don't run directory servers
+    IsBridge: true,
+})
+
+// Publish once
+ctx := context.Background()
+successCount, err := publisher.PublishDescriptor(ctx, descriptor)
+if err != nil {
+    log.Printf("Failed to publish: %v", err)
+}
+log.Printf("Published to %d authorities", successCount)
+```
+
+### Scheduled Publishing
+
+For automatic descriptor refresh:
+
+```go
+// Generator function that creates fresh descriptors
+generateFunc := func() (*relay.ServerDescriptor, *relay.ExtraInfoDescriptor, error) {
+    desc, err := relay.GenerateServerDescriptor(keys, config)
+    if err != nil {
+        return nil, nil, err
+    }
+    
+    // Optional extra-info with statistics
+    extraInfo, _ := relay.GenerateExtraInfo(keys, desc, map[string]string{
+        "bridge-stats-end": time.Now().Format("2006-01-02 15:04:05"),
+        "bridge-ips": "42",
+    })
+    
+    return desc, extraInfo, nil
+}
+
+// Create scheduled publisher
+scheduler := relay.NewScheduledPublisher(
+    publisher,
+    18 * time.Hour,  // Publish interval
+    generateFunc,
+    logger,
+)
+
+// Start scheduled publishing
+err := scheduler.Start(ctx)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Stop when done
+defer scheduler.Stop()
+```
+
+### Features
+
+- **Automatic Retry**: Exponential backoff (5s → 60s max) with configurable attempts
+- **Multiple Authorities**: Publishes to all configured bridge authorities
+- **Success Tracking**: Returns count of successful publications
+- **Extra-Info Support**: Optional extra-info descriptor with statistics
+- **Graceful Shutdown**: Context-aware cancellation
+- **Statistics**: Track last publish time and total publish count
+
+### Configuration
+
+```go
+type PublisherConfig struct {
+    Authorities      []BridgeAuthority // Bridge authorities to publish to
+    PublishInterval  time.Duration     // Interval between publishes (default: 18h)
+    HTTPTimeout      time.Duration     // HTTP request timeout (default: 30s)
+    RetryAttempts    int               // Retry attempts per authority (default: 3)
+    RetryDelay       time.Duration     // Initial retry delay (default: 5s)
+    MaxRetryDelay    time.Duration     // Maximum retry delay (default: 60s)
+}
+
+type BridgeAuthority struct {
+    Address string // IP:Port
+    URL     string // HTTP URL for uploads (e.g., "http://authority/tor/")
+}
+```
+
+### HTTP Protocol
+
+Per dir-spec.txt §4.3, descriptors are POSTed to `/tor/` endpoint:
+
+```
+POST /tor/ HTTP/1.1
+Host: 86.59.21.38
+Content-Type: application/octet-stream
+Content-Length: <descriptor-length>
+
+<server-descriptor-text>
+```
+
+**Success Responses**: `200 OK` or `202 Accepted`
 
 ## Next Steps
 
-Phase 10.1.2: Link Protocol Server (Pending)
-- Handle incoming VERSIONS cells
-- Send CERTS, AUTH_CHALLENGE, NETINFO cells
-- Implement in-protocol link authentication
+Phase 10.3.3: BridgeDB Integration (Optional)
+- Support bridge distribution mechanisms
+- Implement bridge email responder integration (research/educational only)
 
-Phase 10.1.3: Circuit Handling (Server-Side) (Pending)
-- Accept CREATE2 cells from clients
-- Perform ntor handshake server-side
-- Send CREATED2 responses
+Phase 10.4: Relay Security Hardening (Pending)
+- Rate limiting for circuit creation and connections
+- DoS protection mechanisms
+- Relay-specific monitoring and metrics
 
 ## References
 
@@ -184,4 +302,4 @@ See LICENSE file for details.
 ---
 
 **Last Updated**: January 25, 2026  
-**Implementation Status**: Phase 10.1.1 Complete (TLS Server Setup)
+**Implementation Status**: Phase 10.3.2 Complete (Bridge Descriptor Publishing)

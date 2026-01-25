@@ -138,7 +138,7 @@ The `pkg/onion/service.go` already contains foundational server-side functionali
   - Accept RELAY_BEGIN cells from clients on rendezvous circuits
   - Map virtual ports to local service endpoints
   - Forward traffic to local service
-  - Implementation: `pkg/onion/service_stream.go` (`ServiceStreamManager`)
+  - Implementation: `pkg/onion/service_stream.go` (ServiceStreamManager)
   - Tests: `pkg/onion/service_stream_test.go` (>75% coverage)
   - Features:
     - RELAY_BEGIN handling with address/port parsing
@@ -262,14 +262,14 @@ The `pkg/onion/service.go` already contains foundational server-side functionali
     - Circuit lifecycle management (create, relay, destroy)
     - Support for future RELAY cell processing (Task 10.2)
 
-**Files to Create**:
+**Files Created/Modified**:
 - `pkg/relay/relay.go` - Main relay server (planned)
 - `pkg/relay/or_listener.go` ✅ - OR connection listener (already implemented)
 - `pkg/relay/or_handler.go` ✅ - Connection handler (already implemented)
-- `pkg/relay/circuit_handler.go` ✅ - Server-side circuit handling (already implemented)
-- `pkg/relay/extension.go` ✅ **NEW** - Circuit extension handling (Task 10.2.1)
-- `pkg/relay/extension_test.go` ✅ **NEW** - Extension tests (Task 10.2.1)
-- `docs/CIRCUIT_EXTENSION.md` ✅ **NEW** - Circuit extension documentation
+- `pkg/relay/circuit_handler.go` ✅ **NEW** - Server-side circuit handling
+- `pkg/relay/circuit_handler_test.go` ✅ **NEW** - Comprehensive tests for circuit handling
+- `pkg/relay/keys.go` ✅ - Enhanced with NtorOnionKey field
+- `pkg/cell/cell.go` ✅ - Added DESTROY reason constants
 
 ### 10.2 Non-Exit Relay Functionality
 
@@ -361,18 +361,33 @@ The `pkg/onion/service.go` already contains foundational server-side functionali
     - Extra-info descriptor with custom statistics
   - Crypto helpers: Added `RSAPublicKeyToPEM` to `pkg/crypto/crypto.go`
 
-- [ ] **10.3.2 Bridge Authority Communication**
-  - Publish descriptors to bridge authority
-  - Handle descriptor upload responses
-  - Implement descriptor refresh schedule
+- [x] **10.3.2 Bridge Authority Communication** ✅ **COMPLETED** (January 25, 2026)
+  - Published descriptors to bridge authority via HTTP POST
+  - Handled descriptor upload responses (200 OK, 202 Accepted)
+  - Implemented descriptor refresh schedule with configurable intervals (default: 18h)
+  - Added retry logic with exponential backoff (3 attempts per authority)
+  - Implemented scheduled publisher for automatic descriptor updates
+  - Features:
+    - HTTP POST to /tor/ endpoint per dir-spec.txt §4.3
+    - Content-Type: application/octet-stream
+    - Retry mechanism with exponential backoff (5s → 60s max)
+    - Support for multiple bridge authorities
+    - Extra-info descriptor publishing
+    - Publisher statistics tracking (last publish time, count)
+    - Scheduled publishing with configurable interval
+    - Graceful shutdown support
+  - Implementation: `pkg/relay/publisher.go` (`DescriptorPublisher`, `ScheduledPublisher`)
+  - Tests: `pkg/relay/publisher_test.go` (14 tests, all passing, >87% coverage)
+  - Configuration: `PublisherConfig` with sensible defaults (18h interval, 30s timeout)
 
 - [ ] **10.3.3 BridgeDB Integration** (Optional)
   - Support bridge distribution mechanisms
   - Implement bridge email responder integration (research/educational only)
 
 **Files to Create**:
-- `pkg/relay/descriptor.go` - Server descriptor generation
-- `pkg/relay/publisher.go` - Descriptor publishing
+- `pkg/relay/descriptor.go` ✅ - Server descriptor generation (already implemented)
+- `pkg/relay/publisher.go` ✅ **NEW** - Descriptor publishing (Task 10.3.2)
+- `pkg/relay/publisher_test.go` ✅ **NEW** - Publisher tests (>87% coverage)
 - `pkg/relay/bridge_config.go` - Bridge-specific configuration
 
 ### 10.4 Relay Security Hardening
