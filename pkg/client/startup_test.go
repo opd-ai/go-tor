@@ -2,8 +2,8 @@ package client
 
 import (
 	"context"
-	"log/slog"
 	"io"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -35,7 +35,7 @@ func TestConnectWrapperFunctions(t *testing.T) {
 
 		// This will fail to connect (no Tor network) but shouldn't panic
 		_, err := ConnectWithContext(ctx)
-		
+
 		// We expect an error (timeout or directory unavailable)
 		if err == nil {
 			t.Error("Expected error when connecting without Tor network")
@@ -56,7 +56,7 @@ func TestConnectWrapperFunctions(t *testing.T) {
 
 		// This will fail but should apply the options without panicking
 		_, err := ConnectWithOptionsContext(ctx, opts)
-		
+
 		if err == nil {
 			t.Error("Expected error when connecting without Tor network")
 		}
@@ -69,7 +69,7 @@ func TestConnectWrapperFunctions(t *testing.T) {
 
 		// Should handle nil options gracefully by using defaults
 		_, err := ConnectWithOptionsContext(ctx, nil)
-		
+
 		if err == nil {
 			t.Error("Expected error when connecting without Tor network")
 		}
@@ -95,7 +95,7 @@ func TestClientStartWithInfrastructure(t *testing.T) {
 		// Start will fail because directory is not available
 		// But it should fail gracefully
 		err = client.Start(ctx)
-		
+
 		if err != nil {
 			t.Logf("Start failed as expected without directory: %v", err)
 		} else {

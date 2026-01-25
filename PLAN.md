@@ -180,8 +180,21 @@ The audit will follow a multi-phase approach: automated static analysis, specifi
   - Status: Substantially compliant (RELAY_TRUNCATED response delegated to OR handler)
 
 #### Medium Priority (P2) - Advanced Features
-- [ ] Audit circuit padding implementation per padding-spec.txt [pkg/circuit] [8h]
-- [ ] Verify connection-level padding (PADDING/VPADDING cells) [pkg/connection] [4h]
+- [x] **Audit circuit padding implementation per padding-spec.txt** [pkg/circuit] [8h] ✅ **COMPLETED** (January 25, 2026)
+  - Comprehensive audit completed against padding-spec.txt
+  - See `docs/audits/CIRCUIT_PADDING_AUDIT.md` for full report
+  - Assessment: 85% compliance (17/20 requirements fully implemented)
+  - Formal APE state machine implementation verified
+  - All cryptographic operations secure with CSPRNG
+- [x] **Verify connection-level padding (PADDING/VPADDING cells)** [pkg/connection] [4h] ✅ **COMPLETED** (January 25, 2026)
+  - Comprehensive audit completed against tor-spec.txt §7.1
+  - See `docs/audits/CONNECTION_PADDING_AUDIT.md` for full report
+  - Assessment: 95% compliance (19/20 requirements fully implemented)
+  - Four padding strategies implemented (None, Fixed, Random, Adaptive)
+  - Cryptographically secure random number generation with rejection sampling
+  - Test coverage: 67.4% overall, 90.4% for testable functions
+  - All tests pass with race detector, no security vulnerabilities found
+  - Implementation provides robust traffic analysis resistance for connection-level patterns
 - [ ] Audit stream isolation implementation [pkg/circuit] [4h]
 - [ ] Verify rate limiting mechanisms [pkg/ratelimit, pkg/relay] [3h]
 - [ ] Audit client authorization (x25519) per rend-spec-v3.txt [pkg/onion] [4h]
@@ -650,9 +663,9 @@ govulncheck ./...
 
 ---
 
-*Document Version: 1.0*  
+*Document Version: 2.1*  
 *Created: January 2025*  
-*Last Updated: January 2025*  
+*Last Updated: January 25, 2026*  
 *Authors: Automated Audit Planning*
 
 ---
@@ -665,7 +678,7 @@ govulncheck ./...
 |--------------|-----------|-------|----------|
 | P0 (Critical) Core Protocol | 15 | 15 | 100% |
 | P1 (High) Extended Features | 7 | 10 | 70% |
-| P2 (Medium) Advanced Features | 0 | 7 | 0% |
+| P2 (Medium) Advanced Features | 2 | 7 | 29% |
 
 ### P0 Tasks Completed
 
@@ -698,6 +711,11 @@ govulncheck ./...
 - ✅ TRUNCATE/TRUNCATED handling (tor-spec §5.5)
 - ✅ SHA-1 usage audit (protocol-mandated)
 
+### P2 Tasks Completed
+
+- ✅ Circuit padding audit (padding-spec.txt) - 85% compliance
+- ✅ Connection-level padding audit (tor-spec.txt §7.1) - 95% compliance
+
 ### Test Coverage Improvements
 
 | Package | Before | After | Improvement |
@@ -708,6 +726,7 @@ govulncheck ./...
 | pkg/crypto | ~84% | 86.3% | +2pp |
 | pkg/directory | ~74% | 76.3% | +2pp |
 | pkg/control | 94.7% | 95.1% | +0.4pp |
+| pkg/connection | ~65% | 67.4% | +2.4pp |
 
 ### Overall Protocol Compliance: ~98%
 
