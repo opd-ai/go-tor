@@ -29,12 +29,12 @@ func main() {
 	fmt.Println("Step 2: Configuring bridge descriptor...")
 	config := &relay.DescriptorConfig{
 		Nickname:       "MyBridge",
-		Address:        "192.0.2.100",      // Example IP (RFC 5737)
-		ORPort:         443,                 // Common bridge port (HTTPS)
-		DirPort:        0,                   // Bridges don't advertise directory port
+		Address:        "192.0.2.100", // Example IP (RFC 5737)
+		ORPort:         443,           // Common bridge port (HTTPS)
+		DirPort:        0,             // Bridges don't advertise directory port
 		Contact:        "bridge@example.com",
-		BandwidthAvg:   5 * 1024 * 1024,    // 5 MB/s average
-		BandwidthBurst: 10 * 1024 * 1024,   // 10 MB/s burst
+		BandwidthAvg:   5 * 1024 * 1024,  // 5 MB/s average
+		BandwidthBurst: 10 * 1024 * 1024, // 10 MB/s burst
 		IsBridge:       true,
 	}
 	fmt.Printf("✓ Bridge configuration created\n")
@@ -100,7 +100,7 @@ func main() {
 		fmt.Printf("  - Ed25519 identity key\n")
 		fmt.Printf("  - RSA identity key\n")
 		fmt.Printf("  - TLS certificate\n")
-		
+
 		// Clean up example keys
 		defer func() {
 			if err := os.RemoveAll(dataDir); err != nil {

@@ -509,12 +509,12 @@ func RSAPublicKeyToPEM(key *rsa.PublicKey) ([]byte, error) {
 	if key == nil {
 		return nil, fmt.Errorf("public key is nil")
 	}
-	
+
 	derBytes := x509.MarshalPKCS1PublicKey(key)
 	block := &pem.Block{
 		Type:  "RSA PUBLIC KEY",
 		Bytes: derBytes,
 	}
-	
+
 	return pem.EncodeToMemory(block), nil
 }

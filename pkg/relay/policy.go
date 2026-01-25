@@ -45,7 +45,7 @@ func (p *ExitPolicy) CheckExitAllowed(address string, port uint16) (bool, byte) 
 
 	// Always reject exit traffic for non-exit relays
 	atomic.AddUint64(&p.rejectedConnections, 1)
-	
+
 	p.logger.Info("Rejected exit attempt",
 		"address", address,
 		"port", port,

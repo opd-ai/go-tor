@@ -22,31 +22,31 @@ import (
 // Per dir-spec.txt §2.1, server descriptors advertise a relay's capabilities
 type ServerDescriptor struct {
 	// Metadata
-	Nickname        string    // Relay nickname (1-19 alphanumeric characters)
-	Address         string    // IPv4 address
-	ORPort          uint16    // OR protocol port
-	DirPort         uint16    // Directory port (0 for bridges)
-	Platform        string    // Platform information (e.g., "Tor 0.4.8.0 on Linux")
-	PublishedTime   time.Time // Descriptor publication time
-	Uptime          int       // Relay uptime in seconds
-	BandwidthAvg    uint64    // Average bandwidth (bytes/sec)
-	BandwidthBurst  uint64    // Burst bandwidth (bytes/sec)
-	BandwidthObs    uint64    // Observed bandwidth (bytes/sec)
-	Contact         string    // Contact information (optional)
-	Family          []string  // Relay family members (optional)
-	ExitPolicy      string    // Exit policy summary (default: "reject *:*")
-	IPv6Addr        string    // IPv6 address (optional, e.g., "[2001:db8::1]:9001")
-	
+	Nickname       string    // Relay nickname (1-19 alphanumeric characters)
+	Address        string    // IPv4 address
+	ORPort         uint16    // OR protocol port
+	DirPort        uint16    // Directory port (0 for bridges)
+	Platform       string    // Platform information (e.g., "Tor 0.4.8.0 on Linux")
+	PublishedTime  time.Time // Descriptor publication time
+	Uptime         int       // Relay uptime in seconds
+	BandwidthAvg   uint64    // Average bandwidth (bytes/sec)
+	BandwidthBurst uint64    // Burst bandwidth (bytes/sec)
+	BandwidthObs   uint64    // Observed bandwidth (bytes/sec)
+	Contact        string    // Contact information (optional)
+	Family         []string  // Relay family members (optional)
+	ExitPolicy     string    // Exit policy summary (default: "reject *:*")
+	IPv6Addr       string    // IPv6 address (optional, e.g., "[2001:db8::1]:9001")
+
 	// Cryptographic keys
-	RSAIdentity     *rsa.PublicKey // RSA-1024 identity public key
+	RSAIdentity     *rsa.PublicKey    // RSA-1024 identity public key
 	Ed25519Identity ed25519.PublicKey // Ed25519 identity public key
-	NtorOnionKey    []byte         // Curve25519 ntor onion key (32 bytes)
-	
+	NtorOnionKey    []byte            // Curve25519 ntor onion key (32 bytes)
+
 	// Internal fields
-	rsaPrivate      *rsa.PrivateKey // RSA private key for signing
-	Digest          []byte          // SHA-1 digest of descriptor (computed)
-	Signature       []byte          // RSA signature of descriptor
-	RawDescriptor   []byte          // Complete descriptor text
+	rsaPrivate    *rsa.PrivateKey // RSA private key for signing
+	Digest        []byte          // SHA-1 digest of descriptor (computed)
+	Signature     []byte          // RSA signature of descriptor
+	RawDescriptor []byte          // Complete descriptor text
 }
 
 // ExtraInfoDescriptor represents optional extra-info descriptor
@@ -58,6 +58,7 @@ type ExtraInfoDescriptor struct {
 	Statistics    map[string]string
 	Digest        []byte
 	Signature     []byte
+	RawDescriptor []byte // Complete extra-info descriptor text
 }
 
 // DescriptorConfig holds configuration for descriptor generation
@@ -89,38 +90,38 @@ func GenerateServerDescriptor(keys *RelayKeys, config *DescriptorConfig) (*Serve
 	if config.ORPort == 0 {
 		return nil, fmt.Errorf("OR port is required")
 	}
-	
+
 	// Validate address
 	if net.ParseIP(config.Address) == nil {
 		return nil, fmt.Errorf("invalid IPv4 address: %s", config.Address)
 	}
-	
+
 	// Set defaults
 	nickname := config.Nickname
 	if nickname == "" {
 		nickname = generateNickname(keys)
 	}
-	
+
 	bandwidthAvg := config.BandwidthAvg
 	if bandwidthAvg == 0 {
 		bandwidthAvg = 1024 * 1024 // 1 MB/s default
 	}
-	
+
 	bandwidthBurst := config.BandwidthBurst
 	if bandwidthBurst == 0 {
 		bandwidthBurst = bandwidthAvg * 2 // 2x average
 	}
-	
+
 	// Observed bandwidth starts at average (will be updated by bandwidth measurement)
 	bandwidthObs := bandwidthAvg
-	
+
 	// Exit policy (always reject for non-exit/bridge relays)
 	exitPolicy := "reject *:*"
-	
+
 	// Compute ntor onion public key from private key
 	var ntorPublic [32]byte
 	curve25519.ScalarBaseMult(&ntorPublic, (*[32]byte)(keys.NtorOnionKey))
-	
+
 	desc := &ServerDescriptor{
 		Nickname:        nickname,
 		Address:         config.Address,
@@ -141,39 +142,39 @@ func GenerateServerDescriptor(keys *RelayKeys, config *DescriptorConfig) (*Serve
 		NtorOnionKey:    ntorPublic[:],
 		rsaPrivate:      keys.RSAPrivate,
 	}
-	
+
 	// Build and sign descriptor
 	if err := desc.build(); err != nil {
 		return nil, fmt.Errorf("failed to build descriptor: %w", err)
 	}
-	
+
 	return desc, nil
 }
 
 // build constructs the descriptor text and computes digest/signature
 func (d *ServerDescriptor) build() error {
 	var buf bytes.Buffer
-	
+
 	// Per dir-spec.txt §2.1, descriptor format:
 	// router <nickname> <address> <ORPort> <SOCKSPort> <DirPort>
 	fmt.Fprintf(&buf, "router %s %s %d 0 %d\n",
 		d.Nickname, d.Address, d.ORPort, d.DirPort)
-	
+
 	// IPv6 address (optional)
 	if d.IPv6Addr != "" {
 		fmt.Fprintf(&buf, "or-address %s\n", d.IPv6Addr)
 	}
-	
+
 	// Platform
 	fmt.Fprintf(&buf, "platform %s\n", d.Platform)
-	
+
 	// Protocols (link protocol versions we support: 3-5)
 	fmt.Fprintf(&buf, "proto Link=3-5 Circuit=1-2\n")
-	
+
 	// Published time (UTC, format: "YYYY-MM-DD HH:MM:SS")
 	fmt.Fprintf(&buf, "published %s\n",
 		d.PublishedTime.Format("2006-01-02 15:04:05"))
-	
+
 	// RSA identity key (PKCS#1 format)
 	rsaPEM, err := crypto.RSAPublicKeyToPEM(d.RSAIdentity)
 	if err != nil {
@@ -186,45 +187,45 @@ func (d *ServerDescriptor) build() error {
 	// Ed25519 identity is encoded as base64
 	fmt.Fprintf(&buf, "%s\n", base64.StdEncoding.EncodeToString(d.Ed25519Identity))
 	fmt.Fprintf(&buf, "-----END ED25519 CERT-----\n")
-	
+
 	// Master key ed25519 (32-byte public key)
 	fmt.Fprintf(&buf, "master-key-ed25519 %s\n",
 		base64.StdEncoding.EncodeToString(d.Ed25519Identity))
-	
+
 	// Bandwidth (avg, burst, observed in bytes/sec)
 	fmt.Fprintf(&buf, "bandwidth %d %d %d\n",
 		d.BandwidthAvg, d.BandwidthBurst, d.BandwidthObs)
-	
+
 	// Uptime
 	fmt.Fprintf(&buf, "uptime %d\n", d.Uptime)
-	
+
 	// ntor onion key (base64-encoded Curve25519 public key)
 	fmt.Fprintf(&buf, "ntor-onion-key %s\n",
 		base64.StdEncoding.EncodeToString(d.NtorOnionKey))
-	
+
 	// Contact (optional)
 	if d.Contact != "" {
 		fmt.Fprintf(&buf, "contact %s\n", d.Contact)
 	}
-	
+
 	// Family (optional)
 	if len(d.Family) > 0 {
 		fmt.Fprintf(&buf, "family %s\n", strings.Join(d.Family, " "))
 	}
-	
+
 	// Exit policy
 	fmt.Fprintf(&buf, "reject *:*\n")
-	
+
 	// Router signature follows
 	// Compute digest before signature
 	descriptorBody := buf.String()
-	
+
 	// Compute SHA-1 digest of descriptor (required per Tor spec)
 	// #nosec G401 - SHA1 required by Tor protocol
 	h := sha1.New() // #nosec G401
 	h.Write([]byte(descriptorBody))
 	d.Digest = h.Sum(nil)
-	
+
 	// Sign with RSA identity key
 	// Per dir-spec.txt, signature is over SHA-1 digest
 	signature, err := rsa.SignPKCS1v15(nil, d.rsaPrivate, 0, d.Digest)
@@ -232,12 +233,12 @@ func (d *ServerDescriptor) build() error {
 		return fmt.Errorf("failed to sign descriptor: %w", err)
 	}
 	d.Signature = signature
-	
+
 	// Append signature to descriptor
 	fmt.Fprintf(&buf, "router-signature\n-----BEGIN SIGNATURE-----\n")
 	fmt.Fprintf(&buf, "%s\n", base64.StdEncoding.EncodeToString(signature))
 	fmt.Fprintf(&buf, "-----END SIGNATURE-----\n")
-	
+
 	d.RawDescriptor = buf.Bytes()
 	return nil
 }
@@ -309,38 +310,58 @@ func GenerateExtraInfo(keys *RelayKeys, desc *ServerDescriptor, stats map[string
 	if desc == nil {
 		return nil, fmt.Errorf("server descriptor cannot be nil")
 	}
-	
+
 	extraInfo := &ExtraInfoDescriptor{
 		Nickname:      desc.Nickname,
 		Fingerprint:   desc.Fingerprint(),
 		PublishedTime: time.Now().UTC(),
 		Statistics:    stats,
 	}
-	
+
 	// Build extra-info document
 	var buf bytes.Buffer
 	fmt.Fprintf(&buf, "extra-info %s %s\n", extraInfo.Nickname, extraInfo.Fingerprint)
 	fmt.Fprintf(&buf, "published %s\n",
 		extraInfo.PublishedTime.Format("2006-01-02 15:04:05"))
-	
+
 	// Add statistics
 	for key, value := range stats {
 		fmt.Fprintf(&buf, "%s %s\n", key, value)
 	}
-	
+
 	// Compute digest and sign
 	body := buf.String()
 	h := sha256.New()
 	h.Write([]byte(body))
 	extraInfo.Digest = h.Sum(nil)
-	
+
 	// Sign with RSA key
 	sig, err := rsa.SignPKCS1v15(nil, keys.RSAPrivate, 0, extraInfo.Digest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign extra-info: %w", err)
 	}
 	extraInfo.Signature = sig
-	
+
+	// Build complete descriptor with signature
+	var fullBuf bytes.Buffer
+	fullBuf.WriteString(body)
+	fmt.Fprintf(&fullBuf, "router-signature\n")
+
+	// Encode signature in base64
+	sigB64 := base64.StdEncoding.EncodeToString(sig)
+	fmt.Fprintf(&fullBuf, "-----BEGIN SIGNATURE-----\n")
+	// Split base64 into 64-char lines
+	for i := 0; i < len(sigB64); i += 64 {
+		end := i + 64
+		if end > len(sigB64) {
+			end = len(sigB64)
+		}
+		fmt.Fprintf(&fullBuf, "%s\n", sigB64[i:end])
+	}
+	fmt.Fprintf(&fullBuf, "-----END SIGNATURE-----\n")
+
+	extraInfo.RawDescriptor = fullBuf.Bytes()
+
 	return extraInfo, nil
 }
 

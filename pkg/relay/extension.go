@@ -116,12 +116,13 @@ func NewExtensionHandler(keys *RelayKeys, circuits *CircuitHandler, log *logger.
 
 // HandleExtend2 processes a RELAY_EXTEND2 cell
 // Per tor-spec.txt §5.3:
-//   EXTEND2 format:
-//     NSPEC (1 byte) - number of link specifiers
-//     NSPEC * [LSTYPE (1) | LSLEN (1) | LSPEC (LSLEN)]
-//     HTYPE (2 bytes) - handshake type
-//     HLEN (2 bytes) - handshake data length
-//     HDATA (HLEN bytes) - handshake data
+//
+//	EXTEND2 format:
+//	  NSPEC (1 byte) - number of link specifiers
+//	  NSPEC * [LSTYPE (1) | LSLEN (1) | LSPEC (LSLEN)]
+//	  HTYPE (2 bytes) - handshake type
+//	  HLEN (2 bytes) - handshake data length
+//	  HDATA (HLEN bytes) - handshake data
 func (h *ExtensionHandler) HandleExtend2(ctx context.Context, circuitID uint32, relayCell *cell.RelayCell) error {
 	h.logger.Info("Processing EXTEND2", "circuit_id", circuitID)
 

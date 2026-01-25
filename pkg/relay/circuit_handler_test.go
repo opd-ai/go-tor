@@ -124,9 +124,9 @@ func TestCircuitHandler_HandleCreate2_InvalidHandshakeType(t *testing.T) {
 	payload[3] = 0x54
 
 	create2Cell := &cell.Cell{
-		CircID: 2,
+		CircID:  2,
 		Command: cell.CmdCreate2,
-		Payload:   payload,
+		Payload: payload,
 	}
 
 	conn := newMockConn()
@@ -181,9 +181,9 @@ func TestCircuitHandler_HandleCreate2_DuplicateCircuit(t *testing.T) {
 	payload[3] = 0x54
 
 	create2Cell := &cell.Cell{
-		CircID: 2,
+		CircID:  2,
 		Command: cell.CmdCreate2,
-		Payload:   payload,
+		Payload: payload,
 	}
 
 	conn := newMockConn()
@@ -215,9 +215,9 @@ func TestCircuitHandler_HandleDestroy(t *testing.T) {
 
 	// Send DESTROY
 	destroyCell := &cell.Cell{
-		CircID: 2,
+		CircID:  2,
 		Command: cell.CmdDestroy,
-		Payload:   []byte{cell.DestroyReasonNone},
+		Payload: []byte{cell.DestroyReasonNone},
 	}
 
 	conn := newMockConn()
@@ -315,7 +315,7 @@ func TestCircuitHandler_HandleRelay(t *testing.T) {
 	// Create a circuit
 	handler.mu.Lock()
 	handler.circuits[5] = &ServerCircuit{
-		CircuitID: 2,
+		CircuitID:    2,
 		Created:      time.Now(),
 		LastActivity: time.Now().Add(-1 * time.Minute),
 	}
@@ -323,9 +323,9 @@ func TestCircuitHandler_HandleRelay(t *testing.T) {
 
 	// Send RELAY cell
 	relayCell := &cell.Cell{
-		CircID: 2,
+		CircID:  2,
 		Command: cell.CmdRelay,
-		Payload:   make([]byte, 509), // Standard relay cell payload
+		Payload: make([]byte, 509), // Standard relay cell payload
 	}
 
 	conn := newMockConn()
@@ -353,9 +353,9 @@ func TestCircuitHandler_HandleRelay_UnknownCircuit(t *testing.T) {
 
 	// Send RELAY cell for non-existent circuit
 	relayCell := &cell.Cell{
-		CircID: 2,
+		CircID:  2,
 		Command: cell.CmdRelay,
-		Payload:   make([]byte, 509),
+		Payload: make([]byte, 509),
 	}
 
 	conn := newMockConn()
@@ -407,9 +407,9 @@ func BenchmarkHandleCreate2(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		create2Cell := &cell.Cell{
-			CircID: 2,
+			CircID:  2,
 			Command: cell.CmdCreate2,
-			Payload:   payload,
+			Payload: payload,
 		}
 
 		conn := newMockConn()

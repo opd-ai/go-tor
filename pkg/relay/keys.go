@@ -34,7 +34,7 @@ type RelayKeys struct {
 
 	// TLS certificate for OR connections
 	TLSCert []byte // DER-encoded X.509 certificate
-	
+
 	// Convenience fields for compatibility
 	Identity struct {
 		Public  ed25519.PublicKey
@@ -78,7 +78,7 @@ func GenerateRelayKeys() (*RelayKeys, error) {
 	}
 	keys.Ed25519Public = pub
 	keys.Ed25519Private = priv
-	
+
 	// Set compatibility fields
 	keys.Identity.Public = pub
 	keys.Identity.Private = priv
@@ -89,7 +89,7 @@ func GenerateRelayKeys() (*RelayKeys, error) {
 		return nil, fmt.Errorf("failed to generate RSA key: %w", err)
 	}
 	keys.RSAPrivate = rsaKey
-	
+
 	// Generate ntor onion key (Curve25519 private key, 32 bytes)
 	ntorKey := make([]byte, 32)
 	if _, err := rand.Read(ntorKey); err != nil {

@@ -39,8 +39,8 @@ func TestParseLinkSpecifiers(t *testing.T) {
 				6,                // Length = 6
 				192, 168, 1, 100, // IP
 				0x1F, 0x90, // Port 8080
-				2,  // Type = Legacy ID
-				20, // Length = 20
+				2,                                                                    // Type = Legacy ID
+				20,                                                                   // Length = 20
 				0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, // 20 bytes
 			},
 			wantCount: 2,
@@ -90,7 +90,7 @@ func TestExtractAddressFromLinkSpecs(t *testing.T) {
 			name: "IPv4 address",
 			specs: []LinkSpecifier{
 				{
-					Type: 0, // IPv4
+					Type: 0,                                    // IPv4
 					Data: []byte{192, 168, 1, 100, 0x1F, 0x90}, // 192.168.1.100:8080
 				},
 			},
@@ -249,11 +249,11 @@ func TestHandleExtend2_ParseErrors(t *testing.T) {
 		{
 			name: "truncated handshake header",
 			data: []byte{
-				1,             // NSPEC = 1
-				0,             // Type = IPv4
-				6,             // Length = 6
-				127, 0, 0, 1,  // IP
-				0x1F, 0x90,    // Port 8080
+				1,            // NSPEC = 1
+				0,            // Type = IPv4
+				6,            // Length = 6
+				127, 0, 0, 1, // IP
+				0x1F, 0x90, // Port 8080
 				0x00, // Only one byte of handshake type
 			},
 			wantErr: true,
@@ -291,17 +291,17 @@ func TestHandleExtend2_UnsupportedHandshake(t *testing.T) {
 
 	// Build EXTEND2 data with TAP handshake (unsupported)
 	data := make([]byte, 0, 128)
-	
+
 	// Link specifier
-	data = append(data, 1)             // NSPEC = 1
-	data = append(data, 0)             // Type = IPv4
-	data = append(data, 6)             // Length = 6
-	data = append(data, 127, 0, 0, 1)  // IP
-	data = append(data, 0x1F, 0x90)    // Port 8080
+	data = append(data, 1)            // NSPEC = 1
+	data = append(data, 0)            // Type = IPv4
+	data = append(data, 6)            // Length = 6
+	data = append(data, 127, 0, 0, 1) // IP
+	data = append(data, 0x1F, 0x90)   // Port 8080
 
 	// Handshake (TAP type 0x0000)
-	data = append(data, 0x00, 0x00) // HTYPE = TAP
-	data = append(data, 0x00, 0x04) // HLEN = 4
+	data = append(data, 0x00, 0x00)             // HTYPE = TAP
+	data = append(data, 0x00, 0x04)             // HLEN = 4
 	data = append(data, 0x00, 0x01, 0x02, 0x03) // Dummy data
 
 	relayCell := &cell.RelayCell{
@@ -383,13 +383,13 @@ func TestBuildExtend2Data(t *testing.T) {
 
 	// Build the data manually
 	data := make([]byte, 0, 128)
-	
+
 	// Link specifier
-	data = append(data, 1)             // NSPEC = 1
-	data = append(data, 0)             // Type = IPv4
-	data = append(data, 6)             // Length = 6
-	data = append(data, 127, 0, 0, 1)  // IP
-	data = append(data, 0x1F, 0x90)    // Port 8080
+	data = append(data, 1)            // NSPEC = 1
+	data = append(data, 0)            // Type = IPv4
+	data = append(data, 6)            // Length = 6
+	data = append(data, 127, 0, 0, 1) // IP
+	data = append(data, 0x1F, 0x90)   // Port 8080
 
 	// Handshake
 	data = append(data, 0x00, 0x02) // HTYPE = ntor

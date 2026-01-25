@@ -14,20 +14,20 @@ import (
 
 // ExtendedCircuit tracks a circuit that has been extended to next hop
 type ExtendedCircuit struct {
-	ClientCircuitID   uint32 // Circuit ID on client side
-	NextHopCircuitID  uint32 // Circuit ID on next hop side
-	NextHopAddress    string // Address of next hop
-	NextHopConn       net.Conn
-	RelayEarlyCount   int       // Count of RELAY_EARLY cells forwarded
-	mu                sync.Mutex
+	ClientCircuitID  uint32 // Circuit ID on client side
+	NextHopCircuitID uint32 // Circuit ID on next hop side
+	NextHopAddress   string // Address of next hop
+	NextHopConn      net.Conn
+	RelayEarlyCount  int // Count of RELAY_EARLY cells forwarded
+	mu               sync.Mutex
 }
 
 // ForwardingHandler manages cell forwarding between circuits
 type ForwardingHandler struct {
-	circuits     *CircuitHandler
-	extended     map[uint32]*ExtendedCircuit // Map from client circuit ID to extended circuit
-	extendedMu   sync.RWMutex
-	logger       *logger.Logger
+	circuits   *CircuitHandler
+	extended   map[uint32]*ExtendedCircuit // Map from client circuit ID to extended circuit
+	extendedMu sync.RWMutex
+	logger     *logger.Logger
 }
 
 // NewForwardingHandler creates a new forwarding handler
@@ -166,22 +166,22 @@ func (h *ForwardingHandler) handleLocalRelayCell(ctx context.Context, circuitID 
 	case cell.RelayBegin, cell.RelayBeginDir:
 		// Exit policy: reject all exit traffic
 		return h.rejectExitAttempt(circuitID, relayCell.StreamID)
-	
+
 	case cell.RelayExtend2:
 		// This should be handled by extension handler
 		h.logger.Debug("RELAY_EXTEND2 on local circuit - should be handled separately")
 		return nil
-	
+
 	case cell.RelayData, cell.RelayEnd, cell.RelaySendme:
 		// Stream operations not supported in non-exit relay
 		h.logger.Debug("Stream operation on non-exit relay - ignoring",
 			"command", cell.RelayCmdString(relayCell.Command))
 		return nil
-	
+
 	case cell.RelayTruncate:
 		// Handle circuit truncation
 		return h.handleTruncate(circuitID)
-	
+
 	default:
 		h.logger.Debug("Unhandled relay command",
 			"circuit_id", circuitID,
