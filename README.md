@@ -243,4 +243,5 @@ Copyright (c) 2024, OPD AI. See [LICENSE](LICENSE) for full license text.
 - [The Tor Project](https://www.torproject.org/)
 - [Architecture Documentation](docs/ARCHITECTURE.md)
 - [API Reference](docs/API.md)
+- [Onion Service Hosting Guide](docs/ONION_SERVICE_HOSTING.md)
 - [Examples Directory](examples/)

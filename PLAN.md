@@ -457,7 +457,7 @@ Each new package should have comprehensive unit tests:
 
 ### New Documentation
 
-- [ ] `docs/ONION_SERVICE_HOSTING.md` - Complete service hosting guide
+- [x] `docs/ONION_SERVICE_HOSTING.md` - Complete service hosting guide ✅ **COMPLETED** (January 25, 2026)
 - [ ] `docs/BRIDGE_RELAY.md` - Bridge relay setup and operation
 - [ ] `docs/PLUGGABLE_TRANSPORTS.md` - PT configuration and usage
 
