@@ -263,10 +263,13 @@ The `pkg/onion/service.go` already contains foundational server-side functionali
     - Support for future RELAY cell processing (Task 10.2)
 
 **Files to Create**:
-- `pkg/relay/relay.go` - Main relay server
-- `pkg/relay/or_listener.go` - OR connection listener
-- `pkg/relay/or_handler.go` - Connection handler
-- `pkg/relay/circuit_handler.go` - Server-side circuit handling
+- `pkg/relay/relay.go` - Main relay server (planned)
+- `pkg/relay/or_listener.go` ✅ - OR connection listener (already implemented)
+- `pkg/relay/or_handler.go` ✅ - Connection handler (already implemented)
+- `pkg/relay/circuit_handler.go` ✅ - Server-side circuit handling (already implemented)
+- `pkg/relay/extension.go` ✅ **NEW** - Circuit extension handling (Task 10.2.1)
+- `pkg/relay/extension_test.go` ✅ **NEW** - Extension tests (Task 10.2.1)
+- `docs/CIRCUIT_EXTENSION.md` ✅ **NEW** - Circuit extension documentation
 
 ### 10.2 Non-Exit Relay Functionality
 
@@ -274,11 +277,23 @@ The `pkg/onion/service.go` already contains foundational server-side functionali
 
 **Tasks**:
 
-- [ ] **10.2.1 Circuit Extension Handling**
+- [x] **10.2.1 Circuit Extension Handling** ✅ **COMPLETED** (January 25, 2026)
   - Handle RELAY_EXTEND2 cells
   - Connect to next hop relay
   - Forward RELAY_EXTENDED2 responses
   - Implement proper encryption layer management
+  - Implementation: `pkg/relay/extension.go` (`ExtensionHandler`)
+  - Tests: `pkg/relay/extension_test.go` (>80% coverage for core functions)
+  - Features:
+    - Link specifier parsing (IPv4, IPv6, Legacy ID, Ed25519 ID)
+    - Next hop connection pooling and management
+    - VERSIONS cell exchange with next hop
+    - CREATE2 forwarding to next hop
+    - CREATED2 response reception
+    - EXTENDED2 relay cell construction
+    - Circuit extension registration
+    - Resource cleanup and error handling
+  - Documentation: `docs/CIRCUIT_EXTENSION.md`
 
 - [ ] **10.2.2 Cell Forwarding**
   - Forward relay cells between circuits

@@ -277,11 +277,23 @@ The `pkg/onion/service.go` already contains foundational server-side functionali
 
 **Tasks**:
 
-- [ ] **10.2.1 Circuit Extension Handling**
+- [x] **10.2.1 Circuit Extension Handling** ✅ **COMPLETED** (January 25, 2026)
   - Handle RELAY_EXTEND2 cells
   - Connect to next hop relay
   - Forward RELAY_EXTENDED2 responses
   - Implement proper encryption layer management
+  - Implementation: `pkg/relay/extension.go` (`ExtensionHandler`)
+  - Tests: `pkg/relay/extension_test.go` (>80% coverage for core functions)
+  - Features:
+    - Link specifier parsing (IPv4, IPv6, Legacy ID, Ed25519 ID)
+    - Next hop connection pooling and management
+    - VERSIONS cell exchange with next hop
+    - CREATE2 forwarding to next hop
+    - CREATED2 response reception
+    - EXTENDED2 relay cell construction
+    - Circuit extension registration
+    - Resource cleanup and error handling
+  - Documentation: `docs/CIRCUIT_EXTENSION.md`
 
 - [ ] **10.2.2 Cell Forwarding**
   - Forward relay cells between circuits
@@ -295,9 +307,10 @@ The `pkg/onion/service.go` already contains foundational server-side functionali
   - Ensure no exit traffic is relayed
 
 **Files to Create**:
-- `pkg/relay/extension.go` - Circuit extension handling
-- `pkg/relay/forwarding.go` - Cell forwarding logic
-- `pkg/relay/policy.go` - Exit policy enforcement
+- `pkg/relay/extension.go` ✅ **NEW** - Circuit extension handling
+- `pkg/relay/extension_test.go` ✅ **NEW** - Comprehensive tests for extension functionality
+- `pkg/relay/forwarding.go` - Cell forwarding logic (Task 10.2.2)
+- `pkg/relay/policy.go` - Exit policy enforcement (Task 10.2.3)
 
 ### 10.3 Bridge Descriptor Publishing
 
