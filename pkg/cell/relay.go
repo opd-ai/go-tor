@@ -29,8 +29,10 @@ const (
 	RelayIntroduce2   byte = 33 // INTRODUCE2 cell for onion services
 	RelayRendezvous1  byte = 34 // RENDEZVOUS1 cell for onion services
 	RelayRendezvous2  byte = 35 // RENDEZVOUS2 cell for onion services
-	RelayIntroEstab   byte = 38 // ESTABLISH_INTRO cell for onion services
-	RelayIntroEstdAck byte = 39 // INTRO_ESTABLISHED cell for onion services
+	RelayIntroEstab      byte = 38 // ESTABLISH_INTRO cell for onion services
+	RelayIntroEstdAck    byte = 39 // INTRO_ESTABLISHED cell for onion services
+	RelayPaddingNegotiate byte = 41 // PADDING_NEGOTIATE cell for padding negotiation
+	RelayPaddingNegotiated byte = 42 // PADDING_NEGOTIATED cell for padding negotiation response
 )
 
 // RelayCell represents the payload of a RELAY or RELAY_EARLY cell
@@ -155,6 +157,10 @@ func RelayCmdString(cmd byte) string {
 		return "RELAY_EXTEND2"
 	case RelayExtended2:
 		return "RELAY_EXTENDED2"
+	case RelayPaddingNegotiate:
+		return "RELAY_PADDING_NEGOTIATE"
+	case RelayPaddingNegotiated:
+		return "RELAY_PADDING_NEGOTIATED"
 	default:
 		return fmt.Sprintf("RELAY_UNKNOWN(%d)", cmd)
 	}
