@@ -18,6 +18,7 @@ import (
 
 	"github.com/opd-ai/go-tor/pkg/cell"
 	"github.com/opd-ai/go-tor/pkg/circuit"
+	"github.com/opd-ai/go-tor/pkg/crypto"
 	"github.com/opd-ai/go-tor/pkg/logger"
 	"github.com/opd-ai/go-tor/pkg/path"
 	"github.com/opd-ai/go-tor/pkg/security"
@@ -31,6 +32,7 @@ type Service struct {
 	identityKey ed25519.PrivateKey // 64-byte Ed25519 private key
 	publicKey   ed25519.PublicKey  // 32-byte Ed25519 public key
 	address     *Address           // Derived .onion address
+	ntorKey     []byte             // 32-byte Curve25519 ntor private key for rendezvous
 
 	// Configuration
 	config *ServiceConfig
@@ -48,10 +50,16 @@ type Service struct {
 
 	// Circuit building
 	rendezvousBuilder *RendezvousCircuitBuilder // Builds circuits to rendezvous points
+	circuitGetter     CircuitGetter             // Gets circuits by ID for sending cells
 
 	// Connections
 	pendingIntros       map[string]*PendingIntro // cookie -> intro
 	rendezvousCircuits  map[string]uint32        // cookie -> circuit ID
+}
+
+// CircuitGetter provides access to circuits by ID
+type CircuitGetter interface {
+	GetCircuit(id uint32) (CircuitInterface, error)
 }
 
 // ServiceConfig contains configuration for hosting an onion service
@@ -136,6 +144,12 @@ func NewService(config *ServiceConfig, log *logger.Logger) (*Service, error) {
 		return nil, fmt.Errorf("failed to derive address: %w", err)
 	}
 
+	// Generate ntor key for rendezvous handshakes
+	ntorKeyPair, err := crypto.GenerateNtorKeyPair()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate ntor key: %w", err)
+	}
+
 	// Set defaults
 	if config.NumIntroPoints == 0 {
 		config.NumIntroPoints = 3
@@ -161,6 +175,7 @@ func NewService(config *ServiceConfig, log *logger.Logger) (*Service, error) {
 		identityKey:        privateKey,
 		publicKey:          publicKey,
 		address:            addr,
+		ntorKey:            ntorKeyPair.Private[:],
 		config:             config,
 		introPoints:        make([]*ServiceIntroPoint, 0, config.NumIntroPoints),
 		publishedHSDirs:    make([]*HSDirectory, 0),
@@ -858,8 +873,49 @@ func (s *Service) HandleIntroduce2(introCircuitID uint32, introduce2Data []byte)
 			s.rendezvousCircuits[cookieStr] = circ.ID
 			s.mu.Unlock()
 
-			// TODO (Task 9.2.3): Send RENDEZVOUS1 cell with handshake response
-			// This will complete the rendezvous connection with the client
+			// Build client handshake data for ntor server-side processing
+			// Format: NODEID (20) || KEYID (32) || CLIENT_PK (32) = 84 bytes
+			// For onion services, we use our own identity as NODEID/KEYID
+			clientHandshake := make([]byte, 84)
+			copy(clientHandshake[0:20], s.publicKey[0:20])    // NODEID (first 20 bytes of Ed25519)
+			copy(clientHandshake[20:52], s.publicKey[0:32])   // KEYID (full Ed25519 public key)
+			copy(clientHandshake[52:84], request.ClientOnionKey) // CLIENT_PK (from INTRODUCE2)
+
+			// Send RENDEZVOUS1 cell with ntor handshake response
+			// Task 9.2.3: Complete the rendezvous connection
+			s.logger.Info("Sending RENDEZVOUS1 cell",
+				"cookie", cookieStr[:16],
+				"circuit_id", circ.ID)
+
+			// Build and send RENDEZVOUS1 using the circuit
+			keyMaterial, err := SendRendezvous1(
+				circ,
+				circ.ID,
+				request.RendezvousCookie,
+				clientHandshake,
+				s.ntorKey,
+				s.publicKey,
+			)
+			if err != nil {
+				s.logger.Error("Failed to send RENDEZVOUS1",
+					"cookie", cookieStr[:16],
+					"error", err)
+				// Clean up on failure
+				s.mu.Lock()
+				delete(s.pendingIntros, cookieStr)
+				delete(s.rendezvousCircuits, cookieStr)
+				s.mu.Unlock()
+				return
+			}
+
+			s.logger.Info("RENDEZVOUS1 sent successfully",
+				"cookie", cookieStr[:16],
+				"key_material_len", len(keyMaterial))
+
+			// TODO (Task 9.3): Stream handling
+			// At this point, the rendezvous is established and key material is derived.
+			// Next step is to handle incoming RELAY_BEGIN cells and forward traffic
+			// to the local service endpoints configured in config.Ports
 		}()
 	} else {
 		s.logger.Warn("Rendezvous circuit builder not configured, circuit not built",
