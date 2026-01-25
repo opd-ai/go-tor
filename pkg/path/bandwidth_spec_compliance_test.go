@@ -434,10 +434,10 @@ func TestBandwidthWeightingSpecCompliance_ExitSelection(t *testing.T) {
 // TestBandwidthWeightingSpecCompliance_MiddleSelection verifies middle relays use bandwidth weighting
 // per path-spec.txt §2.2: middle relay selection should be bandwidth-weighted
 func TestBandwidthWeightingSpecCompliance_MiddleSelection(t *testing.T) {
-	// Create guards and exits for path construction
+	// Create guards and exits for path construction in different /16 subnets
 	guard := &directory.Relay{
 		Nickname:    "Guard",
-		Address:     "192.168.0.1",
+		Address:     "10.0.1.1",
 		ORPort:      9001,
 		Flags:       []string{"Guard", "Running", "Valid", "Stable"},
 		Bandwidth:   1000,
@@ -446,20 +446,20 @@ func TestBandwidthWeightingSpecCompliance_MiddleSelection(t *testing.T) {
 
 	exit := &directory.Relay{
 		Nickname:    "Exit",
-		Address:     "192.168.0.2",
+		Address:     "10.1.1.1",
 		ORPort:      9001,
 		Flags:       []string{"Exit", "Running", "Valid", "Fast"},
 		Bandwidth:   1000,
 		Fingerprint: "0000000000000000000000000000000000000011",
 	}
 
-	// Create middle relay candidates with different bandwidths
+	// Create middle relay candidates with different bandwidths in separate /16 subnets
 	relays := []*directory.Relay{
 		guard,
 		exit,
 		{
 			Nickname:    "LowBWMiddle",
-			Address:     "192.168.3.1",
+			Address:     "10.2.1.1",
 			ORPort:      9001,
 			Flags:       []string{"Running", "Valid", "Fast"},
 			Bandwidth:   200,
@@ -467,7 +467,7 @@ func TestBandwidthWeightingSpecCompliance_MiddleSelection(t *testing.T) {
 		},
 		{
 			Nickname:    "HighBWMiddle",
-			Address:     "192.168.3.2",
+			Address:     "10.3.1.1",
 			ORPort:      9001,
 			Flags:       []string{"Running", "Valid", "Fast"},
 			Bandwidth:   2000, // 10x higher bandwidth

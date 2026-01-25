@@ -286,24 +286,27 @@ func (s *Selector) selectExit(port int, avoid *directory.Relay) (*directory.Rela
 	exits := make([]*directory.Relay, 0)
 
 	for _, relay := range s.relays {
-		// Skip if same relay
-		if relay.Fingerprint == avoid.Fingerprint {
-			continue
-		}
+		// Skip family/subnet checks if no relay to avoid
+		if avoid != nil {
+			// Skip if same relay
+			if relay.Fingerprint == avoid.Fingerprint {
+				continue
+			}
 
-		// Skip if in same family (bidirectional family relationship)
-		if relay.InSameFamily(avoid) {
-			s.logger.Debug("Skipping exit in same family as guard",
-				"exit", relay.Nickname, "guard", avoid.Nickname)
-			continue
-		}
+			// Skip if in same family (bidirectional family relationship)
+			if relay.InSameFamily(avoid) {
+				s.logger.Debug("Skipping exit in same family as guard",
+					"exit", relay.Nickname, "guard", avoid.Nickname)
+				continue
+			}
 
-		// Skip if in same /16 subnet
-		if relay.InSameSubnet(avoid) {
-			s.logger.Debug("Skipping exit in same subnet as guard",
-				"exit", relay.Nickname, "guard", avoid.Nickname,
-				"subnet", relay.Address[:strings.LastIndex(relay.Address, ".")])
-			continue
+			// Skip if in same /16 subnet
+			if relay.InSameSubnet(avoid) {
+				s.logger.Debug("Skipping exit in same subnet as guard",
+					"exit", relay.Nickname, "guard", avoid.Nickname,
+					"subnet", relay.Address[:strings.LastIndex(relay.Address, ".")])
+				continue
+			}
 		}
 
 		// Prefer exits with Exit flag
@@ -315,9 +318,9 @@ func (s *Selector) selectExit(port int, avoid *directory.Relay) (*directory.Rela
 	// Fallback: any relay that's not the guard and doesn't share family/subnet
 	if len(exits) == 0 {
 		for _, relay := range s.relays {
-			if relay.Fingerprint != avoid.Fingerprint &&
+			if avoid == nil || (relay.Fingerprint != avoid.Fingerprint &&
 				!relay.InSameFamily(avoid) &&
-				!relay.InSameSubnet(avoid) {
+				!relay.InSameSubnet(avoid)) {
 				exits = append(exits, relay)
 			}
 		}
@@ -341,34 +344,37 @@ func (s *Selector) selectMiddle(guard, exit *directory.Relay) (*directory.Relay,
 	candidates := make([]*directory.Relay, 0)
 
 	for _, relay := range s.relays {
-		// Skip if same as guard or exit
-		if relay.Fingerprint == guard.Fingerprint || relay.Fingerprint == exit.Fingerprint {
+		// Skip family/subnet checks if no guard or exit to avoid
+		if guard != nil && relay.Fingerprint == guard.Fingerprint {
+			continue
+		}
+		if exit != nil && relay.Fingerprint == exit.Fingerprint {
 			continue
 		}
 
 		// Skip if in same family as guard
-		if relay.InSameFamily(guard) {
+		if guard != nil && relay.InSameFamily(guard) {
 			s.logger.Debug("Skipping middle in same family as guard",
 				"middle", relay.Nickname, "guard", guard.Nickname)
 			continue
 		}
 
 		// Skip if in same family as exit
-		if relay.InSameFamily(exit) {
+		if exit != nil && relay.InSameFamily(exit) {
 			s.logger.Debug("Skipping middle in same family as exit",
 				"middle", relay.Nickname, "exit", exit.Nickname)
 			continue
 		}
 
 		// Skip if in same /16 subnet as guard
-		if relay.InSameSubnet(guard) {
+		if guard != nil && relay.InSameSubnet(guard) {
 			s.logger.Debug("Skipping middle in same subnet as guard",
 				"middle", relay.Nickname, "guard", guard.Nickname)
 			continue
 		}
 
 		// Skip if in same /16 subnet as exit
-		if relay.InSameSubnet(exit) {
+		if exit != nil && relay.InSameSubnet(exit) {
 			s.logger.Debug("Skipping middle in same subnet as exit",
 				"middle", relay.Nickname, "exit", exit.Nickname)
 			continue

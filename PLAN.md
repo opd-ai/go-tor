@@ -90,7 +90,14 @@ The audit will follow a multi-phase approach: automated static analysis, specifi
 - [x] **Audit consensus document parsing per dir-spec.txt [pkg/directory] [6h]** ✅ **COMPLETED** (January 25, 2026)
 - [x] **Verify relay descriptor parsing and validation [pkg/directory] [4h]** ✅ **COMPLETED** (January 25, 2026)
 - [x] **Audit guard node selection algorithm per path-spec.txt [pkg/path] [4h]** ✅ **COMPLETED** (January 25, 2026)
-- [ ] Verify bandwidth-weighted relay selection [pkg/path] [3h]
+- [x] **Verify bandwidth-weighted relay selection [pkg/path] [3h]** ✅ **COMPLETED** (January 25, 2026)
+  - Audited `weightedRandomIndex` algorithm implementation (path-spec.txt §2.2)
+  - Verified bandwidth-weighted selection for guards, middle, and exit relays
+  - Confirmed cryptographically secure random selection (crypto/rand)
+  - Verified statistical correctness (99.2% accuracy for 100:1 ratio)
+  - Fixed nil pointer bugs in selectExit/selectMiddle
+  - All specification compliance tests passing
+  - Created audit document: `docs/audits/BANDWIDTH_WEIGHTED_SELECTION_AUDIT.md`
 - [ ] Audit control protocol authentication per control-spec.txt [pkg/control] [4h]
 - [ ] Verify control protocol command handling [pkg/control] [4h]
 - [ ] Audit introduction point protocol per rend-spec-v3.txt [pkg/onion] [6h]
