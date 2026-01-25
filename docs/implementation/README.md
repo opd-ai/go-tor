@@ -1,6 +1,8 @@
 # Implementation Reports
 
-Technical implementation documentation for go-tor features and components.
+Technical implementation documentation for go-tor features and components. This directory contains detailed technical documentation for specific protocol features and integrations.
+
+> **Note**: This directory has been consolidated. Historical task completion reports and redundant summaries have been removed. The main feature documentation is in [/docs](../).
 
 ## Protocol Implementation
 
