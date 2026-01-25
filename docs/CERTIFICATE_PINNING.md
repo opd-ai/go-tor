@@ -193,6 +193,40 @@ Potential improvements for consideration:
 3. **Metrics**: Track pinning validation success/failure rates
 4. **Configurable Strictness**: Allow per-relay or per-circuit pinning policies
 
+## Testing
+
+The certificate pinning implementation has comprehensive test coverage (96.6% for `ValidateRelayIdentity`):
+
+### Test Coverage
+
+- **RSA fingerprint validation**: Success and mismatch cases
+- **Ed25519 identity validation**: Success and mismatch cases
+- **Combined validation**: Both RSA and Ed25519 verification
+- **Error handling**: Missing certificates, invalid key types, wrong key lengths
+- **Cross-certification**: Type 7 certificate fallback
+- **Edge cases**: Empty inputs, nil certificates, invalid formats
+
+### Running Tests
+
+```bash
+# Run all protocol tests
+go test -v ./pkg/protocol
+
+# Run only ValidateRelayIdentity tests
+go test -v -run TestValidateRelayIdentity ./pkg/protocol
+
+# Check test coverage
+go test -coverprofile=coverage.out ./pkg/protocol
+go tool cover -func=coverage.out | grep ValidateRelayIdentity
+```
+
+### Test Files
+
+- `pkg/protocol/certs_relay_identity_test.go`: Comprehensive identity validation tests
+- `pkg/protocol/certs_test.go`: General CERTS cell tests
+- `pkg/protocol/certs_signature_test.go`: Signature validation tests
+- `pkg/circuit/pinning_test.go`: Integration tests for circuit-level pinning
+
 ## References
 
 - **tor-spec.txt §2**: TLS and Link Protocol
@@ -207,5 +241,6 @@ Potential improvements for consideration:
 - `pkg/circuit/pinning_test.go`: Certificate pinning tests
 - `pkg/connection/connection.go`: Connection configuration
 - `pkg/protocol/certs.go`: CERTS cell parsing and validation
+- `pkg/protocol/certs_relay_identity_test.go`: Identity validation tests
 - `pkg/protocol/protocol.go`: Link protocol handshake
 - `docs/CERTIFICATE_PINNING.md`: This document

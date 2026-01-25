@@ -21,6 +21,7 @@ import (
 	"github.com/opd-ai/go-tor/pkg/metrics"
 	"github.com/opd-ai/go-tor/pkg/path"
 	"github.com/opd-ai/go-tor/pkg/pool"
+	"github.com/opd-ai/go-tor/pkg/ratelimit"
 	"github.com/opd-ai/go-tor/pkg/socks"
 )
 
@@ -48,9 +49,10 @@ type Client struct {
 	metrics       *metrics.Metrics
 
 	// Circuit management with advanced pooling (Phase 9.4)
-	circuitPool *pool.CircuitPool
-	circuits    []*circuit.Circuit // Legacy circuit list for backward compatibility
-	circuitsMu  sync.RWMutex
+	circuitPool        *pool.CircuitPool
+	circuitRateLimiter *ratelimit.RateLimiter // Rate limiter for circuit creation
+	circuits           []*circuit.Circuit      // Legacy circuit list for backward compatibility
+	circuitsMu         sync.RWMutex
 
 	// Bandwidth tracking (for BW events)
 	bytesRead    uint64
@@ -92,6 +94,15 @@ func New(cfg *config.Config, log *logger.Logger) (*Client, error) {
 	// Initialize circuit manager
 	circuitMgr := circuit.NewManager()
 
+	// Initialize circuit rate limiter if configured
+	var circuitRateLimiter *ratelimit.RateLimiter
+	if cfg.CircuitCreationsPerSecond > 0 && cfg.CircuitCreationsBurst > 0 {
+		circuitRateLimiter = ratelimit.NewRateLimiter(cfg.CircuitCreationsPerSecond, cfg.CircuitCreationsBurst)
+		log.Info("Circuit rate limiting enabled",
+			"rate", cfg.CircuitCreationsPerSecond,
+			"burst", cfg.CircuitCreationsBurst)
+	}
+
 	// Initialize SOCKS5 server with isolation config
 	socksAddr := fmt.Sprintf("127.0.0.1:%d", cfg.SocksPort)
 	socksConfig := &socks.Config{
@@ -111,18 +122,19 @@ func New(cfg *config.Config, log *logger.Logger) (*Client, error) {
 	}
 
 	client := &Client{
-		config:        cfg,
-		logger:        log.Component("client"),
-		directory:     dirClient,
-		circuitMgr:    circuitMgr,
-		socksServer:   socksServer,
-		guardManager:  guardMgr,
-		metrics:       metrics.New(),
-		healthMonitor: health.NewMonitor(),
-		circuits:      make([]*circuit.Circuit, 0),
-		ctx:           ctx,
-		cancel:        cancel,
-		shutdown:      make(chan struct{}),
+		config:             cfg,
+		logger:             log.Component("client"),
+		directory:          dirClient,
+		circuitMgr:         circuitMgr,
+		circuitRateLimiter: circuitRateLimiter,
+		socksServer:        socksServer,
+		guardManager:       guardMgr,
+		metrics:            metrics.New(),
+		healthMonitor:      health.NewMonitor(),
+		circuits:           make([]*circuit.Circuit, 0),
+		ctx:                ctx,
+		cancel:             cancel,
+		shutdown:           make(chan struct{}),
 	}
 
 	// Initialize control protocol server
@@ -374,6 +386,12 @@ func (c *Client) buildCircuitForPool(ctx context.Context) (*circuit.Circuit, err
 
 	// Create circuit builder
 	builder := circuit.NewBuilder(c.circuitMgr, c.logger)
+	
+	// Configure rate limiter if enabled
+	if c.circuitRateLimiter != nil {
+		builder.SetRateLimiter(c.circuitRateLimiter)
+		builder.SetMetricsRecorder(c.metrics)
+	}
 
 	// Track circuit build time
 	startTime := time.Now()

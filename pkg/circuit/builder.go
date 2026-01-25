@@ -11,13 +11,22 @@ import (
 	"github.com/opd-ai/go-tor/pkg/directory"
 	"github.com/opd-ai/go-tor/pkg/logger"
 	"github.com/opd-ai/go-tor/pkg/path"
+	"github.com/opd-ai/go-tor/pkg/ratelimit"
 )
+
+// MetricsRecorder is an interface for recording circuit building metrics
+type MetricsRecorder interface {
+	RecordRateLimitWait(duration time.Duration)
+	RecordRateLimitedCircuit()
+}
 
 // Builder constructs Tor circuits through the network
 type Builder struct {
-	logger  *logger.Logger
-	manager *Manager
-	mu      sync.Mutex
+	logger          *logger.Logger
+	manager         *Manager
+	rateLimiter     *ratelimit.RateLimiter // Rate limiter for circuit creation
+	metricsRecorder MetricsRecorder        // Metrics recorder for rate limiting stats
+	mu              sync.Mutex
 }
 
 // NewBuilder creates a new circuit builder
@@ -27,15 +36,56 @@ func NewBuilder(manager *Manager, log *logger.Logger) *Builder {
 	}
 
 	return &Builder{
-		logger:  log.Component("builder"),
-		manager: manager,
+		logger:          log.Component("builder"),
+		manager:         manager,
+		rateLimiter:     nil, // Disabled by default, enabled via SetRateLimiter
+		metricsRecorder: nil, // Disabled by default, enabled via SetMetricsRecorder
 	}
+}
+
+// SetRateLimiter sets the rate limiter for circuit creation.
+// If nil, rate limiting is disabled.
+func (b *Builder) SetRateLimiter(limiter *ratelimit.RateLimiter) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.rateLimiter = limiter
+}
+
+// SetMetricsRecorder sets the metrics recorder for circuit building stats.
+// If nil, metrics recording is disabled.
+func (b *Builder) SetMetricsRecorder(recorder MetricsRecorder) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.metricsRecorder = recorder
 }
 
 // BuildCircuit builds a complete 3-hop circuit using the provided path
 func (b *Builder) BuildCircuit(ctx context.Context, p *path.Path, timeout time.Duration) (*Circuit, error) {
+	// Check rate limit before acquiring the build lock
+	// This prevents queuing up too many circuit builds
+	if b.rateLimiter != nil {
+		waitStart := time.Now()
+		if err := b.rateLimiter.Wait(ctx); err != nil {
+			// Record that circuit was rate limited
+			if b.metricsRecorder != nil {
+				b.metricsRecorder.RecordRateLimitedCircuit()
+			}
+			return nil, fmt.Errorf("circuit creation rate limited: %w", err)
+		}
+		// Record wait time if we had to wait
+		waitDuration := time.Since(waitStart)
+		if waitDuration > 0 && b.metricsRecorder != nil {
+			b.metricsRecorder.RecordRateLimitWait(waitDuration)
+		}
+	}
+
 	b.mu.Lock()
 	defer b.mu.Unlock()
+
+	// Validate path
+	if p == nil || p.Guard == nil || p.Middle == nil || p.Exit == nil {
+		return nil, fmt.Errorf("invalid path: missing relays")
+	}
 
 	b.logger.Info("Building circuit",
 		"guard", p.Guard.Nickname,

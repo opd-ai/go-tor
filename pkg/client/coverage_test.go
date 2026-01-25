@@ -30,9 +30,17 @@ func addTestCircuit(c *Client, id uint32, state circuit.State, age time.Duration
 // TestStatsGetters tests all Stats getter methods
 func TestStatsGetters(t *testing.T) {
 	stats := Stats{
-		ActiveCircuits: 5,
-		SocksPort:      9050,
-		ControlPort:    9051,
+		ActiveCircuits:      5,
+		SocksPort:           9050,
+		ControlPort:         9051,
+		CircuitBuilds:       100,
+		CircuitBuildSuccess: 95,
+		CircuitBuildFailure: 5,
+		GuardsActive:        3,
+		GuardsConfirmed:     2,
+		UptimeSeconds:       3600,
+		ConnectionAttempts:  150,
+		DataDir:             "/tmp/tor-data",
 	}
 
 	if stats.GetActiveCircuits() != 5 {
@@ -45,6 +53,38 @@ func TestStatsGetters(t *testing.T) {
 
 	if stats.GetControlPort() != 9051 {
 		t.Errorf("GetControlPort() = %d, want 9051", stats.GetControlPort())
+	}
+
+	if stats.GetCircuitBuilds() != 100 {
+		t.Errorf("GetCircuitBuilds() = %d, want 100", stats.GetCircuitBuilds())
+	}
+
+	if stats.GetCircuitBuildSuccess() != 95 {
+		t.Errorf("GetCircuitBuildSuccess() = %d, want 95", stats.GetCircuitBuildSuccess())
+	}
+
+	if stats.GetCircuitBuildFailure() != 5 {
+		t.Errorf("GetCircuitBuildFailure() = %d, want 5", stats.GetCircuitBuildFailure())
+	}
+
+	if stats.GetGuardsActive() != 3 {
+		t.Errorf("GetGuardsActive() = %d, want 3", stats.GetGuardsActive())
+	}
+
+	if stats.GetGuardsConfirmed() != 2 {
+		t.Errorf("GetGuardsConfirmed() = %d, want 2", stats.GetGuardsConfirmed())
+	}
+
+	if stats.GetUptimeSeconds() != 3600 {
+		t.Errorf("GetUptimeSeconds() = %d, want 3600", stats.GetUptimeSeconds())
+	}
+
+	if stats.GetConnectionAttempts() != 150 {
+		t.Errorf("GetConnectionAttempts() = %d, want 150", stats.GetConnectionAttempts())
+	}
+
+	if stats.GetDataDir() != "/tmp/tor-data" {
+		t.Errorf("GetDataDir() = %q, want %q", stats.GetDataDir(), "/tmp/tor-data")
 	}
 }
 
@@ -62,6 +102,38 @@ func TestStatsGettersZeroValues(t *testing.T) {
 
 	if stats.GetControlPort() != 0 {
 		t.Errorf("GetControlPort() = %d, want 0", stats.GetControlPort())
+	}
+
+	if stats.GetCircuitBuilds() != 0 {
+		t.Errorf("GetCircuitBuilds() = %d, want 0", stats.GetCircuitBuilds())
+	}
+
+	if stats.GetCircuitBuildSuccess() != 0 {
+		t.Errorf("GetCircuitBuildSuccess() = %d, want 0", stats.GetCircuitBuildSuccess())
+	}
+
+	if stats.GetCircuitBuildFailure() != 0 {
+		t.Errorf("GetCircuitBuildFailure() = %d, want 0", stats.GetCircuitBuildFailure())
+	}
+
+	if stats.GetGuardsActive() != 0 {
+		t.Errorf("GetGuardsActive() = %d, want 0", stats.GetGuardsActive())
+	}
+
+	if stats.GetGuardsConfirmed() != 0 {
+		t.Errorf("GetGuardsConfirmed() = %d, want 0", stats.GetGuardsConfirmed())
+	}
+
+	if stats.GetUptimeSeconds() != 0 {
+		t.Errorf("GetUptimeSeconds() = %d, want 0", stats.GetUptimeSeconds())
+	}
+
+	if stats.GetConnectionAttempts() != 0 {
+		t.Errorf("GetConnectionAttempts() = %d, want 0", stats.GetConnectionAttempts())
+	}
+
+	if stats.GetDataDir() != "" {
+		t.Errorf("GetDataDir() = %q, want empty string", stats.GetDataDir())
 	}
 }
 
@@ -1295,5 +1367,37 @@ func TestCheckAndRebuildCircuitsOldCircuits(t *testing.T) {
 
 	if count != 2 {
 		t.Errorf("Expected 2 circuits after cleanup, got %d", count)
+	}
+}
+
+// TestClientStatsAdapterGetConfig tests the clientStatsAdapter.GetConfig method
+func TestClientStatsAdapterGetConfig(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.DataDirectory = t.TempDir()
+	log := logger.NewDefault()
+
+	client, err := New(cfg, log)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+	defer client.Stop()
+
+	adapter := &clientStatsAdapter{
+		client: client,
+	}
+
+	configProvider := adapter.GetConfig()
+	if configProvider == nil {
+		t.Fatal("GetConfig() returned nil")
+	}
+
+	// Test that the config provider is functional
+	provider, ok := configProvider.(*clientConfigProvider)
+	if !ok {
+		t.Fatal("GetConfig() returned wrong type")
+	}
+
+	if provider.client != client {
+		t.Error("clientConfigProvider has wrong client reference")
 	}
 }
