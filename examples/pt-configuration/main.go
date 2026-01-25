@@ -18,7 +18,7 @@ import (
 )
 
 func main() {
-	fmt.Println("=== Pluggable Transport Configuration Example ===\n")
+	fmt.Println("=== Pluggable Transport Configuration Example ===")
 
 	// Create a temporary directory for our example
 	tmpDir, err := os.MkdirTemp("", "pt-config-example-*")
