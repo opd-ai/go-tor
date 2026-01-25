@@ -32,7 +32,7 @@ func main() {
 	}
 
 	dataDir := filepath.Join(homeDir, ".go-tor-example")
-	if err := os.MkdirAll(dataDir, 0700); err != nil {
+	if err := os.MkdirAll(dataDir, 0o700); err != nil {
 		log.Fatalf("Failed to create data directory: %v", err)
 	}
 

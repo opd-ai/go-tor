@@ -23,9 +23,9 @@ const (
 	stateFile       = "state.json"
 
 	// File permissions (owner read/write only)
-	keyFilePerms  = 0600
-	dirPerms      = 0700
-	stateFilePerms = 0600
+	keyFilePerms   = 0o600
+	dirPerms       = 0o700
+	stateFilePerms = 0o600
 )
 
 // ServiceState represents the persistent state of an onion service

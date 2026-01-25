@@ -223,11 +223,14 @@ The `pkg/onion/service.go` already contains foundational server-side functionali
 
 **Tasks**:
 
-- [ ] **10.1.1 TLS Server Setup**
+- [x] **10.1.1 TLS Server Setup** ✅ **COMPLETED** (January 25, 2026)
   - Generate/load relay identity keys (Ed25519 + RSA)
   - Configure TLS server with proper cipher suites
   - Accept incoming OR connections
   - Implement TLS certificate generation per tor-spec.txt §1.1
+  - Implementation: `pkg/relay/keys.go`, `pkg/relay/or_listener.go`
+  - Tests: `pkg/relay/keys_test.go`, `pkg/relay/or_listener_test.go` (84.7% coverage)
+  - Documentation: `docs/RELAY_IMPLEMENTATION.md`
 
 - [ ] **10.1.2 Link Protocol Server**
   - Handle incoming VERSIONS cells
