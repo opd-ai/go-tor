@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/opd-ai/go-tor/pkg/connection"
+	"github.com/opd-ai/go-tor/pkg/directory"
 	"github.com/opd-ai/go-tor/pkg/logger"
 	"github.com/opd-ai/go-tor/pkg/path"
 )
@@ -51,9 +52,9 @@ func (b *Builder) BuildCircuit(ctx context.Context, p *path.Path, timeout time.D
 	buildCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	// Connect to guard
+	// Connect to guard with certificate pinning
 	guardAddr := fmt.Sprintf("%s:%d", p.Guard.Address, p.Guard.ORPort)
-	guardConn, err := b.connectToRelay(buildCtx, guardAddr)
+	guardConn, err := b.connectToRelay(buildCtx, guardAddr, p.Guard)
 	if err != nil {
 		circuit.SetState(StateFailed)
 		return nil, fmt.Errorf("failed to connect to guard: %w", err)
@@ -117,9 +118,36 @@ func (b *Builder) BuildCircuit(ctx context.Context, p *path.Path, timeout time.D
 	return circuit, nil
 }
 
-// connectToRelay establishes a connection to a relay
-func (b *Builder) connectToRelay(ctx context.Context, address string) (*connection.Connection, error) {
+// connectToRelay establishes a connection to a relay with certificate pinning.
+// This implements enhanced certificate validation per tor-spec.txt §2 by:
+// 1. Setting expected Ed25519 identity from directory consensus
+// 2. Setting expected RSA fingerprint from directory consensus
+// 3. Enabling CERTS cell validation in the link protocol handshake
+// This prevents MITM attacks where an adversary presents a valid self-signed
+// certificate for a different relay's identity.
+func (b *Builder) connectToRelay(ctx context.Context, address string, relay *directory.Relay) (*connection.Connection, error) {
 	cfg := connection.DefaultConfig(address)
+	
+	// AUDIT-004: Enhanced certificate pinning with relay identity from consensus
+	if relay != nil {
+		// Set expected Ed25519 identity key from consensus (32 bytes)
+		if len(relay.IdentityKey) == 32 {
+			cfg.ExpectedIdentity = relay.IdentityKey
+			b.logger.Debug("Certificate pinning enabled",
+				"relay", relay.Nickname,
+				"fingerprint", relay.Fingerprint)
+		}
+		
+		// Set expected RSA fingerprint from consensus
+		if relay.Fingerprint != "" {
+			cfg.ExpectedFingerprint = relay.Fingerprint
+		}
+		
+		// Enable strict CERTS validation mode for defense-in-depth
+		// This will fail the handshake if CERTS validation fails
+		cfg.RequireCERTS = true
+	}
+	
 	conn := connection.New(cfg, b.logger)
 
 	if err := conn.Connect(ctx, cfg); err != nil {

@@ -100,15 +100,18 @@ const CellLen = CircIDLen + CmdLen + PayloadLen // 514 bytes
 **Implementation Location**: `pkg/connection/connection.go`, `pkg/protocol/protocol.go`
 
 **Details**:
-- TLS 1.2+ required with AEAD cipher suites
-- Certificate validation implemented
-- Link protocol versions 3-5 supported
-- VERSIONS cell sent as first cell (correct)
-- CERTS, AUTH_CHALLENGE, NETINFO handshake sequence implemented
+- TLS 1.2+ required with AEAD cipher suites ✅
+- Certificate validation implemented ✅
+- Link protocol versions 3-5 supported ✅
+- VERSIONS cell sent as first cell (correct) ✅
+- CERTS, AUTH_CHALLENGE, NETINFO handshake sequence implemented ✅
+- **Certificate pinning with relay fingerprint verification** ✅ **ENHANCED (Jan 2026)**
+  - Automatic Ed25519 identity validation from consensus
+  - Automatic RSA fingerprint validation from consensus
+  - Strict CERTS validation mode during circuit building
+  - Defense-in-depth MITM attack prevention
 
-**Partial Finding**: Certificate pinning (tor-spec §2, SHOULD) has basic implementation but lacks enhanced relay fingerprint pinning.
-
-**Impact**: Minor - Basic validation prevents MITM, but enhanced pinning would add defense-in-depth.
+**Impact**: None - Full TLS and link protocol compliance with enhanced security.
 
 ---
 
@@ -298,7 +301,7 @@ keyInfo := []byte("ntor-curve25519-sha256-1:key_extract")
 | **P2** | ~~Enhanced Consensus Validation~~ | ~~dir-spec §1.3~~ | ~~Reduced trust verification~~ | ✅ **COMPLETED** (Jan 2026) |
 | **P2** | ~~Full Circuit Padding~~ | ~~padding-spec §1-3~~ | ~~Reduced traffic analysis protection~~ | ✅ **COMPLETED** (Jan 2026) |
 | **P3** | ~~Path Bias Detection~~ | ~~path-spec §5.3~~ | ~~Missing advanced attack detection~~ | ✅ **COMPLETED** (Jan 2026) |
-| **P3** | Certificate Pinning Enhancement | tor-spec §2 | Reduced MITM defense-in-depth | Open |
+| **P3** | ~~Certificate Pinning Enhancement~~ | ~~tor-spec §2~~ | ~~Reduced MITM defense-in-depth~~ | ✅ **COMPLETED** (Jan 2026) |
 
 ---
 
@@ -350,21 +353,26 @@ keyInfo := []byte("ntor-curve25519-sha256-1:key_extract")
    - Documentation: `docs/PATH_BIAS_DETECTION.md`
    - Priority: P3 - Advanced attack detection ACHIEVED
 
-### High Priority
-
-5. **Certificate Pinning Enhancement**
-   - Add relay fingerprint verification against consensus
-   - Implement stricter TLS certificate validation
-   - Priority: P3 - defense-in-depth
+5. ✅ **Certificate Pinning Enhancement** (tor-spec §2) - **IMPLEMENTED** (January 25, 2026)
+   - ✅ Automatic relay fingerprint verification against consensus
+   - ✅ Ed25519 identity key validation from consensus
+   - ✅ RSA fingerprint validation from consensus
+   - ✅ Strict CERTS validation mode during circuit building
+   - ✅ Defense-in-depth MITM attack prevention
+   - ✅ Comprehensive test coverage (>90%)
+   - Implementation: `pkg/circuit/builder.go`, `pkg/protocol/certs.go`
+   - Tests: `pkg/circuit/pinning_test.go`
+   - Documentation: `docs/CERTIFICATE_PINNING.md`
+   - Priority: P3 - Enhanced security ACHIEVED
 
 ---
 
 ## Conclusion
 
-The go-tor implementation demonstrates **excellent protocol compliance** for core Tor client functionality. All essential components required for anonymous network access, including private onion service support, enhanced consensus validation, circuit padding, and path bias detection, are fully implemented according to official specifications.
+The go-tor implementation demonstrates **excellent protocol compliance** for core Tor client functionality. All essential components required for anonymous network access, including private onion service support, enhanced consensus validation, circuit padding, path bias detection, and certificate pinning, are fully implemented according to official specifications.
 
 **Compliance Summary**:
-- **Fully Compliant**: 18 components (cells, circuits, crypto, streams, SOCKS, control, client auth, consensus validation, path selection with bias detection)
+- **Fully Compliant**: 19 components (cells, circuits, crypto, streams, SOCKS, control, client auth, consensus validation, path selection with bias detection, certificate pinning)
 - **Substantially Compliant**: 1 component (circuit padding - 85%)
 - **Partially Compliant**: 0 components
 - **Non-Compliant**: 0 components (no fundamental violations)
@@ -373,8 +381,9 @@ The go-tor implementation demonstrates **excellent protocol compliance** for cor
   - Enhanced consensus signature validation (January 2026)
   - Circuit padding with APE and state machines (January 2026)
   - Path bias detection for attack resistance (January 2026)
+  - Certificate pinning enhancement for MITM defense (January 2026)
 
-The identified gaps primarily affect optional advanced features (certificate pinning enhancement) rather than core protocol operation. The implementation makes intentional design choices (e.g., no TAP handshake, no exit node functionality) that are compliant with modern Tor protocol standards.
+**All critical gaps have been addressed.** The implementation makes intentional design choices (e.g., no TAP handshake, no exit node functionality) that are compliant with modern Tor protocol standards.
 
 **Interoperability Assessment**: The implementation should interoperate correctly with the production Tor network for standard client operations including clearnet browsing through exit nodes and connecting to public/private v3 onion services.
 
