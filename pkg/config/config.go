@@ -37,6 +37,11 @@ type Config struct {
 	// Onion service settings
 	OnionServices []OnionServiceConfig
 
+	// Pluggable Transport settings (Phase 11.1.3)
+	ClientTransports []ClientTransportConfig // Client-side pluggable transports
+	ServerTransports []ServerTransportConfig // Server-side pluggable transports (for bridge relays)
+	TransportProxy   string                  // Upstream proxy for PT connections (SOCKS5 URL)
+
 	// Logging
 	LogLevel string // Log level: debug, info, warn, error (default: info)
 
@@ -131,6 +136,38 @@ type OnionServiceConfig struct {
 	ClientAuth  map[string]string // Client authorization keys
 }
 
+// ClientTransportConfig represents configuration for a client-side pluggable transport.
+// This is used for connecting through censorship-resistant transports like obfs4 or meek.
+type ClientTransportConfig struct {
+	// Name is the transport method name (e.g., "obfs4", "meek", "snowflake")
+	Name string
+
+	// BinaryPath is the path to the PT executable
+	BinaryPath string
+
+	// Options contains PT-specific configuration options
+	// For obfs4: cert, iat-mode
+	// For meek: url, front
+	Options map[string]string
+}
+
+// ServerTransportConfig represents configuration for a server-side pluggable transport.
+// This is used for bridge relays to accept incoming PT connections.
+type ServerTransportConfig struct {
+	// Name is the transport method name
+	Name string
+
+	// BinaryPath is the path to the PT executable
+	BinaryPath string
+
+	// BindAddr is the address:port where the PT should listen
+	// Format: "address:port" or "address:port#options"
+	BindAddr string
+
+	// Options contains PT-specific server options
+	Options map[string]string
+}
+
 // DefaultConfig returns a configuration with sensible defaults.
 // It automatically detects the appropriate data directory for the current platform
 // and uses ports that work without special privileges.
@@ -169,6 +206,9 @@ func DefaultConfig() *Config {
 		ConnLimit:           1000,
 		DormantTimeout:      24 * time.Hour,
 		OnionServices:       []OnionServiceConfig{},
+		ClientTransports:    []ClientTransportConfig{},
+		ServerTransports:    []ServerTransportConfig{},
+		TransportProxy:      "",
 		LogLevel:            "info",
 		// Monitoring defaults (Phase 9.1)
 		MetricsPort:   0,     // Disabled by default

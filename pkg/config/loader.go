@@ -158,6 +158,44 @@ func processConfigOption(cfg *Config, key, value string) error {
 	case "LogLevel":
 		cfg.LogLevel = strings.ToLower(value)
 
+	// Pluggable Transport configuration (Phase 11.1.3)
+	case "ClientTransportPlugin":
+		// Format: ClientTransportPlugin transport exec path [options]
+		// Example: ClientTransportPlugin obfs4 exec /usr/bin/obfs4proxy
+		transport, err := parseClientTransportPlugin(value)
+		if err != nil {
+			return fmt.Errorf("invalid ClientTransportPlugin: %w", err)
+		}
+		cfg.ClientTransports = append(cfg.ClientTransports, transport)
+
+	case "ServerTransportPlugin":
+		// Format: ServerTransportPlugin transport exec path
+		// Example: ServerTransportPlugin obfs4 exec /usr/bin/obfs4proxy
+		transport, err := parseServerTransportPlugin(value)
+		if err != nil {
+			return fmt.Errorf("invalid ServerTransportPlugin: %w", err)
+		}
+		cfg.ServerTransports = append(cfg.ServerTransports, transport)
+
+	case "ServerTransportListenAddr":
+		// Format: ServerTransportListenAddr transport address:port
+		// Example: ServerTransportListenAddr obfs4 0.0.0.0:9443
+		if err := parseServerTransportListenAddr(cfg, value); err != nil {
+			return fmt.Errorf("invalid ServerTransportListenAddr: %w", err)
+		}
+
+	case "ServerTransportOptions":
+		// Format: ServerTransportOptions transport key=value key=value...
+		// Example: ServerTransportOptions obfs4 iat-mode=1
+		if err := parseServerTransportOptions(cfg, value); err != nil {
+			return fmt.Errorf("invalid ServerTransportOptions: %w", err)
+		}
+
+	case "TransportProxy":
+		// Format: TransportProxy socks5 127.0.0.1:9050
+		// Only SOCKS5 is supported per pt-spec.txt
+		cfg.TransportProxy = value
+
 	// Ignore unknown options for compatibility with standard torrc files
 	default:
 		// Silently ignore unknown options for forward compatibility
@@ -314,7 +352,44 @@ func SaveToFile(path string, cfg *Config) error {
 
 	// Logging
 	fmt.Fprintf(writer, "# Logging\n")
-	fmt.Fprintf(writer, "LogLevel %s\n", cfg.LogLevel)
+	fmt.Fprintf(writer, "LogLevel %s\n\n", cfg.LogLevel)
+
+	// Pluggable Transports
+	if len(cfg.ClientTransports) > 0 || len(cfg.ServerTransports) > 0 || cfg.TransportProxy != "" {
+		fmt.Fprintf(writer, "# Pluggable Transports\n")
+
+		// Client transports
+		for _, ct := range cfg.ClientTransports {
+			fmt.Fprintf(writer, "ClientTransportPlugin %s exec %s", ct.Name, ct.BinaryPath)
+			for k, v := range ct.Options {
+				fmt.Fprintf(writer, " %s=%s", k, v)
+			}
+			fmt.Fprintf(writer, "\n")
+		}
+
+		// Server transports
+		for _, st := range cfg.ServerTransports {
+			if st.BinaryPath != "" {
+				fmt.Fprintf(writer, "ServerTransportPlugin %s exec %s\n", st.Name, st.BinaryPath)
+			}
+			if st.BindAddr != "" {
+				fmt.Fprintf(writer, "ServerTransportListenAddr %s %s\n", st.Name, st.BindAddr)
+			}
+			if len(st.Options) > 0 {
+				fmt.Fprintf(writer, "ServerTransportOptions %s", st.Name)
+				for k, v := range st.Options {
+					fmt.Fprintf(writer, " %s=%s", k, v)
+				}
+				fmt.Fprintf(writer, "\n")
+			}
+		}
+
+		// Transport proxy
+		if cfg.TransportProxy != "" {
+			fmt.Fprintf(writer, "TransportProxy %s\n", cfg.TransportProxy)
+		}
+		fmt.Fprintf(writer, "\n")
+	}
 
 	return writer.Flush()
 }
@@ -339,4 +414,126 @@ func formatBool(b bool) string {
 		return "1"
 	}
 	return "0"
+}
+
+// parseClientTransportPlugin parses a ClientTransportPlugin directive.
+// Format: transport exec path [options]
+// Example: obfs4 exec /usr/bin/obfs4proxy
+func parseClientTransportPlugin(value string) (ClientTransportConfig, error) {
+	parts := strings.Fields(value)
+	if len(parts) < 3 {
+		return ClientTransportConfig{}, fmt.Errorf("invalid format, expected: transport exec path")
+	}
+
+	if parts[1] != "exec" {
+		return ClientTransportConfig{}, fmt.Errorf("only 'exec' is supported, got: %s", parts[1])
+	}
+
+	config := ClientTransportConfig{
+		Name:       parts[0],
+		BinaryPath: parts[2],
+		Options:    make(map[string]string),
+	}
+
+	// Parse any additional options (key=value format)
+	for i := 3; i < len(parts); i++ {
+		kv := strings.SplitN(parts[i], "=", 2)
+		if len(kv) == 2 {
+			config.Options[kv[0]] = kv[1]
+		}
+	}
+
+	return config, nil
+}
+
+// parseServerTransportPlugin parses a ServerTransportPlugin directive.
+// Format: transport exec path
+// Example: obfs4 exec /usr/bin/obfs4proxy
+func parseServerTransportPlugin(value string) (ServerTransportConfig, error) {
+	parts := strings.Fields(value)
+	if len(parts) < 3 {
+		return ServerTransportConfig{}, fmt.Errorf("invalid format, expected: transport exec path")
+	}
+
+	if parts[1] != "exec" {
+		return ServerTransportConfig{}, fmt.Errorf("only 'exec' is supported, got: %s", parts[1])
+	}
+
+	return ServerTransportConfig{
+		Name:       parts[0],
+		BinaryPath: parts[2],
+		Options:    make(map[string]string),
+	}, nil
+}
+
+// parseServerTransportListenAddr sets the bind address for a server transport.
+// Format: transport address:port
+// Example: obfs4 0.0.0.0:9443
+func parseServerTransportListenAddr(cfg *Config, value string) error {
+	parts := strings.Fields(value)
+	if len(parts) < 2 {
+		return fmt.Errorf("invalid format, expected: transport address:port")
+	}
+
+	transportName := parts[0]
+	bindAddr := parts[1]
+
+	// Find the existing server transport and set its bind address
+	for i := range cfg.ServerTransports {
+		if cfg.ServerTransports[i].Name == transportName {
+			cfg.ServerTransports[i].BindAddr = bindAddr
+			return nil
+		}
+	}
+
+	// If transport doesn't exist yet, create it with just the bind address
+	// The binary path should be set by ServerTransportPlugin
+	cfg.ServerTransports = append(cfg.ServerTransports, ServerTransportConfig{
+		Name:     transportName,
+		BindAddr: bindAddr,
+		Options:  make(map[string]string),
+	})
+
+	return nil
+}
+
+// parseServerTransportOptions sets options for a server transport.
+// Format: transport key=value key=value...
+// Example: obfs4 iat-mode=1 drbg-seed=abc123
+func parseServerTransportOptions(cfg *Config, value string) error {
+	parts := strings.Fields(value)
+	if len(parts) < 2 {
+		return fmt.Errorf("invalid format, expected: transport key=value...")
+	}
+
+	transportName := parts[0]
+
+	// Find the existing server transport and set its options
+	for i := range cfg.ServerTransports {
+		if cfg.ServerTransports[i].Name == transportName {
+			for j := 1; j < len(parts); j++ {
+				kv := strings.SplitN(parts[j], "=", 2)
+				if len(kv) == 2 {
+					cfg.ServerTransports[i].Options[kv[0]] = kv[1]
+				}
+			}
+			return nil
+		}
+	}
+
+	// If transport doesn't exist yet, create it with just the options
+	transport := ServerTransportConfig{
+		Name:    transportName,
+		Options: make(map[string]string),
+	}
+
+	for j := 1; j < len(parts); j++ {
+		kv := strings.SplitN(parts[j], "=", 2)
+		if len(kv) == 2 {
+			transport.Options[kv[0]] = kv[1]
+		}
+	}
+
+	cfg.ServerTransports = append(cfg.ServerTransports, transport)
+	return nil
 }
