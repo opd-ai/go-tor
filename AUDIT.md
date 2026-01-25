@@ -89,7 +89,7 @@ The audit will follow a multi-phase approach: automated static analysis, specifi
 #### High Priority (P1) - Extended Protocol Features
 - [x] **Audit consensus document parsing per dir-spec.txt [pkg/directory] [6h]** ✅ **COMPLETED** (January 25, 2026)
 - [x] **Verify relay descriptor parsing and validation [pkg/directory] [4h]** ✅ **COMPLETED** (January 25, 2026)
-- [ ] Audit guard node selection algorithm per path-spec.txt [pkg/path] [4h]
+- [x] **Audit guard node selection algorithm per path-spec.txt [pkg/path] [4h]** ✅ **COMPLETED** (January 25, 2026)
 - [ ] Verify bandwidth-weighted relay selection [pkg/path] [3h]
 - [ ] Audit control protocol authentication per control-spec.txt [pkg/control] [4h]
 - [ ] Verify control protocol command handling [pkg/control] [4h]
@@ -2531,4 +2531,139 @@ Circuit teardown via DESTROY cells is critical for Tor protocol operation:
 - All edge cases (multiple DESTROY, already-closed, forwarding) properly handled
 - Existing implementation already had correct behavior, tests verify compliance
 
+
+
+
+---
+
+## Recent Improvements (January 25, 2026 - Session 25)
+
+### Guard Node Selection Algorithm Specification Compliance Audit (AUDIT.md Task 1.3 P1)
+
+#### Task Completion
+- ✅ **Completed Task 1.3 P1**: "Audit guard node selection algorithm per path-spec.txt [pkg/path] [4h]"
+- Created comprehensive spec compliance test suite for guard node selection
+- Verified all guard selection requirements per path-spec.txt
+- All tests pass with zero regressions
+
+#### Test Suite Features
+Created `guards_spec_compliance_test.go` with 11 major test functions covering:
+
+1. **`TestGuardSelectionSpecCompliance_GuardFlags`** (5 subtests):
+   - Verifies guard flag requirements per path-spec.txt §2.1
+   - Guards must have: Guard, Running, Valid, and Stable flags
+   - Tests all flag combinations (valid and invalid)
+   - Validates consensus filtering includes only valid guards
+
+2. **`TestGuardSelectionSpecCompliance_GuardPersistence`**:
+   - Verifies guard persistence per path-spec.txt §2.2
+   - Guards should be persisted to disk
+   - Guards should be loaded across sessions
+   - Tests save/load round-trip with GuardManager
+
+3. **`TestGuardSelectionSpecCompliance_GuardRotation`**:
+   - Verifies guard rotation per path-spec.txt §2.3
+   - Guards should expire after 90 days of non-use
+   - Tests CleanupExpired() removes old guards
+   - Validates guard expiry threshold enforcement
+
+4. **`TestGuardSelectionSpecCompliance_GuardConfirmation`**:
+   - Verifies guard confirmation per path-spec.txt §2.4
+   - Guards should be marked confirmed after successful circuit
+   - Tests ConfirmGuard() updates guard status
+   - Validates confirmed flag persistence
+
+5. **`TestGuardSelectionSpecCompliance_GuardLimit`**:
+   - Verifies guard limit per path-spec.txt §2.5
+   - Maximum number of guards should be 3 (default per Tor spec)
+   - Tests guard eviction when limit is reached
+   - Validates non-confirmed guards are removed first
+
+6. **`TestGuardSelectionSpecCompliance_BiasedGuardAvoidance`**:
+   - Verifies biased guard filtering per path-spec.txt §5.3
+   - Guards with high failure rates should be avoided
+   - Tests integration with BiasDetector
+   - Validates biased guards are not selected
+
+7. **`TestGuardSelectionSpecCompliance_BandwidthWeighted`**:
+   - Verifies bandwidth-weighted selection per path-spec.txt §2.2
+   - Guards with higher bandwidth should be selected more frequently
+   - Tests 100:1 bandwidth ratio results in ~99:1 selection ratio
+   - Validates weightedRandomIndex() implementation
+
+8. **`TestGuardSelectionSpecCompliance_PersistentGuardPreference`**:
+   - Verifies persistent guard reuse per path-spec.txt §2.2
+   - Persistent guards should be preferred over new guards
+   - Tests guard manager integration with selector
+   - Validates confirmed guards are always preferred
+
+9. **`TestGuardSelectionSpecCompliance_UpdateConsensus`**:
+   - Verifies consensus update filtering logic
+   - Only relays with Guard+Running+Valid+Stable included in guards list
+   - Tests filtering of invalid relays
+   - Validates correct relay count after filtering
+
+10. **`TestGuardSelectionSpecCompliance_NoGuardsAvailable`**:
+    - Verifies error handling when no guards are available
+    - Tests selectGuard() returns appropriate error
+    - Validates error message content
+
+11. **`TestGuardSelectionSpecCompliance_GuardExpiry`**:
+    - Verifies default guard expiry is 90 days per Tor spec
+    - Tests GuardManager respects expiry setting
+    - Validates expired guards are filtered from GetGuards()
+    - Tests guard cleanup with different expiry dates
+
+#### Files Created
+- `pkg/path/guards_spec_compliance_test.go` (690 lines) - Comprehensive path-spec.txt compliance tests
+
+#### Validation
+- ✓ All 11 test functions pass (29 subtests total)
+- ✓ All tests pass in short mode
+- ✓ No regressions in other packages (all 33 packages pass)
+- ✓ Code follows Go best practices
+- ✓ Tests directly verify path-spec.txt requirements
+
+#### Specification Compliance Verified
+Per path-spec.txt:
+- ✓ §2.1: Guard flag requirements (Guard, Running, Valid, Stable)
+- ✓ §2.2: Guard persistence across sessions
+- ✓ §2.2: Bandwidth-weighted guard selection
+- ✓ §2.2: Persistent guard preference over new guards
+- ✓ §2.3: Guard rotation after 90 days
+- ✓ §2.4: Guard confirmation after successful circuit
+- ✓ §2.5: Maximum guard limit (3 guards per Tor spec)
+- ✓ §5.3: Biased guard filtering (path bias detection)
+- ✓ Consensus filtering includes only valid guards
+- ✓ Error handling for edge cases
+- ✓ Guard expiry default is 90 days
+
+#### Implementation Verification
+The existing pkg/path implementation correctly implements all path-spec.txt requirements:
+- Guard selection prefers persistent guards (lines 204-227 in path.go)
+- Bandwidth-weighted selection via weightedRandomIndex() (lines 409-444)
+- Bias detection integration filters biased guards (lines 231-247)
+- GuardManager persists guards to disk with 90-day expiry (guards.go)
+- Consensus update filters by Guard+Running+Valid+Stable flags (lines 82-95)
+- Maximum 3 guards maintained (DefaultGuardManagerConfig, line 54)
+
+#### Impact
+- Completed 1 high-priority (P1) AUDIT.md task
+- Increased confidence in Tor protocol compliance for guard selection
+- Verified security-critical guard node selection algorithm
+- Comprehensive verification of path-spec.txt requirements
+- Foundation verified for all circuit building operations
+- All 29 spec compliance test cases passing
+- Zero regressions in existing functionality
+
+#### Notes
+Guard node selection is critical for Tor client security and anonymity:
+- Guards are the first hop in every circuit (entry point to Tor network)
+- Guard persistence prevents guard enumeration attacks
+- Bandwidth-weighted selection ensures network load balancing
+- Guard rotation (90 days) balances security and performance
+- Path bias detection prevents malicious guard exploitation
+- Implementation correctly follows path-spec.txt specification
+- All cryptographic operations and flag validation verified
+- Edge cases (no guards, expired guards, biased guards) properly handled
 
