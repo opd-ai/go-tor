@@ -72,3 +72,21 @@ circuit-isolation
 # More example/demo binaries
 client-auth-integration
 stream-backpressure
+
+# Root-level compiled binaries
+main
+introduce2-parsing
+rendezvous-circuit
+rendezvous1-demo
+
+# Additional example binaries
+examples/*/pt-client
+examples/*/pt-config-demo
+examples/*/consensus_padding
+examples/*/consensus-padding-example
+examples/*/require-certs-demo
+examples/*/circuit-ratelimit
+examples/*/intro-point-management
+examples/*/client-auth-integration
+examples/*/stream-backpressure
+examples/*/bridge-config
