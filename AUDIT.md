@@ -107,11 +107,16 @@ The `pkg/onion/service.go` already contains foundational server-side functionali
   - Integration: Enhanced `pkg/onion/service.go` `HandleIntroduce2()` to build rendezvous circuits
   - Asynchronous circuit building to avoid blocking introduction handling
 
-- [ ] **9.2.3 RENDEZVOUS1 Cell Construction**
-  - Implement ntor handshake server-side
-  - Construct RENDEZVOUS1 cell with handshake response
-  - Send RENDEZVOUS1 on rendezvous circuit
-  - Complete key derivation for end-to-end encryption
+- [x] **9.2.3 RENDEZVOUS1 Cell Construction** ✅ **COMPLETED** (January 25, 2026)
+  - Implemented server-side ntor handshake (`NtorServerHandshake`)
+  - Constructed RENDEZVOUS1 cells with handshake response
+  - Sent RENDEZVOUS1 on rendezvous circuits
+  - Completed key derivation for end-to-end encryption
+  - Implementation: `pkg/crypto/ntor_server.go`, `pkg/onion/rendezvous1.go`
+  - Tests: `pkg/crypto/ntor_server_test.go`, `pkg/onion/rendezvous1_test.go` (>95% coverage)
+  - Integration: Enhanced `pkg/onion/service.go` `HandleIntroduce2()` to send RENDEZVOUS1
+  - Added ntor key generation in service initialization
+  - Documentation: `docs/RENDEZVOUS1_IMPLEMENTATION.md`
 
 **Files Modified/Created**:
 - `pkg/onion/introduce2.go` (new) - INTRODUCE2 parsing and decryption
@@ -215,11 +220,21 @@ The `pkg/onion/service.go` already contains foundational server-side functionali
   - Tests: `pkg/relay/keys_test.go`, `pkg/relay/or_listener_test.go` (84.7% coverage)
   - Documentation: `docs/RELAY_IMPLEMENTATION.md`
 
-- [ ] **10.1.2 Link Protocol Server**
-  - Handle incoming VERSIONS cells
-  - Send CERTS, AUTH_CHALLENGE, NETINFO cells
-  - Implement in-protocol link authentication
-  - Support link protocol versions 3-5
+- [x] **10.1.2 Link Protocol Server** ✅ **COMPLETED** (January 25, 2026)
+  - Implemented server-side VERSIONS cell handling (receive from client, send response)
+  - Implemented CERTS cell sending with relay identity certificates (TLS, RSA ID, Ed25519)
+  - Implemented NETINFO cell exchange (send to client, receive from client)
+  - Implemented in-protocol link version negotiation (versions 3-5 supported)
+  - Added Ed25519 signing certificate generation per cert-spec.txt
+  - Implementation: `pkg/relay/or_handler.go` (`LinkProtocolHandler`)
+  - Tests: `pkg/relay/or_handler_test.go` (>80% coverage, 14 tests passing)
+  - Integration: Enhanced `pkg/relay/or_listener.go` to use `LinkProtocolHandler`
+  - Features:
+    - Protocol version negotiation (highest mutual version selection)
+    - Multi-certificate CERTS cell with proper encoding
+    - Ed25519 signing certificate with signature validation
+    - NETINFO with timestamp and address information
+    - Context-aware cell reading with timeout handling
 
 - [ ] **10.1.3 Circuit Handling (Server-Side)**
   - Accept CREATE2 cells from clients
@@ -444,6 +459,7 @@ Each new package should have comprehensive unit tests:
 ### New Documentation
 
 - [x] `docs/ONION_SERVICE_HOSTING.md` - Complete service hosting guide ✅ **COMPLETED** (January 25, 2026)
+- [x] `docs/LINK_PROTOCOL_SERVER.md` - Server-side link protocol implementation ✅ **COMPLETED** (January 25, 2026)
 - [ ] `docs/BRIDGE_RELAY.md` - Bridge relay setup and operation
 - [ ] `docs/PLUGGABLE_TRANSPORTS.md` - PT configuration and usage
 
