@@ -116,7 +116,7 @@ func TestLayeredEncryption(t *testing.T) {
 	t.Run("ThreeHopEncryption", func(t *testing.T) {
 		// Per tor-spec.txt §5.1: "When Alice sends a RELAY cell to a hop other than the
 		// last hop, she encrypts the cell with all of the keys for the hops after it"
-		
+
 		// Create 3 hops with different keys
 		hops := []*Hop{
 			createTestHop(t, "hop1"),
@@ -151,7 +151,7 @@ func TestLayeredEncryption(t *testing.T) {
 	t.Run("EncryptionOrder", func(t *testing.T) {
 		// Per tor-spec.txt §5.1: "When sending a relay cell, the client encrypts it
 		// with the keys for each hop, in reverse order"
-		
+
 		hops := []*Hop{
 			createTestHopWithKey(t, []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}),
 			createTestHopWithKey(t, []byte{16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1}),
@@ -176,7 +176,7 @@ func TestLayeredEncryption(t *testing.T) {
 	t.Run("DecryptionOrder", func(t *testing.T) {
 		// Per tor-spec.txt §5.1: "When receiving a relay cell, the client decrypts it
 		// with the keys for each hop, in forward order"
-		
+
 		hops := []*Hop{
 			createTestHop(t, "guard"),
 			createTestHop(t, "middle"),
@@ -207,7 +207,7 @@ func TestRelayCellDigest(t *testing.T) {
 	t.Run("DigestFieldZeroing", func(t *testing.T) {
 		// Per tor-spec.txt §6.1: "The digest field is computed by taking the SHA-1
 		// digest of the entire relay cell payload, with the digest field itself set to 0"
-		
+
 		payload := make([]byte, 509)
 		// Simulate relay cell header:
 		// RelayCommand (1) | Recognized (2) | StreamID (2) | Digest (4) | Length (2) | Data (498)
@@ -233,7 +233,7 @@ func TestRelayCellDigest(t *testing.T) {
 
 	t.Run("SHA1DigestComputation", func(t *testing.T) {
 		// Per tor-spec.txt §5.1: "The digest is computed using a running SHA-1 hash"
-		
+
 		payload := make([]byte, 509)
 		payload[0] = 2 // RELAY_BEGIN
 
@@ -260,7 +260,7 @@ func TestRelayCellDigest(t *testing.T) {
 	t.Run("RunningDigestUpdate", func(t *testing.T) {
 		// Per tor-spec.txt §5.1: "Each hop maintains separate running digests for
 		// forward and backward cells"
-		
+
 		hops := []*Hop{
 			createTestHopWithDigest(t),
 		}
@@ -294,7 +294,7 @@ func TestRelayCellDigest(t *testing.T) {
 	t.Run("SeparateForwardBackwardDigests", func(t *testing.T) {
 		// Per tor-spec.txt §5.1: "When sending a RELAY cell, the OP computes the digest
 		// using the forward digest; when receiving, it uses the backward digest"
-		
+
 		hop := createTestHopWithDigest(t)
 		circuit := &Circuit{Hops: []*Hop{hop}}
 
@@ -338,17 +338,17 @@ func TestEncryptionKeyDerivation(t *testing.T) {
 	t.Run("KeyMaterialStructure", func(t *testing.T) {
 		// Per tor-spec.txt §5.2: "K = K_1 | K_2 | K_3 | ... where | is concatenation"
 		// K contains: Df (20) | Db (20) | Kf (16) | Kb (16) = 72 bytes
-		
+
 		keyMaterial := make([]byte, 72)
 		for i := range keyMaterial {
 			keyMaterial[i] = byte(i)
 		}
 
 		// Extract keys per tor-spec.txt §5.2
-		Df := keyMaterial[0:20]   // Forward digest
-		Db := keyMaterial[20:40]  // Backward digest
-		Kf := keyMaterial[40:56]  // Forward key (AES-128 = 16 bytes)
-		Kb := keyMaterial[56:72]  // Backward key (AES-128 = 16 bytes)
+		Df := keyMaterial[0:20]  // Forward digest
+		Db := keyMaterial[20:40] // Backward digest
+		Kf := keyMaterial[40:56] // Forward key (AES-128 = 16 bytes)
+		Kb := keyMaterial[56:72] // Backward key (AES-128 = 16 bytes)
 
 		// Verify sizes
 		if len(Df) != 20 {
@@ -376,7 +376,7 @@ func TestEncryptionKeyDerivation(t *testing.T) {
 	t.Run("AES128KeyUsage", func(t *testing.T) {
 		// Per tor-spec.txt §5.1: "AES-128-CTR, with a 128-bit key"
 		// 128 bits = 16 bytes
-		
+
 		keyMaterial := make([]byte, 72)
 		Kf := keyMaterial[40:56] // Forward key (16 bytes)
 		Kb := keyMaterial[56:72] // Backward key (16 bytes)
@@ -419,7 +419,7 @@ func createTestHopWithKey(t *testing.T, key []byte) *Hop {
 	}
 
 	zeroIV := make([]byte, 16)
-	
+
 	fwdCipher, err := crypto.NewAESCTRCipher(key, zeroIV)
 	if err != nil {
 		t.Fatalf("Failed to create forward cipher: %v", err)
@@ -439,11 +439,11 @@ func createTestHopWithKey(t *testing.T, key []byte) *Hop {
 func createTestHopWithDigest(t *testing.T) *Hop {
 	t.Helper()
 	key := make([]byte, 16)
-	
+
 	hop := createTestHopWithKey(t, key)
 	hop.ForwardDigest = sha1.New()  // #nosec G401 - Required by Tor spec
 	hop.BackwardDigest = sha1.New() // #nosec G401 - Required by Tor spec
-	
+
 	return hop
 }
 

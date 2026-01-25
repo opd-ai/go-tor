@@ -23,7 +23,7 @@ func TestEXTEND2CellFormat(t *testing.T) {
 		{
 			name:          "ntor handshake type",
 			handshakeType: HandshakeTypeNTor,
-			wantNSPEC:     1,   // At least 1 link specifier
+			wantNSPEC:     1,      // At least 1 link specifier
 			wantHTYPE:     0x0002, // ntor handshake type
 		},
 		{
@@ -464,9 +464,9 @@ func TestEXTEND2StreamID(t *testing.T) {
 
 // Helper function to check if string contains substring
 func stringContains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && 
-		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || 
-		stringContainsHelper(s, substr)))
+	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) &&
+		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
+			stringContainsHelper(s, substr)))
 }
 
 func stringContainsHelper(s, substr string) bool {

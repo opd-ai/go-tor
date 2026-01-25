@@ -19,7 +19,7 @@ import (
 func TestNtorSpecCompliance_HandshakeFormat(t *testing.T) {
 	serverIdentity := make([]byte, 32)
 	serverNtorKey := make([]byte, 32)
-	
+
 	if _, err := rand.Read(serverIdentity); err != nil {
 		t.Fatalf("Failed to generate server identity: %v", err)
 	}
@@ -304,10 +304,10 @@ func TestNtorSpecCompliance_KeyDerivation(t *testing.T) {
 		}
 
 		// Extract keys per tor-spec.txt §5.2
-		Df := keyMaterial[0:20]   // Forward digest
-		Db := keyMaterial[20:40]  // Backward digest
-		Kf := keyMaterial[40:56]  // Forward cipher
-		Kb := keyMaterial[56:72]  // Backward cipher
+		Df := keyMaterial[0:20]  // Forward digest
+		Db := keyMaterial[20:40] // Backward digest
+		Kf := keyMaterial[40:56] // Forward cipher
+		Kb := keyMaterial[56:72] // Backward cipher
 
 		// Verify forward != backward
 		if bytes.Equal(Df, Db) {
