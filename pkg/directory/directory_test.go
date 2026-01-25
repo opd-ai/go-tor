@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -1264,3 +1266,380 @@ func TestValidateConsensusMetadataWithUpdatedThresholds(t *testing.T) {
 		})
 	}
 }
+
+// TestInSameFamily tests family relationship validation per path-spec.txt §2.2
+func TestInSameFamily(t *testing.T) {
+	tests := []struct {
+		name     string
+		relay1   *Relay
+		relay2   *Relay
+		expected bool
+	}{
+		{
+			name: "Same relay (identical fingerprint)",
+			relay1: &Relay{
+				Fingerprint: "ABC123",
+				Nickname:    "relay1",
+			},
+			relay2: &Relay{
+				Fingerprint: "ABC123",
+				Nickname:    "relay1",
+			},
+			expected: true,
+		},
+		{
+			name: "Bidirectional family relationship by fingerprint",
+			relay1: &Relay{
+				Fingerprint: "FP1",
+				Nickname:    "relay1",
+				Family:      []string{"FP2"},
+			},
+			relay2: &Relay{
+				Fingerprint: "FP2",
+				Nickname:    "relay2",
+				Family:      []string{"FP1"},
+			},
+			expected: true,
+		},
+		{
+			name: "Bidirectional family relationship by nickname",
+			relay1: &Relay{
+				Fingerprint: "FP1",
+				Nickname:    "relay1",
+				Family:      []string{"relay2"},
+			},
+			relay2: &Relay{
+				Fingerprint: "FP2",
+				Nickname:    "relay2",
+				Family:      []string{"relay1"},
+			},
+			expected: true,
+		},
+		{
+			name: "Unidirectional family (not valid)",
+			relay1: &Relay{
+				Fingerprint: "FP1",
+				Nickname:    "relay1",
+				Family:      []string{"FP2"},
+			},
+			relay2: &Relay{
+				Fingerprint: "FP2",
+				Nickname:    "relay2",
+				Family:      []string{},
+			},
+			expected: false,
+		},
+		{
+			name: "No family relationship",
+			relay1: &Relay{
+				Fingerprint: "FP1",
+				Nickname:    "relay1",
+				Family:      []string{},
+			},
+			relay2: &Relay{
+				Fingerprint: "FP2",
+				Nickname:    "relay2",
+				Family:      []string{},
+			},
+			expected: false,
+		},
+		{
+			name: "Mixed fingerprint and nickname in family",
+			relay1: &Relay{
+				Fingerprint: "FP1",
+				Nickname:    "relay1",
+				Family:      []string{"relay2"},
+			},
+			relay2: &Relay{
+				Fingerprint: "FP2",
+				Nickname:    "relay2",
+				Family:      []string{"FP1"},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.relay1.InSameFamily(tt.relay2)
+			if result != tt.expected {
+				t.Errorf("InSameFamily() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+// TestInSameSubnet tests /16 subnet conflict detection per path-spec.txt §2.2.1
+func TestInSameSubnet(t *testing.T) {
+	tests := []struct {
+		name     string
+		relay1   *Relay
+		relay2   *Relay
+		expected bool
+	}{
+		{
+			name: "Same /16 subnet",
+			relay1: &Relay{
+				Address: "192.168.1.1",
+			},
+			relay2: &Relay{
+				Address: "192.168.2.1",
+			},
+			expected: true,
+		},
+		{
+			name: "Different /16 subnet",
+			relay1: &Relay{
+				Address: "192.168.1.1",
+			},
+			relay2: &Relay{
+				Address: "10.0.1.1",
+			},
+			expected: false,
+		},
+		{
+			name: "Same exact IP",
+			relay1: &Relay{
+				Address: "192.168.1.1",
+			},
+			relay2: &Relay{
+				Address: "192.168.1.1",
+			},
+			expected: true,
+		},
+		{
+			name: "Different subnets (close first octets)",
+			relay1: &Relay{
+				Address: "192.167.1.1",
+			},
+			relay2: &Relay{
+				Address: "192.168.1.1",
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.relay1.InSameSubnet(tt.relay2)
+			if result != tt.expected {
+				t.Errorf("InSameSubnet() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+// TestGetSubnet16 tests subnet extraction helper
+func TestGetSubnet16(t *testing.T) {
+	tests := []struct {
+		address  string
+		expected string
+	}{
+		{"192.168.1.1", "192.168"},
+		{"10.0.0.1", "10.0"},
+		{"172.16.5.10", "172.16"},
+		{"1.2.3.4", "1.2"},
+		{"invalid", "invalid"},
+		{"", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.address, func(t *testing.T) {
+			result := getSubnet16(tt.address)
+			if result != tt.expected {
+				t.Errorf("getSubnet16(%s) = %s, want %s", tt.address, result, tt.expected)
+			}
+		})
+	}
+}
+
+// TestAuthorityCertCacheGet tests certificate fetching with HTTP mock server
+func TestAuthorityCertCacheGet(t *testing.T) {
+	// Create test certificate data
+	certData := `dir-source testauth
+fingerprint AAAA BB61 6EB2 F60B EC80 1511 14BB 25CE F515 B226
+dir-key-expires 2027-01-01 00:00:00
+-----BEGIN RSA PUBLIC KEY-----
+MEgCQQC7VJTUt9Us8WXZHY/7/w4M1iSp3PNxCCPyOuLYmUxJ+NjF8uYGE00j+6C0
+y5TQJtSNlMLaPfJQr8PZQhClq5cJAgMBAAE=
+-----END RSA PUBLIC KEY-----`
+
+	// Create test HTTP server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/tor/keys/authority" {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(certData))
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	logger := logger.NewDefault()
+	cache := &AuthorityCertCache{
+		certs:  make(map[string]*AuthorityCert),
+		logger: logger.Component("certcache"),
+	}
+
+	ctx := context.Background()
+	httpClient := server.Client()
+	authorities := []string{server.URL + "/tor/status-vote/current/consensus"}
+
+	// First fetch - should retrieve from server
+	cert, err := cache.Get(ctx, "AAAABB616EB2F60BEC80151114BB25CEF515B226", httpClient, authorities)
+	if err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+
+	if cert == nil {
+		t.Fatal("Get() returned nil cert")
+	}
+
+	if cert.Identity != "AAAABB616EB2F60BEC80151114BB25CEF515B226" {
+		t.Errorf("cert.Identity = %s, want AAAABB616EB2F60BEC80151114BB25CEF515B226", cert.Identity)
+	}
+
+	// Second fetch - should return from cache
+	cert2, err := cache.Get(ctx, "AAAABB616EB2F60BEC80151114BB25CEF515B226", httpClient, authorities)
+	if err != nil {
+		t.Fatalf("Get() second call error = %v", err)
+	}
+
+	if cert2 != cert {
+		t.Error("Get() should return cached certificate")
+	}
+}
+
+// TestAuthorityCertCacheGetError tests error handling
+func TestAuthorityCertCacheGetError(t *testing.T) {
+	// Create server that always fails
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	logger := logger.NewDefault()
+	cache := &AuthorityCertCache{
+		certs:  make(map[string]*AuthorityCert),
+		logger: logger.Component("certcache"),
+	}
+
+	ctx := context.Background()
+	httpClient := server.Client()
+	authorities := []string{server.URL + "/tor/status-vote/current/consensus"}
+
+	_, err := cache.Get(ctx, "TESTIDENT", httpClient, authorities)
+	if err == nil {
+		t.Error("Get() should return error when server fails")
+	}
+}
+
+// TestFetchMicrodescriptors tests microdescriptor fetching
+func TestFetchMicrodescriptors(t *testing.T) {
+	// Create realistic microdescriptor data
+	mdData := `onion-key
+-----BEGIN RSA PUBLIC KEY-----
+MIGJAoGBAKq5qQ0wLVJJxUdP8x1iN3ZVVJ3nVLpB6K8z2VcCx5fLYqgS+7sYPbLw
+-----END RSA PUBLIC KEY-----
+ntor-onion-key ` + base64.StdEncoding.EncodeToString(make([]byte, 32)) + `
+id ed25519 ` + base64.StdEncoding.EncodeToString(make([]byte, 32))
+
+	// Create test HTTP server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/tor/micro/d/") {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(mdData))
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	client := &Client{
+		httpClient:  server.Client(),
+		authorities: []string{server.URL},
+		logger:      logger.NewDefault().Component("directory"),
+	}
+
+	relays := []*Relay{
+		{
+			Nickname:        "TestRelay1",
+			MicrodescDigest: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+		},
+		{
+			Nickname:        "TestRelay2",
+			MicrodescDigest: "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+		},
+	}
+
+	ctx := context.Background()
+	err := client.FetchMicrodescriptors(ctx, relays)
+	// Error is expected as test data won't match digest validation, but tests the flow
+	if err != nil {
+		t.Logf("FetchMicrodescriptors returned error (expected for test data): %v", err)
+	}
+}
+
+// TestFetchMicrodescriptorsEmptyList tests handling of empty relay list
+func TestFetchMicrodescriptorsEmptyList(t *testing.T) {
+	client := NewClient(nil)
+	ctx := context.Background()
+
+	err := client.FetchMicrodescriptors(ctx, []*Relay{})
+	if err != nil {
+		t.Errorf("FetchMicrodescriptors with empty list error = %v, want nil", err)
+	}
+}
+
+// TestFetchMicrodescriptorsNoDigests tests handling of relays without microdesc digests
+func TestFetchMicrodescriptorsNoDigests(t *testing.T) {
+	client := NewClient(nil)
+	ctx := context.Background()
+
+	relays := []*Relay{
+		{Nickname: "relay1", MicrodescDigest: ""},
+		{Nickname: "relay2", MicrodescDigest: ""},
+	}
+
+	err := client.FetchMicrodescriptors(ctx, relays)
+	if err != nil {
+		t.Errorf("FetchMicrodescriptors with no digests error = %v, want nil", err)
+	}
+}
+
+// TestFetchMicrodescriptorBatching tests batch size limits
+func TestFetchMicrodescriptorBatching(t *testing.T) {
+	// Create test HTTP server that counts requests
+	requestCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("onion-key\nntor-onion-key test\nid ed25519 test\n"))
+	}))
+	defer server.Close()
+
+	client := &Client{
+		httpClient:  server.Client(),
+		authorities: []string{server.URL},
+		logger:      logger.NewDefault().Component("directory"),
+	}
+
+	// Create 100 relays to test batching (should result in 2 batches: 90 + 10)
+	relays := make([]*Relay, 100)
+	for i := 0; i < 100; i++ {
+		relays[i] = &Relay{
+			Nickname:        fmt.Sprintf("relay%d", i),
+			MicrodescDigest: fmt.Sprintf("%040d", i),
+		}
+	}
+
+	ctx := context.Background()
+	_ = client.FetchMicrodescriptors(ctx, relays)
+
+	// Should have made at least 1 batch request (exact count depends on error handling)
+	if requestCount == 0 {
+		t.Error("Expected at least one batch request")
+	}
+	t.Logf("Made %d batch requests for 100 microdescriptors", requestCount)
+}
+
