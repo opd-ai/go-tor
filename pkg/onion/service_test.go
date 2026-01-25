@@ -758,3 +758,122 @@ func TestUploadDescriptorURLConstruction(t *testing.T) {
 		t.Error("HSDir DirPort should not be zero")
 	}
 }
+
+// TestServicePersistence_Integration tests key persistence integration with Service
+func TestServicePersistence_Integration(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Create service with persistence
+	config1 := &ServiceConfig{
+		DataDirectory: tempDir,
+		Ports: map[int]string{
+			80: "localhost:8080",
+		},
+	}
+
+	service1, err := NewService(config1, nil)
+	if err != nil {
+		t.Fatalf("Failed to create service: %v", err)
+	}
+
+	// Get the onion address
+	addr1 := service1.GetAddress()
+
+	// Stop service
+	service1.Stop()
+
+	// Create another service with same data directory
+	// Should load the same keys
+	config2 := &ServiceConfig{
+		DataDirectory: tempDir,
+		Ports: map[int]string{
+			80: "localhost:8080",
+		},
+	}
+
+	service2, err := NewService(config2, nil)
+	if err != nil {
+		t.Fatalf("Failed to create second service: %v", err)
+	}
+
+	// Should have same onion address
+	addr2 := service2.GetAddress()
+
+	if addr1 != addr2 {
+		t.Errorf("Onion addresses don't match: %s != %s", addr1, addr2)
+	}
+
+	service2.Stop()
+}
+
+// TestServicePersistence_ProvidedKey tests that provided keys override persistence
+func TestServicePersistence_ProvidedKey(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Create service with persistence to generate keys
+	config1 := &ServiceConfig{
+		DataDirectory: tempDir,
+		Ports: map[int]string{
+			80: "localhost:8080",
+		},
+	}
+
+	service1, err := NewService(config1, nil)
+	if err != nil {
+		t.Fatalf("Failed to create service: %v", err)
+	}
+
+	addr1 := service1.GetAddress()
+	service1.Stop()
+
+	// Now provide a different key explicitly
+	_, privateKey, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatalf("Failed to generate key: %v", err)
+	}
+
+	config2 := &ServiceConfig{
+		PrivateKey:    privateKey,
+		DataDirectory: tempDir, // Same directory, but key should override
+		Ports: map[int]string{
+			80: "localhost:8080",
+		},
+	}
+
+	service2, err := NewService(config2, nil)
+	if err != nil {
+		t.Fatalf("Failed to create service with provided key: %v", err)
+	}
+
+	addr2 := service2.GetAddress()
+
+	// Addresses should be different (different keys)
+	if addr1 == addr2 {
+		t.Error("Provided key should override persisted key")
+	}
+
+	service2.Stop()
+}
+
+// TestServicePersistence_NoPersistence tests that services work without persistence
+func TestServicePersistence_NoPersistence(t *testing.T) {
+	// Create service without DataDirectory
+	config := &ServiceConfig{
+		Ports: map[int]string{
+			80: "localhost:8080",
+		},
+	}
+
+	service, err := NewService(config, nil)
+	if err != nil {
+		t.Fatalf("Failed to create service: %v", err)
+	}
+
+	// Should have a valid address
+	addr := service.GetAddress()
+	if addr == "" {
+		t.Error("Service should have onion address even without persistence")
+	}
+
+	service.Stop()
+}

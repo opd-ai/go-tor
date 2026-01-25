@@ -138,6 +138,7 @@ func NewService(config *ServiceConfig, log *logger.Logger) (*Service, error) {
 	// Generate or load identity key
 	var privateKey ed25519.PrivateKey
 	var publicKey ed25519.PublicKey
+	var ntorKey []byte
 
 	if len(config.PrivateKey) > 0 {
 		// Use provided key
@@ -147,25 +148,81 @@ func NewService(config *ServiceConfig, log *logger.Logger) (*Service, error) {
 		}
 		privateKey = config.PrivateKey
 		publicKey = privateKey.Public().(ed25519.PublicKey)
+
+		// Generate new ntor key (not persisted yet)
+		ntorKeyPair, err := crypto.GenerateNtorKeyPair()
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate ntor key: %w", err)
+		}
+		ntorKey = ntorKeyPair.Private[:]
+	} else if config.DataDirectory != "" {
+		// Try to load from persistent storage
+		persistence, err := NewServicePersistence(config.DataDirectory, log)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create persistence: %w", err)
+		}
+
+		if persistence.KeysExist() {
+			// Load existing keys
+			log.Info("Loading existing service keys from storage",
+				"directory", config.DataDirectory)
+
+			privateKey, err = persistence.LoadIdentityKey()
+			if err != nil {
+				return nil, fmt.Errorf("failed to load identity key: %w", err)
+			}
+
+			ntorKey, err = persistence.LoadNtorKey()
+			if err != nil {
+				return nil, fmt.Errorf("failed to load ntor key: %w", err)
+			}
+
+			publicKey = privateKey.Public().(ed25519.PublicKey)
+		} else {
+			// Generate new keys and save
+			log.Info("Generating new service keys",
+				"directory", config.DataDirectory)
+
+			var err error
+			publicKey, privateKey, err = ed25519.GenerateKey(rand.Reader)
+			if err != nil {
+				return nil, fmt.Errorf("failed to generate identity key: %w", err)
+			}
+
+			ntorKeyPair, err := crypto.GenerateNtorKeyPair()
+			if err != nil {
+				return nil, fmt.Errorf("failed to generate ntor key: %w", err)
+			}
+			ntorKey = ntorKeyPair.Private[:]
+
+			// Save keys to disk
+			if err := persistence.SaveIdentityKey(privateKey); err != nil {
+				return nil, fmt.Errorf("failed to save identity key: %w", err)
+			}
+
+			if err := persistence.SaveNtorKey(ntorKey); err != nil {
+				return nil, fmt.Errorf("failed to save ntor key: %w", err)
+			}
+		}
 	} else {
-		// Generate new identity
+		// Generate new identity (no persistence)
 		var err error
 		publicKey, privateKey, err = ed25519.GenerateKey(rand.Reader)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate identity key: %w", err)
 		}
+
+		ntorKeyPair, err := crypto.GenerateNtorKeyPair()
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate ntor key: %w", err)
+		}
+		ntorKey = ntorKeyPair.Private[:]
 	}
 
 	// Derive onion address from public key
 	addr, err := addressFromPublicKey(publicKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to derive address: %w", err)
-	}
-
-	// Generate ntor key for rendezvous handshakes
-	ntorKeyPair, err := crypto.GenerateNtorKeyPair()
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate ntor key: %w", err)
 	}
 
 	// Set defaults
@@ -193,7 +250,7 @@ func NewService(config *ServiceConfig, log *logger.Logger) (*Service, error) {
 		identityKey:        privateKey,
 		publicKey:          publicKey,
 		address:            addr,
-		ntorKey:            ntorKeyPair.Private[:],
+		ntorKey:            ntorKey,
 		config:             config,
 		introPoints:        make([]*ServiceIntroPoint, 0, config.NumIntroPoints),
 		publishedHSDirs:    make([]*HSDirectory, 0),
