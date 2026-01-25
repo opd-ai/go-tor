@@ -29,8 +29,17 @@ type RelayKeys struct {
 	// RSA identity key (1024 bits as per Tor spec)
 	RSAPrivate *rsa.PrivateKey
 
+	// Ntor onion key (Curve25519, 32 bytes)
+	NtorOnionKey []byte // Private key for ntor handshakes
+
 	// TLS certificate for OR connections
 	TLSCert []byte // DER-encoded X.509 certificate
+	
+	// Convenience fields for compatibility
+	Identity struct {
+		Public  ed25519.PublicKey
+		Private ed25519.PrivateKey
+	}
 }
 
 // Fingerprint returns the relay's RSA identity fingerprint (SHA-1 of RSA public key)
@@ -58,7 +67,7 @@ func (k *RelayKeys) Ed25519Fingerprint() string {
 }
 
 // GenerateRelayKeys generates a new set of relay keys
-// Returns Ed25519 identity key, RSA identity key (1024-bit), and TLS certificate
+// Returns Ed25519 identity key, RSA identity key (1024-bit), ntor onion key, and TLS certificate
 func GenerateRelayKeys() (*RelayKeys, error) {
 	keys := &RelayKeys{}
 
@@ -69,6 +78,10 @@ func GenerateRelayKeys() (*RelayKeys, error) {
 	}
 	keys.Ed25519Public = pub
 	keys.Ed25519Private = priv
+	
+	// Set compatibility fields
+	keys.Identity.Public = pub
+	keys.Identity.Private = priv
 
 	// Generate RSA identity key (1024 bits per Tor spec)
 	rsaKey, err := rsa.GenerateKey(rand.Reader, 1024)
@@ -76,6 +89,13 @@ func GenerateRelayKeys() (*RelayKeys, error) {
 		return nil, fmt.Errorf("failed to generate RSA key: %w", err)
 	}
 	keys.RSAPrivate = rsaKey
+	
+	// Generate ntor onion key (Curve25519 private key, 32 bytes)
+	ntorKey := make([]byte, 32)
+	if _, err := rand.Read(ntorKey); err != nil {
+		return nil, fmt.Errorf("failed to generate ntor onion key: %w", err)
+	}
+	keys.NtorOnionKey = ntorKey
 
 	// Generate self-signed TLS certificate
 	cert, err := generateTLSCertificate(rsaKey)

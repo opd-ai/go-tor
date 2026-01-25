@@ -248,17 +248,28 @@ The `pkg/onion/service.go` already contains foundational server-side functionali
     - NETINFO with timestamp and address information
     - Context-aware cell reading with timeout handling
 
-- [ ] **10.1.3 Circuit Handling (Server-Side)**
+- [x] **10.1.3 Circuit Handling (Server-Side)** ✅ **COMPLETED** (January 25, 2026)
   - Accept CREATE2 cells from clients
   - Perform ntor handshake server-side
   - Send CREATED2 responses
   - Manage server-side circuit state
+  - Implementation: `pkg/relay/circuit_handler.go` (`CircuitHandler`)
+  - Tests: `pkg/relay/circuit_handler_test.go` (comprehensive test coverage)
+  - Features:
+    - Server-side ntor handshake using existing crypto infrastructure
+    - Circuit state management with concurrent access protection
+    - DESTROY cell handling
+    - Circuit lifecycle management (create, relay, destroy)
+    - Support for future RELAY cell processing (Task 10.2)
 
-**Files to Create**:
-- `pkg/relay/relay.go` - Main relay server
-- `pkg/relay/or_listener.go` - OR connection listener
-- `pkg/relay/or_handler.go` - Connection handler
-- `pkg/relay/circuit_handler.go` - Server-side circuit handling
+**Files Created/Modified**:
+- `pkg/relay/relay.go` - Main relay server (planned)
+- `pkg/relay/or_listener.go` ✅ - OR connection listener (already implemented)
+- `pkg/relay/or_handler.go` ✅ - Connection handler (already implemented)
+- `pkg/relay/circuit_handler.go` ✅ **NEW** - Server-side circuit handling
+- `pkg/relay/circuit_handler_test.go` ✅ **NEW** - Comprehensive tests for circuit handling
+- `pkg/relay/keys.go` ✅ - Enhanced with NtorOnionKey field
+- `pkg/cell/cell.go` ✅ - Added DESTROY reason constants
 
 ### 10.2 Non-Exit Relay Functionality
 

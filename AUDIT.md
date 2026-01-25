@@ -248,11 +248,19 @@ The `pkg/onion/service.go` already contains foundational server-side functionali
     - NETINFO with timestamp and address information
     - Context-aware cell reading with timeout handling
 
-- [ ] **10.1.3 Circuit Handling (Server-Side)**
+- [x] **10.1.3 Circuit Handling (Server-Side)** ✅ **COMPLETED** (January 25, 2026)
   - Accept CREATE2 cells from clients
   - Perform ntor handshake server-side
   - Send CREATED2 responses
   - Manage server-side circuit state
+  - Implementation: `pkg/relay/circuit_handler.go` (`CircuitHandler`)
+  - Tests: `pkg/relay/circuit_handler_test.go` (comprehensive test coverage)
+  - Features:
+    - Server-side ntor handshake using existing crypto infrastructure
+    - Circuit state management with concurrent access protection
+    - DESTROY cell handling
+    - Circuit lifecycle management (create, relay, destroy)
+    - Support for future RELAY cell processing (Task 10.2)
 
 **Files to Create**:
 - `pkg/relay/relay.go` - Main relay server
