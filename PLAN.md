@@ -210,7 +210,22 @@ The audit will follow a multi-phase approach: automated static analysis, specifi
   - Implementation provides robust correlation resistance
   - Documentation: Excellent with comprehensive CIRCUIT_ISOLATION.md user guide (436 lines)
   - Status: Production-ready for educational/research use
-- [ ] Verify rate limiting mechanisms [pkg/ratelimit, pkg/relay] [3h]
+- [x] **Verify rate limiting mechanisms [pkg/ratelimit, pkg/relay] [3h]** ✅ **COMPLETED** (January 25, 2026)
+  - Comprehensive audit completed for both client and relay rate limiting
+  - See `docs/audits/RATE_LIMITING_AUDIT.md` for full audit report (560 lines)
+  - Assessment: 95% compliance (19/20 requirements fully compliant)
+  - pkg/ratelimit: 95.2% test coverage, custom token bucket algorithm verified
+  - pkg/relay/ratelimit.go: 84.6% test coverage, uses golang.org/x/time/rate library
+  - Three-tier rate limiting: circuits (10/sec), connections per IP (5/sec), cells per circuit (100/sec)
+  - Thread-safe implementations with proper mutex usage and lock ordering
+  - Context-aware with graceful shutdown support in all Wait() methods
+  - Automatic cleanup prevents memory leaks (minor best-effort cleanup noted)
+  - Comprehensive metrics integration for monitoring DoS events
+  - DoS attack resistance verified: circuit floods, connection floods, cell floods all mitigated
+  - All 28 tests pass with race detector clean, no security vulnerabilities found
+  - Documentation: Excellent (docs/RELAY_SECURITY.md, docs/CIRCUIT_RATELIMIT.md, examples/)
+  - Minor findings: Add guaranteed periodic cleanup goroutine (RL-001), complete metrics test coverage (RL-002)
+  - Status: Production-ready for educational/research use
 - [ ] Audit client authorization (x25519) per rend-spec-v3.txt [pkg/onion] [4h]
 - [ ] Verify bridge relay cell forwarding [pkg/relay] [4h]
 - [ ] Audit RELAY_EARLY limiting per tor-spec.txt [pkg/relay] [2h]
@@ -692,7 +707,7 @@ govulncheck ./...
 |--------------|-----------|-------|----------|
 | P0 (Critical) Core Protocol | 15 | 15 | 100% |
 | P1 (High) Extended Features | 7 | 10 | 70% |
-| P2 (Medium) Advanced Features | 2 | 7 | 29% |
+| P2 (Medium) Advanced Features | 4 | 7 | 57% |
 
 ### P0 Tasks Completed
 
@@ -729,6 +744,8 @@ govulncheck ./...
 
 - ✅ Circuit padding audit (padding-spec.txt) - 85% compliance
 - ✅ Connection-level padding audit (tor-spec.txt §7.1) - 95% compliance
+- ✅ Stream isolation audit - 95% compliance
+- ✅ Rate limiting mechanisms audit - 95% compliance
 
 ### Test Coverage Improvements
 
