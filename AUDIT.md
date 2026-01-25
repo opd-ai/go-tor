@@ -566,19 +566,48 @@ The `pkg/onion/service.go` already contains foundational server-side functionali
 
 **Tasks**:
 
-- [ ] **11.3.1 Managed PT Mode**
+- [x] **11.3.1 Managed PT Mode** ✅ **COMPLETED** (January 25, 2026)
   - Launch external PT binaries (obfs4proxy, snowflake-client)
   - Parse CMETHOD/SMETHOD lines
   - Handle PT process restarts
+  - Implementation: `pkg/pt/manager.go` (`Manager`)
+  - Tests: `pkg/pt/manager_test.go`, `pkg/pt/manager_integration_test.go` (comprehensive coverage)
+  - Features:
+    - Multi-PT lifecycle management
+    - Automatic process restart on failure with configurable backoff
+    - Health monitoring (checks every 2s)
+    - Configurable restart limits
+    - Graceful shutdown
+    - Separate client and server PT support
+  - Documentation: Updated `docs/PLUGGABLE_TRANSPORTS.md`
 
-- [ ] **11.3.2 PT Path Configuration**
+- [x] **11.3.2 PT Path Configuration** ✅ **COMPLETED** (January 25, 2026)
   - Configurable PT binary paths
   - Support for multiple PTs
   - PT state directory management
+  - Implementation: `pkg/pt/discovery.go` (`DiscoverPT`, `DiscoverCommonPTs`)
+  - Tests: `pkg/pt/discovery_test.go` (>85% coverage)
+  - Features:
+    - Platform-specific search paths (Linux, macOS, Windows)
+    - Tor Browser PluggableTransports directory detection
+    - User home directory search (~/.local/bin, ~/bin)
+    - Absolute and relative path support
+    - Common PT discovery (obfs4proxy, snowflake-client, meek-client, lyrebird)
+  - Search paths automatically initialized on import
+
+**Files Created**:
+- `pkg/pt/manager.go` - PT manager with auto-restart (314 lines)
+- `pkg/pt/manager_test.go` - Manager unit tests (225 lines)
+- `pkg/pt/manager_integration_test.go` - Integration tests (174 lines)
+- `pkg/pt/discovery.go` - PT binary discovery (115 lines)
+- `pkg/pt/discovery_test.go` - Discovery tests (250 lines)
 
 **Files to Create**:
-- `pkg/pt/external.go` - External PT integration
-- `pkg/pt/protocol.go` - PT IPC protocol implementation
+- `pkg/pt/manager.go` ✅ **COMPLETED** - PT manager with auto-restart
+- `pkg/pt/manager_test.go` ✅ **COMPLETED** - Manager unit tests
+- `pkg/pt/manager_integration_test.go` ✅ **COMPLETED** - Integration tests
+- `pkg/pt/discovery.go` ✅ **COMPLETED** - PT binary discovery
+- `pkg/pt/discovery_test.go` ✅ **COMPLETED** - Discovery tests
 
 ### 11.4 Bridge Client Integration
 
@@ -651,7 +680,7 @@ Each new package should have comprehensive unit tests:
 - [x] `docs/LINK_PROTOCOL_SERVER.md` - Server-side link protocol implementation ✅ **COMPLETED** (January 25, 2026)
 - [x] `docs/RELAY_SECURITY.md` - Relay security hardening (rate limiting, DoS protection, metrics) ✅ **COMPLETED** (January 25, 2026)
 - [x] `docs/BRIDGE_RELAY.md` - Bridge relay setup and operation ✅ **COMPLETED** (January 25, 2026)
-- [ ] `docs/PLUGGABLE_TRANSPORTS.md` - PT configuration and usage
+- [x] `docs/PLUGGABLE_TRANSPORTS.md` - PT configuration and usage ✅ **COMPLETED** (January 25, 2026)
 
 ### Updates to Existing Docs
 

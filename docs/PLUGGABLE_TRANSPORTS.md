@@ -23,6 +23,23 @@ Pluggable transports (PTs) allow Tor to use external programs to transform traff
    - Performs PT IPC handshake
    - Provides SOCKS proxy connections through PT
 
+3. **Managed Server** (`server.go`)
+   - `ManagedServer`: Implements `ServerTransport` interface
+   - Manages server-side PT process lifecycle
+   - Performs SMETHOD handshake
+   - Provides listener for bridge relays
+
+4. **PT Manager** (`manager.go`)
+   - Multi-PT lifecycle management
+   - Automatic process restart on failure
+   - Concurrent client and server PT support
+   - Health monitoring
+
+5. **PT Discovery** (`discovery.go`)
+   - Automatic PT binary path discovery
+   - Platform-specific search paths
+   - Common PT detection (obfs4proxy, snowflake, etc.)
+
 ### Design Principles
 
 - **Process Isolation**: PT runs as separate process for security
@@ -109,6 +126,62 @@ defer conn.Close()
 // Use conn for Tor circuit building
 ```
 
+### PT Manager (Multi-PT with Auto-Restart)
+
+```go
+import "github.com/opd-ai/go-tor/pkg/pt"
+
+// Create manager with auto-restart enabled
+mgr := pt.NewManager(pt.ManagerConfig{
+    StateDir:     "/var/lib/tor/pt",
+    AutoRestart:  true,
+    RestartDelay: 5 * time.Second,
+    MaxRestarts:  0, // Unlimited restarts
+})
+defer mgr.Close()
+
+// Add multiple PTs
+mgr.AddClient("obfs4", pt.TransportConfig{
+    BinaryPath: "/usr/bin/obfs4proxy",
+})
+
+mgr.AddClient("snowflake", pt.TransportConfig{
+    BinaryPath: "/usr/bin/snowflake-client",
+})
+
+// Start all PTs (monitored automatically)
+if err := mgr.StartAll(context.Background()); err != nil {
+    log.Warn("Some PTs failed to start:", err)
+    // Manager will auto-restart failed PTs
+}
+
+// Get specific PT for use
+client, _ := mgr.GetClient("obfs4")
+conn, _ := client.Dial(ctx, "bridge:443")
+```
+
+### PT Discovery
+
+```go
+// Find specific PT binary
+path, err := pt.DiscoverPT("obfs4proxy")
+if err != nil {
+    log.Fatal("obfs4proxy not found:", err)
+}
+
+// Discover all common PTs
+pts := pt.DiscoverCommonPTs()
+for name, path := range pts {
+    fmt.Printf("Found %s at %s\n", name, path)
+}
+
+// Use discovered PT
+if path, ok := pts["obfs4proxy"]; ok {
+    config := pt.TransportConfig{BinaryPath: path}
+    client, _ := pt.NewManagedClient(config)
+}
+```
+
 ### Bridge Configuration
 
 To use PTs with bridges, configure bridge lines in your torrc:
@@ -140,13 +213,51 @@ The PT framework supports any PT that implements the protocol. Common transports
 - [x] Environment variable configuration
 - [x] Comprehensive unit tests (37.9% coverage)
 
+### Phase 11.1.2: PT Server Interface ✅
+
+- [x] `ServerTransport` interface implemented
+- [x] SMETHOD line parsing
+- [x] Server-side environment configuration
+- [x] Bridge relay PT support
+- [x] Comprehensive unit tests (39.9% coverage)
+
+### Phase 11.1.3: PT Configuration ✅
+
+- [x] torrc PT configuration parsing
+- [x] ClientTransportPlugin support
+- [x] ServerTransportPlugin support
+- [x] PT options parsing
+- [x] Comprehensive tests (82.7% config coverage)
+
+### Phase 11.3.1: Managed PT Mode ✅
+
+- [x] PT Manager for multi-PT lifecycle
+- [x] Automatic process restart on failure
+- [x] Configurable restart delay and limits
+- [x] Process health monitoring
+- [x] Graceful shutdown
+- [x] Comprehensive tests (65.2% coverage)
+
+### Phase 11.3.2: PT Path Configuration ✅
+
+- [x] PT binary path discovery
+- [x] Platform-specific search paths
+- [x] Common PT detection (obfs4, snowflake, meek, lyrebird)
+- [x] Absolute and relative path support
+- [x] HOME directory search
+- [x] Comprehensive tests (85.0% discovery coverage)
+
+### Phase 11.4: Bridge Client Integration ✅
+
+- [x] Bridge line parsing (vanilla and PT bridges)
+- [x] PT parameter extraction
+- [x] Configuration integration
+- [x] Example implementations
+
 ### Remaining Work
 
-- [ ] Task 11.1.2: PT Server Interface (for bridge relays)
-- [ ] Task 11.1.3: PT Configuration (torrc parsing)
-- [ ] Task 11.2: Built-in obfs4 support
-- [ ] Task 11.3: External PT integration
-- [ ] Task 11.4: Bridge client integration
+- [ ] Task 11.2: Built-in obfs4 support (optional)
+- [ ] Integration tests with real PT binaries
 
 ## Testing
 
@@ -165,15 +276,23 @@ go test -race -v ./pkg/pt/...
 
 ### Test Coverage
 
-Current coverage: **37.9%**
+Current coverage: **65.2%** (overall pkg/pt package)
+
+Component coverage:
+- **client.go**: 37.9% (CMETHOD, SOCKS5, lifecycle)
+- **server.go**: 39.9% (SMETHOD, server lifecycle)
+- **manager.go**: Comprehensive (multi-PT, restart, monitoring)
+- **discovery.go**: 85.0% (path discovery, platform detection)
 
 Areas tested:
-- Client creation and configuration
+- Client/server creation and configuration
 - Environment variable generation
-- CMETHOD parsing (socks4, socks5, args)
+- CMETHOD/SMETHOD parsing (socks4/5, args)
 - Method registration
-- Process lifecycle
-- SOCKS5 handshake
+- Process lifecycle and monitoring
+- Automatic restart with backoff
+- PT binary discovery
+- Multi-PT management
 
 Integration tests require actual PT binaries and are skipped in `-short` mode.
 
@@ -184,6 +303,8 @@ Integration tests require actual PT binaries and are skipped in `-short` mode.
 3. **Binary Verification**: Verify PT binary integrity before execution
 4. **Timeouts**: Handshake has 30-second timeout to prevent hangs
 5. **Error Handling**: PT errors don't leak sensitive information
+6. **Restart Limits**: Set `MaxRestarts` to prevent infinite restart loops
+7. **Logging**: PT stderr output may contain sensitive configuration
 
 ## References
 
@@ -193,6 +314,6 @@ Integration tests require actual PT binaries and are skipped in `-short` mode.
 
 ---
 
-**Status**: Phase 11.1.1 Complete  
+**Status**: Phases 11.1, 11.3, 11.4 Complete  
 **Last Updated**: January 25, 2026  
-**Test Coverage**: 37.9%
+**Test Coverage**: 65.2% overall
