@@ -483,6 +483,46 @@ ConnectionPoolMaxLife 5m
 # Disable metrics (no information leak)
 EnableMetrics false
 ```
+### Example 6: Bridge Relay
+```ini
+# Bridge relay configuration (non-exit relay for censorship resistance)
+# ⚠️ EXPERIMENTAL - For research/educational purposes only
+
+# Standard client ports (optional for bridges)
+SocksPort 9050
+ControlPort 9051
+
+# OR port for accepting relay connections
+ORPort 9001
+
+# Bridge mode (do not publish to public directories)
+BridgeRelay true
+
+# Data directory for relay state
+DataDirectory /var/lib/go-tor-bridge
+
+# Relay identity (auto-generated on first run)
+# Keys stored in: DataDirectory/keys/
+
+# Contact information (optional but recommended)
+ContactInfo your-email@example.com
+
+# Nickname (auto-generated if not specified)
+Nickname MyBridge
+
+# Exit policy (bridges are non-exit relays)
+ExitPolicy reject *:*
+
+# Optional: Bridge authority for descriptor publishing
+# BridgeAuthority 1.2.3.4:9030
+
+# Bandwidth limits (optional)
+# RelayBandwidthRate 1 MB
+# RelayBandwidthBurst 2 MB
+
+# Logging
+LogLevel info
+```
 ## See Also
 - [Getting Started](TUTORIAL.md)
 - [Architecture](ARCHITECTURE.md)

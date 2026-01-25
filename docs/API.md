@@ -18,6 +18,8 @@ This API documentation is **for educational and research purposes only**. Code w
 - [Client API](#client-api)
 - [Circuit Management](#circuit-management)
 - [SOCKS5 Proxy](#socks5-proxy)
+- [Onion Service Hosting](#onion-service-hosting)
+- [Relay Mode (Bridge/Non-Exit)](#relay-mode-bridgenon-exit)
 - [Configuration](#configuration)
 - [Control Protocol](#control-protocol)
 - [Metrics & Observability](#metrics--observability)
@@ -150,12 +152,267 @@ curl --socks5 127.0.0.1:9050 https://check.torproject.org
 # Settings → Network Settings → Manual proxy configuration
 # SOCKS Host: 127.0.0.1  Port: 9050  SOCKS v5
 ```
-### Onion Services
+### Onion Services (Client)
 The SOCKS5 server automatically handles .onion addresses:
 ```go
 // Connect to onion service (v3)
 // http://example.onion will be automatically routed through Tor
 ```
+---
+## Onion Service Hosting
+The onion package provides server-side functionality for hosting v3 onion services.
+
+⚠️ **Educational/Research Only**: Not for production anonymity needs.
+
+### Creating an Onion Service
+```go
+import (
+    "github.com/opd-ai/go-tor/pkg/onion"
+    "github.com/opd-ai/go-tor/pkg/logger"
+    "github.com/opd-ai/go-tor/pkg/circuit"
+    "github.com/opd-ai/go-tor/pkg/path"
+)
+
+// Configure the service
+cfg := &onion.ServiceConfig{
+    // Service ports: map virtual port -> local backend
+    Ports: map[int]string{
+        80:  "localhost:8080",  // HTTP
+        443: "localhost:8443",  // HTTPS
+    },
+    
+    // Number of introduction points (default: 3)
+    NumIntroPoints: 3,
+    
+    // Descriptor lifetime (default: 3 hours)
+    DescriptorLifetime: 3 * time.Hour,
+    
+    // Data directory for persistent keys and state
+    DataDirectory: "/var/lib/go-tor/onion-service",
+    
+    // Circuit builder (required for production)
+    CircuitBuilder: circuitBuilder,
+    
+    // Path selector (required for production)
+    PathSelector: pathSelector,
+}
+
+// Create the service
+log := logger.NewDefault()
+service, err := onion.NewService(cfg, log)
+if err != nil {
+    log.Fatal("Failed to create onion service", "error", err)
+}
+
+// Get the .onion address
+address := service.Address()
+log.Info("Onion service address", "address", address)
+// Example: "abcdefghijklmnop.onion"
+
+// Start the service
+ctx := context.Background()
+if err := service.Start(ctx); err != nil {
+    log.Fatal("Failed to start service", "error", err)
+}
+
+// Service is now accepting connections...
+
+// Graceful shutdown
+if err := service.Stop(); err != nil {
+    log.Warn("Error during shutdown", "error", err)
+}
+```
+
+### Service Configuration Options
+```go
+type ServiceConfig struct {
+    // Optional: Existing private key (otherwise auto-generated)
+    PrivateKey ed25519.PrivateKey
+    
+    // Service ports: virtual port -> local target
+    Ports map[int]string
+    
+    // Number of introduction points (1-10, default: 3)
+    NumIntroPoints int
+    
+    // Descriptor lifetime (default: 3h)
+    DescriptorLifetime time.Duration
+    
+    // Data directory for key/state persistence
+    DataDirectory string
+    
+    // Circuit builder for introduction points
+    CircuitBuilder *circuit.Builder
+    
+    // Path selector for choosing relay paths
+    PathSelector *path.Selector
+    
+    // Optional metrics collector
+    Metrics MetricsCollector
+}
+```
+
+### Service Persistence
+Keys and state are automatically persisted to `DataDirectory`:
+```
+DataDirectory/
+├── keys/
+│   ├── identity_key      # Ed25519 identity (permissions 0600)
+│   └── ntor_key          # Curve25519 ntor key
+└── state/
+    └── service_state.json # Descriptor revisions, intro points
+```
+
+### Service Metrics
+```go
+// Get service statistics
+stats := service.GetStats()
+fmt.Printf("Active streams: %d\n", stats.ActiveStreams)
+fmt.Printf("Total connections: %d\n", stats.TotalConnections)
+fmt.Printf("Introduction points: %d\n", stats.IntroductionPoints)
+```
+
+---
+## Relay Mode (Bridge/Non-Exit)
+The relay package implements server-side OR protocol for bridge and non-exit relays.
+
+⚠️ **Educational/Research Only**: Not intended for production relay operation.
+
+### Creating a Bridge Relay
+```go
+import (
+    "github.com/opd-ai/go-tor/pkg/relay"
+    "github.com/opd-ai/go-tor/pkg/logger"
+)
+
+// Generate or load relay keys
+keys, err := relay.GenerateRelayKeys()
+if err != nil {
+    log.Fatal("Failed to generate keys", "error", err)
+}
+
+// Or load existing keys
+// keys, err := relay.LoadRelayKeys("/var/lib/go-tor/keys")
+
+// Configure OR listener
+orConfig := &relay.ORListenerConfig{
+    Address:        ":9001",  // OR port
+    Keys:           keys,
+    MaxConnections: 1000,
+    ReadTimeout:    60 * time.Second,
+    WriteTimeout:   60 * time.Second,
+}
+
+log := logger.NewDefault()
+listener, err := relay.NewORListener(orConfig, log)
+if err != nil {
+    log.Fatal("Failed to create OR listener", "error", err)
+}
+
+// Start accepting connections
+ctx := context.Background()
+if err := listener.Start(ctx); err != nil {
+    log.Fatal("Failed to start listener", "error", err)
+}
+
+log.Info("Bridge relay started",
+    "address", orConfig.Address,
+    "fingerprint", keys.Fingerprint())
+
+// Relay is now accepting connections...
+
+// Graceful shutdown
+listener.Stop()
+```
+
+### Relay Descriptor Publishing
+Bridges publish descriptors to bridge authorities:
+```go
+// Configure descriptor
+descConfig := &relay.DescriptorConfig{
+    Nickname:  "MyBridge",
+    Contact:   "operator@example.com",
+    Platform:  "go-tor/0.1.0",
+    Address:   "1.2.3.4",
+    ORPort:    9001,
+    
+    // Bandwidth in bytes/sec
+    BandwidthAvg:   1024 * 1024,      // 1 MB/s
+    BandwidthBurst: 2 * 1024 * 1024,  // 2 MB/s
+    BandwidthObs:   1024 * 1024,
+    
+    // Bridge-specific: no DirPort
+    DirPort: 0,
+    
+    // Non-exit relay
+    ExitPolicy: []string{"reject *:*"},
+}
+
+// Generate descriptor
+descriptor, err := relay.GenerateServerDescriptor(keys, descConfig)
+if err != nil {
+    log.Fatal("Failed to generate descriptor", "error", err)
+}
+
+// Publish to bridge authority
+publisher := relay.NewDescriptorPublisher(&relay.PublisherConfig{
+    Authorities: []string{"https://bridge-authority.torproject.org"},
+    Interval:    18 * time.Hour,  // Refresh every 18h
+    Timeout:     30 * time.Second,
+}, log)
+
+if err := publisher.Publish(descriptor, nil); err != nil {
+    log.Warn("Failed to publish descriptor", "error", err)
+}
+
+// Or use scheduled publishing
+scheduledPub := relay.NewScheduledPublisher(publisher, descriptor, log)
+go scheduledPub.Run(ctx)
+```
+
+### Relay Security Features
+```go
+// Rate limiting
+rateLimiter := relay.NewRateLimiter(&relay.RateLimitConfig{
+    CircuitCreationRate: 10.0,    // circuits/sec
+    CircuitCreationBurst: 20,
+    ConnectionRate: 5.0,           // connections/sec per IP
+    ConnectionBurst: 10,
+    CellProcessingRate: 100.0,    // cells/sec per circuit
+    CellProcessingBurst: 200,
+})
+
+// DoS protection
+protection := relay.NewProtectionManager(&relay.ProtectionConfig{
+    MaxConnectionsPerIP:     10,
+    MaxCircuitsPerConnection: 1000,
+    MaxTotalConnections:     5000,
+})
+
+// Check before accepting connection
+if !protection.AllowConnection(remoteIP) {
+    // Reject connection
+    log.Warn("Connection rejected by DoS protection", "ip", remoteIP)
+}
+```
+
+### Relay Metrics
+```go
+// Initialize metrics
+metrics := relay.NewRelayMetrics()
+
+// Record operations
+metrics.CircuitsCreated.Inc()
+metrics.CellsForwarded.Inc()
+metrics.BytesReceived.Add(1024)
+
+// Get snapshot
+snapshot := metrics.Snapshot()
+fmt.Printf("Circuits: %d\n", snapshot.CircuitsCreated)
+fmt.Printf("Bandwidth: %d bytes\n", snapshot.BytesReceived)
+fmt.Printf("Uptime: %v\n", snapshot.Uptime)
+```
+
 ---
 ## Configuration
 The config package manages application configuration with torrc compatibility.

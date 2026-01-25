@@ -602,8 +602,23 @@ Each new package should have comprehensive unit tests:
   - Added onion service data flows (introduction, rendezvous)
   - Updated Phase 9 and Phase 10 completion status
   - Updated overview to reflect all three operating modes
-- [ ] `docs/CONFIGURATION.md` - Add relay and PT configuration
-- [ ] `docs/API.md` - Add new public APIs
+- [x] `docs/CONFIGURATION.md` - Add relay and PT configuration ✅ **COMPLETED** (January 25, 2026)
+  - Added Example 6: Bridge Relay configuration
+  - Documented ORPort, BridgeRelay, exit policy, and relay-specific settings
+  - Included bridge authority configuration
+  - Added bandwidth limit configuration
+  - Documented relay identity key management
+- [x] `docs/API.md` - Add new public APIs ✅ **COMPLETED** (January 25, 2026)
+  - Added comprehensive Onion Service Hosting API section
+  - Documented onion.Service creation and lifecycle
+  - Documented ServiceConfig with all options
+  - Added service persistence and metrics examples
+  - Added comprehensive Relay Mode (Bridge/Non-Exit) API section
+  - Documented relay.ORListener creation and configuration
+  - Documented relay descriptor generation and publishing
+  - Added relay security features (rate limiting, DoS protection)
+  - Documented relay metrics collection
+  - Updated Table of Contents with new sections
 - [ ] `ROADMAP.md` - Update with completion status
 
 ---
