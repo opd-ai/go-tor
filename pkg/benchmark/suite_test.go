@@ -280,7 +280,7 @@ func TestBenchmarkCircuitBuildWithPool(t *testing.T) {
 		t.Error("Expected non-zero operations")
 	}
 
-	t.Logf("Pool benchmark: ops=%d, throughput=%.2f ops/sec", 
+	t.Logf("Pool benchmark: ops=%d, throughput=%.2f ops/sec",
 		result.TotalOperations, result.OperationsPerSec)
 }
 
@@ -349,7 +349,7 @@ func TestBenchmarkStreamScaling(t *testing.T) {
 	}
 
 	for i, result := range results {
-		t.Logf("Scaling test %d: %s - ops=%d, throughput=%.2f", 
+		t.Logf("Scaling test %d: %s - ops=%d, throughput=%.2f",
 			i, result.Name, result.TotalOperations, result.OperationsPerSec)
 	}
 }
