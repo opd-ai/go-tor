@@ -14,10 +14,10 @@ import (
 
 // mockMetricsRecorder is a mock implementation of MetricsRecorder for testing
 type mockMetricsRecorder struct {
-	rateLimitWaitCalls   int64
-	rateLimitedCircuits  int64
-	totalWaitTime        int64 // in nanoseconds
-	mu                   sync.Mutex
+	rateLimitWaitCalls  int64
+	rateLimitedCircuits int64
+	totalWaitTime       int64 // in nanoseconds
+	mu                  sync.Mutex
 }
 
 func (m *mockMetricsRecorder) RecordRateLimitWait(duration time.Duration) {

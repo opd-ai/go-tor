@@ -1642,4 +1642,3 @@ func TestFetchMicrodescriptorBatching(t *testing.T) {
 	}
 	t.Logf("Made %d batch requests for 100 microdescriptors", requestCount)
 }
-

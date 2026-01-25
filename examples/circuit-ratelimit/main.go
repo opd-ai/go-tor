@@ -17,28 +17,28 @@ import (
 func main() {
 	// Create configuration with circuit rate limiting enabled
 	cfg := config.DefaultConfig()
-	
+
 	// Enable circuit rate limiting
 	// Allow 10 circuit creations per second with a burst of 5
 	cfg.CircuitCreationsPerSecond = 10.0
 	cfg.CircuitCreationsBurst = 5
-	
+
 	// Set other required config
 	cfg.DataDirectory = "/tmp/go-tor-ratelimit-demo"
 	cfg.SocksPort = 9050
 	cfg.ControlPort = 9051
-	
+
 	// Create logger
 	logger := logger.NewDefault()
-	
+
 	fmt.Println("Circuit Rate Limiting Demo")
 	fmt.Println("===========================")
 	fmt.Printf("Rate: %.1f circuits/second\n", cfg.CircuitCreationsPerSecond)
 	fmt.Printf("Burst: %d circuits\n", cfg.CircuitCreationsBurst)
 	fmt.Println()
-	
+
 	// Note: In a real application, you would create a client with this config:
-	// 
+	//
 	// client, err := client.New(cfg, logger)
 	// if err != nil {
 	//     log.Fatalf("Failed to create client: %v", err)
@@ -49,7 +49,7 @@ func main() {
 	// if err != nil {
 	//     log.Fatalf("Failed to start client: %v", err)
 	// }
-	
+
 	// Demonstrate the rate limiting behavior
 	fmt.Println("Rate Limiting Behavior:")
 	fmt.Println("-----------------------")
@@ -68,22 +68,22 @@ func main() {
 	fmt.Println("  * RateLimitedCircuits: Count of rate-limited requests")
 	fmt.Println("  * RateLimitWaitTime: Average wait time due to rate limiting")
 	fmt.Println()
-	
+
 	// Simulate rate limiting with a simple demonstration
 	fmt.Println("Simulation:")
 	fmt.Println("-----------")
-	
+
 	rate := cfg.CircuitCreationsPerSecond
 	burst := cfg.CircuitCreationsBurst
-	
+
 	// Calculate delays
 	burstDuration := time.Duration(0) // Burst happens immediately
 	intervalDuration := time.Second / time.Duration(rate)
-	
+
 	fmt.Printf("Burst of %d circuits: %v\n", burst, burstDuration)
 	fmt.Printf("Rate-limited interval: %v per circuit\n", intervalDuration)
 	fmt.Println()
-	
+
 	// Example timeline
 	fmt.Println("Example Timeline:")
 	currentTime := time.Duration(0)
@@ -95,7 +95,7 @@ func main() {
 			fmt.Printf("Circuit %2d: %6s (rate limited)\n", i, currentTime)
 		}
 	}
-	
+
 	fmt.Println()
 	fmt.Println("Configuration Options:")
 	fmt.Println("---------------------")
@@ -103,7 +103,7 @@ func main() {
 	fmt.Println("CircuitCreationsBurst: Burst capacity (e.g., 5)")
 	fmt.Println()
 	fmt.Println("To disable rate limiting, set both values to 0 in config.")
-	
+
 	_ = logger
 	_ = context.Background()
 	_ = log.Print

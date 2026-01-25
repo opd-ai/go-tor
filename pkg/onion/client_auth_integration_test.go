@@ -376,7 +376,7 @@ func encodeBase64(data []byte) string {
 }
 
 // computeSharedSecret computes x25519 ECDH shared secret
-func computeSharedSecret(publicKey *[32]byte, privateKey *[32]byte) []byte {
+func computeSharedSecret(publicKey, privateKey *[32]byte) []byte {
 	var shared [32]byte
 	curve25519.ScalarMult(&shared, privateKey, publicKey)
 	return shared[:]

@@ -51,7 +51,7 @@ type Client struct {
 	// Circuit management with advanced pooling (Phase 9.4)
 	circuitPool        *pool.CircuitPool
 	circuitRateLimiter *ratelimit.RateLimiter // Rate limiter for circuit creation
-	circuits           []*circuit.Circuit      // Legacy circuit list for backward compatibility
+	circuits           []*circuit.Circuit     // Legacy circuit list for backward compatibility
 	circuitsMu         sync.RWMutex
 
 	// Bandwidth tracking (for BW events)
@@ -386,7 +386,7 @@ func (c *Client) buildCircuitForPool(ctx context.Context) (*circuit.Circuit, err
 
 	// Create circuit builder
 	builder := circuit.NewBuilder(c.circuitMgr, c.logger)
-	
+
 	// Configure rate limiter if enabled
 	if c.circuitRateLimiter != nil {
 		builder.SetRateLimiter(c.circuitRateLimiter)

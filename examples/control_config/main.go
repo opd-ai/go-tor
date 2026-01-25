@@ -27,22 +27,22 @@ func main() {
 
 	// Create configuration with specific settings
 	cfg := &config.Config{
-		SocksPort:              9050,
-		ControlPort:            9051,
-		DataDirectory:          "/tmp/tor-getconf-example",
-		CircuitBuildTimeout:    60 * time.Second,
-		MaxCircuitDirtiness:    10 * time.Minute,
-		NewCircuitPeriod:       30 * time.Second,
-		EnableCircuitPadding:   true,
-		PaddingStrategy:        "random",
-		PaddingMinInterval:     3 * time.Second,
-		PaddingMaxInterval:     10 * time.Second,
+		SocksPort:                 9050,
+		ControlPort:               9051,
+		DataDirectory:             "/tmp/tor-getconf-example",
+		CircuitBuildTimeout:       60 * time.Second,
+		MaxCircuitDirtiness:       10 * time.Minute,
+		NewCircuitPeriod:          30 * time.Second,
+		EnableCircuitPadding:      true,
+		PaddingStrategy:           "random",
+		PaddingMinInterval:        3 * time.Second,
+		PaddingMaxInterval:        10 * time.Second,
 		SOCKSConnectionsPerSecond: 100.0,
-		SOCKSConnectionsBurst:  50,
-		EnableRateLimiting:     true,
-		LogLevel:               "info",
-		TracingSampleRate:      0.1,
-		EnableMemoryMonitoring: false,
+		SOCKSConnectionsBurst:     50,
+		EnableRateLimiting:        true,
+		LogLevel:                  "info",
+		TracingSampleRate:         0.1,
+		EnableMemoryMonitoring:    false,
 	}
 
 	// Create and start client

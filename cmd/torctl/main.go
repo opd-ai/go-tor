@@ -374,7 +374,6 @@ func getConfig(conn net.Conn, key string) error {
 	return nil
 }
 
-
 func sendSignal(conn net.Conn, signal string) error {
 	signal = strings.ToUpper(signal)
 
