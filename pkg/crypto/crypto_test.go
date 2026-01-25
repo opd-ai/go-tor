@@ -485,6 +485,107 @@ func TestConstantTimeCompare(t *testing.T) {
 			if got != tt.want {
 				t.Errorf("constantTimeCompare() = %v, want %v", got, tt.want)
 			}
+			// Also test exported version
+			gotExported := ConstantTimeCompare(tt.a, tt.b)
+			if gotExported != tt.want {
+				t.Errorf("ConstantTimeCompare() = %v, want %v", gotExported, tt.want)
+			}
+		})
+	}
+}
+
+// TestDecryptAES256CTR tests AES-256-CTR decryption
+func TestDecryptAES256CTR(t *testing.T) {
+	key := make([]byte, AES256KeySize)
+	iv := make([]byte, 16)
+	plaintext := []byte("Hello, World! This is a test message.")
+
+	// Encrypt first
+	ciphertext, err := EncryptAES256CTR(plaintext, key, iv)
+	if err != nil {
+		t.Fatalf("EncryptAES256CTR failed: %v", err)
+	}
+
+	// Decrypt
+	decrypted, err := DecryptAES256CTR(ciphertext, key, iv)
+	if err != nil {
+		t.Fatalf("DecryptAES256CTR failed: %v", err)
+	}
+
+	if !bytes.Equal(decrypted, plaintext) {
+		t.Errorf("Decrypted text doesn't match original")
+	}
+
+	// Test with wrong key size
+	_, err = DecryptAES256CTR(ciphertext, []byte("short"), iv)
+	if err == nil {
+		t.Error("Expected error with invalid key size")
+	}
+}
+
+// TestEncryptAES256CTR tests AES-256-CTR encryption
+func TestEncryptAES256CTR(t *testing.T) {
+	key := make([]byte, AES256KeySize)
+	iv := make([]byte, 16)
+	plaintext := []byte("Test message for encryption")
+
+	// Encrypt
+	ciphertext, err := EncryptAES256CTR(plaintext, key, iv)
+	if err != nil {
+		t.Fatalf("EncryptAES256CTR failed: %v", err)
+	}
+
+	// Verify ciphertext is different from plaintext
+	if bytes.Equal(ciphertext, plaintext) {
+		t.Error("Ciphertext should differ from plaintext")
+	}
+
+	// Verify same length
+	if len(ciphertext) != len(plaintext) {
+		t.Errorf("Ciphertext length %d != plaintext length %d", len(ciphertext), len(plaintext))
+	}
+
+	// Test with wrong key size
+	_, err = EncryptAES256CTR(plaintext, []byte("short"), iv)
+	if err == nil {
+		t.Error("Expected error with invalid key size")
+	}
+}
+
+// TestAES256CTRRoundTrip tests encryption and decryption round trip
+func TestAES256CTRRoundTrip(t *testing.T) {
+	testCases := []struct {
+		name      string
+		plaintext []byte
+	}{
+		{"short", []byte("Hi")},
+		{"medium", []byte("The quick brown fox jumps over the lazy dog")},
+		{"long", bytes.Repeat([]byte("A"), 1024)},
+		{"empty", []byte{}},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			key := make([]byte, AES256KeySize)
+			iv := make([]byte, 16)
+			rand.Read(key)
+			rand.Read(iv)
+
+			// Encrypt
+			ciphertext, err := EncryptAES256CTR(tc.plaintext, key, iv)
+			if err != nil {
+				t.Fatalf("Encryption failed: %v", err)
+			}
+
+			// Decrypt
+			decrypted, err := DecryptAES256CTR(ciphertext, key, iv)
+			if err != nil {
+				t.Fatalf("Decryption failed: %v", err)
+			}
+
+			if !bytes.Equal(decrypted, tc.plaintext) {
+				t.Error("Round trip failed - plaintext doesn't match")
+			}
 		})
 	}
 }

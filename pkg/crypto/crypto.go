@@ -131,6 +131,42 @@ func (c *AESCTRCipher) Stream() cipher.Stream {
 	return c.stream
 }
 
+// DecryptAES256CTR decrypts data using AES-256-CTR
+func DecryptAES256CTR(ciphertext, key, iv []byte) ([]byte, error) {
+	if len(key) != AES256KeySize {
+		return nil, fmt.Errorf("invalid key size: %d, expected %d", len(key), AES256KeySize)
+	}
+	
+	plaintext := make([]byte, len(ciphertext))
+	copy(plaintext, ciphertext)
+	
+	cipher, err := NewAESCTRCipher(key, iv)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cipher: %w", err)
+	}
+	
+	cipher.Decrypt(plaintext)
+	return plaintext, nil
+}
+
+// EncryptAES256CTR encrypts data using AES-256-CTR
+func EncryptAES256CTR(plaintext, key, iv []byte) ([]byte, error) {
+	if len(key) != AES256KeySize {
+		return nil, fmt.Errorf("invalid key size: %d, expected %d", len(key), AES256KeySize)
+	}
+	
+	ciphertext := make([]byte, len(plaintext))
+	copy(ciphertext, plaintext)
+	
+	cipher, err := NewAESCTRCipher(key, iv)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cipher: %w", err)
+	}
+	
+	cipher.Encrypt(ciphertext)
+	return ciphertext, nil
+}
+
 // RSAPublicKey wraps an RSA public key
 type RSAPublicKey struct {
 	key *rsa.PublicKey
@@ -426,6 +462,11 @@ func constantTimeCompare(a, b []byte) bool {
 		result |= a[i] ^ b[i]
 	}
 	return result == 0
+}
+
+// ConstantTimeCompare is the exported version of constantTimeCompare
+func ConstantTimeCompare(a, b []byte) bool {
+	return constantTimeCompare(a, b)
 }
 
 // Ed25519Verify verifies an Ed25519 signature

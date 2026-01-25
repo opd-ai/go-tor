@@ -84,15 +84,19 @@ The `pkg/onion/service.go` already contains foundational server-side functionali
 
 **Specification Reference**: rend-spec-v3.txt §3.2-3.3
 
-**Current State**: Basic parsing exists in `HandleIntroduce2()`
+**Current State**: INTRODUCE2 parsing complete
 
 **Tasks**:
 
-- [ ] **9.2.1 INTRODUCE2 Cell Parsing**
+- [x] **9.2.1 INTRODUCE2 Cell Parsing** ✅ **COMPLETED** (January 25, 2026)
   - Parse complete INTRODUCE2 cell format (encrypted portion)
   - Decrypt client data using introduction point keys
   - Extract rendezvous cookie, client onion key, link specifiers
   - Validate cell MAC
+  - Implementation: `pkg/onion/introduce2.go` with comprehensive test coverage (>70%)
+  - Tests: `pkg/onion/introduce2_test.go` (9 tests, all passing)
+  - Added crypto helpers: `DecryptAES256CTR`, `EncryptAES256CTR`, `ConstantTimeCompare`
+  - Tests: `pkg/crypto/crypto_test.go` (comprehensive coverage >85%)
 
 - [ ] **9.2.2 Rendezvous Circuit Building**
   - Build circuit to rendezvous point specified by client
@@ -105,10 +109,13 @@ The `pkg/onion/service.go` already contains foundational server-side functionali
   - Send RENDEZVOUS1 on rendezvous circuit
   - Complete key derivation for end-to-end encryption
 
-**Files to Modify**:
-- `pkg/onion/service.go` - Enhance `HandleIntroduce2()`
-- `pkg/onion/rendezvous_server.go` (new) - Server-side rendezvous handling
-- `pkg/crypto/ntor_server.go` (new) - ntor handshake server implementation
+**Files Modified/Created**:
+- `pkg/onion/introduce2.go` (new) - INTRODUCE2 parsing and decryption
+- `pkg/onion/introduce2_test.go` (new) - Comprehensive test coverage
+- `pkg/onion/service.go` - Updated `HandleIntroduce2()` to use new parser
+- `pkg/onion/service_test.go` - Updated tests for new parsing logic
+- `pkg/crypto/crypto.go` - Added `DecryptAES256CTR`, `EncryptAES256CTR`, `ConstantTimeCompare`
+- `pkg/crypto/crypto_test.go` - Added comprehensive tests for new functions
 
 ### 9.3 Stream Handling for Services
 

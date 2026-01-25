@@ -759,34 +759,59 @@ func (s *Service) HandleIntroduce2(introCircuitID uint32, introduce2Data []byte)
 		"circuit", introCircuitID,
 		"size", len(introduce2Data))
 
-	// Parse INTRODUCE2 cell
-	// Format: RENDEZVOUS_COOKIE (20 bytes) || CLIENT_ONION_KEY (32 bytes) || LINK_SPECIFIERS || ...
-	if len(introduce2Data) < 52 {
-		return fmt.Errorf("INTRODUCE2 data too short: %d bytes", len(introduce2Data))
+	// Find the introduction point for this circuit
+	s.mu.RLock()
+	var introPoint *ServiceIntroPoint
+	for _, ip := range s.introPoints {
+		if ip.CircuitID == introCircuitID {
+			introPoint = ip
+			break
+		}
+	}
+	s.mu.RUnlock()
+
+	if introPoint == nil {
+		return fmt.Errorf("no introduction point found for circuit %d", introCircuitID)
 	}
 
-	rendezvousCookie := introduce2Data[0:20]
-	clientOnionKey := introduce2Data[20:52]
-	// Link specifiers would follow, but we'll simplify for Phase 7.4
+	// Parse and decrypt INTRODUCE2 cell
+	request, err := ParseIntroduce2(introduce2Data, introPoint.AuthKey, introPoint.EncKey)
+	if err != nil {
+		return fmt.Errorf("failed to parse INTRODUCE2: %w", err)
+	}
 
-	cookieStr := fmt.Sprintf("%x", rendezvousCookie)
+	s.logger.Debug("INTRODUCE2 parsed successfully",
+		"cookie", fmt.Sprintf("%x", request.RendezvousCookie[:16]),
+		"link_specs", len(request.LinkSpecifiers))
+
+	// Extract rendezvous point address from link specifiers
+	rendezvousAddr, err := LinkSpecifierToAddress(request.LinkSpecifiers)
+	if err != nil {
+		s.logger.Warn("Could not extract rendezvous address", "error", err)
+		// Continue anyway - we'll store what we have
+		rendezvousAddr = "unknown"
+	}
+
+	cookieStr := fmt.Sprintf("%x", request.RendezvousCookie)
 
 	// Store pending introduction
 	s.mu.Lock()
 	s.pendingIntros[cookieStr] = &PendingIntro{
-		Cookie:         rendezvousCookie,
-		ClientOnionKey: clientOnionKey,
-		ReceivedAt:     time.Now(),
+		Cookie:          request.RendezvousCookie,
+		RendezvousPoint: rendezvousAddr,
+		ClientOnionKey:  request.ClientOnionKey,
+		ReceivedAt:      time.Now(),
 	}
 	s.mu.Unlock()
 
-	s.logger.Debug("INTRODUCE2 parsed and stored",
-		"cookie", cookieStr[:16])
+	s.logger.Debug("INTRODUCE2 request stored",
+		"cookie", cookieStr[:16],
+		"rendezvous", rendezvousAddr)
 
-	// In production, we would now:
+	// TODO: In production, we would now:
 	// 1. Build a circuit to the rendezvous point
 	// 2. Send RENDEZVOUS1 with our handshake response
-	// 3. Complete the connection
+	// 3. Complete the connection (Task 9.2.2 and 9.2.3)
 
 	return nil
 }
