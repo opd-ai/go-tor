@@ -1,5 +1,17 @@
 # Tor Protocol Compliance Audit Report
 
+## ⚠️ Important Notice
+
+This document describes an **unofficial, experimental Tor client implementation** developed for educational and research purposes. This software has been developed **without the supervision or endorsement of The Tor Project**.
+
+**This software should NOT be used for any real anonymity or privacy needs.**
+
+For actual Tor usage:
+- **Users**: Use [Tor Browser](https://www.torproject.org/download/)
+- **Developers**: Use [Arti](https://gitlab.torproject.org/tpo/core/arti) (official Rust implementation) or the [C reference implementation](https://github.com/torproject/tor)
+
+---
+
 **Repository**: opd-ai/go-tor  
 **Audit Date**: January 2026  
 **Reference Specifications**: tor-spec.txt, dir-spec.txt, rend-spec-v3.txt, path-spec.txt, control-spec.txt, padding-spec.txt  
@@ -44,16 +56,16 @@ The go-tor implementation demonstrates strong compliance with core Tor protocol 
 | Key Derivation | ✅ Complete | tor-spec §5.2 | 100% | KDF-TOR and HKDF-SHA256 |
 | Stream Protocol | ✅ Complete | tor-spec §6 | 100% | BEGIN, CONNECTED, DATA, END |
 | Flow Control | ✅ Complete | tor-spec §6.5 | 100% | SENDME cells implemented |
-| Directory Client | ✅ Complete | dir-spec §1-6 | 95% | Consensus, descriptors, authorities |
+| Directory Client | ⚠️ Partial | dir-spec §1-6 | 95% | Consensus, descriptors, authorities |
 | Guard Selection | ✅ Complete | path-spec §1 | 100% | Persistence and rotation |
-| Path Selection | ✅ Complete | path-spec §2-4 | 100% | Family/subnet conflict avoidance |
-| v3 Onion Client | ✅ Complete | rend-spec-v3 §1-4 | 95% | Full client connection workflow |
+| Path Selection | ⚠️ Partial | path-spec §2-4 | 100% | Family/subnet conflict avoidance |
+| v3 Onion Client | ⚠️ Partial | rend-spec-v3 §1-4 | 95% | Full client connection workflow |
 | Descriptor Handling | ✅ Complete | rend-spec-v3 §2 | 100% | Parsing, caching, HSDir fetching |
 | Introduction Protocol | ✅ Complete | rend-spec-v3 §3 | 100% | INTRODUCE1/ACK |
 | Rendezvous Protocol | ✅ Complete | rend-spec-v3 §4 | 100% | ESTABLISH_RENDEZVOUS, RENDEZVOUS2 |
 | SOCKS5 Proxy | ✅ Complete | socks-extensions | 100% | RFC 1928 + Tor extensions |
 | Control Protocol | ✅ Complete | control-spec §1-5 | 100% | Commands and event notifications |
-| Circuit Padding | ⚠️ Partial | padding-spec §1 | 40% | Basic padding only |
+| Circuit Padding | ⚠️ Partial | padding-spec §1 | 40% | Custom adaptive padding only |
 | Client Authorization | ❌ Missing | rend-spec-v3 §2.5 | 0% | Cannot access private services |
 | Path Bias Detection | ❌ Missing | path-spec §5.3 | 0% | Advanced security feature |
 
@@ -245,11 +257,12 @@ keyInfo := []byte("ntor-curve25519-sha256-1:key_extract")
 **Details**:
 - Basic PADDING cells supported ✅
 - Fixed padding intervals implemented ✅
+- Custom adaptive padding strategy (`PaddingStrategyAdaptive`) implemented (non-spec, traffic-pattern-based) ✅
 
 **Missing Features**:
-- Adaptive padding engine (APE) not implemented
-- Machine-based padding states not implemented
-- Connection-level padding not implemented
+- Formal adaptive padding engine (APE) protocol from padding-spec (including `PADDING_NEGOTIATE` and standardized padding machines) not implemented
+- Standardized machine-based padding states from padding-spec not implemented
+- Formal connection-level padding protocol from padding-spec not implemented
 
 **Impact**: Medium - Reduced traffic analysis resistance compared to reference implementation.
 
@@ -298,7 +311,7 @@ keyInfo := []byte("ntor-curve25519-sha256-1:key_extract")
    - Implement multi-authority threshold verification
    - Verify at least 5 of 9 authority signatures
    - Cache and verify Ed25519 identity keys
-   - Priority: P2 - Defense-in-depth
+   - Priority: P2 - defense-in-depth
 
 ### Medium Priority
 
@@ -319,7 +332,7 @@ keyInfo := []byte("ntor-curve25519-sha256-1:key_extract")
 5. **Certificate Pinning Enhancement**
    - Add relay fingerprint verification against consensus
    - Implement stricter TLS certificate validation
-   - Priority: P3 - Defense-in-depth
+   - Priority: P3 - defense-in-depth
 
 ---
 
