@@ -35,6 +35,24 @@ const (
 	RelayPaddingNegotiated byte = 42 // PADDING_NEGOTIATED cell for padding negotiation response
 )
 
+// END_REASON codes from tor-spec.txt §6.3
+const (
+	EndReasonMisc          byte = 1  // Misc reason
+	EndReasonResolveFailed byte = 2  // Couldn't resolve hostname
+	EndReasonConnRefused   byte = 3  // Connection refused
+	EndReasonExitPolicy    byte = 4  // Exit policy rejected
+	EndReasonDestroy       byte = 5  // Circuit destroyed
+	EndReasonDone          byte = 6  // Finished normally
+	EndReasonTimeout       byte = 7  // Connection timeout
+	EndReasonNoRoute       byte = 8  // No route to host
+	EndReasonHibernating   byte = 9  // Server hibernating
+	EndReasonInternal      byte = 10 // Internal error
+	EndReasonResourceLimit byte = 11 // Resource limit reached
+	EndReasonConnReset     byte = 12 // Connection reset
+	EndReasonProtocol      byte = 13 // Tor protocol violation
+	EndReasonNotDirectory  byte = 14 // Not a directory
+)
+
 // RelayCell represents the payload of a RELAY or RELAY_EARLY cell
 type RelayCell struct {
 	Command    byte    // Relay command

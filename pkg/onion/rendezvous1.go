@@ -4,6 +4,7 @@
 package onion
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/opd-ai/go-tor/pkg/cell"
@@ -119,4 +120,6 @@ func SendRendezvous1(circuit CircuitInterface, circuitID uint32, rendezvousCooki
 // CircuitInterface defines the minimal interface needed for sending relay cells
 type CircuitInterface interface {
 	SendRelayCell(cell *cell.RelayCell) error
+	ReceiveRelayCell(ctx context.Context) (*cell.RelayCell, error)
+	GetID() uint32
 }

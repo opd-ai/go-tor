@@ -55,6 +55,7 @@ type Service struct {
 	// Connections
 	pendingIntros       map[string]*PendingIntro // cookie -> intro
 	rendezvousCircuits  map[string]uint32        // cookie -> circuit ID
+	streamManager       *ServiceStreamManager    // Manages incoming streams
 }
 
 // CircuitGetter provides access to circuits by ID
@@ -189,6 +190,9 @@ func NewService(config *ServiceConfig, log *logger.Logger) (*Service, error) {
 	// Initialize introduction point manager
 	service.introManager = NewIntroPointManager(service, log)
 
+	// Initialize stream manager for handling incoming connections
+	service.streamManager = NewServiceStreamManager(service, log)
+
 	// Initialize rendezvous circuit builder if we have circuit builder and path selector
 	if config.CircuitBuilder != nil && config.PathSelector != nil {
 		service.rendezvousBuilder = NewRendezvousCircuitBuilder(
@@ -289,6 +293,11 @@ func (s *Service) Stop() error {
 
 	// Stop health checking
 	s.introManager.StopHealthChecking()
+
+	// Close all active streams
+	if s.streamManager != nil {
+		s.streamManager.CloseAll()
+	}
 
 	// Cancel context to stop background tasks
 	s.cancel()
@@ -912,10 +921,12 @@ func (s *Service) HandleIntroduce2(introCircuitID uint32, introduce2Data []byte)
 				"cookie", cookieStr[:16],
 				"key_material_len", len(keyMaterial))
 
-			// TODO (Task 9.3): Stream handling
-			// At this point, the rendezvous is established and key material is derived.
-			// Next step is to handle incoming RELAY_BEGIN cells and forward traffic
-			// to the local service endpoints configured in config.Ports
+			// Task 9.3.1: Set up relay cell handler for incoming streams
+			// Start monitoring the rendezvous circuit for RELAY_BEGIN cells
+			s.logger.Info("Starting stream handler for rendezvous circuit",
+				"circuit_id", circ.ID)
+
+			go s.handleRendezvousCircuitCells(circ)
 		}()
 	} else {
 		s.logger.Warn("Rendezvous circuit builder not configured, circuit not built",
@@ -930,6 +941,11 @@ func (s *Service) GetStats() ServiceStats {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
+	activeStreams := 0
+	if s.streamManager != nil {
+		activeStreams = s.streamManager.GetActiveStreamCount()
+	}
+
 	return ServiceStats{
 		Address:            s.address.String(),
 		Running:            s.running,
@@ -938,6 +954,7 @@ func (s *Service) GetStats() ServiceStats {
 		PendingIntros:      len(s.pendingIntros),
 		PublishedHSDirs:    len(s.publishedHSDirs),
 		RendezvousCircuits: len(s.rendezvousCircuits),
+		ActiveStreams:      activeStreams,
 	}
 }
 
@@ -950,6 +967,7 @@ type ServiceStats struct {
 	PendingIntros      int
 	PublishedHSDirs    int
 	RendezvousCircuits int
+	ActiveStreams      int
 }
 
 // buildIntroCircuit builds a 3-hop circuit to the introduction point relay
@@ -1030,3 +1048,96 @@ func (s *Service) waitForIntroEstablished(ctx context.Context, circ *circuit.Cir
 
 	return nil
 }
+
+// handleRendezvousCircuitCells monitors a rendezvous circuit for incoming relay cells
+// and dispatches them to the stream manager (Task 9.3.1)
+func (s *Service) handleRendezvousCircuitCells(circ CircuitInterface) {
+	s.logger.Info("Starting rendezvous circuit relay cell handler",
+		"circuit_id", circ.GetID())
+
+	for {
+		// Receive relay cell with timeout
+		ctx, cancel := context.WithTimeout(s.ctx, 30*time.Second)
+		relayCell, err := circ.ReceiveRelayCell(ctx)
+		cancel()
+
+		if err != nil {
+			// Check if service is shutting down
+			select {
+			case <-s.ctx.Done():
+				s.logger.Debug("Service context cancelled, stopping relay handler",
+					"circuit_id", circ.GetID())
+				return
+			default:
+			}
+
+			s.logger.Debug("Error receiving relay cell",
+				"circuit_id", circ.GetID(),
+				"error", err)
+			continue
+		}
+
+		// Dispatch based on relay command
+		switch relayCell.Command {
+		case cell.RelayBegin:
+			// Handle RELAY_BEGIN - client initiating new stream
+			s.logger.Info("Received RELAY_BEGIN on rendezvous circuit",
+				"circuit_id", circ.GetID(),
+				"stream_id", relayCell.StreamID)
+
+			if err := s.streamManager.HandleRelayBegin(
+				circ.GetID(),
+				relayCell.StreamID,
+				relayCell.Data,
+				circ,
+			); err != nil {
+				s.logger.Error("Failed to handle RELAY_BEGIN",
+					"circuit_id", circ.GetID(),
+					"stream_id", relayCell.StreamID,
+					"error", err)
+			}
+
+		case cell.RelayData:
+			// Handle RELAY_DATA - client sending data on stream
+			s.logger.Debug("Received RELAY_DATA on rendezvous circuit",
+				"circuit_id", circ.GetID(),
+				"stream_id", relayCell.StreamID,
+				"data_len", len(relayCell.Data))
+
+			if err := s.streamManager.HandleRelayData(
+				relayCell.StreamID,
+				relayCell.Data,
+			); err != nil {
+				s.logger.Error("Failed to handle RELAY_DATA",
+					"stream_id", relayCell.StreamID,
+					"error", err)
+			}
+
+		case cell.RelayEnd:
+			// Handle RELAY_END - client closing stream
+			s.logger.Info("Received RELAY_END on rendezvous circuit",
+				"circuit_id", circ.GetID(),
+				"stream_id", relayCell.StreamID)
+
+			if err := s.streamManager.HandleRelayEnd(relayCell.StreamID); err != nil {
+				s.logger.Error("Failed to handle RELAY_END",
+					"stream_id", relayCell.StreamID,
+					"error", err)
+			}
+
+		case cell.RelaySendme:
+			// Handle SENDME for flow control
+			s.logger.Debug("Received SENDME on rendezvous circuit",
+				"circuit_id", circ.GetID(),
+				"stream_id", relayCell.StreamID)
+			// Flow control handling would go here
+
+		default:
+			s.logger.Warn("Unexpected relay command on rendezvous circuit",
+				"circuit_id", circ.GetID(),
+				"command", relayCell.Command,
+				"stream_id", relayCell.StreamID)
+		}
+	}
+}
+

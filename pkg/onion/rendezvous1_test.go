@@ -2,6 +2,7 @@ package onion
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"errors"
 	"testing"
@@ -24,6 +25,14 @@ func (m *MockCircuit) SendRelayCell(c *cell.RelayCell) error {
 	}
 	m.sentCells = append(m.sentCells, c)
 	return nil
+}
+
+func (m *MockCircuit) ReceiveRelayCell(ctx context.Context) (*cell.RelayCell, error) {
+	return nil, nil
+}
+
+func (m *MockCircuit) GetID() uint32 {
+	return m.id
 }
 
 // TestBuildRendezvous1CellV2 tests RENDEZVOUS1 cell construction

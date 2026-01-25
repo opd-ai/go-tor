@@ -162,6 +162,11 @@ func (c *Circuit) GetState() State {
 	return c.State
 }
 
+// GetID returns the circuit ID
+func (c *Circuit) GetID() uint32 {
+	return c.ID
+}
+
 // Length returns the number of hops in the circuit
 func (c *Circuit) Length() int {
 	c.mu.RLock()

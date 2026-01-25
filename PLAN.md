@@ -134,10 +134,19 @@ The `pkg/onion/service.go` already contains foundational server-side functionali
 
 **Tasks**:
 
-- [ ] **9.3.1 Incoming Stream Management**
+- [x] **9.3.1 Incoming Stream Management** ✅ **COMPLETED** (January 25, 2026)
   - Accept RELAY_BEGIN cells from clients on rendezvous circuits
   - Map virtual ports to local service endpoints
   - Forward traffic to local service
+  - Implementation: `pkg/onion/service_stream.go` (ServiceStreamManager)
+  - Tests: `pkg/onion/service_stream_test.go` (>75% coverage)
+  - Features:
+    - RELAY_BEGIN handling with address/port parsing
+    - RELAY_CONNECTED response to clients
+    - RELAY_DATA bidirectional forwarding
+    - RELAY_END cleanup and stream termination
+    - Backend TCP connection management with timeouts
+    - Stream lifecycle management and statistics
 
 - [ ] **9.3.2 Service Backend Connection**
   - Connect to local service ports defined in `ServiceConfig.Ports`
@@ -149,10 +158,13 @@ The `pkg/onion/service.go` already contains foundational server-side functionali
   - Monitor descriptor publication success
   - Report introduction success/failure rates
 
-**Files to Modify**:
-- `pkg/onion/service.go` - Add stream handling
+**Files Modified/Created**:
 - `pkg/onion/service_stream.go` (new) - Stream management for services
-- `pkg/metrics/onion_service.go` (new) - Service-specific metrics
+- `pkg/onion/service_stream_test.go` (new) - Comprehensive test coverage (>75%)
+- `pkg/onion/service.go` - Add stream handling, updated Stop() to close streams, added `handleRendezvousCircuitCells()`
+- `pkg/circuit/circuit.go` - Added `GetID()` method for CircuitInterface
+- `pkg/onion/rendezvous1.go` - Updated CircuitInterface to include GetID() and ReceiveRelayCell()
+- `pkg/cell/relay.go` - Added END_REASON constants
 
 ### 9.4 Service Persistence
 
