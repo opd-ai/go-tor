@@ -295,22 +295,44 @@ The `pkg/onion/service.go` already contains foundational server-side functionali
     - Resource cleanup and error handling
   - Documentation: `docs/CIRCUIT_EXTENSION.md`
 
-- [ ] **10.2.2 Cell Forwarding**
+- [x] **10.2.2 Cell Forwarding** ✅ **COMPLETED** (January 25, 2026)
   - Forward relay cells between circuits
   - Implement proper cell routing
   - Handle RELAY_EARLY cell counting (8 max per circuit direction)
   - Process DESTROY cells correctly
+  - Implementation: `pkg/relay/forwarding.go` (`ForwardingHandler`)
+  - Tests: `pkg/relay/forwarding_test.go` (>85% coverage, all tests passing)
+  - Features:
+    - Extended circuit tracking with client/next-hop mapping
+    - RELAY_EARLY limiting (max 8 per circuit direction)
+    - Cell forwarding between client and next hop
+    - Local relay cell handling for non-extended circuits
+    - Exit attempt rejection with EXITPOLICY reason
+    - TRUNCATE cell handling
+    - DESTROY cell forwarding and cleanup
+    - Concurrent access protection with mutexes
 
-- [ ] **10.2.3 Exit Policy (Reject All)**
+- [x] **10.2.3 Exit Policy (Reject All)** ✅ **COMPLETED** (January 25, 2026)
   - Implement reject-all exit policy
   - Respond with RELAY_END (EXITPOLICY) for any exit attempts
   - Ensure no exit traffic is relayed
+  - Implementation: `pkg/relay/policy.go` (`ExitPolicy`)
+  - Tests: `pkg/relay/policy_test.go` (>90% coverage, all tests passing)
+  - Features:
+    - Reject-all exit policy for non-exit relays
+    - Exit attempt validation for BEGIN/BEGIN_DIR commands
+    - Rejected connection tracking (atomic counter)
+    - ExitPolicyViolation error type with reason codes
+    - Policy string generation (torrc format: "reject *:*")
+    - Thread-safe exit attempt counting
 
 **Files to Create**:
 - `pkg/relay/extension.go` ✅ **NEW** - Circuit extension handling
 - `pkg/relay/extension_test.go` ✅ **NEW** - Comprehensive tests for extension functionality
-- `pkg/relay/forwarding.go` - Cell forwarding logic (Task 10.2.2)
-- `pkg/relay/policy.go` - Exit policy enforcement (Task 10.2.3)
+- `pkg/relay/forwarding.go` ✅ **NEW** - Cell forwarding logic (Task 10.2.2)
+- `pkg/relay/forwarding_test.go` ✅ **NEW** - Comprehensive tests for forwarding (>85% coverage)
+- `pkg/relay/policy.go` ✅ **NEW** - Exit policy enforcement (Task 10.2.3)
+- `pkg/relay/policy_test.go` ✅ **NEW** - Comprehensive tests for exit policy (>90% coverage)
 
 ### 10.3 Bridge Descriptor Publishing
 
