@@ -26,7 +26,7 @@ import (
 //   - err: Error if handshake fails
 //
 // Implements tor-spec.txt section 5.1.4 (server side)
-func NtorServerHandshake(clientHandshake []byte, serverNtorKey, serverIdentity []byte) (response, keyMaterial []byte, err error) {
+func NtorServerHandshake(clientHandshake, serverNtorKey, serverIdentity []byte) (response, keyMaterial []byte, err error) {
 	// Validate input lengths
 	if len(clientHandshake) != 84 {
 		return nil, nil, fmt.Errorf("invalid client handshake length: %d, expected 84", len(clientHandshake))
@@ -71,13 +71,13 @@ func NtorServerHandshake(clientHandshake []byte, serverNtorKey, serverIdentity [
 	curve25519.ScalarBaseMult(&serverPublic, &serverB)
 
 	secretInput := make([]byte, 0, 32+32+32+32+32+32+len(protoid))
-	secretInput = append(secretInput, sharedXY[:]...)     // EXP(X,y)
-	secretInput = append(secretInput, sharedXB[:]...)     // EXP(X,b)
-	secretInput = append(secretInput, serverIdentity...)  // ID
-	secretInput = append(secretInput, serverPublic[:]...) // B
-	secretInput = append(secretInput, clientPK[:]...)     // X
+	secretInput = append(secretInput, sharedXY[:]...)               // EXP(X,y)
+	secretInput = append(secretInput, sharedXB[:]...)               // EXP(X,b)
+	secretInput = append(secretInput, serverIdentity...)            // ID
+	secretInput = append(secretInput, serverPublic[:]...)           // B
+	secretInput = append(secretInput, clientPK[:]...)               // X
 	secretInput = append(secretInput, serverEphemeral.Public[:]...) // Y
-	secretInput = append(secretInput, protoid...)         // PROTOID
+	secretInput = append(secretInput, protoid...)                   // PROTOID
 
 	// Derive verification key for AUTH computation
 	verify := []byte("ntor-curve25519-sha256-1:verify")

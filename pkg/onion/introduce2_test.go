@@ -7,10 +7,10 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
+	"io"
 	"testing"
 
 	"golang.org/x/crypto/hkdf"
-	"io"
 
 	"github.com/opd-ai/go-tor/pkg/crypto"
 )
@@ -41,21 +41,21 @@ func TestParseIntroduce2ValidCell(t *testing.T) {
 
 	// Create link specifiers (IPv4 example)
 	linkSpecData := []byte{
-		0x00,       // Type: TLS-over-TCP-IPv4
-		0x06,       // Length: 6 bytes
+		0x00,         // Type: TLS-over-TCP-IPv4
+		0x06,         // Length: 6 bytes
 		192, 0, 2, 1, // IP: 192.0.2.1
 		0x1F, 0x90, // Port: 8080
 	}
 
 	// Build inner plaintext
 	innerPlaintext := make([]byte, 0)
-	innerPlaintext = append(innerPlaintext, rendezvousCookie...)   // 20 bytes
-	innerPlaintext = append(innerPlaintext, 0x01)                   // NSPEC: 1 link specifier
-	innerPlaintext = append(innerPlaintext, linkSpecData...)        // Link specifier
-	innerPlaintext = append(innerPlaintext, 0x00)                   // Onion key type: ntor
-	innerPlaintext = append(innerPlaintext, 0x00, 0x20)             // Onion key len: 32
-	innerPlaintext = append(innerPlaintext, clientOnionKey...)      // Client onion key
-	innerPlaintext = append(innerPlaintext, 0x00)                   // No extensions
+	innerPlaintext = append(innerPlaintext, rendezvousCookie...) // 20 bytes
+	innerPlaintext = append(innerPlaintext, 0x01)                // NSPEC: 1 link specifier
+	innerPlaintext = append(innerPlaintext, linkSpecData...)     // Link specifier
+	innerPlaintext = append(innerPlaintext, 0x00)                // Onion key type: ntor
+	innerPlaintext = append(innerPlaintext, 0x00, 0x20)          // Onion key len: 32
+	innerPlaintext = append(innerPlaintext, clientOnionKey...)   // Client onion key
+	innerPlaintext = append(innerPlaintext, 0x00)                // No extensions
 
 	// Encrypt inner plaintext
 	kdfInfo := []byte("tor-hs-ntor-curve25519-sha3-256-1:hs_key_extract")
@@ -88,10 +88,10 @@ func TestParseIntroduce2ValidCell(t *testing.T) {
 	}
 
 	outerCell := make([]byte, 0)
-	outerCell = append(outerCell, 0x02)        // Auth key type: ED25519-SHA3-256
-	outerCell = append(outerCell, 0x00, 0x20)  // Auth key len: 32
+	outerCell = append(outerCell, 0x02)       // Auth key type: ED25519-SHA3-256
+	outerCell = append(outerCell, 0x00, 0x20) // Auth key len: 32
 	outerCell = append(outerCell, clientAuthKey...)
-	outerCell = append(outerCell, 0x00)        // No outer extensions
+	outerCell = append(outerCell, 0x00) // No outer extensions
 	outerCell = append(outerCell, encryptedData...)
 
 	// Parse the cell
@@ -126,9 +126,9 @@ func TestParseIntroduce2ValidCell(t *testing.T) {
 func TestParseIntroduce2TooShort(t *testing.T) {
 	introAuthKey := make([]byte, 32)
 	introEncKey := make([]byte, 32)
-	
+
 	shortCell := make([]byte, 50)
-	
+
 	_, err := ParseIntroduce2(shortCell, introAuthKey, introEncKey)
 	if err == nil {
 		t.Error("Expected error for short cell")
@@ -139,11 +139,11 @@ func TestParseIntroduce2TooShort(t *testing.T) {
 func TestParseIntroduce2InvalidAuthKeyType(t *testing.T) {
 	introAuthKey := make([]byte, 32)
 	introEncKey := make([]byte, 32)
-	
+
 	cell := make([]byte, 200)
 	cell[0] = 0xFF // Invalid auth key type
 	binary.BigEndian.PutUint16(cell[1:3], 32)
-	
+
 	_, err := ParseIntroduce2(cell, introAuthKey, introEncKey)
 	if err == nil {
 		t.Error("Expected error for invalid auth key type")
@@ -174,8 +174,8 @@ func TestParseIntroduce2InvalidMAC(t *testing.T) {
 	}
 
 	outerCell := make([]byte, 0)
-	outerCell = append(outerCell, 0x02)        // Auth key type
-	outerCell = append(outerCell, 0x00, 0x20)  // Auth key len
+	outerCell = append(outerCell, 0x02)       // Auth key type
+	outerCell = append(outerCell, 0x00, 0x20) // Auth key len
 	outerCell = append(outerCell, clientAuthKey...)
 	outerCell = append(outerCell, 0x00)        // No extensions
 	outerCell = append(outerCell, fakeData...) // Fake encrypted data
@@ -256,7 +256,7 @@ func TestParseIntroduce2WithExtensions(t *testing.T) {
 	// This test verifies that extensions are properly skipped/parsed
 	// In the current implementation, we skip outer extensions
 	// This is a placeholder for when extension support is needed
-	
+
 	t.Skip("Extension support not yet required - skipping")
 }
 
@@ -274,10 +274,10 @@ func BenchmarkParseIntroduce2(b *testing.B) {
 
 	// Build minimal inner plaintext
 	innerPlaintext := make([]byte, 20+1+8+1+3+32+1) // cookie+nspec+linkspec+keytype+keylen+key+ext
-	rand.Read(innerPlaintext[:20]) // Cookie
-	innerPlaintext[20] = 0x01      // 1 link spec
-	innerPlaintext[21] = 0x00      // Type IPv4
-	innerPlaintext[22] = 0x06      // Len 6
+	rand.Read(innerPlaintext[:20])                  // Cookie
+	innerPlaintext[20] = 0x01                       // 1 link spec
+	innerPlaintext[21] = 0x00                       // Type IPv4
+	innerPlaintext[22] = 0x06                       // Len 6
 	// Skip link spec data
 	innerPlaintext[29] = 0x00 // Onion key type
 	binary.BigEndian.PutUint16(innerPlaintext[30:32], 32)

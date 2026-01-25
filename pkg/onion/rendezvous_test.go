@@ -26,7 +26,7 @@ func (m *mockCircuitBuilder) BuildCircuit(ctx context.Context, p *path.Path, tim
 	return &circuit.Circuit{ID: 12345}, nil
 }
 
-func (m *mockCircuitBuilder) SetRateLimiter(limiter interface{}) {}
+func (m *mockCircuitBuilder) SetRateLimiter(limiter interface{})      {}
 func (m *mockCircuitBuilder) SetMetricsRecorder(recorder interface{}) {}
 
 // mockPathSelector implements a test path selector
@@ -59,31 +59,31 @@ func (m *mockPathSelector) ConfirmGuard(fingerprint string) {}
 func createTestRelays() []*directory.Relay {
 	return []*directory.Relay{
 		{
-			Nickname:     "TestGuard",
-			Fingerprint:  "AAAAAAAAAAAAAAAAAAAAAA",
-			Address:      "1.2.3.4", // Different /16 subnet
-			ORPort:       9001,
-			Bandwidth:    1000000,
-			IdentityKey:  make([]byte, 32), // Guard has Ed25519 identity
-			Flags:        []string{"Guard", "Fast", "Stable", "Running", "Valid"},
+			Nickname:    "TestGuard",
+			Fingerprint: "AAAAAAAAAAAAAAAAAAAAAA",
+			Address:     "1.2.3.4", // Different /16 subnet
+			ORPort:      9001,
+			Bandwidth:   1000000,
+			IdentityKey: make([]byte, 32), // Guard has Ed25519 identity
+			Flags:       []string{"Guard", "Fast", "Stable", "Running", "Valid"},
 		},
 		{
-			Nickname:     "TestMiddle",
-			Fingerprint:  "BBBBBBBBBBBBBBBBBBBBBB",
-			Address:      "5.6.7.8", // Different /16 subnet
-			ORPort:       9001,
-			Bandwidth:    800000,
-			IdentityKey:  make([]byte, 32),
-			Flags:        []string{"Fast", "Stable", "Running", "Valid"},
+			Nickname:    "TestMiddle",
+			Fingerprint: "BBBBBBBBBBBBBBBBBBBBBB",
+			Address:     "5.6.7.8", // Different /16 subnet
+			ORPort:      9001,
+			Bandwidth:   800000,
+			IdentityKey: make([]byte, 32),
+			Flags:       []string{"Fast", "Stable", "Running", "Valid"},
 		},
 		{
-			Nickname:     "TestRendezvous",
-			Fingerprint:  "CCCCCCCCCCCCCCCCCCCCCC",
-			Address:      "10.0.0.1", // Different /16 subnet
-			ORPort:       443,
-			Bandwidth:    500000,
-			IdentityKey:  make([]byte, 32),
-			Flags:        []string{"Fast", "Running", "Valid"},
+			Nickname:    "TestRendezvous",
+			Fingerprint: "CCCCCCCCCCCCCCCCCCCCCC",
+			Address:     "10.0.0.1", // Different /16 subnet
+			ORPort:      443,
+			Bandwidth:   500000,
+			IdentityKey: make([]byte, 32),
+			Flags:       []string{"Fast", "Running", "Valid"},
 		},
 	}
 }

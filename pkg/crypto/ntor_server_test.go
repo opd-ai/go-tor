@@ -259,7 +259,7 @@ func TestNtorServerHandshakeDeterminism(t *testing.T) {
 	// This test would require mocking the random number generator
 	// For now, we just verify that two separate runs with same server keys
 	// but different client ephemeral keys produce different results
-	
+
 	serverNtor, err := GenerateNtorKeyPair()
 	if err != nil {
 		t.Fatalf("Failed to generate server ntor key: %v", err)

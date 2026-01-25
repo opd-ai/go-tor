@@ -14,9 +14,9 @@ import (
 
 // MockCircuit implements CircuitInterface for testing
 type MockCircuit struct {
-	id          uint32
-	sentCells   []*cell.RelayCell
-	sendError   error
+	id        uint32
+	sentCells []*cell.RelayCell
+	sendError error
 }
 
 func (m *MockCircuit) SendRelayCell(c *cell.RelayCell) error {
@@ -413,10 +413,10 @@ func TestRendezvous1KeyMaterialFormat(t *testing.T) {
 	}
 
 	// Extract key components per tor-spec.txt
-	Df := keyMaterial[0:20]   // Forward digest
-	Db := keyMaterial[20:40]  // Backward digest
-	Kf := keyMaterial[40:56]  // Forward cipher key
-	Kb := keyMaterial[56:72]  // Backward cipher key
+	Df := keyMaterial[0:20]  // Forward digest
+	Db := keyMaterial[20:40] // Backward digest
+	Kf := keyMaterial[40:56] // Forward cipher key
+	Kb := keyMaterial[56:72] // Backward cipher key
 
 	// Verify all components are non-zero
 	components := []struct {

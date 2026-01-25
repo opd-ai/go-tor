@@ -136,15 +136,15 @@ func DecryptAES256CTR(ciphertext, key, iv []byte) ([]byte, error) {
 	if len(key) != AES256KeySize {
 		return nil, fmt.Errorf("invalid key size: %d, expected %d", len(key), AES256KeySize)
 	}
-	
+
 	plaintext := make([]byte, len(ciphertext))
 	copy(plaintext, ciphertext)
-	
+
 	cipher, err := NewAESCTRCipher(key, iv)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cipher: %w", err)
 	}
-	
+
 	cipher.Decrypt(plaintext)
 	return plaintext, nil
 }
@@ -154,15 +154,15 @@ func EncryptAES256CTR(plaintext, key, iv []byte) ([]byte, error) {
 	if len(key) != AES256KeySize {
 		return nil, fmt.Errorf("invalid key size: %d, expected %d", len(key), AES256KeySize)
 	}
-	
+
 	ciphertext := make([]byte, len(plaintext))
 	copy(ciphertext, plaintext)
-	
+
 	cipher, err := NewAESCTRCipher(key, iv)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cipher: %w", err)
 	}
-	
+
 	cipher.Encrypt(ciphertext)
 	return ciphertext, nil
 }

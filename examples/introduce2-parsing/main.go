@@ -4,7 +4,8 @@
 // connecting to an onion service.
 //
 // Usage:
-//   go run main.go
+//
+//	go run main.go
 package main
 
 import (
@@ -86,12 +87,12 @@ func createMockIntroduce2(introEncKey []byte) []byte {
 
 	// Build inner plaintext
 	innerPlaintext := make([]byte, 0)
-	innerPlaintext = append(innerPlaintext, rendezvousCookie...)   // 20 bytes
-	innerPlaintext = append(innerPlaintext, 0x01)                   // NSPEC: 1 link specifier
+	innerPlaintext = append(innerPlaintext, rendezvousCookie...) // 20 bytes
+	innerPlaintext = append(innerPlaintext, 0x01)                // NSPEC: 1 link specifier
 
 	// Add IPv4 link specifier (192.0.2.1:9001)
-	innerPlaintext = append(innerPlaintext, 0x00)       // Type: IPv4
-	innerPlaintext = append(innerPlaintext, 0x06)       // Length: 6
+	innerPlaintext = append(innerPlaintext, 0x00)         // Type: IPv4
+	innerPlaintext = append(innerPlaintext, 0x06)         // Length: 6
 	innerPlaintext = append(innerPlaintext, 192, 0, 2, 1) // IP
 	innerPlaintext = append(innerPlaintext, 0x23, 0x29)   // Port: 9001
 
@@ -123,10 +124,10 @@ func createMockIntroduce2(introEncKey []byte) []byte {
 
 	// Build outer layer
 	outerCell := make([]byte, 0)
-	outerCell = append(outerCell, 0x02)        // Auth key type: ED25519-SHA3-256
-	outerCell = append(outerCell, 0x00, 0x20)  // Auth key len: 32
+	outerCell = append(outerCell, 0x02)       // Auth key type: ED25519-SHA3-256
+	outerCell = append(outerCell, 0x00, 0x20) // Auth key len: 32
 	outerCell = append(outerCell, clientAuthKey...)
-	outerCell = append(outerCell, 0x00)        // No outer extensions
+	outerCell = append(outerCell, 0x00) // No outer extensions
 	outerCell = append(outerCell, encryptedData...)
 
 	return outerCell

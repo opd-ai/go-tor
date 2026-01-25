@@ -43,6 +43,7 @@ type Service struct {
 	publishedHSDirs []*HSDirectory
 	lastPublish     time.Time
 	running         bool
+	startTime       time.Time
 	ctx             context.Context
 	cancel          context.CancelFunc
 	logger          *logger.Logger
@@ -53,14 +54,26 @@ type Service struct {
 	circuitGetter     CircuitGetter             // Gets circuits by ID for sending cells
 
 	// Connections
-	pendingIntros       map[string]*PendingIntro // cookie -> intro
-	rendezvousCircuits  map[string]uint32        // cookie -> circuit ID
-	streamManager       *ServiceStreamManager    // Manages incoming streams
+	pendingIntros      map[string]*PendingIntro // cookie -> intro
+	rendezvousCircuits map[string]uint32        // cookie -> circuit ID
+	streamManager      *ServiceStreamManager    // Manages incoming streams
 }
 
 // CircuitGetter provides access to circuits by ID
 type CircuitGetter interface {
 	GetCircuit(id uint32) (CircuitInterface, error)
+}
+
+// MetricsCollector defines the interface for collecting onion service metrics
+type MetricsCollector interface {
+	RecordOnionServiceStream(created bool)
+	RecordOnionServiceStreamData(bytes int64)
+	RecordOnionServiceDescriptorPublish(success bool)
+	RecordOnionServiceIntroEstablish(success bool)
+	RecordOnionServiceIntroReceived()
+	RecordOnionServiceRendezvous(success bool)
+	SetOnionServiceIntroPoints(count int64)
+	RecordOnionServiceDuration(duration time.Duration)
 }
 
 // ServiceConfig contains configuration for hosting an onion service
@@ -88,6 +101,10 @@ type ServiceConfig struct {
 	// Path selector for choosing introduction point paths (optional)
 	// If nil, uses placeholder circuits for testing
 	PathSelector *path.Selector
+
+	// Metrics collector (optional)
+	// If nil, metrics are not collected
+	Metrics MetricsCollector
 }
 
 // ServiceIntroPoint represents an introduction point for this service
@@ -246,6 +263,7 @@ func (s *Service) Start(ctx context.Context, hsdirs []*HSDirectory) error {
 		return fmt.Errorf("service already running")
 	}
 	s.running = true
+	s.startTime = time.Now()
 	s.mu.Unlock()
 
 	s.logger.Info("Starting onion service",
@@ -290,6 +308,11 @@ func (s *Service) Stop() error {
 	}
 
 	s.logger.Info("Stopping onion service", "address", s.address.String())
+
+	// Record service duration
+	if s.config.Metrics != nil && !s.startTime.IsZero() {
+		s.config.Metrics.RecordOnionServiceDuration(time.Since(s.startTime))
+	}
 
 	// Stop health checking
 	s.introManager.StopHealthChecking()
@@ -396,11 +419,17 @@ func (s *Service) establishIntroductionPoint(ctx context.Context, relay *HSDirec
 			// Send ESTABLISH_INTRO cell
 			if err := s.sendEstablishIntro(ctx, circ, authKey, encKey); err != nil {
 				s.introManager.RecordFailure(circuitID)
+				if s.config.Metrics != nil {
+					s.config.Metrics.RecordOnionServiceIntroEstablish(false)
+				}
 				return nil, fmt.Errorf("failed to send ESTABLISH_INTRO: %w", err)
 			}
 			established = true
 			s.introManager.RegisterIntroPoint(circuitID)
 			s.introManager.RecordSuccess(circuitID)
+			if s.config.Metrics != nil {
+				s.config.Metrics.RecordOnionServiceIntroEstablish(true)
+			}
 			s.logger.Info("Introduction point circuit established",
 				"relay", relay.Fingerprint,
 				"circuit", circuitID)
@@ -431,6 +460,11 @@ func (s *Service) establishIntroductionPoint(ctx context.Context, relay *HSDirec
 	s.logger.Debug("Introduction point created",
 		"relay", relay.Fingerprint,
 		"circuit", circuitID)
+
+	// Update intro point count metric
+	if s.config.Metrics != nil {
+		s.config.Metrics.SetOnionServiceIntroPoints(int64(len(s.introPoints) + 1))
+	}
 
 	return intro, nil
 }
@@ -622,12 +656,19 @@ func (s *Service) publishDescriptor(ctx context.Context, hsdirs []*HSDirectory) 
 	}
 
 	if published == 0 {
+		if s.config.Metrics != nil {
+			s.config.Metrics.RecordOnionServiceDescriptorPublish(false)
+		}
 		return fmt.Errorf("failed to publish descriptor to any HSDir")
 	}
 
 	s.mu.Lock()
 	s.lastPublish = time.Now()
 	s.mu.Unlock()
+
+	if s.config.Metrics != nil {
+		s.config.Metrics.RecordOnionServiceDescriptorPublish(true)
+	}
 
 	s.logger.Info("Descriptor published successfully",
 		"hsdirs", published)
@@ -866,6 +907,9 @@ func (s *Service) HandleIntroduce2(introCircuitID uint32, introduce2Data []byte)
 				s.logger.Error("Failed to build rendezvous circuit",
 					"cookie", cookieStr[:16],
 					"error", err)
+				if s.config.Metrics != nil {
+					s.config.Metrics.RecordOnionServiceRendezvous(false)
+				}
 				// Remove pending intro on failure
 				s.mu.Lock()
 				delete(s.pendingIntros, cookieStr)
@@ -886,8 +930,8 @@ func (s *Service) HandleIntroduce2(introCircuitID uint32, introduce2Data []byte)
 			// Format: NODEID (20) || KEYID (32) || CLIENT_PK (32) = 84 bytes
 			// For onion services, we use our own identity as NODEID/KEYID
 			clientHandshake := make([]byte, 84)
-			copy(clientHandshake[0:20], s.publicKey[0:20])    // NODEID (first 20 bytes of Ed25519)
-			copy(clientHandshake[20:52], s.publicKey[0:32])   // KEYID (full Ed25519 public key)
+			copy(clientHandshake[0:20], s.publicKey[0:20])       // NODEID (first 20 bytes of Ed25519)
+			copy(clientHandshake[20:52], s.publicKey[0:32])      // KEYID (full Ed25519 public key)
 			copy(clientHandshake[52:84], request.ClientOnionKey) // CLIENT_PK (from INTRODUCE2)
 
 			// Send RENDEZVOUS1 cell with ntor handshake response
@@ -909,6 +953,9 @@ func (s *Service) HandleIntroduce2(introCircuitID uint32, introduce2Data []byte)
 				s.logger.Error("Failed to send RENDEZVOUS1",
 					"cookie", cookieStr[:16],
 					"error", err)
+				if s.config.Metrics != nil {
+					s.config.Metrics.RecordOnionServiceRendezvous(false)
+				}
 				// Clean up on failure
 				s.mu.Lock()
 				delete(s.pendingIntros, cookieStr)
@@ -920,6 +967,10 @@ func (s *Service) HandleIntroduce2(introCircuitID uint32, introduce2Data []byte)
 			s.logger.Info("RENDEZVOUS1 sent successfully",
 				"cookie", cookieStr[:16],
 				"key_material_len", len(keyMaterial))
+
+			if s.config.Metrics != nil {
+				s.config.Metrics.RecordOnionServiceRendezvous(true)
+			}
 
 			// Task 9.3.1: Set up relay cell handler for incoming streams
 			// Start monitoring the rendezvous circuit for RELAY_BEGIN cells
@@ -1140,4 +1191,3 @@ func (s *Service) handleRendezvousCircuitCells(circ CircuitInterface) {
 		}
 	}
 }
-

@@ -239,7 +239,7 @@ func (r *RendezvousCircuitBuilder) selectPathToRelay(exitRelay *directory.Relay)
 
 // selectRelayAvoid selects a relay avoiding the given relays
 // Implements basic relay selection with family/subnet diversity
-func (r *RendezvousCircuitBuilder) selectRelayAvoid(relays []*directory.Relay, avoid []*directory.Relay, needGuard bool, needExit bool) (*directory.Relay, error) {
+func (r *RendezvousCircuitBuilder) selectRelayAvoid(relays, avoid []*directory.Relay, needGuard, needExit bool) (*directory.Relay, error) {
 	candidates := make([]*directory.Relay, 0)
 
 	for _, relay := range relays {

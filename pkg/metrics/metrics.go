@@ -93,6 +93,21 @@ type Metrics struct {
 	UniqueCountriesObserved *Gauge     // Number of unique countries observed across all relays
 	PathDiversityAvgScore   *Gauge     // Running average diversity score (scaled 0-1000)
 
+	// Onion service metrics (Phase 9.3.3)
+	OnionServiceStreamsActive       *Gauge     // Current active streams across all services
+	OnionServiceStreamCreated       *Counter   // Total streams created
+	OnionServiceStreamClosed        *Counter   // Total streams closed
+	OnionServiceStreamData          *Counter   // Bytes transferred through service streams
+	OnionServiceDescriptorPublished *Counter   // Successful descriptor publications
+	OnionServiceDescriptorFailed    *Counter   // Failed descriptor publications
+	OnionServiceIntroEstablished    *Counter   // Successful ESTABLISH_INTRO operations
+	OnionServiceIntroFailed         *Counter   // Failed ESTABLISH_INTRO operations
+	OnionServiceIntroReceived       *Counter   // INTRODUCE2 cells received
+	OnionServiceRendezvousSuccess   *Counter   // Successful rendezvous completions
+	OnionServiceRendezvousFailed    *Counter   // Failed rendezvous attempts
+	OnionServiceActiveIntroPoints   *Gauge     // Current number of active introduction points
+	OnionServiceActiveDuration      *Histogram // Duration services remain active
+
 	// System metrics
 	Uptime      *Gauge
 	startTime   time.Time
@@ -184,6 +199,21 @@ func New() *Metrics {
 		UniqueASNsObserved:      NewGauge(),
 		UniqueCountriesObserved: NewGauge(),
 		PathDiversityAvgScore:   NewGauge(),
+
+		// Onion service metrics (Phase 9.3.3)
+		OnionServiceStreamsActive:       NewGauge(),
+		OnionServiceStreamCreated:       NewCounter(),
+		OnionServiceStreamClosed:        NewCounter(),
+		OnionServiceStreamData:          NewCounter(),
+		OnionServiceDescriptorPublished: NewCounter(),
+		OnionServiceDescriptorFailed:    NewCounter(),
+		OnionServiceIntroEstablished:    NewCounter(),
+		OnionServiceIntroFailed:         NewCounter(),
+		OnionServiceIntroReceived:       NewCounter(),
+		OnionServiceRendezvousSuccess:   NewCounter(),
+		OnionServiceRendezvousFailed:    NewCounter(),
+		OnionServiceActiveIntroPoints:   NewGauge(),
+		OnionServiceActiveDuration:      NewHistogram(),
 
 		// System metrics
 		Uptime:    NewGauge(),
@@ -691,4 +721,62 @@ func (h *Histogram) Count() int {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	return len(h.observations)
+}
+
+// RecordOnionServiceStream records a service stream creation
+func (m *Metrics) RecordOnionServiceStream(created bool) {
+	if created {
+		m.OnionServiceStreamCreated.Inc()
+		m.OnionServiceStreamsActive.Inc()
+	} else {
+		m.OnionServiceStreamClosed.Inc()
+		m.OnionServiceStreamsActive.Dec()
+	}
+}
+
+// RecordOnionServiceStreamData records bytes transferred through service streams
+func (m *Metrics) RecordOnionServiceStreamData(bytes int64) {
+	m.OnionServiceStreamData.Add(bytes)
+}
+
+// RecordOnionServiceDescriptorPublish records a descriptor publication attempt
+func (m *Metrics) RecordOnionServiceDescriptorPublish(success bool) {
+	if success {
+		m.OnionServiceDescriptorPublished.Inc()
+	} else {
+		m.OnionServiceDescriptorFailed.Inc()
+	}
+}
+
+// RecordOnionServiceIntroEstablish records an ESTABLISH_INTRO attempt
+func (m *Metrics) RecordOnionServiceIntroEstablish(success bool) {
+	if success {
+		m.OnionServiceIntroEstablished.Inc()
+	} else {
+		m.OnionServiceIntroFailed.Inc()
+	}
+}
+
+// RecordOnionServiceIntroReceived records an INTRODUCE2 cell received
+func (m *Metrics) RecordOnionServiceIntroReceived() {
+	m.OnionServiceIntroReceived.Inc()
+}
+
+// RecordOnionServiceRendezvous records a rendezvous attempt
+func (m *Metrics) RecordOnionServiceRendezvous(success bool) {
+	if success {
+		m.OnionServiceRendezvousSuccess.Inc()
+	} else {
+		m.OnionServiceRendezvousFailed.Inc()
+	}
+}
+
+// SetOnionServiceIntroPoints sets the current number of active intro points
+func (m *Metrics) SetOnionServiceIntroPoints(count int64) {
+	m.OnionServiceActiveIntroPoints.Set(count)
+}
+
+// RecordOnionServiceDuration records how long a service was active
+func (m *Metrics) RecordOnionServiceDuration(duration time.Duration) {
+	m.OnionServiceActiveDuration.Observe(duration)
 }

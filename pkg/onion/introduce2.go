@@ -8,9 +8,9 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
+	"io"
 
 	"golang.org/x/crypto/hkdf"
-	"io"
 
 	"github.com/opd-ai/go-tor/pkg/crypto"
 )
@@ -21,44 +21,46 @@ type Introduce2Cell struct {
 	EncryptedData []byte
 
 	// Decrypted contents
-	AuthKey           []byte   // Client's authentication key (32 bytes)
-	EncKey            []byte   // Client's encryption key (32 bytes)
-	ClientPK          []byte   // Client's ephemeral public key for ntor (32 bytes)
-	RendezvousCookie  []byte   // Rendezvous cookie (20 bytes)
-	LinkSpecifiers    []byte   // Link specifiers for rendezvous point
-	OnionKeyType      uint8    // Onion key type (0x00 = ntor)
-	OnionKey          []byte   // Client's onion key (32 bytes for ntor)
-	ExtensionFields   []byte   // Extension fields
+	AuthKey          []byte // Client's authentication key (32 bytes)
+	EncKey           []byte // Client's encryption key (32 bytes)
+	ClientPK         []byte // Client's ephemeral public key for ntor (32 bytes)
+	RendezvousCookie []byte // Rendezvous cookie (20 bytes)
+	LinkSpecifiers   []byte // Link specifiers for rendezvous point
+	OnionKeyType     uint8  // Onion key type (0x00 = ntor)
+	OnionKey         []byte // Client's onion key (32 bytes for ntor)
+	ExtensionFields  []byte // Extension fields
 }
 
 // Introduce2Request contains parsed data needed to establish rendezvous
 type Introduce2Request struct {
-	RendezvousCookie []byte              // 20-byte cookie for rendezvous point
-	LinkSpecifiers   []LinkSpecifier     // Rendezvous point address info
-	ClientOnionKey   []byte              // Client's public key for ntor handshake
-	ClientAuthKey    []byte              // Client's authentication key
-	Extensions       map[uint8][]byte    // Extension data (type -> value)
+	RendezvousCookie []byte           // 20-byte cookie for rendezvous point
+	LinkSpecifiers   []LinkSpecifier  // Rendezvous point address info
+	ClientOnionKey   []byte           // Client's public key for ntor handshake
+	ClientAuthKey    []byte           // Client's authentication key
+	Extensions       map[uint8][]byte // Extension data (type -> value)
 }
 
 // ParseIntroduce2 parses and decrypts an INTRODUCE2 cell
 // Following rend-spec-v3.txt §3.2
 //
 // The INTRODUCE2 cell format:
-//   AUTH_KEY_TYPE   [1 byte]
-//   AUTH_KEY_LEN    [2 bytes]
-//   AUTH_KEY        [AUTH_KEY_LEN bytes]
-//   EXTENSIONS      [N bytes]
-//   ENCRYPTED_DATA  [remaining bytes]
+//
+//	AUTH_KEY_TYPE   [1 byte]
+//	AUTH_KEY_LEN    [2 bytes]
+//	AUTH_KEY        [AUTH_KEY_LEN bytes]
+//	EXTENSIONS      [N bytes]
+//	ENCRYPTED_DATA  [remaining bytes]
 //
 // The ENCRYPTED_DATA decrypts to:
-//   RENDEZVOUS_COOKIE  [20 bytes]
-//   NSPEC              [1 byte]
-//   LINK_SPECIFIERS    [variable]
-//   ONION_KEY_TYPE     [1 byte]
-//   ONION_KEY_LEN      [2 bytes]
-//   ONION_KEY          [ONION_KEY_LEN bytes]
-//   EXTENSIONS         [variable]
-func ParseIntroduce2(encryptedCell []byte, introAuthKey, introEncKey []byte) (*Introduce2Request, error) {
+//
+//	RENDEZVOUS_COOKIE  [20 bytes]
+//	NSPEC              [1 byte]
+//	LINK_SPECIFIERS    [variable]
+//	ONION_KEY_TYPE     [1 byte]
+//	ONION_KEY_LEN      [2 bytes]
+//	ONION_KEY          [ONION_KEY_LEN bytes]
+//	EXTENSIONS         [variable]
+func ParseIntroduce2(encryptedCell, introAuthKey, introEncKey []byte) (*Introduce2Request, error) {
 	if len(encryptedCell) < 100 {
 		return nil, fmt.Errorf("INTRODUCE2 cell too short: %d bytes", len(encryptedCell))
 	}
@@ -72,7 +74,7 @@ func ParseIntroduce2(encryptedCell []byte, introAuthKey, introEncKey []byte) (*I
 		return nil, fmt.Errorf("unsupported auth key type: 0x%02x", authKeyType)
 	}
 
-	authKeyLen := binary.BigEndian.Uint16(encryptedCell[offset:offset+2])
+	authKeyLen := binary.BigEndian.Uint16(encryptedCell[offset : offset+2])
 	offset += 2
 	if authKeyLen != 32 {
 		return nil, fmt.Errorf("invalid auth key length: %d", authKeyLen)
@@ -96,7 +98,7 @@ func ParseIntroduce2(encryptedCell []byte, introAuthKey, introEncKey []byte) (*I
 		}
 		// extType := encryptedCell[offset]
 		offset++
-		extLen := binary.BigEndian.Uint16(encryptedCell[offset:offset+2])
+		extLen := binary.BigEndian.Uint16(encryptedCell[offset : offset+2])
 		offset += 2
 		if offset+int(extLen) > len(encryptedCell) {
 			return nil, fmt.Errorf("truncated extension data")
@@ -152,7 +154,7 @@ func ParseIntroduce2(encryptedCell []byte, introAuthKey, introEncKey []byte) (*I
 }
 
 // parseIntroduce2Inner parses the decrypted inner portion of INTRODUCE2
-func parseIntroduce2Inner(plaintext []byte, clientAuthKey []byte) (*Introduce2Request, error) {
+func parseIntroduce2Inner(plaintext, clientAuthKey []byte) (*Introduce2Request, error) {
 	if len(plaintext) < 20+1 {
 		return nil, fmt.Errorf("decrypted data too short: %d bytes", len(plaintext))
 	}
@@ -205,7 +207,7 @@ func parseIntroduce2Inner(plaintext []byte, clientAuthKey []byte) (*Introduce2Re
 		return nil, fmt.Errorf("unsupported onion key type: 0x%02x", onionKeyType)
 	}
 
-	onionKeyLen := binary.BigEndian.Uint16(plaintext[offset:offset+2])
+	onionKeyLen := binary.BigEndian.Uint16(plaintext[offset : offset+2])
 	offset += 2
 	if onionKeyLen != 32 {
 		return nil, fmt.Errorf("invalid ntor onion key length: %d", onionKeyLen)
@@ -230,7 +232,7 @@ func parseIntroduce2Inner(plaintext []byte, clientAuthKey []byte) (*Introduce2Re
 			}
 			extType := plaintext[offset]
 			offset++
-			extLen := binary.BigEndian.Uint16(plaintext[offset:offset+2])
+			extLen := binary.BigEndian.Uint16(plaintext[offset : offset+2])
 			offset += 2
 
 			if offset+int(extLen) > len(plaintext) {
