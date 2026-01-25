@@ -68,3 +68,7 @@ examples/*/http-helpers-demo
 tor-client
 tor-client-stripped
 circuit-isolation
+
+# More example/demo binaries
+client-auth-integration
+stream-backpressure
