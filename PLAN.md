@@ -98,10 +98,14 @@ The `pkg/onion/service.go` already contains foundational server-side functionali
   - Added crypto helpers: `DecryptAES256CTR`, `EncryptAES256CTR`, `ConstantTimeCompare`
   - Tests: `pkg/crypto/crypto_test.go` (comprehensive coverage >85%)
 
-- [ ] **9.2.2 Rendezvous Circuit Building**
+- [x] **9.2.2 Rendezvous Circuit Building** ✅ **COMPLETED** (January 25, 2026)
   - Build circuit to rendezvous point specified by client
   - Parse link specifiers to determine rendezvous relay
   - Use existing circuit builder infrastructure
+  - Implementation: `pkg/onion/rendezvous.go` (rendezvous circuit builder)
+  - Tests: `pkg/onion/rendezvous_test.go` (comprehensive test coverage >95%)
+  - Integration: Enhanced `pkg/onion/service.go` `HandleIntroduce2()` to build rendezvous circuits
+  - Asynchronous circuit building to avoid blocking introduction handling
 
 - [ ] **9.2.3 RENDEZVOUS1 Cell Construction**
   - Implement ntor handshake server-side
@@ -112,7 +116,9 @@ The `pkg/onion/service.go` already contains foundational server-side functionali
 **Files Modified/Created**:
 - `pkg/onion/introduce2.go` (new) - INTRODUCE2 parsing and decryption
 - `pkg/onion/introduce2_test.go` (new) - Comprehensive test coverage
-- `pkg/onion/service.go` - Updated `HandleIntroduce2()` to use new parser
+- `pkg/onion/rendezvous.go` (new) - Rendezvous circuit building
+- `pkg/onion/rendezvous_test.go` (new) - Comprehensive test coverage (>95%)
+- `pkg/onion/service.go` - Updated `HandleIntroduce2()` to build rendezvous circuits, added `RendezvousCircuitBuilder`
 - `pkg/onion/service_test.go` - Updated tests for new parsing logic
 - `pkg/crypto/crypto.go` - Added `DecryptAES256CTR`, `EncryptAES256CTR`, `ConstantTimeCompare`
 - `pkg/crypto/crypto_test.go` - Added comprehensive tests for new functions

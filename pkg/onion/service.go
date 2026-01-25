@@ -46,8 +46,12 @@ type Service struct {
 	logger          *logger.Logger
 	introManager    *IntroPointManager // Manages intro point lifecycle
 
+	// Circuit building
+	rendezvousBuilder *RendezvousCircuitBuilder // Builds circuits to rendezvous points
+
 	// Connections
-	pendingIntros map[string]*PendingIntro // cookie -> intro
+	pendingIntros       map[string]*PendingIntro // cookie -> intro
+	rendezvousCircuits  map[string]uint32        // cookie -> circuit ID
 }
 
 // ServiceConfig contains configuration for hosting an onion service
@@ -154,20 +158,30 @@ func NewService(config *ServiceConfig, log *logger.Logger) (*Service, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	service := &Service{
-		identityKey:     privateKey,
-		publicKey:       publicKey,
-		address:         addr,
-		config:          config,
-		introPoints:     make([]*ServiceIntroPoint, 0, config.NumIntroPoints),
-		publishedHSDirs: make([]*HSDirectory, 0),
-		pendingIntros:   make(map[string]*PendingIntro),
-		ctx:             ctx,
-		cancel:          cancel,
-		logger:          log.Component("onion-service"),
+		identityKey:        privateKey,
+		publicKey:          publicKey,
+		address:            addr,
+		config:             config,
+		introPoints:        make([]*ServiceIntroPoint, 0, config.NumIntroPoints),
+		publishedHSDirs:    make([]*HSDirectory, 0),
+		pendingIntros:      make(map[string]*PendingIntro),
+		rendezvousCircuits: make(map[string]uint32),
+		ctx:                ctx,
+		cancel:             cancel,
+		logger:             log.Component("onion-service"),
 	}
 
 	// Initialize introduction point manager
 	service.introManager = NewIntroPointManager(service, log)
+
+	// Initialize rendezvous circuit builder if we have circuit builder and path selector
+	if config.CircuitBuilder != nil && config.PathSelector != nil {
+		service.rendezvousBuilder = NewRendezvousCircuitBuilder(
+			config.CircuitBuilder,
+			config.PathSelector,
+			log,
+		)
+	}
 
 	return service, nil
 }
@@ -808,10 +822,49 @@ func (s *Service) HandleIntroduce2(introCircuitID uint32, introduce2Data []byte)
 		"cookie", cookieStr[:16],
 		"rendezvous", rendezvousAddr)
 
-	// TODO: In production, we would now:
-	// 1. Build a circuit to the rendezvous point
-	// 2. Send RENDEZVOUS1 with our handshake response
-	// 3. Complete the connection (Task 9.2.2 and 9.2.3)
+	// Build circuit to rendezvous point if we have a rendezvous builder
+	if s.rendezvousBuilder != nil {
+		s.logger.Info("Building rendezvous circuit",
+			"cookie", cookieStr[:16],
+			"rendezvous", rendezvousAddr)
+
+		// Build circuit asynchronously to avoid blocking
+		go func() {
+			ctx, cancel := context.WithTimeout(s.ctx, 30*time.Second)
+			defer cancel()
+
+			circ, err := s.rendezvousBuilder.BuildRendezvousCircuit(
+				ctx,
+				request.LinkSpecifiers,
+				25*time.Second,
+			)
+			if err != nil {
+				s.logger.Error("Failed to build rendezvous circuit",
+					"cookie", cookieStr[:16],
+					"error", err)
+				// Remove pending intro on failure
+				s.mu.Lock()
+				delete(s.pendingIntros, cookieStr)
+				s.mu.Unlock()
+				return
+			}
+
+			s.logger.Info("Rendezvous circuit built successfully",
+				"cookie", cookieStr[:16],
+				"circuit_id", circ.ID)
+
+			// Store circuit ID for this rendezvous
+			s.mu.Lock()
+			s.rendezvousCircuits[cookieStr] = circ.ID
+			s.mu.Unlock()
+
+			// TODO (Task 9.2.3): Send RENDEZVOUS1 cell with handshake response
+			// This will complete the rendezvous connection with the client
+		}()
+	} else {
+		s.logger.Warn("Rendezvous circuit builder not configured, circuit not built",
+			"cookie", cookieStr[:16])
+	}
 
 	return nil
 }
@@ -822,23 +875,25 @@ func (s *Service) GetStats() ServiceStats {
 	defer s.mu.RUnlock()
 
 	return ServiceStats{
-		Address:         s.address.String(),
-		Running:         s.running,
-		IntroPoints:     len(s.introPoints),
-		DescriptorAge:   time.Since(s.lastPublish),
-		PendingIntros:   len(s.pendingIntros),
-		PublishedHSDirs: len(s.publishedHSDirs),
+		Address:            s.address.String(),
+		Running:            s.running,
+		IntroPoints:        len(s.introPoints),
+		DescriptorAge:      time.Since(s.lastPublish),
+		PendingIntros:      len(s.pendingIntros),
+		PublishedHSDirs:    len(s.publishedHSDirs),
+		RendezvousCircuits: len(s.rendezvousCircuits),
 	}
 }
 
 // ServiceStats contains statistics about a running service
 type ServiceStats struct {
-	Address         string
-	Running         bool
-	IntroPoints     int
-	DescriptorAge   time.Duration
-	PendingIntros   int
-	PublishedHSDirs int
+	Address            string
+	Running            bool
+	IntroPoints        int
+	DescriptorAge      time.Duration
+	PendingIntros      int
+	PublishedHSDirs    int
+	RendezvousCircuits int
 }
 
 // buildIntroCircuit builds a 3-hop circuit to the introduction point relay
