@@ -79,14 +79,14 @@ introduce2-parsing
 rendezvous-circuit
 rendezvous1-demo
 
-# Additional example binaries
-examples/*/pt-client
-examples/*/pt-config-demo
-examples/*/consensus_padding
-examples/*/consensus-padding-example
-examples/*/require-certs-demo
-examples/*/circuit-ratelimit
-examples/*/intro-point-management
-examples/*/client-auth-integration
-examples/*/stream-backpressure
-examples/*/bridge-config
+# Additional example binaries (specific paths)
+examples/pt-client/pt-client
+examples/pt-configuration/pt-config-demo
+examples/consensus_padding/consensus_padding
+examples/consensus_padding/consensus-padding-example
+examples/require-certs-demo/require-certs-demo
+examples/circuit-ratelimit/circuit-ratelimit
+examples/intro-point-management/intro-point-management
+examples/client-auth-integration/client-auth-integration
+examples/stream-backpressure/stream-backpressure
+examples/bridge-config/bridge-config
