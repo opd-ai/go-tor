@@ -22,7 +22,8 @@ import (
 )
 
 func main() {
-	fmt.Println("=== INTRODUCE2 Cell Parsing Example ===\n")
+	fmt.Println("=== INTRODUCE2 Cell Parsing Example ===")
+	fmt.Println()
 
 	// Step 1: Generate introduction point keys
 	// In a real service, these would be established during ESTABLISH_INTRO

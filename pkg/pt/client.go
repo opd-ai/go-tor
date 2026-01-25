@@ -65,7 +65,7 @@ func (mc *ManagedClient) Start(ctx context.Context) error {
 		return nil
 	}
 
-	if err := os.MkdirAll(mc.config.StateDir, 0700); err != nil {
+	if err := os.MkdirAll(mc.config.StateDir, 0o700); err != nil {
 		return errors.Wrap(errors.CategoryNetwork, errors.SeverityHigh, "failed to create state directory", err)
 	}
 
@@ -92,7 +92,7 @@ func (mc *ManagedClient) Start(ctx context.Context) error {
 	mc.log.Info("PT process started", "binary", mc.config.BinaryPath, "pid", mc.cmd.Process.Pid)
 
 	go mc.readStderr()
-	
+
 	if err := mc.performHandshake(ctx); err != nil {
 		mc.cmd.Process.Kill()
 		mc.running = false

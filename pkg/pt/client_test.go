@@ -314,7 +314,7 @@ echo "CMETHODS DONE"
 sleep 60
 `
 
-	if err := os.WriteFile(mockScript, []byte(script), 0755); err != nil {
+	if err := os.WriteFile(mockScript, []byte(script), 0o755); err != nil {
 		t.Fatalf("Failed to create mock PT: %v", err)
 	}
 

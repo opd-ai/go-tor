@@ -26,7 +26,7 @@ func main() {
 	config := pt.TransportConfig{
 		BinaryPath: "/usr/bin/obfs4proxy", // Adjust path for your system
 		StateDir:   "/tmp/go-tor-pt-demo",
-		Options: map[string]string{
+		Options:    map[string]string{
 			// Example obfs4 options (get these from your bridge configuration)
 			// "cert":     "...",
 			// "iat-mode": "0",

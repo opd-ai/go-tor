@@ -10,8 +10,10 @@ import (
 )
 
 func main() {
-	fmt.Println("=== Rendezvous Circuit Building Example ===\n")
-	fmt.Println("⚠️  Educational example - demonstrates concepts only\n")
+	fmt.Println("=== Rendezvous Circuit Building Example ===")
+	fmt.Println()
+	fmt.Println("⚠️  Educational example - demonstrates concepts only")
+	fmt.Println()
 
 	// Step 1: Receive INTRODUCE2 from client
 	fmt.Println("1. Service receives INTRODUCE2 from client at introduction point")
