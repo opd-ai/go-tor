@@ -62,11 +62,11 @@ type StateMachine struct {
 	circuit     *Circuit
 
 	// State transition parameters
-	burstMin      int           // Minimum cells in a burst
-	burstMax      int           // Maximum cells in a burst
-	gapMin        time.Duration // Minimum gap between bursts
-	gapMax        time.Duration // Maximum gap between bursts
-	cellDelay     time.Duration // Delay between cells within a burst
+	burstMin  int           // Minimum cells in a burst
+	burstMax  int           // Maximum cells in a burst
+	gapMin    time.Duration // Minimum gap between bursts
+	gapMax    time.Duration // Maximum gap between bursts
+	cellDelay time.Duration // Delay between cells within a burst
 
 	// Runtime state
 	cellsInBurst  int       // Cells sent in current burst
@@ -82,11 +82,11 @@ type StateMachine struct {
 // PaddingMachineParams contains configurable parameters for padding machines
 // These can be set from consensus parameters via directory.GetPaddingParams()
 type PaddingMachineParams struct {
-	BurstMin      int           // Minimum cells in a burst
-	BurstMax      int           // Maximum cells in a burst
-	GapMin        time.Duration // Minimum gap between bursts
-	GapMax        time.Duration // Maximum gap between bursts
-	CellDelay     time.Duration // Delay between cells within a burst
+	BurstMin  int           // Minimum cells in a burst
+	BurstMax  int           // Maximum cells in a burst
+	GapMin    time.Duration // Minimum gap between bursts
+	GapMax    time.Duration // Maximum gap between bursts
+	CellDelay time.Duration // Delay between cells within a burst
 }
 
 // DefaultAPEParams returns default parameters for APE machine per padding-spec.txt §3

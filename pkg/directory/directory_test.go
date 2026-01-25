@@ -681,7 +681,7 @@ func TestParseConsensusWithSignatures(t *testing.T) {
 	validAfter := now.Add(-1 * time.Hour).Format("2006-01-02 15:04:05")
 	freshUntil := now.Add(1 * time.Hour).Format("2006-01-02 15:04:05")
 	validUntil := now.Add(3 * time.Hour).Format("2006-01-02 15:04:05")
-	
+
 	// Mock consensus with directory signatures
 	consensusData := fmt.Sprintf(`network-status-version 3
 valid-after %s
@@ -976,10 +976,10 @@ func TestVerifyConsensusSignatures(t *testing.T) {
 			meta: &ConsensusMetadata{
 				SignatureCount: 4,
 				Signatures: []*ConsensusSignature{
-					{Algorithm: "sha256", Identity: "ED03BB616EB2F60BEC80151114BB25CEF515B226", SigningKeyDigest: "KEY1", Signature: shortSig},      // too short
-					{Algorithm: "sha256", Identity: "F533C81CEF0BC0267857C99B2F471ADF249FA232", SigningKeyDigest: "KEY2", Signature: validSig128},   // valid
-					{Algorithm: "sha256", Identity: "23D15D965BC35114467363C165C4F724B64B4F66", SigningKeyDigest: "KEY3", Signature: validSig128},   // valid
-					{Algorithm: "sha256", Identity: "0232AF901C31A04EE9848595AF9BB7620D4C5B2E", SigningKeyDigest: "KEY4", Signature: validSig128},   // valid (dannenberg)
+					{Algorithm: "sha256", Identity: "ED03BB616EB2F60BEC80151114BB25CEF515B226", SigningKeyDigest: "KEY1", Signature: shortSig},    // too short
+					{Algorithm: "sha256", Identity: "F533C81CEF0BC0267857C99B2F471ADF249FA232", SigningKeyDigest: "KEY2", Signature: validSig128}, // valid
+					{Algorithm: "sha256", Identity: "23D15D965BC35114467363C165C4F724B64B4F66", SigningKeyDigest: "KEY3", Signature: validSig128}, // valid
+					{Algorithm: "sha256", Identity: "0232AF901C31A04EE9848595AF9BB7620D4C5B2E", SigningKeyDigest: "KEY4", Signature: validSig128}, // valid (dannenberg)
 				},
 			},
 			wantErr: true,

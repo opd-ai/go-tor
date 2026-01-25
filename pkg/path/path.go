@@ -215,7 +215,7 @@ func (s *Selector) selectGuard() (*directory.Relay, error) {
 							"fingerprint", relay.Fingerprint)
 						continue
 					}
-					
+
 					s.logger.Debug("Using persistent guard", "nickname", relay.Nickname)
 					return relay, nil
 				}
@@ -235,7 +235,7 @@ func (s *Selector) selectGuard() (*directory.Relay, error) {
 				filtered = append(filtered, guard)
 			}
 		}
-		
+
 		if len(filtered) > 0 {
 			availableGuards = filtered
 			s.logger.Debug("Filtered biased guards",
@@ -431,7 +431,7 @@ func weightedRandomIndex(relays []*directory.Relay) (int, error) {
 	// Select relay based on weighted probability
 	var cumulative uint64
 	target := randVal.Uint64()
-	
+
 	for i, relay := range relays {
 		cumulative += relay.Bandwidth
 		if cumulative > target {
@@ -457,7 +457,7 @@ func (s *Selector) RecordCircuitOutcome(circuitID uint32, guardFingerprint strin
 		return nil
 	}
 	alerts := s.biasDetector.RecordOutcome(circuitID, guardFingerprint, outcome)
-	
+
 	// Log any new alerts
 	for _, alert := range alerts {
 		s.logger.Warn("Path bias detected",
@@ -465,7 +465,7 @@ func (s *Selector) RecordCircuitOutcome(circuitID uint32, guardFingerprint strin
 			"guard", alert.Fingerprint,
 			"message", alert.Message)
 	}
-	
+
 	return alerts
 }
 

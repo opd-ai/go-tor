@@ -36,11 +36,11 @@ func main() {
 	// Start the client (this starts control server but we won't wait for full startup)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	
+
 	go func() {
 		torClient.Start(ctx)
 	}()
-	
+
 	// Give the control server time to start
 	time.Sleep(100 * time.Millisecond)
 

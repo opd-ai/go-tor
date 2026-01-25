@@ -108,7 +108,7 @@ func TestIntegrationOnionServiceSOCKS(t *testing.T) {
 
 	// Step 4: Create and start SOCKS5 server
 	t.Log("\n[4/4] Starting SOCKS5 proxy server...")
-	
+
 	// Create a minimal circuit manager (methods won't be called in mock scenario)
 	circuitMgr := &circuit.Manager{}
 
@@ -147,7 +147,7 @@ func TestIntegrationOnionServiceSOCKS(t *testing.T) {
 
 	// Step 5: Connect to .onion address via SOCKS5
 	t.Log("\n[5/6] Connecting to .onion address via SOCKS5...")
-	
+
 	// Connect to SOCKS5 proxy
 	socksConn, err := net.DialTimeout("tcp", socksAddr, 5*time.Second)
 	if err != nil {
@@ -158,7 +158,7 @@ func TestIntegrationOnionServiceSOCKS(t *testing.T) {
 
 	// Perform SOCKS5 handshake
 	t.Log("  Performing SOCKS5 handshake...")
-	
+
 	// Send version/method selection
 	_, err = socksConn.Write([]byte{0x05, 0x01, 0x00}) // VER=5, NMETHODS=1, METHOD=0 (no auth)
 	if err != nil {
@@ -225,25 +225,25 @@ func TestIntegrationOnionServiceSOCKS(t *testing.T) {
 
 	// Step 6: Validate results
 	t.Log("\n[6/6] Validating test results...")
-	
+
 	switch replyCode {
 	case 0x00: // Success
 		t.Log("✓ .onion connection SUCCEEDED - full data relay available")
 		t.Log("✓ Data relay framework validated")
-		
+
 		// Could test bidirectional data here if we had full circuit implementation
 		t.Log("  Note: Bidirectional data relay requires complete circuit implementation")
-		
+
 	case 0x01: // General failure
 		t.Log("✓ Connection initiated but failed (expected with mock circuits)")
 		t.Log("✓ SOCKS5 .onion protocol flow validated")
 		t.Log("✓ Descriptor fetch and address parsing successful")
-		
+
 	case 0x04: // Host unreachable
 		t.Log("✓ Connection reached rendezvous phase (expected with mock circuits)")
 		t.Log("✓ SOCKS5 .onion protocol flow validated")
 		t.Log("✓ Descriptor fetch and rendezvous establishment attempted")
-		
+
 	default:
 		t.Logf("✓ SOCKS5 protocol handling validated (reply code: 0x%02x)", replyCode)
 		t.Log("✓ .onion address routing framework functional")
@@ -298,7 +298,7 @@ func TestIntegrationOnionServiceDescriptor(t *testing.T) {
 	// Step 2: Test service stats
 	stats := service.GetStats()
 	t.Logf("✓ Service stats: running=%v, intro_points=%d", stats.Running, stats.IntroPoints)
-	
+
 	// Step 3: Validate address format
 	addr := service.GetAddress()
 	if !strings.HasSuffix(addr, ".onion") {
@@ -308,7 +308,7 @@ func TestIntegrationOnionServiceDescriptor(t *testing.T) {
 		t.Fatalf("Invalid v3 onion address length: %s", addr)
 	}
 	t.Logf("✓ Address format validated: v3 onion service (56 characters)")
-	
+
 	// Note: Descriptor publishing would require real HSDir connectivity
 	// The publishing code path is tested via service.Start() method
 	// which internally calls publishDescriptor()
@@ -320,16 +320,16 @@ func TestIntegrationOnionServiceDescriptor(t *testing.T) {
 func buildSOCKSConnectRequest(onionAddr string, port uint16) []byte {
 	// Remove .onion suffix if present
 	addr := strings.TrimSuffix(onionAddr, ".onion")
-	
+
 	req := make([]byte, 0, 256)
-	req = append(req, 0x05)          // VER = SOCKS5
-	req = append(req, 0x01)          // CMD = CONNECT
-	req = append(req, 0x00)          // RSV (reserved)
-	req = append(req, 0x03)          // ATYP = Domain name
-	req = append(req, byte(len(addr))) // Domain length
-	req = append(req, []byte(addr)...) // Domain
+	req = append(req, 0x05)                           // VER = SOCKS5
+	req = append(req, 0x01)                           // CMD = CONNECT
+	req = append(req, 0x00)                           // RSV (reserved)
+	req = append(req, 0x03)                           // ATYP = Domain name
+	req = append(req, byte(len(addr)))                // Domain length
+	req = append(req, []byte(addr)...)                // Domain
 	req = append(req, byte(port>>8), byte(port&0xFF)) // Port (big-endian)
-	
+
 	return req
 }
 

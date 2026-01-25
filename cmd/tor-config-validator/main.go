@@ -138,7 +138,7 @@ func printUsage() {
 	fmt.Println("  high-security  - Privacy-focused with strict isolation")
 }
 
-func validateConfigFile(path string, verbose bool, strict bool) error {
+func validateConfigFile(path string, verbose, strict bool) error {
 	if verbose {
 		fmt.Printf("Validating configuration file: %s\n", path)
 		if strict {
@@ -193,7 +193,7 @@ func validateConfigFile(path string, verbose bool, strict bool) error {
 }
 
 // printWarnings prints a list of validation warnings with a custom title and icon
-func printWarnings(warnings []config.ValidationError, title string, icon string) {
+func printWarnings(warnings []config.ValidationError, title, icon string) {
 	fmt.Println(title)
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	for _, warn := range warnings {

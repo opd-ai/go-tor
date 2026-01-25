@@ -33,12 +33,12 @@ func TestEd25519CertificateVerifySignature(t *testing.T) {
 	signedData := make([]byte, 0, 256)
 	signedData = append(signedData, cert.Version)
 	signedData = append(signedData, cert.CertType)
-	
+
 	expirationHours := uint32(cert.ExpiresAt.Unix() / 3600)
 	expBytes := make([]byte, 4)
 	binary.BigEndian.PutUint32(expBytes, expirationHours)
 	signedData = append(signedData, expBytes...)
-	
+
 	signedData = append(signedData, cert.CertKeyType)
 	signedData = append(signedData, cert.CertifiedKey...)
 	signedData = append(signedData, byte(len(cert.Extensions)))
@@ -58,7 +58,7 @@ func TestEd25519CertificateVerifySignature(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to generate wrong keypair: %v", err)
 	}
-	
+
 	err = cert.VerifySignature(wrongKey)
 	if err == nil {
 		t.Error("Signature verification should fail with wrong key")
@@ -98,16 +98,16 @@ func TestEd25519CertificateVerifySignature_WithExtensions(t *testing.T) {
 	signedData := make([]byte, 0, 256)
 	signedData = append(signedData, cert.Version)
 	signedData = append(signedData, cert.CertType)
-	
+
 	expirationHours := uint32(cert.ExpiresAt.Unix() / 3600)
 	expBytes := make([]byte, 4)
 	binary.BigEndian.PutUint32(expBytes, expirationHours)
 	signedData = append(signedData, expBytes...)
-	
+
 	signedData = append(signedData, cert.CertKeyType)
 	signedData = append(signedData, cert.CertifiedKey...)
 	signedData = append(signedData, byte(len(cert.Extensions)))
-	
+
 	for _, ext := range cert.Extensions {
 		extLen := uint16(2 + len(ext.ExtData))
 		extLenBytes := make([]byte, 2)
@@ -179,7 +179,7 @@ func TestValidateSignatures(t *testing.T) {
 
 	// Create a self-signed Ed25519 signing key certificate (type 4)
 	signingKeyCert := createSignedEd25519Cert(t, 4, publicKey, privateKey, publicKey)
-	
+
 	// Create CERTS cell with the signing key certificate
 	certsCell := &CERTSCell{
 		Certificates: []*Certificate{
@@ -212,7 +212,7 @@ func TestValidateSignatures_WithTLSLink(t *testing.T) {
 
 	// Create self-signed signing key cert (type 4)
 	signingKeyCert := createSignedEd25519Cert(t, 4, signingPubKey, signingPrivKey, signingPubKey)
-	
+
 	// Create TLS link cert (type 5) signed by signing key
 	tlsLinkCert := createSignedEd25519Cert(t, 5, linkPubKey, signingPrivKey, signingPubKey)
 
@@ -312,12 +312,12 @@ func createSignedEd25519Cert(t *testing.T, certType uint8, certifiedKey, private
 	signedData := make([]byte, 0, 256)
 	signedData = append(signedData, cert.Version)
 	signedData = append(signedData, cert.CertType)
-	
+
 	expirationHours := uint32(cert.ExpiresAt.Unix() / 3600)
 	expBytes := make([]byte, 4)
 	binary.BigEndian.PutUint32(expBytes, expirationHours)
 	signedData = append(signedData, expBytes...)
-	
+
 	signedData = append(signedData, cert.CertKeyType)
 	signedData = append(signedData, cert.CertifiedKey...)
 	signedData = append(signedData, byte(len(cert.Extensions)))
@@ -341,15 +341,15 @@ func TestValidateSignatures_Integration(t *testing.T) {
 	certData := make([]byte, 0, 256)
 	certData = append(certData, 1) // Version
 	certData = append(certData, 4) // CertType (signing key)
-	
+
 	expirationHours := uint32(time.Now().Add(365*24*time.Hour).Unix() / 3600)
 	expBytes := make([]byte, 4)
 	binary.BigEndian.PutUint32(expBytes, expirationHours)
 	certData = append(certData, expBytes...)
-	
-	certData = append(certData, 1) // CertKeyType
+
+	certData = append(certData, 1)            // CertKeyType
 	certData = append(certData, publicKey...) // CertifiedKey (32 bytes)
-	certData = append(certData, 0) // No extensions
+	certData = append(certData, 0)            // No extensions
 
 	// Sign the certificate data
 	signature := ed25519.Sign(privateKey, certData)
@@ -357,9 +357,9 @@ func TestValidateSignatures_Integration(t *testing.T) {
 
 	// Build CERTS cell payload
 	payload := make([]byte, 0, 256)
-	payload = append(payload, 1) // Number of certificates
+	payload = append(payload, 1)                            // Number of certificates
 	payload = append(payload, byte(CertTypeEd25519Signing)) // Cert type
-	
+
 	certLen := make([]byte, 2)
 	binary.BigEndian.PutUint16(certLen, uint16(len(certData)))
 	payload = append(payload, certLen...)

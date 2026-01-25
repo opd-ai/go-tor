@@ -170,7 +170,7 @@ LogLevel info
 CircuitBuildTimeout 60
 MaxCircuitDirtiness 600
 `
-	if err := os.WriteFile(configPath, []byte(initialConfig), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(initialConfig), 0o644); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
 
@@ -194,7 +194,7 @@ LogLevel debug
 CircuitBuildTimeout 90
 MaxCircuitDirtiness 900
 `
-	if err := os.WriteFile(configPath, []byte(updatedConfig), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(updatedConfig), 0o644); err != nil {
 		t.Fatalf("Failed to update config file: %v", err)
 	}
 
@@ -219,7 +219,7 @@ func TestReloadableConfig_CheckAndReload(t *testing.T) {
 
 	// Write initial config
 	initialConfig := `LogLevel info`
-	if err := os.WriteFile(configPath, []byte(initialConfig), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(initialConfig), 0o644); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
 
@@ -239,7 +239,7 @@ func TestReloadableConfig_CheckAndReload(t *testing.T) {
 	// Modify file
 	time.Sleep(10 * time.Millisecond) // Ensure different mod time
 	updatedConfig := `LogLevel debug`
-	if err := os.WriteFile(configPath, []byte(updatedConfig), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(updatedConfig), 0o644); err != nil {
 		t.Fatalf("Failed to update config file: %v", err)
 	}
 
@@ -260,7 +260,7 @@ func TestReloadableConfig_StartWatcher(t *testing.T) {
 
 	// Write initial config
 	initialConfig := `LogLevel info`
-	if err := os.WriteFile(configPath, []byte(initialConfig), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(initialConfig), 0o644); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
 
@@ -286,7 +286,7 @@ func TestReloadableConfig_StartWatcher(t *testing.T) {
 
 	// Modify config file
 	updatedConfig := `LogLevel debug`
-	if err := os.WriteFile(configPath, []byte(updatedConfig), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(updatedConfig), 0o644); err != nil {
 		t.Fatalf("Failed to update config file: %v", err)
 	}
 
@@ -340,7 +340,7 @@ func TestReloadableConfig_InvalidConfigReload(t *testing.T) {
 
 	// Write valid initial config
 	initialConfig := `LogLevel info`
-	if err := os.WriteFile(configPath, []byte(initialConfig), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(initialConfig), 0o644); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
 
@@ -354,7 +354,7 @@ func TestReloadableConfig_InvalidConfigReload(t *testing.T) {
 	// Write invalid config
 	time.Sleep(10 * time.Millisecond)
 	invalidConfig := `LogLevel invalid_level` // Invalid log level
-	if err := os.WriteFile(configPath, []byte(invalidConfig), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(invalidConfig), 0o644); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
 

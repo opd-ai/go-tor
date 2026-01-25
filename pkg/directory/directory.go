@@ -35,7 +35,7 @@ const (
 	minDirectoryAuthorities = 5                // Minimum authorities for valid consensus (5 of 9)
 	minSignatureThreshold   = 5                // Minimum valid signatures required (proper quorum)
 	maxClockSkew            = 30 * time.Minute // Maximum allowed clock skew for consensus timestamps
-	
+
 	// Certificate caching
 	certCacheTTL = 24 * time.Hour // Authority certificates are valid for ~30 days, cache for 24h
 )
@@ -123,7 +123,7 @@ type Relay struct {
 	Fingerprint     string
 	Address         string
 	ORPort          int
-	DirPort          int
+	DirPort         int
 	Flags           []string
 	Published       time.Time
 	IdentityKey     []byte   // Ed25519 identity key (32 bytes) - SPEC-001
@@ -150,10 +150,10 @@ type AuthorityCertCache struct {
 
 // AuthorityCert represents a cached directory authority signing certificate
 type AuthorityCert struct {
-	Identity   string          // SHA-1 fingerprint of authority's identity key
-	SigningKey *rsa.PublicKey  // RSA public key for signature verification
-	ExpiresAt  time.Time       // Certificate expiration time
-	FetchedAt  time.Time       // When this cert was fetched
+	Identity   string         // SHA-1 fingerprint of authority's identity key
+	SigningKey *rsa.PublicKey // RSA public key for signature verification
+	ExpiresAt  time.Time      // Certificate expiration time
+	FetchedAt  time.Time      // When this cert was fetched
 }
 
 // NewClient creates a new directory client
@@ -334,7 +334,7 @@ func (c *Client) parseConsensusWithMetadata(r io.Reader) ([]*Relay, *ConsensusMe
 				metadata.ValidUntil = t
 			}
 		}
-		
+
 		// Parse consensus parameters (dir-spec.txt §3.4.1)
 		// Format: "params key=value key=value ..."
 		if strings.HasPrefix(line, "params ") {
@@ -745,19 +745,19 @@ type PaddingParams struct {
 	// Global padding settings
 	GlobalAllowedCells int  // Maximum padding cells allowed globally
 	PaddingDisabled    bool // Whether padding is disabled network-wide
-	
+
 	// APE (Adaptive Padding Engine) parameters
-	APEBurstMin  int // Minimum cells in a burst (default: 2)
-	APEBurstMax  int // Maximum cells in a burst (default: 10)
-	APEGapMinMS  int // Minimum gap between bursts in milliseconds (default: 1500)
-	APEGapMaxMS  int // Maximum gap between bursts in milliseconds (default: 9500)
+	APEBurstMin    int // Minimum cells in a burst (default: 2)
+	APEBurstMax    int // Maximum cells in a burst (default: 10)
+	APEGapMinMS    int // Minimum gap between bursts in milliseconds (default: 1500)
+	APEGapMaxMS    int // Maximum gap between bursts in milliseconds (default: 9500)
 	APECellDelayMS int // Delay between cells in a burst in milliseconds (default: 20)
-	
+
 	// Circuit setup padding parameters
-	SetupBurstMin int // Minimum cells in setup burst (default: 1)
-	SetupBurstMax int // Maximum cells in setup burst (default: 5)
-	SetupGapMinMS int // Minimum setup gap in milliseconds (default: 500)
-	SetupGapMaxMS int // Maximum setup gap in milliseconds (default: 2000)
+	SetupBurstMin    int // Minimum cells in setup burst (default: 1)
+	SetupBurstMax    int // Maximum cells in setup burst (default: 5)
+	SetupGapMinMS    int // Minimum setup gap in milliseconds (default: 500)
+	SetupGapMaxMS    int // Maximum setup gap in milliseconds (default: 2000)
 	SetupCellDelayMS int // Setup cell delay in milliseconds (default: 50)
 }
 
@@ -779,11 +779,11 @@ func GetPaddingParams(meta *ConsensusMetadata) *PaddingParams {
 		SetupGapMaxMS:      2000,
 		SetupCellDelayMS:   50,
 	}
-	
+
 	if meta == nil || meta.Params == nil {
 		return params
 	}
-	
+
 	// Parse global padding parameters
 	if val, ok := meta.Params["circpad_global_allowed_cells"]; ok {
 		params.GlobalAllowedCells = val
@@ -791,7 +791,7 @@ func GetPaddingParams(meta *ConsensusMetadata) *PaddingParams {
 	if val, ok := meta.Params["circpad_padding_disabled"]; ok {
 		params.PaddingDisabled = val != 0
 	}
-	
+
 	// Parse APE parameters (using nf_* prefix for network flow obfuscation)
 	if val, ok := meta.Params["nf_ito_low"]; ok && val > 0 {
 		params.APEGapMinMS = val
@@ -808,7 +808,7 @@ func GetPaddingParams(meta *ConsensusMetadata) *PaddingParams {
 	if val, ok := meta.Params["circpad_ape_cell_delay"]; ok && val > 0 {
 		params.APECellDelayMS = val
 	}
-	
+
 	// Parse circuit setup padding parameters
 	if val, ok := meta.Params["circpad_setup_burst_min"]; ok && val > 0 {
 		params.SetupBurstMin = val
@@ -825,7 +825,7 @@ func GetPaddingParams(meta *ConsensusMetadata) *PaddingParams {
 	if val, ok := meta.Params["circpad_setup_cell_delay"]; ok && val > 0 {
 		params.SetupCellDelayMS = val
 	}
-	
+
 	return params
 }
 
@@ -854,35 +854,35 @@ func getAuthorityName(v3ident string) string {
 // Get retrieves a cached certificate or fetches it from authorities (SPEC-003)
 func (c *AuthorityCertCache) Get(ctx context.Context, identity string, httpClient *http.Client, authorities []string) (*AuthorityCert, error) {
 	identity = strings.ToUpper(identity)
-	
+
 	// Check cache first
 	c.mu.RLock()
 	cert, ok := c.certs[identity]
 	c.mu.RUnlock()
-	
+
 	// Return cached cert if valid
 	if ok && time.Since(cert.FetchedAt) < certCacheTTL && time.Now().Before(cert.ExpiresAt) {
 		return cert, nil
 	}
-	
+
 	// Fetch new certificate
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	// Double-check after acquiring write lock
 	if cert, ok := c.certs[identity]; ok && time.Since(cert.FetchedAt) < certCacheTTL && time.Now().Before(cert.ExpiresAt) {
 		return cert, nil
 	}
-	
+
 	// Fetch from authorities
 	newCert, err := c.fetchAuthorityCert(ctx, identity, httpClient, authorities)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch authority certificate: %w", err)
 	}
-	
+
 	c.certs[identity] = newCert
 	c.logger.Info("Cached authority certificate", "identity", identity, "expires", newCert.ExpiresAt)
-	
+
 	return newCert, nil
 }
 
@@ -895,42 +895,42 @@ func (c *AuthorityCertCache) fetchAuthorityCert(ctx context.Context, identity st
 		baseURL := strings.TrimSuffix(authority, "/tor/status-vote/current/consensus-microdesc")
 		baseURL = strings.TrimSuffix(baseURL, "/tor/status-vote/current/consensus")
 		certURL := baseURL + "/tor/keys/authority"
-		
+
 		req, err := http.NewRequestWithContext(ctx, "GET", certURL, nil)
 		if err != nil {
 			lastErr = err
 			continue
 		}
-		
+
 		resp, err := httpClient.Do(req)
 		if err != nil {
 			lastErr = err
 			continue
 		}
-		
+
 		body, err := io.ReadAll(resp.Body)
 		resp.Body.Close()
-		
+
 		if err != nil {
 			lastErr = err
 			continue
 		}
-		
+
 		if resp.StatusCode != http.StatusOK {
 			lastErr = fmt.Errorf("unexpected status: %d", resp.StatusCode)
 			continue
 		}
-		
+
 		// Parse the certificate
 		cert, err := c.parseAuthorityCert(body, identity)
 		if err != nil {
 			lastErr = err
 			continue
 		}
-		
+
 		return cert, nil
 	}
-	
+
 	return nil, fmt.Errorf("failed to fetch from any authority: %w", lastErr)
 }
 
@@ -939,15 +939,15 @@ func (c *AuthorityCertCache) fetchAuthorityCert(ctx context.Context, identity st
 // containing their RSA public key for signature verification
 func (c *AuthorityCertCache) parseAuthorityCert(data []byte, expectedIdentity string) (*AuthorityCert, error) {
 	scanner := bufio.NewScanner(strings.NewReader(string(data)))
-	
+
 	var identity string
 	var signingKeyPEM strings.Builder
 	var expiresAt time.Time
 	inSigningKey := false
-	
+
 	for scanner.Scan() {
 		line := scanner.Text()
-		
+
 		// Parse fingerprint line
 		if strings.HasPrefix(line, "fingerprint ") {
 			parts := strings.Fields(line)
@@ -957,7 +957,7 @@ func (c *AuthorityCertCache) parseAuthorityCert(data []byte, expectedIdentity st
 				identity = strings.ToUpper(identity)
 			}
 		}
-		
+
 		// Parse dir-key-expires
 		if strings.HasPrefix(line, "dir-key-expires ") {
 			timeStr := strings.TrimPrefix(line, "dir-key-expires ")
@@ -965,14 +965,14 @@ func (c *AuthorityCertCache) parseAuthorityCert(data []byte, expectedIdentity st
 				expiresAt = t
 			}
 		}
-		
+
 		// Parse signing key
 		if strings.HasPrefix(line, "-----BEGIN RSA PUBLIC KEY-----") {
 			inSigningKey = true
 			signingKeyPEM.WriteString(line + "\n")
 			continue
 		}
-		
+
 		if inSigningKey {
 			signingKeyPEM.WriteString(line + "\n")
 			if strings.HasPrefix(line, "-----END RSA PUBLIC KEY-----") {
@@ -980,24 +980,24 @@ func (c *AuthorityCertCache) parseAuthorityCert(data []byte, expectedIdentity st
 			}
 		}
 	}
-	
+
 	// Verify we got the expected identity
 	if identity != expectedIdentity {
 		return nil, fmt.Errorf("certificate identity mismatch: got %s, want %s", identity, expectedIdentity)
 	}
-	
+
 	// Parse RSA public key
 	block, _ := pem.Decode([]byte(signingKeyPEM.String()))
 	if block == nil {
 		return nil, fmt.Errorf("failed to decode PEM block")
 	}
-	
+
 	// Try parsing as PKCS1 RSA public key (standard for Tor)
 	pubKey, err := x509.ParsePKCS1PublicKey(block.Bytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse RSA public key: %w", err)
 	}
-	
+
 	return &AuthorityCert{
 		Identity:   identity,
 		SigningKey: pubKey,
@@ -1009,13 +1009,13 @@ func (c *AuthorityCertCache) parseAuthorityCert(data []byte, expectedIdentity st
 // VerifyConsensusSignatures verifies cryptographic signatures on a consensus document (SPEC-003)
 // This implements RSA-PKCS1v15 signature verification per dir-spec.txt §3.4
 // The function verifies that at least minSignatureThreshold valid signatures are present
-// 
+//
 // Parameters:
 //   - ctx: Context for certificate fetching
 //   - consensusBody: The signed portion of the consensus (from "network-status-version" to "directory-signature" lines, exclusive)
 //   - meta: Consensus metadata containing parsed signatures
 //
-// Returns error if verification fails or if insufficient valid signatures are found
+// # Returns error if verification fails or if insufficient valid signatures are found
 //
 // IMPLEMENTATION STATUS (SPEC-003):
 //   - ✅ Signature structure validation complete
@@ -1046,7 +1046,7 @@ func (c *Client) VerifyConsensusSignatures(ctx context.Context, consensusBody []
 			c.logger.Debug("Failed to extract signature data", "identity", sig.Identity)
 			continue
 		}
-		
+
 		// Decode base64 signature
 		sigBytes, err := base64.StdEncoding.DecodeString(sigData)
 		if err != nil {
@@ -1120,7 +1120,7 @@ func (c *Client) VerifyConsensusSignatures(ctx context.Context, consensusBody []
 func extractSignatureData(sigBlock string) string {
 	lines := strings.Split(sigBlock, "\n")
 	var sigData strings.Builder
-	
+
 	inBlock := false
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -1135,7 +1135,7 @@ func extractSignatureData(sigBlock string) string {
 			sigData.WriteString(line)
 		}
 	}
-	
+
 	return sigData.String()
 }
 

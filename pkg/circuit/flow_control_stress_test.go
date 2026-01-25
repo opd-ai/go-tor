@@ -38,7 +38,7 @@ func TestFlowControlHighThroughput(t *testing.T) {
 			// Window exhausted, simulate receiving SENDME
 			circ.incrementPackageWindow()
 			sendmesSent++
-			
+
 			// Retry the cell
 			err = circ.decrementPackageWindow()
 			if err != nil {

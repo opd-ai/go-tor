@@ -286,9 +286,9 @@ func TestAuthenticationNoPasswordProvided(t *testing.T) {
 // TestProtocolInfoAuthMethods tests that PROTOCOLINFO reports correct auth methods
 func TestProtocolInfoAuthMethods(t *testing.T) {
 	tests := []struct {
-		name             string
-		password         string
-		expectedMethod   string
+		name           string
+		password       string
+		expectedMethod string
 	}{
 		{
 			name:           "No password - NULL auth",

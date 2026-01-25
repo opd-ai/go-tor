@@ -519,10 +519,10 @@ func (e *Extension) deriveHopFromKeyMaterial(keyMaterial []byte) (*Hop, error) {
 	}
 
 	// Extract keys from key material per tor-spec.txt §5.2
-	dfKey := keyMaterial[0:20]   // Forward digest key
-	dbKey := keyMaterial[20:40]  // Backward digest key
-	kfKey := keyMaterial[40:56]  // Forward cipher key (AES-128)
-	kbKey := keyMaterial[56:72]  // Backward cipher key (AES-128)
+	dfKey := keyMaterial[0:20]  // Forward digest key
+	dbKey := keyMaterial[20:40] // Backward digest key
+	kfKey := keyMaterial[40:56] // Forward cipher key (AES-128)
+	kbKey := keyMaterial[56:72] // Backward cipher key (AES-128)
 
 	// Create forward cipher (client → relay)
 	// Per tor-spec.txt §5.1.1, use AES-128-CTR with zero IV
@@ -547,7 +547,7 @@ func (e *Extension) deriveHopFromKeyMaterial(keyMaterial []byte) (*Hop, error) {
 	// Initialize with the digest keys (Df, Db)
 	forwardDigest := sha1.New() // #nosec G401 - SHA-1 required by Tor spec
 	forwardDigest.Write(dfKey)  // #nosec G104 - hash.Hash.Write never fails
-	
+
 	backwardDigest := sha1.New() // #nosec G401 - SHA-1 required by Tor spec
 	backwardDigest.Write(dbKey)  // #nosec G104 - hash.Hash.Write never fails
 

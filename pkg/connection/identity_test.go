@@ -12,10 +12,10 @@ func TestConnectionExpectedIdentityGetters(t *testing.T) {
 	testFingerprint := "0011223344556677889900AABBCCDDEEFF00112233"
 
 	tests := []struct {
-		name                string
-		setupConfig         func() *Config
-		wantIdentity        []byte
-		wantFingerprint     string
+		name            string
+		setupConfig     func() *Config
+		wantIdentity    []byte
+		wantFingerprint string
 	}{
 		{
 			name: "both values set",

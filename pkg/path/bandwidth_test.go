@@ -94,8 +94,8 @@ func TestWeightedRandomIndex(t *testing.T) {
 func TestWeightedRandomIndexDistribution(t *testing.T) {
 	// Test that higher bandwidth relays are selected more frequently
 	relays := []*directory.Relay{
-		{Nickname: "LowBW", Bandwidth: 100},     // 10% of total
-		{Nickname: "HighBW", Bandwidth: 900},    // 90% of total
+		{Nickname: "LowBW", Bandwidth: 100},  // 10% of total
+		{Nickname: "HighBW", Bandwidth: 900}, // 90% of total
 	}
 
 	const iterations = 1000

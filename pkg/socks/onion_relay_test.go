@@ -180,9 +180,11 @@ func (m *mockConnection) RemoteAddr() net.Addr { return nil }
 func (m *mockConnection) SetDeadline(t time.Time) error {
 	return nil
 }
+
 func (m *mockConnection) SetReadDeadline(t time.Time) error {
 	return nil
 }
+
 func (m *mockConnection) SetWriteDeadline(t time.Time) error {
 	return nil
 }
@@ -205,7 +207,7 @@ func TestOnionServiceDataRelay(t *testing.T) {
 
 	// Create mock circuit manager
 	circuitMgr := newMockCircuitManagerForRelay()
-	
+
 	// Create mock circuit
 	mockCirc := newMockCircuitForRelay(1000)
 	circuitMgr.AddCircuit(mockCirc)
@@ -228,11 +230,11 @@ func TestOnionServiceDataRelay(t *testing.T) {
 
 	go func() {
 		defer wg.Done()
-		
+
 		// We need to adapt the mockCircuitManager to circuit.Manager interface
 		// For this test, we'll directly test the relay logic
 		// by simulating the relay process manually
-		
+
 		// Instead, let's test the individual components
 		relayErr = nil // Placeholder - in a real implementation, we'd call relayOnionServiceData
 	}()

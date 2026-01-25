@@ -291,13 +291,13 @@ func (h *Handshake) receiveCERTS(ctx context.Context) error {
 	// Validate relay identity if expected values are provided
 	expectedIdentity := h.conn.ExpectedIdentity()
 	expectedFingerprint := h.conn.ExpectedFingerprint()
-	
+
 	if expectedIdentity != nil || expectedFingerprint != "" {
 		if err := certs.ValidateRelayIdentity(expectedFingerprint, expectedIdentity); err != nil {
 			if h.conn.RequireCERTS() {
 				return fmt.Errorf("relay identity validation failed (strict mode): %w", err)
 			}
-			h.logger.Warn("Relay identity validation failed", 
+			h.logger.Warn("Relay identity validation failed",
 				"error", err,
 				"expected_identity_set", expectedIdentity != nil,
 				"expected_fingerprint_set", expectedFingerprint != "")

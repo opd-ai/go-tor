@@ -226,7 +226,6 @@ func TestNewContextWithRequestID(t *testing.T) {
 	t.Run("creates context with ID", func(t *testing.T) {
 		ctx := context.Background()
 		newCtx, id, err := NewContextWithRequestID(ctx)
-
 		if err != nil {
 			t.Fatalf("NewContextWithRequestID() returned error: %v", err)
 		}
@@ -248,7 +247,6 @@ func TestNewContextWithRequestID(t *testing.T) {
 		type testKey string
 		ctx := context.WithValue(context.Background(), testKey("key"), "value")
 		newCtx, _, err := NewContextWithRequestID(ctx)
-
 		if err != nil {
 			t.Fatalf("NewContextWithRequestID() returned error: %v", err)
 		}

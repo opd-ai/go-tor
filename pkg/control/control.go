@@ -373,7 +373,7 @@ func (s *Server) getInfoValue(key string, stats StatsProvider) (string, bool) {
 		return "0", true
 	case "status/enough-dir-info":
 		return "1", true
-	
+
 	// Circuit statistics
 	case "status/circuits":
 		return fmt.Sprintf("%d", stats.GetActiveCircuits()), true
@@ -383,17 +383,17 @@ func (s *Server) getInfoValue(key string, stats StatsProvider) (string, bool) {
 		return fmt.Sprintf("%d", stats.GetCircuitBuildSuccess()), true
 	case "status/circuit-build-failure":
 		return fmt.Sprintf("%d", stats.GetCircuitBuildFailure()), true
-	
+
 	// Guard statistics
 	case "status/guards/active":
 		return fmt.Sprintf("%d", stats.GetGuardsActive()), true
 	case "status/guards/confirmed":
 		return fmt.Sprintf("%d", stats.GetGuardsConfirmed()), true
-	
+
 	// Connection statistics
 	case "status/connection-attempts":
 		return fmt.Sprintf("%d", stats.GetConnectionAttempts()), true
-	
+
 	// System information
 	case "status/uptime":
 		return fmt.Sprintf("%d", stats.GetUptimeSeconds()), true
@@ -403,17 +403,17 @@ func (s *Server) getInfoValue(key string, stats StatsProvider) (string, bool) {
 	case "config-text":
 		// Not implemented - would require full config serialization
 		return "", false
-	
+
 	// Port information
 	case "net/listeners/socks":
 		return fmt.Sprintf("127.0.0.1:%d", stats.GetSocksPort()), true
 	case "net/listeners/control":
 		return fmt.Sprintf("127.0.0.1:%d", stats.GetControlPort()), true
-	
+
 	// Help information
 	case "info/names":
 		return s.getInfoNames(), true
-	
+
 	default:
 		return "", false
 	}

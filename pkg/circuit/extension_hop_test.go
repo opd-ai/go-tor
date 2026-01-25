@@ -183,7 +183,7 @@ func TestDeriveHopFromKeyMaterial_DeterministicOutput(t *testing.T) {
 
 	// Test that both hops produce identical encryption
 	plaintext := []byte("deterministic test")
-	
+
 	encrypted1 := make([]byte, len(plaintext))
 	copy(encrypted1, plaintext)
 	hop1.ForwardCipher.XORKeyStream(encrypted1, encrypted1)
@@ -220,7 +220,7 @@ func TestProcessCreated2_IntegrationWithAddHop(t *testing.T) {
 
 	// We expect this to fail at ntor verification, not at AddHop
 	err := ext.ProcessCreated2(created2Cell)
-	
+
 	// Should fail during ntor verification (before AddHop is called)
 	if err == nil {
 		t.Error("ProcessCreated2 should fail with invalid handshake data")
@@ -255,7 +255,7 @@ func TestProcessExtended2_IntegrationWithAddHop(t *testing.T) {
 
 	// We expect this to fail at ntor verification
 	err := ext.ProcessExtended2(extended2Cell)
-	
+
 	// Should fail during ntor verification (before AddHop is called)
 	if err == nil {
 		t.Error("ProcessExtended2 should fail with invalid handshake data")
@@ -264,9 +264,9 @@ func TestProcessExtended2_IntegrationWithAddHop(t *testing.T) {
 
 // Helper function to check if string contains substring
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && 
-		(s == substr || len(s) > len(substr) && 
-			(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || 
+	return len(s) >= len(substr) &&
+		(s == substr || len(s) > len(substr) &&
+			(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
 				findSubstring(s, substr)))
 }
 

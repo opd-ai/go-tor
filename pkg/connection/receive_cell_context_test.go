@@ -43,7 +43,7 @@ func TestReceiveCellWithContextCancellation(t *testing.T) {
 	// Check goroutine count
 	after := runtime.NumGoroutine()
 	leaked := after - baseline
-	
+
 	if leaked > 2 {
 		t.Errorf("Goroutine leak detected: baseline=%d, after=%d, leaked=%d", baseline, after, leaked)
 	}
@@ -75,7 +75,7 @@ func TestReceiveCellWithContextMultipleCancellations(t *testing.T) {
 
 	after := runtime.NumGoroutine()
 	leaked := after - baseline
-	
+
 	// With 20 cancelled reads, we should not accumulate goroutines
 	if leaked > 3 {
 		t.Errorf("Goroutine leak detected after 20 cancellations: baseline=%d, after=%d, leaked=%d", baseline, after, leaked)

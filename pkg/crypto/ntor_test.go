@@ -3,12 +3,12 @@ package crypto
 import (
 	"bytes"
 	"crypto/rand"
+	"crypto/sha256"
+	"io"
 	"testing"
 
-	"crypto/sha256"
 	"golang.org/x/crypto/curve25519"
 	"golang.org/x/crypto/hkdf"
-	"io"
 )
 
 // TestNtorHandshakeEndToEnd performs a complete end-to-end ntor handshake

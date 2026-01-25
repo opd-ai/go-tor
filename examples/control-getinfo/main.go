@@ -19,7 +19,7 @@ func main() {
 	fmt.Println("Make sure to start the Tor client first with:")
 	fmt.Println("  go run cmd/go-tor/main.go")
 	fmt.Println()
-	
+
 	conn, err := net.DialTimeout("tcp", "127.0.0.1:9051", 5*time.Second)
 	if err != nil {
 		fmt.Printf("Cannot connect to control port (this is expected if client not running)\n")
@@ -99,12 +99,12 @@ func printExampleCommands() {
 		"GETINFO net/listeners/socks",
 		"GETINFO info/names",
 	}
-	
+
 	fmt.Println("\nBasic Information:")
 	for _, cmd := range commands {
 		fmt.Printf("  %s\n", cmd)
 	}
-	
+
 	fmt.Println("\nMultiple keys at once:")
 	fmt.Println("  GETINFO status/circuits status/guards/active status/uptime")
 }

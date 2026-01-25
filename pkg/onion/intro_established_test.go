@@ -66,6 +66,3 @@ func stringContains(s, substr string) bool {
 	}
 	return false
 }
-
-
-

@@ -121,7 +121,6 @@ func TestCircuitBreaker_HalfOpenState(t *testing.T) {
 	err := cb.Execute(ctx, func() error {
 		return nil // Success
 	})
-
 	if err != nil {
 		t.Errorf("Expected no error in half-open state, got %v", err)
 	}
@@ -338,7 +337,6 @@ func TestCircuitBreaker_ExecuteWithRetry(t *testing.T) {
 		}
 		return nil
 	})
-
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}

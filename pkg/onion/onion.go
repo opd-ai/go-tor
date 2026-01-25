@@ -34,13 +34,13 @@ const (
 	// V3AddressLength is the length of a v3 onion address in base32 characters
 	V3AddressLength = 56 // 56 base32 characters
 	// V3Suffix is the domain suffix for onion addresses
-	V3Suffix        = ".onion"
+	V3Suffix = ".onion"
 	// V3Version is the version byte for v3 onion addresses
-	V3Version       = 0x03
+	V3Version = 0x03
 	// V3ChecksumLen is the length of the checksum in v3 onion addresses
-	V3ChecksumLen   = 2
+	V3ChecksumLen = 2
 	// V3PubkeyLen is the length of the ed25519 public key in bytes
-	V3PubkeyLen     = 32 // ed25519 public key
+	V3PubkeyLen = 32 // ed25519 public key
 
 	// MaxDescriptorSize is the maximum descriptor size to prevent resource exhaustion.
 	// Per rend-spec-v3.txt, descriptors are typically under 50KB.
@@ -359,7 +359,7 @@ func NewClient(log *logger.Logger) *Client {
 		hsdir:           NewHSDir(log),
 		consensus:       make([]*HSDirectory, 0),
 		rendezvousState: make(map[uint32]*RendezvousState), // AUDIT-006
-		authStore:       NewClientAuthStore(),               // Client authorization support
+		authStore:       NewClientAuthStore(),              // Client authorization support
 	}
 }
 
@@ -413,14 +413,14 @@ func (c *Client) AddClientAuth(onionAddress string, privateKey [32]byte) error {
 	if c.authStore == nil {
 		c.authStore = NewClientAuthStore()
 	}
-	
+
 	if err := c.authStore.AddCredential(onionAddress, privateKey); err != nil {
 		c.logger.Error("Failed to add client auth credential",
 			"address", onionAddress,
 			"error", err)
 		return err
 	}
-	
+
 	c.logger.Info("Client authorization credential added", "address", onionAddress)
 	return nil
 }
@@ -469,7 +469,7 @@ func (c *Client) GetDescriptor(ctx context.Context, addr *Address) (*Descriptor,
 	if len(desc.IntroPoints) == 0 && c.authStore != nil {
 		c.logger.Debug("Descriptor has no intro points, trying client authorization",
 			"address", addr.String())
-		
+
 		authDesc, authErr := c.TryClientAuth(desc, addr)
 		if authErr != nil {
 			c.logger.Warn("Client authorization failed",
@@ -765,13 +765,13 @@ func DecryptDescriptor(descriptor *Descriptor, address *Address, timePeriod uint
 	// Extract encrypted data between "-----BEGIN MESSAGE-----" and "-----END MESSAGE-----"
 	beginMarker := []byte("-----BEGIN MESSAGE-----")
 	endMarker := []byte("-----END MESSAGE-----")
-	
+
 	beginIdx := bytes.Index(raw[superencryptedIdx:], beginMarker)
 	if beginIdx == -1 {
 		return nil, fmt.Errorf("superencrypted section missing BEGIN MESSAGE marker")
 	}
 	beginIdx += superencryptedIdx + len(beginMarker)
-	
+
 	endIdx := bytes.Index(raw[beginIdx:], endMarker)
 	if endIdx == -1 {
 		return nil, fmt.Errorf("superencrypted section missing END MESSAGE marker")
@@ -788,7 +788,7 @@ func DecryptDescriptor(descriptor *Descriptor, address *Address, timePeriod uint
 	// Per rend-spec-v3.txt section 2.5.1.2:
 	// The encrypted data format is: SALT (16 bytes) || ENCRYPTED (variable) || MAC (16 bytes)
 	// Using XChaCha20-Poly1305 (24-byte nonce derived from SALT and SECRET_INPUT)
-	
+
 	if len(encryptedData) < 32 {
 		return nil, fmt.Errorf("encrypted data too short: %d bytes", len(encryptedData))
 	}
@@ -800,7 +800,7 @@ func DecryptDescriptor(descriptor *Descriptor, address *Address, timePeriod uint
 	// SECRET_INPUT = blinded_pubkey
 	// SECRET_DATA = SALT
 	// Keys = HKDF-SHA256(SECRET_INPUT, SALT, "hsdir-superencrypted-data", 32)
-	
+
 	blindedPubkey := ComputeBlindedPubkey(ed25519.PublicKey(address.Pubkey), timePeriod)
 	keys, err := deriveDescriptorKeys(blindedPubkey, salt, "hsdir-superencrypted-data")
 	if err != nil {
@@ -815,7 +815,7 @@ func DecryptDescriptor(descriptor *Descriptor, address *Address, timePeriod uint
 		return nil, fmt.Errorf("failed to derive nonce: %w", err)
 	}
 	defer security.SecureZeroMemory(nonce)
-	
+
 	if len(nonce) < chacha20poly1305.NonceSizeX {
 		return nil, fmt.Errorf("derived nonce too short: %d bytes", len(nonce))
 	}
@@ -850,13 +850,13 @@ func DecryptDescriptor(descriptor *Descriptor, address *Address, timePeriod uint
 func deriveDescriptorKeys(secret, salt []byte, info string) ([]byte, error) {
 	// Create HKDF with SHA256
 	kdf := hkdf.New(sha256.New, secret, salt, []byte(info))
-	
+
 	// Derive 32 bytes for the key material
 	key := make([]byte, 32)
 	if _, err := io.ReadFull(kdf, key); err != nil {
 		return nil, fmt.Errorf("HKDF derivation failed: %w", err)
 	}
-	
+
 	return key, nil
 }
 

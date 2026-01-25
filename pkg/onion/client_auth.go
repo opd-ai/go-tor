@@ -19,9 +19,9 @@ import (
 // ClientAuthCredential represents a client authorization credential for accessing private onion services
 // Per rend-spec-v3.txt §2.5, clients need x25519 key pairs to decrypt authorized descriptors
 type ClientAuthCredential struct {
-	OnionAddress string     // The .onion address this credential is for
-	PrivateKey   [32]byte   // x25519 private key for client authorization
-	PublicKey    [32]byte   // x25519 public key (derived from private key)
+	OnionAddress string   // The .onion address this credential is for
+	PrivateKey   [32]byte // x25519 private key for client authorization
+	PublicKey    [32]byte // x25519 public key (derived from private key)
 }
 
 // ClientAuthStore manages client authorization credentials
@@ -85,11 +85,13 @@ func (s *ClientAuthStore) Clear() {
 // that requires the client's x25519 private key to decrypt
 //
 // Wire format of encrypted auth layer:
-//   CLIENT_ID (8 bytes) || IV (16 bytes) || ENCRYPTED_DATA || MAC (16 bytes)
+//
+//	CLIENT_ID (8 bytes) || IV (16 bytes) || ENCRYPTED_DATA || MAC (16 bytes)
 //
 // Encryption uses AES-256-CTR with keys derived from:
-//   shared_secret = X25519(client_private_key, service_public_key_for_auth)
-func DecryptAuthDescriptor(encryptedData []byte, clientPrivateKey [32]byte, servicePubKey [32]byte) ([]byte, error) {
+//
+//	shared_secret = X25519(client_private_key, service_public_key_for_auth)
+func DecryptAuthDescriptor(encryptedData []byte, clientPrivateKey, servicePubKey [32]byte) ([]byte, error) {
 	if len(encryptedData) < 40 { // CLIENT_ID(8) + IV(16) + MAC(16)
 		return nil, fmt.Errorf("encrypted data too short: %d bytes", len(encryptedData))
 	}
@@ -97,13 +99,13 @@ func DecryptAuthDescriptor(encryptedData []byte, clientPrivateKey [32]byte, serv
 	// Extract components
 	// CLIENT_ID is first 8 bytes (used to identify which client key to use)
 	clientID := encryptedData[0:8]
-	
+
 	// IV is next 16 bytes
 	iv := encryptedData[8:24]
-	
+
 	// Remaining data includes ciphertext and MAC
 	ciphertextWithMAC := encryptedData[24:]
-	
+
 	if len(ciphertextWithMAC) < 16 {
 		return nil, fmt.Errorf("insufficient data for MAC")
 	}
@@ -158,12 +160,12 @@ func DecryptAuthDescriptor(encryptedData []byte, clientPrivateKey [32]byte, serv
 // Uses HKDF-SHA256 with the shared secret, client ID as salt, and info string
 func deriveAuthKeys(secret, salt, info []byte, length int) ([]byte, error) {
 	kdf := hkdf.New(sha256.New, secret, salt, info)
-	
+
 	keys := make([]byte, length)
 	if _, err := io.ReadFull(kdf, keys); err != nil {
 		return nil, fmt.Errorf("HKDF derivation failed: %w", err)
 	}
-	
+
 	return keys, nil
 }
 
@@ -177,7 +179,8 @@ func computeMAC(key, data []byte) []byte {
 
 // ParseAuthClients parses auth-client entries from a descriptor
 // Per rend-spec-v3.txt §2.5.1.1, authorized descriptors contain auth-client lines:
-//   "auth-client" SP client-id SP iv SP encrypted-cookie
+//
+//	"auth-client" SP client-id SP iv SP encrypted-cookie
 //
 // Returns a map of client-id -> encrypted auth data
 func ParseAuthClients(descriptorLines []string) (map[string][]byte, error) {
@@ -232,7 +235,7 @@ func ParseAuthClients(descriptorLines []string) (map[string][]byte, error) {
 func splitFields(line string) []string {
 	fields := make([]string, 0, 4)
 	field := make([]byte, 0, 64)
-	
+
 	for i := 0; i < len(line); i++ {
 		c := line[i]
 		if c == ' ' || c == '\t' {
@@ -244,11 +247,11 @@ func splitFields(line string) []string {
 			field = append(field, c)
 		}
 	}
-	
+
 	if len(field) > 0 {
 		fields = append(fields, string(field))
 	}
-	
+
 	return fields
 }
 
@@ -273,7 +276,7 @@ func (c *Client) TryClientAuth(descriptor *Descriptor, address *Address) (*Descr
 	// Look for encrypted auth layer in descriptor
 	// Per rend-spec-v3.txt §2.5, authorized descriptors have an "encrypted" section
 	// that is separate from the superencrypted section
-	
+
 	// Parse the descriptor to find auth-client entries
 	lines := splitDescriptorLines(descriptor.RawDescriptor)
 	authClients, err := ParseAuthClients(lines)
@@ -349,7 +352,7 @@ func (c *Client) TryClientAuth(descriptor *Descriptor, address *Address) (*Descr
 func splitDescriptorLines(raw []byte) []string {
 	lines := make([]string, 0, 50)
 	line := make([]byte, 0, 256)
-	
+
 	for i := 0; i < len(raw); i++ {
 		c := raw[i]
 		if c == '\n' {
@@ -361,10 +364,10 @@ func splitDescriptorLines(raw []byte) []string {
 			line = append(line, c)
 		}
 	}
-	
+
 	if len(line) > 0 {
 		lines = append(lines, string(line))
 	}
-	
+
 	return lines
 }

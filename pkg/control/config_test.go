@@ -33,7 +33,7 @@ func TestGetConfRequiresAuth(t *testing.T) {
 	defer conn.Close()
 
 	reader := bufio.NewReader(conn)
-	
+
 	// Consume greeting
 	reader.ReadString('\n')
 
@@ -53,10 +53,10 @@ func TestGetConfSingleKey(t *testing.T) {
 		socksPort:      9050,
 		controlPort:    9051,
 		config: map[string]string{
-			"SocksPort":    "9050",
-			"ControlPort":  "9051",
-			"LogLevel":     "info",
-			"MetricsPort":  "9090",
+			"SocksPort":   "9050",
+			"ControlPort": "9051",
+			"LogLevel":    "info",
+			"MetricsPort": "9090",
 		},
 	}
 
@@ -100,10 +100,10 @@ func TestGetConfMultipleKeys(t *testing.T) {
 		socksPort:      9050,
 		controlPort:    9051,
 		config: map[string]string{
-			"SocksPort":    "9050",
-			"ControlPort":  "9051",
-			"LogLevel":     "debug",
-			"MetricsPort":  "9090",
+			"SocksPort":   "9050",
+			"ControlPort": "9051",
+			"LogLevel":    "debug",
+			"MetricsPort": "9090",
 		},
 	}
 
@@ -267,7 +267,7 @@ func TestSetConfRequiresAuth(t *testing.T) {
 	defer conn.Close()
 
 	reader := bufio.NewReader(conn)
-	
+
 	// Consume greeting
 	reader.ReadString('\n')
 

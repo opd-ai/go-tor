@@ -1004,7 +1004,7 @@ func (c *Circuit) SendRelayCell(relayCell *cell.RelayCell) error {
 		if err := c.decrementPackageWindow(); err != nil {
 			return fmt.Errorf("circuit flow control: %w", err)
 		}
-		
+
 		// Stream-level flow control (if this is a stream-level DATA cell)
 		if relayCell.StreamID > 0 {
 			if err := c.decrementStreamPackageWindow(relayCell.StreamID); err != nil {
@@ -1172,7 +1172,7 @@ func (c *Circuit) DeliverRelayCell(cellData *cell.Cell) error {
 			if err := c.decrementStreamDeliverWindow(relayCell.StreamID); err != nil {
 				return fmt.Errorf("stream flow control: %w", err)
 			}
-			
+
 			// Check if we should send a stream-level SENDME
 			if c.shouldSendStreamSendme(relayCell.StreamID) {
 				// Send stream SENDME in background to avoid blocking

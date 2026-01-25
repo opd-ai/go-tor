@@ -137,8 +137,8 @@ func TestCERTSValidation_StrictModeIdentity(t *testing.T) {
 // Helper function to create a signed Ed25519 certificate for testing
 func createTestEd25519Cert(t *testing.T, pubKey ed25519.PublicKey, privKey ed25519.PrivateKey, expiryTimeHours uint32) []byte {
 	certData := make([]byte, 104) // Version(1) + CertType(1) + Expiry(4) + CertKeyType(1) + CertifiedKey(32) + N_Extensions(1) + Signature(64)
-	certData[0] = 1                // Version
-	certData[1] = 4                // CertType: Ed25519 signing key (self-signed)
+	certData[0] = 1               // Version
+	certData[1] = 4               // CertType: Ed25519 signing key (self-signed)
 	binary.BigEndian.PutUint32(certData[2:6], expiryTimeHours)
 	certData[6] = 1 // CertKeyType: Ed25519
 	copy(certData[7:39], pubKey)

@@ -47,26 +47,26 @@ func TestDecryptDescriptor(t *testing.T) {
 			setupDesc: func() *Descriptor {
 				// Create a simple encrypted descriptor
 				plaintext := []byte("introduction-point\nauth-key\nABCDEFGH==\n")
-				
+
 				// Derive encryption keys
 				blindedPubkey := ComputeBlindedPubkey(pubkey, timePeriod)
 				salt := make([]byte, 16)
 				rand.Read(salt)
-				
+
 				keys, _ := deriveDescriptorKeys(blindedPubkey, salt, "hsdir-superencrypted-data")
 				nonce, _ := deriveDescriptorKeys(blindedPubkey, salt, "hsdir-superencrypted-nonce")
-				
+
 				// Encrypt with XChaCha20-Poly1305
 				aead, _ := chacha20poly1305.NewX(keys[:32])
 				ciphertext := aead.Seal(nil, nonce[:chacha20poly1305.NonceSizeX], plaintext, nil)
-				
+
 				// Build encrypted data: SALT || CIPHERTEXT
 				encryptedData := append(salt, ciphertext...)
 				encryptedB64 := base64.StdEncoding.EncodeToString(encryptedData)
-				
+
 				raw := "hs-descriptor 3\nrevision-counter 1\nsuperencrypted\n-----BEGIN MESSAGE-----\n" +
 					encryptedB64 + "\n-----END MESSAGE-----\n"
-				
+
 				return &Descriptor{
 					Version:       3,
 					RawDescriptor: []byte(raw),
@@ -221,8 +221,8 @@ func TestParseDecryptedLayer(t *testing.T) {
 			wantIntroPoints: 0,
 		},
 		{
-			name: "single introduction point",
-			data: "introduction-point\nauth-key\n" + base64.StdEncoding.EncodeToString(make([]byte, 32)) + "\n",
+			name:            "single introduction point",
+			data:            "introduction-point\nauth-key\n" + base64.StdEncoding.EncodeToString(make([]byte, 32)) + "\n",
 			wantIntroPoints: 1,
 		},
 		{
@@ -232,8 +232,8 @@ func TestParseDecryptedLayer(t *testing.T) {
 			wantIntroPoints: 2,
 		},
 		{
-			name: "introduction point with onion key",
-			data: "introduction-point\nonion-key\nntor " + base64.StdEncoding.EncodeToString(make([]byte, 32)) + "\n",
+			name:            "introduction point with onion key",
+			data:            "introduction-point\nonion-key\nntor " + base64.StdEncoding.EncodeToString(make([]byte, 32)) + "\n",
 			wantIntroPoints: 1,
 		},
 	}
@@ -269,9 +269,9 @@ func TestParseLinkSpecifiers(t *testing.T) {
 		{
 			name: "single link specifier",
 			data: []byte{
-				1,    // NSPEC = 1
-				0x00, // LSTYPE = 0 (IPv4)
-				6,    // LSLEN = 6
+				1,              // NSPEC = 1
+				0x00,           // LSTYPE = 0 (IPv4)
+				6,              // LSLEN = 6
 				192, 168, 1, 1, // IP address
 				0x1F, 0x90, // Port 8080
 			},
@@ -408,6 +408,6 @@ superencrypted
 
 // Helper function to check if a string contains a substring
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 || 
+	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
 		(len(s) > 0 && (s[:len(substr)] == substr || contains(s[1:], substr))))
 }

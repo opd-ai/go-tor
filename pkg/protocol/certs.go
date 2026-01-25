@@ -68,20 +68,20 @@ type Certificate struct {
 
 // Ed25519Certificate represents a Tor Ed25519 certificate per cert-spec.txt
 type Ed25519Certificate struct {
-	Version    uint8
-	CertType   uint8
-	ExpiresAt  time.Time
-	CertKeyType uint8
+	Version      uint8
+	CertType     uint8
+	ExpiresAt    time.Time
+	CertKeyType  uint8
 	CertifiedKey []byte
-	Extensions []Ed25519Extension
-	Signature  []byte
+	Extensions   []Ed25519Extension
+	Signature    []byte
 }
 
 // Ed25519Extension represents an extension in an Ed25519 certificate
 type Ed25519Extension struct {
-	ExtType  uint8
-	Flags    uint8
-	ExtData  []byte
+	ExtType uint8
+	Flags   uint8
+	ExtData []byte
 }
 
 // CERTSCell represents a parsed CERTS cell
@@ -91,11 +91,12 @@ type CERTSCell struct {
 
 // ParseCERTSCell parses a CERTS cell payload per tor-spec.txt §4.2
 // Format:
-//   N             [1 octet]   Number of certificates
-//   N times:
-//     CertType    [1 octet]   Certificate type
-//     CLEN        [2 octets]  Certificate length (big-endian)
-//     Certificate [CLEN bytes] Certificate body
+//
+//	N             [1 octet]   Number of certificates
+//	N times:
+//	  CertType    [1 octet]   Certificate type
+//	  CLEN        [2 octets]  Certificate length (big-endian)
+//	  Certificate [CLEN bytes] Certificate body
 func ParseCERTSCell(cellData *cell.Cell) (*CERTSCell, error) {
 	if cellData.Command != cell.CmdCerts {
 		return nil, fmt.Errorf("not a CERTS cell: got %s", cellData.Command)
@@ -178,18 +179,19 @@ func parseCertificateBody(cert *Certificate) error {
 
 // parseEd25519Certificate parses an Ed25519 certificate per cert-spec.txt
 // Format:
-//   Version       [1 octet]   Must be 1
-//   CertType      [1 octet]   Type of certificate
-//   ExpirationDate [4 octets]  Hours since epoch
-//   CertKeyType   [1 octet]   Type of certified key
-//   CertifiedKey  [32 octets] The key being certified
-//   N             [1 octet]   Number of extensions
-//   N times:
-//     ExtLength   [2 octets]  Extension length
-//     ExtType     [1 octet]   Extension type
-//     ExtFlags    [1 octet]   Extension flags
-//     ExtData     [ExtLength-2 octets] Extension data
-//   Signature     [64 octets] Ed25519 signature
+//
+//	Version       [1 octet]   Must be 1
+//	CertType      [1 octet]   Type of certificate
+//	ExpirationDate [4 octets]  Hours since epoch
+//	CertKeyType   [1 octet]   Type of certified key
+//	CertifiedKey  [32 octets] The key being certified
+//	N             [1 octet]   Number of extensions
+//	N times:
+//	  ExtLength   [2 octets]  Extension length
+//	  ExtType     [1 octet]   Extension type
+//	  ExtFlags    [1 octet]   Extension flags
+//	  ExtData     [ExtLength-2 octets] Extension data
+//	Signature     [64 octets] Ed25519 signature
 func parseEd25519Certificate(data []byte) (*Ed25519Certificate, error) {
 	if len(data) < 40 { // Minimum: 1+1+4+1+32+1 = 40 bytes (no extensions, no signature yet)
 		return nil, fmt.Errorf("Ed25519 certificate too short: %d bytes", len(data))
@@ -284,8 +286,8 @@ func (c *CERTSCell) FindCertificate(certType CertType) *Certificate {
 // ValidateRelayIdentity validates the relay identity using CERTS cell
 // This verifies that the relay's claimed identity matches the certificates
 // Per tor-spec.txt §4.2, we need:
-//   1. RSA identity key certificate (type 2)
-//   2. Ed25519 identity key certificate (type 4 or 7)
+//  1. RSA identity key certificate (type 2)
+//  2. Ed25519 identity key certificate (type 4 or 7)
 func (c *CERTSCell) ValidateRelayIdentity(expectedRSAFingerprint string, expectedEd25519Identity []byte) error {
 	// Check for RSA identity certificate if fingerprint provided
 	if expectedRSAFingerprint != "" {
@@ -305,11 +307,11 @@ func (c *CERTSCell) ValidateRelayIdentity(expectedRSAFingerprint string, expecte
 		if err != nil {
 			return fmt.Errorf("failed to encode RSA public key: %w", err)
 		}
-		
+
 		// For Tor, we use SHA-256 of the DER encoding
 		fingerprint := sha256.Sum256(derBytes)
 		fingerprintHex := fmt.Sprintf("%X", fingerprint[:20]) // Use first 20 bytes for compatibility
-		
+
 		if fingerprintHex != expectedRSAFingerprint {
 			return fmt.Errorf("RSA identity mismatch: expected %s, got %s", expectedRSAFingerprint, fingerprintHex)
 		}
@@ -323,7 +325,7 @@ func (c *CERTSCell) ValidateRelayIdentity(expectedRSAFingerprint string, expecte
 			// Try type 7 (cross-certification)
 			ed25519Cert = c.FindCertificate(CertTypeEd25519Identity)
 		}
-		
+
 		if ed25519Cert == nil || ed25519Cert.Ed25519Cert == nil {
 			return fmt.Errorf("missing Ed25519 identity certificate")
 		}
@@ -352,7 +354,7 @@ func (c *CERTSCell) ValidateRelayIdentity(expectedRSAFingerprint string, expecte
 // ValidateExpiration checks if any certificates in the CERTS cell have expired
 func (c *CERTSCell) ValidateExpiration() error {
 	now := time.Now()
-	
+
 	for _, cert := range c.Certificates {
 		if cert.X509Cert != nil {
 			if now.After(cert.X509Cert.NotAfter) {
@@ -362,14 +364,14 @@ func (c *CERTSCell) ValidateExpiration() error {
 				return fmt.Errorf("X.509 certificate type %s not yet valid (valid from %v)", cert.CertType, cert.X509Cert.NotBefore)
 			}
 		}
-		
+
 		if cert.Ed25519Cert != nil {
 			if now.After(cert.Ed25519Cert.ExpiresAt) {
 				return fmt.Errorf("Ed25519 certificate type %s expired at %v", cert.CertType, cert.Ed25519Cert.ExpiresAt)
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -388,37 +390,37 @@ func (e *Ed25519Certificate) VerifySignature(signingKey []byte) error {
 	if len(signingKey) != ed25519.PublicKeySize {
 		return fmt.Errorf("invalid signing key length: %d, expected %d", len(signingKey), ed25519.PublicKeySize)
 	}
-	
+
 	if len(e.Signature) != ed25519.SignatureSize {
 		return fmt.Errorf("invalid signature length: %d, expected %d", len(e.Signature), ed25519.SignatureSize)
 	}
-	
+
 	// Reconstruct the signed message (all fields before signature)
-	// Per cert-spec.txt: Version || CertType || ExpirationDate || CertKeyType || 
+	// Per cert-spec.txt: Version || CertType || ExpirationDate || CertKeyType ||
 	// CertifiedKey || NumExtensions || Extensions
 	signedData := make([]byte, 0, 256)
-	
+
 	// Version (1 byte)
 	signedData = append(signedData, e.Version)
-	
+
 	// CertType (1 byte)
 	signedData = append(signedData, e.CertType)
-	
+
 	// ExpirationDate (4 bytes, hours since epoch)
 	expirationHours := uint32(e.ExpiresAt.Unix() / 3600)
 	expBytes := make([]byte, 4)
 	binary.BigEndian.PutUint32(expBytes, expirationHours)
 	signedData = append(signedData, expBytes...)
-	
+
 	// CertKeyType (1 byte)
 	signedData = append(signedData, e.CertKeyType)
-	
+
 	// CertifiedKey (32 bytes)
 	signedData = append(signedData, e.CertifiedKey...)
-	
+
 	// Number of extensions (1 byte)
 	signedData = append(signedData, byte(len(e.Extensions)))
-	
+
 	// Extensions
 	for _, ext := range e.Extensions {
 		// ExtLength (2 bytes) - length of (ExtType + ExtFlags + ExtData)
@@ -426,22 +428,22 @@ func (e *Ed25519Certificate) VerifySignature(signingKey []byte) error {
 		extLenBytes := make([]byte, 2)
 		binary.BigEndian.PutUint16(extLenBytes, extLen)
 		signedData = append(signedData, extLenBytes...)
-		
+
 		// ExtType (1 byte)
 		signedData = append(signedData, ext.ExtType)
-		
+
 		// ExtFlags (1 byte)
 		signedData = append(signedData, ext.Flags)
-		
+
 		// ExtData
 		signedData = append(signedData, ext.ExtData...)
 	}
-	
+
 	// Verify signature using Ed25519
 	if !ed25519.Verify(ed25519.PublicKey(signingKey), signedData, e.Signature) {
 		return fmt.Errorf("Ed25519 signature verification failed")
 	}
-	
+
 	return nil
 }
 
@@ -455,7 +457,7 @@ func (c *CERTSCell) ValidateSignatures() error {
 		if cert.Ed25519Cert == nil {
 			continue
 		}
-		
+
 		switch cert.CertType {
 		case CertTypeEd25519Signing:
 			// Type 4: Ed25519 signing key certificate
@@ -464,7 +466,7 @@ func (c *CERTSCell) ValidateSignatures() error {
 			if err := cert.Ed25519Cert.VerifySignature(cert.Ed25519Cert.CertifiedKey); err != nil {
 				return fmt.Errorf("type 4 (Ed25519 signing key) signature verification failed: %w", err)
 			}
-			
+
 		case CertTypeEd25519TLSLink:
 			// Type 5: Ed25519 TLS link certificate
 			// Signed by the Ed25519 signing key (type 4)
@@ -475,7 +477,7 @@ func (c *CERTSCell) ValidateSignatures() error {
 			if err := cert.Ed25519Cert.VerifySignature(signingKeyCert.Ed25519Cert.CertifiedKey); err != nil {
 				return fmt.Errorf("type 5 (Ed25519 TLS link) signature verification failed: %w", err)
 			}
-			
+
 		case CertTypeEd25519Auth:
 			// Type 6: Ed25519 authentication certificate
 			// Signed by the Ed25519 signing key (type 4)
@@ -488,6 +490,6 @@ func (c *CERTSCell) ValidateSignatures() error {
 			}
 		}
 	}
-	
+
 	return nil
 }

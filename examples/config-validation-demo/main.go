@@ -107,7 +107,7 @@ func main() {
 
 	// Write to temporary file for demonstration
 	tmpFile := "/tmp/config-schema-demo.json"
-	if err := os.WriteFile(tmpFile, jsonData, 0644); err != nil {
+	if err := os.WriteFile(tmpFile, jsonData, 0o644); err != nil {
 		log.Fatalf("Failed to write schema: %v", err)
 	}
 	fmt.Printf("   ✓ Schema exported to %s (%d bytes)\n", tmpFile, len(jsonData))

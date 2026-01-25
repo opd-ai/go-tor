@@ -321,7 +321,7 @@ func TestStreamMultiplexing_ConcurrentReads(t *testing.T) {
 		received := mockStream.GetReceivedData()
 		totalReceived += len(received)
 	}
-	
+
 	// With 3 streams, reading 1 cell each, and 5 cells per stream sent (15 total),
 	// we should have at least a few cells delivered through the manager
 	t.Logf("total cells delivered through stream manager: %d", totalReceived)

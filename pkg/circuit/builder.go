@@ -127,7 +127,7 @@ func (b *Builder) BuildCircuit(ctx context.Context, p *path.Path, timeout time.D
 // certificate for a different relay's identity.
 func (b *Builder) connectToRelay(ctx context.Context, address string, relay *directory.Relay) (*connection.Connection, error) {
 	cfg := connection.DefaultConfig(address)
-	
+
 	// AUDIT-004: Enhanced certificate pinning with relay identity from consensus
 	if relay != nil {
 		// Set expected Ed25519 identity key from consensus (32 bytes)
@@ -137,17 +137,17 @@ func (b *Builder) connectToRelay(ctx context.Context, address string, relay *dir
 				"relay", relay.Nickname,
 				"fingerprint", relay.Fingerprint)
 		}
-		
+
 		// Set expected RSA fingerprint from consensus
 		if relay.Fingerprint != "" {
 			cfg.ExpectedFingerprint = relay.Fingerprint
 		}
-		
+
 		// Enable strict CERTS validation mode for defense-in-depth
 		// This will fail the handshake if CERTS validation fails
 		cfg.RequireCERTS = true
 	}
-	
+
 	conn := connection.New(cfg, b.logger)
 
 	if err := conn.Connect(ctx, cfg); err != nil {

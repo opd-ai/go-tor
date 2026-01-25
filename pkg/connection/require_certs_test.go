@@ -2,7 +2,7 @@ package connection
 
 import (
 	"testing"
-	
+
 	"github.com/opd-ai/go-tor/pkg/logger"
 )
 
@@ -31,9 +31,9 @@ func TestRequireCERTSGetter(t *testing.T) {
 				Address:      "127.0.0.1:9001",
 				RequireCERTS: tt.requireCERTS,
 			}
-			
+
 			conn := New(cfg, logger.NewDefault())
-			
+
 			if got := conn.RequireCERTS(); got != tt.expectedValue {
 				t.Errorf("RequireCERTS() = %v, want %v", got, tt.expectedValue)
 			}
@@ -44,7 +44,7 @@ func TestRequireCERTSGetter(t *testing.T) {
 // TestDefaultConfigRequireCERTS tests that DefaultConfig returns RequireCERTS=false by default
 func TestDefaultConfigRequireCERTS(t *testing.T) {
 	cfg := DefaultConfig("127.0.0.1:9001")
-	
+
 	if cfg.RequireCERTS {
 		t.Error("DefaultConfig().RequireCERTS should be false by default (backward compatible)")
 	}
@@ -59,20 +59,20 @@ func TestConnectionStoresRequireCERTS(t *testing.T) {
 		{name: "RequireCERTS true", requireCERTS: true},
 		{name: "RequireCERTS false", requireCERTS: false},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &Config{
 				Address:      "127.0.0.1:9001",
 				RequireCERTS: tt.requireCERTS,
 			}
-			
+
 			conn := New(cfg, logger.NewDefault())
-			
+
 			if conn.requireCERTS != tt.requireCERTS {
 				t.Errorf("Connection.requireCERTS = %v, want %v", conn.requireCERTS, tt.requireCERTS)
 			}
-			
+
 			if conn.RequireCERTS() != tt.requireCERTS {
 				t.Errorf("Connection.RequireCERTS() = %v, want %v", conn.RequireCERTS(), tt.requireCERTS)
 			}

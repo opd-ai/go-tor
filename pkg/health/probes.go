@@ -189,7 +189,7 @@ func (m *CachedMonitor) checkProbeWithCache(
 	cache map[string]*cachedProbeResult,
 	ttl time.Duration,
 	checkFunc func(ctx context.Context) bool,
-) (healthy bool, fromCache bool) {
+) (healthy, fromCache bool) {
 	name := checker.Name()
 
 	// Check cache (short read lock)

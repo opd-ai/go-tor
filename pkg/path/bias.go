@@ -78,27 +78,27 @@ type BiasDetector struct {
 	mu         sync.RWMutex
 	thresholds BiasThresholds
 	records    []CircuitRecord
-	
+
 	// Per-guard statistics
 	guardStats map[string]*BiasGuardStats
-	
+
 	// Alert tracking
-	alerts     []BiasAlert
-	maxAlerts  int
+	alerts    []BiasAlert
+	maxAlerts int
 }
 
 // BiasGuardStats tracks statistics for a specific guard
 type BiasGuardStats struct {
-	Fingerprint       string
-	TotalBuilds       int
-	BuildSuccesses    int
-	BuildTimeouts     int
-	BuildFailures     int
-	TotalUses         int
-	UseSuccesses      int
-	UseFailures       int
+	Fingerprint         string
+	TotalBuilds         int
+	BuildSuccesses      int
+	BuildTimeouts       int
+	BuildFailures       int
+	TotalUses           int
+	UseSuccesses        int
+	UseFailures         int
 	ConsecutiveTimeouts int
-	LastSeen          time.Time
+	LastSeen            time.Time
 }
 
 // BiasAlert represents a detected path bias issue
@@ -125,7 +125,7 @@ func NewBiasDetector(thresholds BiasThresholds) *BiasDetector {
 func (bd *BiasDetector) RecordOutcome(circuitID uint32, fingerprint string, outcome CircuitOutcome) []BiasAlert {
 	bd.mu.Lock()
 	defer bd.mu.Unlock()
-	
+
 	// Create record
 	record := CircuitRecord{
 		Timestamp:   time.Now(),
@@ -133,17 +133,17 @@ func (bd *BiasDetector) RecordOutcome(circuitID uint32, fingerprint string, outc
 		Fingerprint: fingerprint,
 		CircuitID:   circuitID,
 	}
-	
+
 	// Add to records (ring buffer behavior)
 	if len(bd.records) >= bd.thresholds.SuccessCount {
 		bd.records = bd.records[1:]
 	}
 	bd.records = append(bd.records, record)
-	
+
 	// Update guard stats
 	stats := bd.getOrCreateGuardStats(fingerprint)
 	bd.updateGuardStats(stats, outcome)
-	
+
 	// Check for bias and return any new alerts
 	return bd.checkBias(stats)
 }
@@ -169,21 +169,21 @@ func (bd *BiasDetector) updateGuardStats(stats *BiasGuardStats, outcome CircuitO
 		stats.TotalBuilds++
 		stats.BuildSuccesses++
 		stats.ConsecutiveTimeouts = 0
-		
+
 	case OutcomeBuildTimeout:
 		stats.TotalBuilds++
 		stats.BuildTimeouts++
 		stats.ConsecutiveTimeouts++
-		
+
 	case OutcomeBuildFailed:
 		stats.TotalBuilds++
 		stats.BuildFailures++
 		stats.ConsecutiveTimeouts = 0
-		
+
 	case OutcomeUseSuccess:
 		stats.TotalUses++
 		stats.UseSuccesses++
-		
+
 	case OutcomeUseFailed:
 		stats.TotalUses++
 		stats.UseFailures++
@@ -193,7 +193,7 @@ func (bd *BiasDetector) updateGuardStats(stats *BiasGuardStats, outcome CircuitO
 // checkBias checks if the guard statistics indicate bias
 func (bd *BiasDetector) checkBias(stats *BiasGuardStats) []BiasAlert {
 	var newAlerts []BiasAlert
-	
+
 	// Check for consecutive timeout bias
 	if stats.ConsecutiveTimeouts >= bd.thresholds.BuildTimeoutCount {
 		alert := BiasAlert{
@@ -207,7 +207,7 @@ func (bd *BiasDetector) checkBias(stats *BiasGuardStats) []BiasAlert {
 		newAlerts = append(newAlerts, alert)
 		bd.addAlert(alert)
 	}
-	
+
 	// Check use success rate (only if we have minimum sample size)
 	if stats.TotalUses >= bd.thresholds.UseSuccessMin {
 		useRate := float64(stats.UseSuccesses) / float64(stats.TotalUses)
@@ -225,7 +225,7 @@ func (bd *BiasDetector) checkBias(stats *BiasGuardStats) []BiasAlert {
 			bd.addAlert(alert)
 		}
 	}
-	
+
 	// Check build success rate (minimum sample)
 	if stats.TotalBuilds >= bd.thresholds.UseSuccessMin {
 		buildRate := float64(stats.BuildSuccesses) / float64(stats.TotalBuilds)
@@ -243,7 +243,7 @@ func (bd *BiasDetector) checkBias(stats *BiasGuardStats) []BiasAlert {
 			bd.addAlert(alert)
 		}
 	}
-	
+
 	return newAlerts
 }
 
@@ -259,12 +259,12 @@ func (bd *BiasDetector) addAlert(alert BiasAlert) {
 func (bd *BiasDetector) GetGuardStats(fingerprint string) (*BiasGuardStats, error) {
 	bd.mu.RLock()
 	defer bd.mu.RUnlock()
-	
+
 	stats, exists := bd.guardStats[fingerprint]
 	if !exists {
 		return nil, fmt.Errorf("no statistics for guard %s", fingerprint)
 	}
-	
+
 	// Return a copy
 	statsCopy := *stats
 	return &statsCopy, nil
@@ -274,7 +274,7 @@ func (bd *BiasDetector) GetGuardStats(fingerprint string) (*BiasGuardStats, erro
 func (bd *BiasDetector) GetAllGuardStats() map[string]BiasGuardStats {
 	bd.mu.RLock()
 	defer bd.mu.RUnlock()
-	
+
 	result := make(map[string]BiasGuardStats)
 	for fp, stats := range bd.guardStats {
 		result[fp] = *stats
@@ -286,11 +286,11 @@ func (bd *BiasDetector) GetAllGuardStats() map[string]BiasGuardStats {
 func (bd *BiasDetector) GetAlerts(limit int) []BiasAlert {
 	bd.mu.RLock()
 	defer bd.mu.RUnlock()
-	
+
 	if limit <= 0 || limit > len(bd.alerts) {
 		limit = len(bd.alerts)
 	}
-	
+
 	// Return most recent alerts
 	start := len(bd.alerts) - limit
 	result := make([]BiasAlert, limit)
@@ -303,7 +303,7 @@ func (bd *BiasDetector) GetAlerts(limit int) []BiasAlert {
 func (bd *BiasDetector) ClearGuard(fingerprint string) {
 	bd.mu.Lock()
 	defer bd.mu.Unlock()
-	
+
 	delete(bd.guardStats, fingerprint)
 }
 
@@ -311,7 +311,7 @@ func (bd *BiasDetector) ClearGuard(fingerprint string) {
 func (bd *BiasDetector) Reset() {
 	bd.mu.Lock()
 	defer bd.mu.Unlock()
-	
+
 	bd.records = make([]CircuitRecord, 0, bd.thresholds.SuccessCount)
 	bd.guardStats = make(map[string]*BiasGuardStats)
 	bd.alerts = make([]BiasAlert, 0)
@@ -321,10 +321,10 @@ func (bd *BiasDetector) Reset() {
 func (bd *BiasDetector) GetStats() BiasStats {
 	bd.mu.RLock()
 	defer bd.mu.RUnlock()
-	
+
 	var totalBuilds, buildSuccesses, buildTimeouts, buildFailures int
 	var totalUses, useSuccesses, useFailures int
-	
+
 	for _, stats := range bd.guardStats {
 		totalBuilds += stats.TotalBuilds
 		buildSuccesses += stats.BuildSuccesses
@@ -334,18 +334,18 @@ func (bd *BiasDetector) GetStats() BiasStats {
 		useSuccesses += stats.UseSuccesses
 		useFailures += stats.UseFailures
 	}
-	
+
 	return BiasStats{
-		TotalGuards:     len(bd.guardStats),
-		TotalBuilds:     totalBuilds,
-		BuildSuccesses:  buildSuccesses,
-		BuildTimeouts:   buildTimeouts,
-		BuildFailures:   buildFailures,
-		TotalUses:       totalUses,
-		UseSuccesses:    useSuccesses,
-		UseFailures:     useFailures,
-		TotalAlerts:     len(bd.alerts),
-		RecordCount:     len(bd.records),
+		TotalGuards:    len(bd.guardStats),
+		TotalBuilds:    totalBuilds,
+		BuildSuccesses: buildSuccesses,
+		BuildTimeouts:  buildTimeouts,
+		BuildFailures:  buildFailures,
+		TotalUses:      totalUses,
+		UseSuccesses:   useSuccesses,
+		UseFailures:    useFailures,
+		TotalAlerts:    len(bd.alerts),
+		RecordCount:    len(bd.records),
 	}
 }
 
@@ -367,17 +367,17 @@ type BiasStats struct {
 func (bd *BiasDetector) IsBiased(fingerprint string) bool {
 	bd.mu.RLock()
 	defer bd.mu.RUnlock()
-	
+
 	stats, exists := bd.guardStats[fingerprint]
 	if !exists {
 		return false
 	}
-	
+
 	// Check consecutive timeouts
 	if stats.ConsecutiveTimeouts >= bd.thresholds.BuildTimeoutCount {
 		return true
 	}
-	
+
 	// Check use success rate
 	if stats.TotalUses >= bd.thresholds.UseSuccessMin {
 		useRate := float64(stats.UseSuccesses) / float64(stats.TotalUses)
@@ -385,7 +385,7 @@ func (bd *BiasDetector) IsBiased(fingerprint string) bool {
 			return true
 		}
 	}
-	
+
 	// Check build success rate
 	if stats.TotalBuilds >= bd.thresholds.UseSuccessMin {
 		buildRate := float64(stats.BuildSuccesses) / float64(stats.TotalBuilds)
@@ -393,6 +393,6 @@ func (bd *BiasDetector) IsBiased(fingerprint string) bool {
 			return true
 		}
 	}
-	
+
 	return false
 }

@@ -261,7 +261,7 @@ func (p *Profiler) updateStats() {
 func (p *Profiler) GetStats() StatsSnapshot {
 	p.stats.mu.RLock()
 	defer p.stats.mu.RUnlock()
-	
+
 	return StatsSnapshot{
 		NumGoroutines:     p.stats.NumGoroutines,
 		PeakGoroutines:    p.stats.PeakGoroutines,
@@ -446,7 +446,7 @@ func (p *Profiler) DetectGoroutineLeaks(ctx context.Context, threshold float64) 
 
 // TriggerHeapDump triggers a heap dump and returns heap profiling information.
 // This is useful for debugging memory leaks.
-func (p *Profiler) TriggerHeapDump() (numObjects uint64, heapBytes uint64) {
+func (p *Profiler) TriggerHeapDump() (numObjects, heapBytes uint64) {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 	return m.HeapObjects, m.HeapAlloc

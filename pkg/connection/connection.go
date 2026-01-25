@@ -517,4 +517,3 @@ func (c *Connection) ExpectedFingerprint() string {
 func (c *Connection) RequireCERTS() bool {
 	return c.requireCERTS
 }
-

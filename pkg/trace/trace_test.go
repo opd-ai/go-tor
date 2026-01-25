@@ -353,7 +353,6 @@ func TestWithSpanNeverSample(t *testing.T) {
 		receivedSpan = span
 		return nil
 	})
-
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
