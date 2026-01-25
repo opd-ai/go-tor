@@ -17,8 +17,8 @@ import (
 // Format:
 //   - For hostname queries: HOSTNAME\x00 (null-terminated string)
 //   - For PTR queries: TYPE (1 byte) | LENGTH (1 byte) | ADDRESS (LENGTH bytes)
-//     - TYPE 0x04 for IPv4, TYPE 0x06 for IPv6
-//     - LENGTH is 4 for IPv4, 16 for IPv6
+//   - TYPE 0x04 for IPv4, TYPE 0x06 for IPv6
+//   - LENGTH is 4 for IPv4, 16 for IPv6
 func TestRELAY_RESOLVECellFormat(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -158,7 +158,8 @@ func TestRELAY_RESOLVECellFormat(t *testing.T) {
 // Specification: tor-spec.txt §6.4
 // RELAY_RESOLVED cells contain DNS resolution responses.
 // Format (one or more records):
-//   TYPE (1 byte) | LENGTH (1 byte) | VALUE (LENGTH bytes) | TTL (4 bytes)
+//
+//	TYPE (1 byte) | LENGTH (1 byte) | VALUE (LENGTH bytes) | TTL (4 bytes)
 //
 // Record types:
 //   - 0x00: Hostname (null-terminated string)
@@ -411,14 +412,15 @@ func TestDNSResolutionSpecCompliance(t *testing.T) {
 // TestDNSErrorCodes verifies all DNS error codes per tor-spec.txt §6.4
 //
 // Specification defines the following error codes:
-//   0x00: No error
-//   0x01: Format error
-//   0x02: Server failure
-//   0x03: Name does not exist (NXDOMAIN)
-//   0x04: Not implemented
-//   0x05: Query refused
-//   0xF0: Transient failure (Tor-specific)
-//   0xF1: Non-transient failure (Tor-specific)
+//
+//	0x00: No error
+//	0x01: Format error
+//	0x02: Server failure
+//	0x03: Name does not exist (NXDOMAIN)
+//	0x04: Not implemented
+//	0x05: Query refused
+//	0xF0: Transient failure (Tor-specific)
+//	0xF1: Non-transient failure (Tor-specific)
 func TestDNSErrorCodes(t *testing.T) {
 	tests := []struct {
 		name      string
