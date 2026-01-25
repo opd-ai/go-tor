@@ -432,11 +432,17 @@ The go-tor implementation demonstrates **excellent protocol compliance** for cor
 - Client package: 64.0% (improved from 62.5%, +1.5pp with Stats getter tests and GetConfig tests)
 - Connection package: 65.7% (improved from 61.1% with padding implementation)
 - Stream package: 87.0% (improved from ~75% with backpressure implementation)
+- Onion package: Comprehensive integration tests for client authorization workflows
 - All critical components now have >60% test coverage
 - Zero test failures in short test suite
 - Fixed linter error in examples/consensus_padding (redundant newline in fmt.Println)
-- New tests cover: family relationships, subnet detection, certificate caching, microdescriptor fetching, RSA/Ed25519 relay identity validation, Stats getters, clientStatsAdapter.GetConfig, stream backpressure hysteresis
+- New tests cover: family relationships, subnet detection, certificate caching, microdescriptor fetching, RSA/Ed25519 relay identity validation, Stats getters, clientStatsAdapter.GetConfig, stream backpressure hysteresis, client authorization end-to-end workflows
 - New unit tests for protocol handshake functions validate encoding/decoding logic
+- **New integration tests** (Jan 25, 2026):
+  - Complete client authorization workflow (credential generation → descriptor decryption)
+  - Multiple authorized clients with credential isolation
+  - Address validation and error handling
+  - Documentation: `docs/TESTING_CLIENT_AUTHORIZATION.md`
 
 ---
 
