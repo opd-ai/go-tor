@@ -211,11 +211,11 @@ func TestRFC1928_Section4_RequestFormat(t *testing.T) {
 		// DST.PORT: 2 bytes (network byte order)
 
 		var buf bytes.Buffer
-		buf.WriteByte(socks5Version)       // VER
-		buf.WriteByte(cmdConnect)           // CMD
-		buf.WriteByte(0x00)                 // RSV
-		buf.WriteByte(addrIPv4)             // ATYP
-		buf.Write([]byte{127, 0, 0, 1})     // IPv4 address
+		buf.WriteByte(socks5Version)                     // VER
+		buf.WriteByte(cmdConnect)                        // CMD
+		buf.WriteByte(0x00)                              // RSV
+		buf.WriteByte(addrIPv4)                          // ATYP
+		buf.Write([]byte{127, 0, 0, 1})                  // IPv4 address
 		binary.Write(&buf, binary.BigEndian, uint16(80)) // Port
 
 		// Verify minimum request size

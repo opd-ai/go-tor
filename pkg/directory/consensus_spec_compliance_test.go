@@ -410,9 +410,9 @@ func TestConsensusParsingSpecCompliance_ConsensusParams(t *testing.T) {
 			consensusData: `params circwindow=1000 min_paths_for_circs_pct=60 UseOptimisticData=1
 `,
 			expectedParams: map[string]int{
-				"circwindow":               1000,
-				"min_paths_for_circs_pct":  60,
-				"UseOptimisticData":        1,
+				"circwindow":              1000,
+				"min_paths_for_circs_pct": 60,
+				"UseOptimisticData":       1,
 			},
 		},
 		{
@@ -420,9 +420,9 @@ func TestConsensusParsingSpecCompliance_ConsensusParams(t *testing.T) {
 			consensusData: `params nf_ito_low=1500 nf_ito_high=9500 circpad_padding_disabled=0
 `,
 			expectedParams: map[string]int{
-				"nf_ito_low":                1500,
-				"nf_ito_high":               9500,
-				"circpad_padding_disabled":  0,
+				"nf_ito_low":               1500,
+				"nf_ito_high":              9500,
+				"circpad_padding_disabled": 0,
 			},
 		},
 	}
@@ -599,9 +599,14 @@ func TestConsensusParsingSpecCompliance_PaddingParams(t *testing.T) {
 			expectedValue: 10000,
 		},
 		{
-			name:          "padding disabled",
-			params:        map[string]int{"circpad_padding_disabled": 1},
-			expectedField: func(p *PaddingParams) int { if p.PaddingDisabled { return 1 }; return 0 },
+			name:   "padding disabled",
+			params: map[string]int{"circpad_padding_disabled": 1},
+			expectedField: func(p *PaddingParams) int {
+				if p.PaddingDisabled {
+					return 1
+				}
+				return 0
+			},
 			expectedValue: 1,
 		},
 		{
