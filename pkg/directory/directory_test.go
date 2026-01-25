@@ -701,6 +701,14 @@ directory-signature sha256 99AABBCC DDEEFF00
 -----BEGIN SIGNATURE-----
 dGhpcmRzaWduYXR1cmU5OTg4Nzc=
 -----END SIGNATURE-----
+directory-signature sha256 44556677 88990011
+-----BEGIN SIGNATURE-----
+Zm91cnRoc2lnbmF0dXJlMTIzNDU=
+-----END SIGNATURE-----
+directory-signature sha256 AABBCCDD 22334455
+-----BEGIN SIGNATURE-----
+ZmlmdGhzaWduYXR1cmU2Nzg5MA==
+-----END SIGNATURE-----
 `, validAfter, freshUntil, validUntil, validAfter)
 
 	client := NewClient(nil)
@@ -720,13 +728,13 @@ dGhpcmRzaWduYXR1cmU5OTg4Nzc=
 	}
 
 	// Check signature count
-	if metadata.SignatureCount != 3 {
-		t.Errorf("SignatureCount = %d, want 3", metadata.SignatureCount)
+	if metadata.SignatureCount != 5 {
+		t.Errorf("SignatureCount = %d, want 5", metadata.SignatureCount)
 	}
 
 	// Check signatures were parsed
-	if len(metadata.Signatures) != 3 {
-		t.Errorf("len(Signatures) = %d, want 3", len(metadata.Signatures))
+	if len(metadata.Signatures) != 5 {
+		t.Errorf("len(Signatures) = %d, want 5", len(metadata.Signatures))
 	}
 
 	// Validate first signature
@@ -792,12 +800,14 @@ func TestValidateConsensusMetadataEnhanced(t *testing.T) {
 			meta: &ConsensusMetadata{
 				ValidAfter:     now.Add(-1 * time.Hour),
 				ValidUntil:     now.Add(3 * time.Hour),
-				SignatureCount: 3,
+				SignatureCount: 5,
 				AuthorityCount: 6,
 				Signatures: []*ConsensusSignature{
 					{Algorithm: "sha256", Identity: "AAA", SigningKeyDigest: "BBB", Signature: "sig1"},
 					{Algorithm: "sha256", Identity: "CCC", SigningKeyDigest: "DDD", Signature: "sig2"},
 					{Algorithm: "sha256", Identity: "EEE", SigningKeyDigest: "FFF", Signature: "sig3"},
+					{Algorithm: "sha256", Identity: "GGG", SigningKeyDigest: "HHH", Signature: "sig4"},
+					{Algorithm: "sha256", Identity: "III", SigningKeyDigest: "JJJ", Signature: "sig5"},
 				},
 			},
 			wantErr: false,
@@ -807,7 +817,7 @@ func TestValidateConsensusMetadataEnhanced(t *testing.T) {
 			meta: &ConsensusMetadata{
 				ValidAfter:     now.Add(-1 * time.Hour),
 				ValidUntil:     now.Add(3 * time.Hour),
-				SignatureCount: 3,
+				SignatureCount: 5,
 				AuthorityCount: 6,
 				Signatures: []*ConsensusSignature{
 					{Algorithm: "sha256", Identity: "AAA", SigningKeyDigest: "BBB", Signature: "sig1"},
@@ -821,11 +831,14 @@ func TestValidateConsensusMetadataEnhanced(t *testing.T) {
 			meta: &ConsensusMetadata{
 				ValidAfter:     now.Add(-1 * time.Hour),
 				ValidUntil:     now.Add(3 * time.Hour),
-				SignatureCount: 2,
+				SignatureCount: 5,
 				AuthorityCount: 6,
 				Signatures: []*ConsensusSignature{
 					{Algorithm: "sha256", Identity: "AAA", SigningKeyDigest: "", Signature: "sig1"},
 					{Algorithm: "", Identity: "CCC", SigningKeyDigest: "DDD", Signature: "sig2"},
+					{Algorithm: "sha256", Identity: "EEE", SigningKeyDigest: "FFF", Signature: "sig3"},
+					{Algorithm: "sha256", Identity: "GGG", SigningKeyDigest: "HHH", Signature: "sig4"},
+					{Algorithm: "sha256", Identity: "III", SigningKeyDigest: "JJJ", Signature: "sig5"},
 				},
 			},
 			wantErr: true,
@@ -834,12 +847,14 @@ func TestValidateConsensusMetadataEnhanced(t *testing.T) {
 		{
 			name: "missing_timestamps",
 			meta: &ConsensusMetadata{
-				SignatureCount: 3,
+				SignatureCount: 5,
 				AuthorityCount: 6,
 				Signatures: []*ConsensusSignature{
 					{Algorithm: "sha256", Identity: "AAA", SigningKeyDigest: "BBB", Signature: "sig1"},
 					{Algorithm: "sha256", Identity: "CCC", SigningKeyDigest: "DDD", Signature: "sig2"},
 					{Algorithm: "sha256", Identity: "EEE", SigningKeyDigest: "FFF", Signature: "sig3"},
+					{Algorithm: "sha256", Identity: "GGG", SigningKeyDigest: "HHH", Signature: "sig4"},
+					{Algorithm: "sha256", Identity: "III", SigningKeyDigest: "JJJ", Signature: "sig5"},
 				},
 			},
 			wantErr: true,
@@ -885,8 +900,10 @@ func TestConsensusSignatureStructure(t *testing.T) {
 func TestVerifyConsensusSignatures(t *testing.T) {
 	// Create valid-length signature (128 bytes for RSA-1024)
 	validSig128 := base64.StdEncoding.EncodeToString(make([]byte, 128))
-	validSig256 := base64.StdEncoding.EncodeToString(make([]byte, 256))
 	shortSig := base64.StdEncoding.EncodeToString(make([]byte, 64))
+
+	client := NewClient(nil)
+	ctx := context.Background()
 
 	tests := []struct {
 		name          string
@@ -914,19 +931,6 @@ func TestVerifyConsensusSignatures(t *testing.T) {
 			errMsg:        "no signatures",
 		},
 		{
-			name:          "Sufficient known authority signatures",
-			consensusBody: []byte("network-status-version 3\ntest consensus body"),
-			meta: &ConsensusMetadata{
-				SignatureCount: 3,
-				Signatures: []*ConsensusSignature{
-					{Algorithm: "sha256", Identity: "ED03BB616EB2F60BEC80151114BB25CEF515B226", SigningKeyDigest: "KEY1", Signature: validSig128}, // gabelmoo
-					{Algorithm: "sha256", Identity: "F533C81CEF0BC0267857C99B2F471ADF249FA232", SigningKeyDigest: "KEY2", Signature: validSig256}, // moria1
-					{Algorithm: "sha256", Identity: "23D15D965BC35114467363C165C4F724B64B4F66", SigningKeyDigest: "KEY3", Signature: validSig128}, // longclaw
-				},
-			},
-			wantErr: false,
-		},
-		{
 			name:          "Unknown authority signatures",
 			consensusBody: []byte("test body"),
 			meta: &ConsensusMetadata{
@@ -939,21 +943,6 @@ func TestVerifyConsensusSignatures(t *testing.T) {
 			},
 			wantErr: true,
 			errMsg:  "insufficient known authorities",
-		},
-		{
-			name:          "Mixed known and unknown authorities",
-			consensusBody: []byte("test body"),
-			meta: &ConsensusMetadata{
-				SignatureCount: 5,
-				Signatures: []*ConsensusSignature{
-					{Algorithm: "sha256", Identity: "ED03BB616EB2F60BEC80151114BB25CEF515B226", SigningKeyDigest: "KEY1", Signature: validSig128}, // gabelmoo (known)
-					{Algorithm: "sha256", Identity: "UNKNOWN1111111111111111111111111111111111", SigningKeyDigest: "KEY2", Signature: validSig128}, // unknown
-					{Algorithm: "sha256", Identity: "F533C81CEF0BC0267857C99B2F471ADF249FA232", SigningKeyDigest: "KEY3", Signature: validSig128}, // moria1 (known)
-					{Algorithm: "sha256", Identity: "23D15D965BC35114467363C165C4F724B64B4F66", SigningKeyDigest: "KEY4", Signature: validSig128}, // longclaw (known)
-					{Algorithm: "sha256", Identity: "UNKNOWN2222222222222222222222222222222222", SigningKeyDigest: "KEY5", Signature: validSig128}, // unknown
-				},
-			},
-			wantErr: false, // Should pass with 3 known authorities
 		},
 		{
 			name:          "Insufficient valid signatures",
@@ -978,7 +967,8 @@ func TestVerifyConsensusSignatures(t *testing.T) {
 					{Algorithm: "sha256", Identity: "23D15D965BC35114467363C165C4F724B64B4F66", SigningKeyDigest: "KEY3", Signature: validSig128},
 				},
 			},
-			wantErr: true, // Only 2 valid signatures, need 3 authorities
+			wantErr: true,
+			errMsg:  "insufficient",
 		},
 		{
 			name:          "Signature too short",
@@ -992,13 +982,14 @@ func TestVerifyConsensusSignatures(t *testing.T) {
 					{Algorithm: "sha256", Identity: "0232AF901C31A04EE9848595AF9BB7620D4C5B2E", SigningKeyDigest: "KEY4", Signature: validSig128},   // valid (dannenberg)
 				},
 			},
-			wantErr: false, // Should pass with 3 valid signatures
+			wantErr: true,
+			errMsg:  "insufficient",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := VerifyConsensusSignatures(tt.consensusBody, tt.meta)
+			err := client.VerifyConsensusSignatures(ctx, tt.consensusBody, tt.meta)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("VerifyConsensusSignatures() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -1080,5 +1071,196 @@ func TestKnownAuthoritiesDatabase(t *testing.T) {
 			t.Errorf("Duplicate v3ident %s found in authorities %s and %s", auth.V3Ident, existing, auth.Nickname)
 		}
 		seen[auth.V3Ident] = auth.Nickname
+	}
+}
+
+// TestExtractSignatureData tests signature data extraction from PEM blocks
+func TestExtractSignatureData(t *testing.T) {
+	tests := []struct {
+		name     string
+		sigBlock string
+		want     string
+	}{
+		{
+			name: "Valid PEM block",
+			sigBlock: `-----BEGIN SIGNATURE-----
+VGVzdFNpZ25hdHVyZURhdGE=
+-----END SIGNATURE-----`,
+			want: "VGVzdFNpZ25hdHVyZURhdGE=",
+		},
+		{
+			name: "Multi-line PEM block",
+			sigBlock: `-----BEGIN SIGNATURE-----
+VGVzdFNp
+Z25hdHVy
+ZURhdGE=
+-----END SIGNATURE-----`,
+			want: "VGVzdFNpZ25hdHVyZURhdGE=",
+		},
+		{
+			name:     "No PEM markers",
+			sigBlock: "VGVzdFNpZ25hdHVyZURhdGE=",
+			want:     "",
+		},
+		{
+			name:     "Empty block",
+			sigBlock: "",
+			want:     "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := extractSignatureData(tt.sigBlock)
+			if got != tt.want {
+				t.Errorf("extractSignatureData() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestAuthorityCertCache tests certificate caching functionality
+func TestAuthorityCertCache(t *testing.T) {
+	logger := logger.NewDefault()
+	cache := &AuthorityCertCache{
+		certs:  make(map[string]*AuthorityCert),
+		logger: logger.Component("certcache"),
+	}
+
+	// Test cache initialization
+	if cache.certs == nil {
+		t.Fatal("Cache certs map not initialized")
+	}
+
+	// Test manual cert insertion and retrieval
+	testCert := &AuthorityCert{
+		Identity:  "TEST123",
+		ExpiresAt: time.Now().Add(24 * time.Hour),
+		FetchedAt: time.Now(),
+	}
+
+	cache.mu.Lock()
+	cache.certs["TEST123"] = testCert
+	cache.mu.Unlock()
+
+	cache.mu.RLock()
+	retrieved, ok := cache.certs["TEST123"]
+	cache.mu.RUnlock()
+
+	if !ok {
+		t.Error("Failed to retrieve cached cert")
+	}
+	if retrieved.Identity != "TEST123" {
+		t.Errorf("Retrieved cert identity = %s, want TEST123", retrieved.Identity)
+	}
+}
+
+// TestParseAuthorityCert tests authority certificate parsing
+func TestParseAuthorityCert(t *testing.T) {
+	logger := logger.NewDefault()
+	cache := &AuthorityCertCache{
+		certs:  make(map[string]*AuthorityCert),
+		logger: logger.Component("certcache"),
+	}
+
+	// Test parsing with a valid PKCS1 RSA public key (minimal 512-bit for testing)
+	// This is a real valid RSA key for testing purposes only
+	certData := `dir-source gabelmoo
+fingerprint ED03 BB61 6EB2 F60B EC80 1511 14BB 25CE F515 B226
+dir-key-expires 2027-01-01 00:00:00
+-----BEGIN RSA PUBLIC KEY-----
+MEgCQQC7VJTUt9Us8WXZHY/7/w4M1iSp3PNxCCPyOuLYmUxJ+NjF8uYGE00j+6C0
+y5TQJtSNlMLaPfJQr8PZQhClq5cJAgMBAAE=
+-----END RSA PUBLIC KEY-----`
+
+	cert, err := cache.parseAuthorityCert([]byte(certData), "ED03BB616EB2F60BEC80151114BB25CEF515B226")
+	if err != nil {
+		t.Fatalf("parseAuthorityCert() error = %v", err)
+	}
+
+	if cert.Identity != "ED03BB616EB2F60BEC80151114BB25CEF515B226" {
+		t.Errorf("cert.Identity = %s, want ED03BB616EB2F60BEC80151114BB25CEF515B226", cert.Identity)
+	}
+
+	expectedExpires := time.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC)
+	if !cert.ExpiresAt.Equal(expectedExpires) {
+		t.Errorf("cert.ExpiresAt = %v, want %v", cert.ExpiresAt, expectedExpires)
+	}
+}
+
+// TestValidateConsensusMetadataWithUpdatedThresholds tests enhanced validation
+func TestValidateConsensusMetadataWithUpdatedThresholds(t *testing.T) {
+	now := time.Now()
+
+	tests := []struct {
+		name    string
+		meta    *ConsensusMetadata
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name: "Valid with 5 signatures",
+			meta: &ConsensusMetadata{
+				ValidAfter:     now.Add(-1 * time.Hour),
+				ValidUntil:     now.Add(1 * time.Hour),
+				SignatureCount: 5,
+				AuthorityCount: 5,
+				Signatures: []*ConsensusSignature{
+					{Algorithm: "sha256", Identity: "ID1", Signature: "sig1"},
+					{Algorithm: "sha256", Identity: "ID2", Signature: "sig2"},
+					{Algorithm: "sha256", Identity: "ID3", Signature: "sig3"},
+					{Algorithm: "sha256", Identity: "ID4", Signature: "sig4"},
+					{Algorithm: "sha256", Identity: "ID5", Signature: "sig5"},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Insufficient signatures (4 < 5)",
+			meta: &ConsensusMetadata{
+				ValidAfter:     now.Add(-1 * time.Hour),
+				ValidUntil:     now.Add(1 * time.Hour),
+				SignatureCount: 4,
+				AuthorityCount: 5,
+				Signatures: []*ConsensusSignature{
+					{Algorithm: "sha256", Identity: "ID1", Signature: "sig1"},
+					{Algorithm: "sha256", Identity: "ID2", Signature: "sig2"},
+					{Algorithm: "sha256", Identity: "ID3", Signature: "sig3"},
+					{Algorithm: "sha256", Identity: "ID4", Signature: "sig4"},
+				},
+			},
+			wantErr: true,
+			errMsg:  "insufficient signatures",
+		},
+		{
+			name: "Insufficient authorities (4 < 5)",
+			meta: &ConsensusMetadata{
+				ValidAfter:     now.Add(-1 * time.Hour),
+				ValidUntil:     now.Add(1 * time.Hour),
+				SignatureCount: 5,
+				AuthorityCount: 4,
+				Signatures: []*ConsensusSignature{
+					{Algorithm: "sha256", Identity: "ID1", Signature: "sig1"},
+					{Algorithm: "sha256", Identity: "ID2", Signature: "sig2"},
+					{Algorithm: "sha256", Identity: "ID3", Signature: "sig3"},
+					{Algorithm: "sha256", Identity: "ID4", Signature: "sig4"},
+					{Algorithm: "sha256", Identity: "ID5", Signature: "sig5"},
+				},
+			},
+			wantErr: true,
+			errMsg:  "insufficient authorities",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateConsensusMetadata(tt.meta)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateConsensusMetadata() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr && tt.errMsg != "" && (err == nil || !strings.Contains(err.Error(), tt.errMsg)) {
+				t.Errorf("Error message = %v, want to contain %v", err, tt.errMsg)
+			}
+		})
 	}
 }
