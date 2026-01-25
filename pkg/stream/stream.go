@@ -83,6 +83,10 @@ type Stream struct {
 	deliverWindow  int // Stream-level deliver window (cells we can receive)
 	sendmeReceived int // Count of DATA cells received (for sending SENDME)
 	sendmeSent     int // Count of SENDME cells sent
+	// Backpressure state for memory management
+	backpressure   *BackpressureState // Optional backpressure controller
+	sendBufferSize int                // Current send buffer size in bytes
+	recvBufferSize int                // Current recv buffer size in bytes
 }
 
 // NewStream creates a new stream
@@ -134,8 +138,26 @@ func (s *Stream) Send(data []byte) error {
 		return fmt.Errorf("stream not connected: state=%s", s.GetState())
 	}
 
+	// Check backpressure before attempting to send
+	if s.backpressure != nil {
+		s.mu.Lock()
+		potentialSize := s.sendBufferSize + len(data)
+		isPaused := s.backpressure.CheckSendBuffer(potentialSize)
+		s.mu.Unlock()
+
+		if isPaused {
+			return fmt.Errorf("send buffer full (backpressure applied)")
+		}
+	}
+
 	select {
 	case s.sendQueue <- data:
+		// Successfully queued - now update buffer size
+		if s.backpressure != nil {
+			s.mu.Lock()
+			s.sendBufferSize += len(data)
+			s.mu.Unlock()
+		}
 		return nil
 	case <-s.closeChan:
 		return io.EOF
@@ -148,6 +170,16 @@ func (s *Stream) Send(data []byte) error {
 func (s *Stream) Receive(ctx context.Context) ([]byte, error) {
 	select {
 	case data := <-s.recvQueue:
+		// Update buffer size and check if backpressure can be released
+		if s.backpressure != nil {
+			s.mu.Lock()
+			s.recvBufferSize -= len(data)
+			if s.recvBufferSize < 0 {
+				s.recvBufferSize = 0
+			}
+			s.backpressure.CheckRecvBuffer(s.recvBufferSize)
+			s.mu.Unlock()
+		}
 		return data, nil
 	case <-s.closeChan:
 		return nil, io.EOF
@@ -158,8 +190,26 @@ func (s *Stream) Receive(ctx context.Context) ([]byte, error) {
 
 // ReceiveData delivers received data to the stream (called by circuit layer)
 func (s *Stream) ReceiveData(data []byte) error {
+	// Check backpressure before accepting data
+	if s.backpressure != nil {
+		s.mu.Lock()
+		potentialSize := s.recvBufferSize + len(data)
+		isPaused := s.backpressure.CheckRecvBuffer(potentialSize)
+		s.mu.Unlock()
+
+		if isPaused {
+			return fmt.Errorf("receive buffer full (backpressure applied)")
+		}
+	}
+
 	select {
 	case s.recvQueue <- data:
+		// Successfully queued - now update buffer size
+		if s.backpressure != nil {
+			s.mu.Lock()
+			s.recvBufferSize += len(data)
+			s.mu.Unlock()
+		}
 		return nil
 	case <-s.closeChan:
 		return io.EOF
@@ -172,6 +222,16 @@ func (s *Stream) ReceiveData(data []byte) error {
 func (s *Stream) SendData(ctx context.Context) ([]byte, error) {
 	select {
 	case data := <-s.sendQueue:
+		// Update buffer size and check if backpressure can be released
+		if s.backpressure != nil {
+			s.mu.Lock()
+			s.sendBufferSize -= len(data)
+			if s.sendBufferSize < 0 {
+				s.sendBufferSize = 0
+			}
+			s.backpressure.CheckSendBuffer(s.sendBufferSize)
+			s.mu.Unlock()
+		}
 		return data, nil
 	case <-s.closeChan:
 		return nil, io.EOF
@@ -408,4 +468,32 @@ func (s *Stream) GetDeliverWindow() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.deliverWindow
+}
+
+// SetBackpressure attaches a backpressure controller to this stream
+func (s *Stream) SetBackpressure(bp *BackpressureState) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.backpressure = bp
+}
+
+// GetBackpressure returns the current backpressure state
+func (s *Stream) GetBackpressure() *BackpressureState {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.backpressure
+}
+
+// GetSendBufferSize returns the current send buffer size in bytes
+func (s *Stream) GetSendBufferSize() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.sendBufferSize
+}
+
+// GetRecvBufferSize returns the current receive buffer size in bytes
+func (s *Stream) GetRecvBufferSize() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.recvBufferSize
 }

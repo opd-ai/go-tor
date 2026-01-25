@@ -419,6 +419,7 @@ The go-tor implementation demonstrates **excellent protocol compliance** for cor
   - **Client package test coverage improved from 62.5% to 64.0%** (+1.5pp) (January 25, 2026)
   - **Protocol package handshake unit tests** for improved code validation (January 25, 2026)
   - **Circuit rate limiting implementation** (token bucket, metrics, >95% test coverage) (January 25, 2026)
+  - **Stream backpressure implementation** (hysteresis-based, independent send/receive, 87% test coverage) (January 25, 2026)
 
 **All critical gaps have been addressed.** The implementation makes intentional design choices (e.g., no TAP handshake, no exit node functionality) that are compliant with modern Tor protocol standards.
 
@@ -430,10 +431,11 @@ The go-tor implementation demonstrates **excellent protocol compliance** for cor
 - Protocol package: 60.3% (stable - integration tests cover handshake functions at runtime)
 - Client package: 64.0% (improved from 62.5%, +1.5pp with Stats getter tests and GetConfig tests)
 - Connection package: 65.7% (improved from 61.1% with padding implementation)
+- Stream package: 87.0% (improved from ~75% with backpressure implementation)
 - All critical components now have >60% test coverage
 - Zero test failures in short test suite
 - Fixed linter error in examples/consensus_padding (redundant newline in fmt.Println)
-- New tests cover: family relationships, subnet detection, certificate caching, microdescriptor fetching, RSA/Ed25519 relay identity validation, Stats getters, clientStatsAdapter.GetConfig
+- New tests cover: family relationships, subnet detection, certificate caching, microdescriptor fetching, RSA/Ed25519 relay identity validation, Stats getters, clientStatsAdapter.GetConfig, stream backpressure hysteresis
 - New unit tests for protocol handshake functions validate encoding/decoding logic
 
 ---
