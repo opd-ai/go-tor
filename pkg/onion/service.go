@@ -44,6 +44,7 @@ type Service struct {
 	ctx             context.Context
 	cancel          context.CancelFunc
 	logger          *logger.Logger
+	introManager    *IntroPointManager // Manages intro point lifecycle
 
 	// Connections
 	pendingIntros map[string]*PendingIntro // cookie -> intro
@@ -165,6 +166,9 @@ func NewService(config *ServiceConfig, log *logger.Logger) (*Service, error) {
 		logger:          log.Component("onion-service"),
 	}
 
+	// Initialize introduction point manager
+	service.introManager = NewIntroPointManager(service, log)
+
 	return service, nil
 }
 
@@ -235,6 +239,7 @@ func (s *Service) Start(ctx context.Context, hsdirs []*HSDirectory) error {
 
 	// Step 4: Start background tasks
 	go s.maintenanceLoop(ctx, hsdirs)
+	go s.introManager.StartHealthChecking(ctx)
 
 	s.logger.Info("Onion service started successfully",
 		"address", s.address.String())
@@ -253,11 +258,16 @@ func (s *Service) Stop() error {
 
 	s.logger.Info("Stopping onion service", "address", s.address.String())
 
+	// Stop health checking
+	s.introManager.StopHealthChecking()
+
 	// Cancel context to stop background tasks
 	s.cancel()
 
 	// Clean up introduction points
 	for _, intro := range s.introPoints {
+		// Unregister from health monitoring
+		s.introManager.UnregisterIntroPoint(intro.CircuitID)
 		// In a full implementation, we would:
 		// 1. Send INTRO_ESTABLISHED teardown
 		// 2. Close circuits
@@ -330,9 +340,10 @@ func (s *Service) establishIntroductionPoint(ctx context.Context, relay *HSDirec
 
 	// Build real circuit if circuit builder is available
 	if s.config.CircuitBuilder != nil && s.config.PathSelector != nil {
-		circ, err := s.buildIntroCircuit(ctx, relay)
+		// Use IntroPointManager for circuit building with retry
+		circ, err := s.introManager.BuildIntroCircuitWithRetry(ctx, relay)
 		if err != nil {
-			s.logger.Warn("Failed to build intro circuit, using placeholder",
+			s.logger.Warn("Failed to build intro circuit with retries, using placeholder",
 				"relay", relay.Fingerprint,
 				"error", err)
 			// Fall back to placeholder for testing
@@ -346,9 +357,12 @@ func (s *Service) establishIntroductionPoint(ctx context.Context, relay *HSDirec
 			circuitID = circ.ID
 			// Send ESTABLISH_INTRO cell
 			if err := s.sendEstablishIntro(ctx, circ, authKey, encKey); err != nil {
+				s.introManager.RecordFailure(circuitID)
 				return nil, fmt.Errorf("failed to send ESTABLISH_INTRO: %w", err)
 			}
 			established = true
+			s.introManager.RegisterIntroPoint(circuitID)
+			s.introManager.RecordSuccess(circuitID)
 			s.logger.Info("Introduction point circuit established",
 				"relay", relay.Fingerprint,
 				"circuit", circuitID)
@@ -656,6 +670,9 @@ func (s *Service) maintenanceLoop(ctx context.Context, hsdirs []*HSDirectory) {
 		case <-ticker.C:
 			s.logger.Debug("Running maintenance tasks")
 
+			// Check for unhealthy or stale introduction points
+			s.rotateUnhealthyIntroPoints(ctx, hsdirs)
+
 			// Re-publish descriptor
 			if err := s.createDescriptor(); err != nil {
 				s.logger.Error("Failed to refresh descriptor", "error", err)
@@ -666,6 +683,74 @@ func (s *Service) maintenanceLoop(ctx context.Context, hsdirs []*HSDirectory) {
 			}
 		}
 	}
+}
+
+// rotateUnhealthyIntroPoints replaces unhealthy or stale introduction points
+func (s *Service) rotateUnhealthyIntroPoints(ctx context.Context, hsdirs []*HSDirectory) {
+	// Get unhealthy and stale intro points
+	unhealthy := s.introManager.GetUnhealthyIntroPoints()
+	stale := s.introManager.GetStaleIntroPoints()
+
+	// Combine into set of intro points to replace
+	toReplace := make(map[uint32]bool)
+	for _, id := range unhealthy {
+		toReplace[id] = true
+	}
+	for _, id := range stale {
+		toReplace[id] = true
+	}
+
+	if len(toReplace) == 0 {
+		return
+	}
+
+	s.logger.Info("Rotating introduction points",
+		"unhealthy", len(unhealthy),
+		"stale", len(stale),
+		"total_to_replace", len(toReplace))
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Remove unhealthy/stale intro points
+	newIntroPoints := make([]*ServiceIntroPoint, 0, len(s.introPoints))
+	for _, intro := range s.introPoints {
+		if toReplace[intro.CircuitID] {
+			s.logger.Info("Removing introduction point",
+				"circuit", intro.CircuitID,
+				"relay", intro.Relay.Fingerprint)
+			s.introManager.UnregisterIntroPoint(intro.CircuitID)
+		} else {
+			newIntroPoints = append(newIntroPoints, intro)
+		}
+	}
+	s.introPoints = newIntroPoints
+
+	// Establish new introduction points to maintain desired count
+	needed := s.config.NumIntroPoints - len(s.introPoints)
+	if needed <= 0 {
+		return
+	}
+
+	s.logger.Info("Establishing replacement introduction points", "needed", needed)
+
+	// Select relays for new intro points (simplified - use first available)
+	availableRelays := hsdirs
+	for i := 0; i < needed && i < len(availableRelays); i++ {
+		relay := availableRelays[i]
+		intro, err := s.establishIntroductionPoint(ctx, relay)
+		if err != nil {
+			s.logger.Warn("Failed to establish replacement intro point",
+				"relay", relay.Fingerprint,
+				"error", err)
+			continue
+		}
+		s.introPoints = append(s.introPoints, intro)
+	}
+
+	s.logger.Info("Introduction point rotation complete",
+		"current_count", len(s.introPoints),
+		"target_count", s.config.NumIntroPoints)
 }
 
 // HandleIntroduce2 handles an INTRODUCE2 cell from an introduction point
@@ -732,26 +817,6 @@ type ServiceStats struct {
 }
 
 // buildIntroCircuit builds a 3-hop circuit to the introduction point relay
-func (s *Service) buildIntroCircuit(ctx context.Context, relay *HSDirectory) (*circuit.Circuit, error) {
-	// Select a path to the introduction point
-	// Use port 0 for introduction point circuits (no exit port requirement)
-	selectedPath, err := s.config.PathSelector.SelectPath(0)
-	if err != nil {
-		return nil, fmt.Errorf("failed to select path: %w", err)
-	}
-
-	// Build circuit with 30-second timeout
-	buildCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	circ, err := s.config.CircuitBuilder.BuildCircuit(buildCtx, selectedPath, 30*time.Second)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build circuit: %w", err)
-	}
-
-	return circ, nil
-}
-
 // sendEstablishIntro sends an ESTABLISH_INTRO cell to the introduction point
 func (s *Service) sendEstablishIntro(ctx context.Context, circ *circuit.Circuit, authKey, encKey []byte) error {
 	// Build ESTABLISH_INTRO cell per rend-spec-v3.txt section 3.1.1
