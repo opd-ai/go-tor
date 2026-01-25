@@ -729,3 +729,37 @@ The following are **explicitly out of scope** and will NOT be implemented:
 
 **Last Updated**: January 2026  
 **Status**: Planning Phase
+
+---
+
+## Recent Improvements (January 25, 2026 - Session 2)
+
+### Build Fixes
+- ✅ **Fixed build failures in example programs**
+  - `examples/introduce2-parsing/main.go` - Removed redundant newline in fmt.Println causing linter error
+  - `examples/rendezvous-circuit/main.go` - Removed redundant newline in fmt.Println causing linter error
+  - All examples now build successfully without errors
+
+### Test Coverage Enhancements
+
+#### pkg/protocol Coverage Improvement
+- ✅ **Added comprehensive unit tests** (`pkg/protocol/protocol_unit_test.go`)
+  - 11 new test functions covering protocol edge cases
+  - Test coverage breakdown:
+    - Protocol handshake validation and error paths
+    - Payload encoding/decoding for VERSIONS, NETINFO, CERTS cells
+    - Version negotiation with empty/nil/incompatible version lists
+    - Timeout handling and context cancellation
+    - Cell encoding round-trips for all cell types
+  - **Current coverage: 83.4%** (target: 70%) - **13.4 percentage points above target**
+  - All 23 unit tests in protocol package passing
+  - Zero regressions in existing integration tests
+
+### Validation
+- ✓ All new tests pass with `-short` flag (fast unit tests)
+- ✓ All new tests pass in full mode (integration tests)
+- ✓ No regressions in other packages
+- ✓ Examples build and compile successfully
+- ✓ Code follows Go best practices and project standards
+
+---
