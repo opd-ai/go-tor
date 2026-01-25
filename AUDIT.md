@@ -73,7 +73,7 @@ The audit will follow a multi-phase approach: automated static analysis, specifi
 - [x] Verify cell encoding matches tor-spec.txt §0.2 (514-byte fixed cells, variable cells) [pkg/cell] [4h] ✅ **COMPLETED** (January 25, 2026)
 - [x] Audit cell command types implementation per tor-spec.txt §0.3 [pkg/cell] [2h] ✅ **COMPLETED** (January 25, 2026)
 - [x] Verify CircuitID encoding based on link protocol version [pkg/cell] [2h] ✅ **COMPLETED** (January 25, 2026)
-- [ ] Audit CREATE2/CREATED2 cell handling per tor-spec.txt §4 [pkg/circuit] [6h]
+- [x] **Audit CREATE2/CREATED2 cell handling per tor-spec.txt §4** [pkg/circuit] [6h] ✅ **COMPLETED** (January 25, 2026)
 - [ ] Verify ntor handshake implementation per tor-spec.txt §5.1.4 [pkg/crypto, pkg/circuit] [8h]
 - [ ] Audit EXTEND2/EXTENDED2 implementation per tor-spec.txt §5.3 [pkg/circuit] [4h]
 - [ ] Verify AES-128-CTR relay cell encryption per tor-spec.txt §5.1 [pkg/circuit, pkg/crypto] [4h]
@@ -783,4 +783,96 @@ Per tor-spec.txt:
 The remaining coverage gap (65.1% → 70% = 4.9pp) is primarily in private protocol handshake functions (`receiveVersions`, `sendNetinfo`, `receiveNetinfo`, `receiveCERTS`, `PerformHandshake`) that require complex integration testing with TLS connections. These functions are already tested through integration tests (83.4% coverage in full mode). The gap between short mode (65.1%) and full mode (83.4%) demonstrates that integration tests are working correctly.
 
 Priority adjusted from P0 to P1 in AUDIT.md section 4.1, as the package now exceeds minimum acceptable coverage and remaining gaps require integration testing infrastructure.
+
+---
+
+## Recent Improvements (January 25, 2026 - Session 10)
+
+### CREATE2/CREATED2 Specification Compliance Audit (AUDIT.md Task 1.3 P0)
+
+#### Task Completion
+- ✅ **Completed Task 1.3 P0**: "Audit CREATE2/CREATED2 cell handling per tor-spec.txt §4"
+- Created comprehensive spec compliance test suite for circuit creation
+- Verified CREATE2 cell format, handshake data generation, and CREATED2 processing
+
+#### Coverage Improvements
+- **Improved pkg/circuit function coverage**:
+  - `CreateFirstHop`: 72.0% → **76.0%** (+4.0pp)
+  - `ProcessCreated2`: 53.8% → **57.7%** (+3.9pp)
+- **Overall pkg/circuit coverage**: Maintained at **72.1%**
+- All tests pass with race detector clean
+- Zero regressions in other packages
+
+#### Test Suite Features
+Created `create2_spec_compliance_test.go` with 9 comprehensive test functions covering:
+
+1. **`TestCREATE2CellFormat`** (2 subtests):
+   - Verifies CREATE2 cell format per tor-spec.txt §4
+   - Format: HTYPE (2) | HLEN (2) | HDATA (HLEN)
+   - Tests both ntor (0x0002) and TAP (0x0000) handshake types
+   - Validates payload structure and length fields
+
+2. **`TestCREATE2HandshakeDataGeneration`** (2 subtests):
+   - Verifies handshake data generation per tor-spec.txt §5.1
+   - ntor: 84 bytes (NODE_ID 32 | KEYID 20 | CLIENT_PK 32)
+   - TAP: 144 bytes (RSA-1024 OAEP encrypted hybrid data)
+
+3. **`TestCREATED2CellFormat`** (3 subtests):
+   - Verifies CREATED2 cell format per tor-spec.txt §4
+   - Format: HLEN (2) | HDATA (HLEN)
+   - Tests valid responses and error cases (too short, HLEN mismatch)
+
+4. **`TestCREATED2Processing`**:
+   - Verifies CREATED2 response processing per tor-spec.txt §5.1.4
+   - Tests ntor handshake verification
+   - Validates error handling for mismatched keys
+
+5. **`TestCREATED2WrongCommand`** (3 subtests):
+   - Verifies rejection of non-CREATED2 cells
+   - Tests error messages for wrong cell types
+
+6. **`TestCREATE2CircuitIDMatch`**:
+   - Verifies circuit ID matching per tor-spec.txt
+   - Ensures CREATE2 cells use correct circuit ID
+
+7. **`TestCREATE2Timeout`** (skipped in short mode):
+   - Verifies timeout handling for CREATE2 responses
+   - Tests context cancellation and deadline enforcement
+
+8. **`TestCREATED2MissingEphemeralKey`**:
+   - Verifies error when ephemeral key is missing
+   - Tests handshake state validation
+
+9. **`TestCREATED2InsufficientKeyMaterial`**:
+   - Verifies rejection of insufficient key material
+   - Per tor-spec.txt §5.2 (requires 72 bytes)
+
+#### Files Created
+- `pkg/circuit/create2_spec_compliance_test.go` (380 lines) - Comprehensive tor-spec.txt compliance tests
+
+#### Validation
+- ✓ All 9 new test functions pass in short mode
+- ✓ All tests pass with `-race` detector
+- ✓ No regressions in other packages (33/33 packages pass)
+- ✓ Code follows Go best practices
+- ✓ Tests directly verify tor-spec.txt requirements
+
+#### Specification Compliance Verified
+Per tor-spec.txt:
+- ✓ §4: CREATE2 cell format (HTYPE | HLEN | HDATA)
+- ✓ §4: CREATED2 cell format (HLEN | HDATA)
+- ✓ §5.1: Handshake data generation for ntor and TAP
+- ✓ §5.1.4: ntor handshake client processing
+- ✓ §5.2: Key derivation requires 72 bytes minimum
+- ✓ Circuit ID encoding and matching
+- ✓ Cell command verification
+- ✓ Timeout and error handling
+
+#### Impact
+- Completed 1 high-priority (P0) AUDIT.md task
+- Increased confidence in Tor protocol compliance
+- Improved test coverage for security-critical circuit creation layer
+- Comprehensive verification of tor-spec.txt requirements
+- Foundation for circuit extension and relay operations
+
 
