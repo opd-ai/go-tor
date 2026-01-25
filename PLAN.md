@@ -394,25 +394,63 @@ The `pkg/onion/service.go` already contains foundational server-side functionali
 
 **Tasks**:
 
-- [ ] **10.4.1 Rate Limiting**
-  - Limit circuit creation rate
-  - Limit connections per IP
-  - Implement token bucket for cell processing
+- [x] **10.4.1 Rate Limiting** ✅ **COMPLETED** (January 25, 2026)
+  - Implemented circuit creation rate limiting (token bucket, 10/sec default)
+  - Implemented per-IP connection rate limiting (5/sec default)
+  - Implemented per-circuit cell processing rate limiting (100/sec default)
+  - Added automatic cleanup of stale limiters
+  - Implementation: `pkg/relay/ratelimit.go` (`RateLimiter`)
+  - Tests: `pkg/relay/ratelimit_test.go` (11 tests, all passing)
+  - Features:
+    - Context-aware rate limiting with graceful cancellation
+    - Configurable rates and burst sizes
+    - Metrics integration for tracking rate-limited operations
+    - Periodic cleanup to prevent memory leaks
 
-- [ ] **10.4.2 DoS Protection**
-  - Connection count limits
-  - Circuit count limits per connection
-  - Cell rate limiting per circuit
+- [x] **10.4.2 DoS Protection** ✅ **COMPLETED** (January 25, 2026)
+  - Implemented per-IP connection count limits (10 per IP default)
+  - Implemented per-connection circuit count limits (1000 per connection default)
+  - Implemented global connection limit (5000 total default)
+  - Added automatic cleanup of stale trackers
+  - Implementation: `pkg/relay/protection.go` (`ProtectionManager`)
+  - Tests: `pkg/relay/protection_test.go` (11 tests, all passing)
+  - Features:
+    - Separate tracking for connections and circuits
+    - Atomic operations for thread safety
+    - Metrics integration for DoS event tracking
+    - Configurable limits with sensible defaults
 
-- [ ] **10.4.3 Logging and Monitoring**
-  - Relay-specific metrics (circuits/second, bandwidth)
-  - Connection statistics
-  - Attack detection logging
+- [x] **10.4.3 Logging and Monitoring** ✅ **COMPLETED** (January 25, 2026)
+  - Implemented comprehensive relay metrics package
+  - Added circuit metrics (creation, extension, active count)
+  - Added connection metrics (accepted, rejected, duration)
+  - Added cell forwarding metrics (received, forwarded, dropped)
+  - Added bandwidth metrics (bytes received/transmitted)
+  - Added rate limiting and DoS protection metrics
+  - Added error tracking metrics (handshake, protocol, extension)
+  - Implementation: `pkg/relay/metrics.go` (`RelayMetrics`)
+  - Tests: `pkg/relay/metrics_test.go` (14 tests, 100% coverage)
+  - Features:
+    - Thread-safe Counter, Gauge, and Histogram types
+    - Snapshot functionality for point-in-time metrics
+    - Uptime tracking
+    - Comprehensive metric categories
 
-**Files to Create**:
-- `pkg/relay/ratelimit.go` - Relay rate limiting
-- `pkg/relay/protection.go` - DoS protection
-- `pkg/relay/metrics.go` - Relay metrics
+**Files Created**:
+- `pkg/relay/ratelimit.go` ✅ - Relay rate limiting (177 lines)
+- `pkg/relay/ratelimit_test.go` ✅ - Rate limiting tests (11 tests, all passing)
+- `pkg/relay/protection.go` ✅ - DoS protection (288 lines)
+- `pkg/relay/protection_test.go` ✅ - DoS protection tests (11 tests, all passing)
+- `pkg/relay/metrics.go` ✅ - Relay metrics (336 lines)
+- `pkg/relay/metrics_test.go` ✅ - Relay metrics tests (14 tests, 100% coverage)
+
+**Dependencies Added**:
+- `golang.org/x/time/rate` v0.14.0 - Token bucket rate limiting
+
+**Test Coverage**: 
+- Overall relay package: 79.1%
+- New files: >85% average coverage
+- metrics.go: 100% coverage
 
 ---
 
@@ -549,6 +587,7 @@ Each new package should have comprehensive unit tests:
 
 - [x] `docs/ONION_SERVICE_HOSTING.md` - Complete service hosting guide ✅ **COMPLETED** (January 25, 2026)
 - [x] `docs/LINK_PROTOCOL_SERVER.md` - Server-side link protocol implementation ✅ **COMPLETED** (January 25, 2026)
+- [x] `docs/RELAY_SECURITY.md` - Relay security hardening (rate limiting, DoS protection, metrics) ✅ **COMPLETED** (January 25, 2026)
 - [ ] `docs/BRIDGE_RELAY.md` - Bridge relay setup and operation
 - [ ] `docs/PLUGGABLE_TRANSPORTS.md` - PT configuration and usage
 
