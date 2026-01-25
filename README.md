@@ -201,6 +201,8 @@ func main() {
 - **Control Protocol** - Password-authenticated control interface with event notifications
 - **Onion Services** - v3 onion address support including client connections and service hosting
 - **Client Authorization** - x25519-based authentication for accessing private onion services
+- **Circuit Padding** - Adaptive Padding Engine (APE) with state machines for traffic analysis resistance
+- **Connection Padding** - Link-level PADDING/VPADDING cells for connection-level protection
 - **Metrics & Observability** - Prometheus, JSON, and HTML dashboard endpoints
 - **Health Monitoring** - Component-level health checks and status reporting
 - **Resource Pooling** - Circuit and connection pooling for performance optimization
