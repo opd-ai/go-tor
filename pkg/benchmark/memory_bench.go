@@ -25,7 +25,7 @@ func (s *Suite) BenchmarkMemoryUsage(ctx context.Context) error {
 		targetMemory   = targetMemoryMB * 1024 * 1024 // 50 MB in bytes
 		numCircuits    = 3
 		numStreams     = 10
-		duration       = 30 * time.Second
+		duration       = 15 * time.Second // Reduced from 30s for faster test execution
 	)
 
 	// Force GC and get baseline

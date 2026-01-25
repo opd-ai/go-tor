@@ -15,7 +15,8 @@ import (
 )
 
 func main() {
-	fmt.Println("=== Stream Backpressure Demo ===\n")
+	fmt.Println("=== Stream Backpressure Demo ===")
+	fmt.Println()
 
 	// Configure backpressure with low thresholds for demonstration
 	cfg := config.DefaultConfig()

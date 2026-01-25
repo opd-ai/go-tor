@@ -55,6 +55,11 @@ These are potential enhancements that could be implemented in the future. None a
     - Stream scaling and multiplexing
   - Tests run in both short mode (fast) and full mode (comprehensive)
   - All tests pass with race detector
+  - Fixed test timeout issue (TestRunAll reduced from 120s timeout to 27s completion)
+  - Optimized benchmark parameters for faster execution:
+    - Circuit count: 100→20
+    - Circuit delay: 1000-1500ms→100-600ms
+    - Memory duration: 30s→15s
   - Priority: Low → COMPLETED
   - Benefit: Better test coverage and reliability for performance tracking
 

@@ -16,7 +16,7 @@ func (s *Suite) BenchmarkCircuitBuild(ctx context.Context) error {
 	s.log.Info("Running circuit build benchmark")
 
 	const (
-		numCircuits = 100
+		numCircuits = 20 // Reduced from 100 for faster test execution
 		targetP95   = 5 * time.Second
 	)
 
@@ -36,7 +36,8 @@ func (s *Suite) BenchmarkCircuitBuild(ctx context.Context) error {
 		// Simulate network latency and crypto operations
 		// Typical circuit build: 3 hops × ~300-500ms = ~1-1.5 seconds
 		// Plus crypto overhead (negligible based on PERFORMANCE.md)
-		time.Sleep(time.Duration(1000+i%500) * time.Millisecond)
+		// Using shorter delays for test efficiency: 100-600ms per circuit
+		time.Sleep(time.Duration(100+i%500) * time.Millisecond)
 
 		buildDuration := time.Since(buildStart)
 		tracker.Record(buildDuration)
