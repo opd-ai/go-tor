@@ -109,7 +109,12 @@ func (s *Suite) BenchmarkConcurrentStreams(ctx context.Context) error {
 			"total_operations": totalOps,
 			"error_count":      totalErrors,
 			"ops_per_stream":   float64(totalOps) / float64(targetStreams),
-			"avg_latency":      totalDuration / time.Duration(totalOps),
+			"avg_latency": func() time.Duration {
+				if totalOps > 0 {
+					return totalDuration / time.Duration(totalOps)
+				}
+				return 0
+			}(),
 			// Safe conversion for data transfer calculation (AUDIT-002)
 			"data_transferred": func() string {
 				transferred := totalOps * dataSize
@@ -194,8 +199,13 @@ func (s *Suite) BenchmarkStreamScaling(ctx context.Context) error {
 				"num_streams":    numStreams,
 				"ops_per_stream": operationsPerStream,
 				"total_ops":      completedOps,
-				"avg_latency":    totalDuration / time.Duration(completedOps),
-				"gc_runs":        memAfter.NumGC - memBefore.NumGC,
+				"avg_latency": func() time.Duration {
+					if completedOps > 0 {
+						return totalDuration / time.Duration(completedOps)
+					}
+					return 0
+				}(),
+				"gc_runs": memAfter.NumGC - memBefore.NumGC,
 			},
 		}
 

@@ -44,11 +44,19 @@ These are potential enhancements that could be implemented in the future. None a
   - Priority: Low → COMPLETED
   - Benefit: Improved reliability detection for private onion services achieved
 
-- [ ] **Benchmark Suite**
-  - Expand `pkg/benchmark` test coverage (currently 21.6%)
-  - Add continuous performance monitoring
-  - Priority: Low
-  - Benefit: Performance tracking over time
+- [x] **Benchmark Suite Expansion** ✅ **COMPLETED (January 25, 2026)**
+  - Expanded `pkg/benchmark` test coverage from 21.6% to 84.6%
+  - Added comprehensive tests for all benchmark suite methods
+  - Fixed divide-by-zero bugs in edge cases (short timeouts)
+  - Added unit tests for:
+    - RunAll comprehensive benchmark suite
+    - All individual benchmark methods (circuit build, memory, streams)
+    - Circuit build with pool, memory leak detection
+    - Stream scaling and multiplexing
+  - Tests run in both short mode (fast) and full mode (comprehensive)
+  - All tests pass with race detector
+  - Priority: Low → COMPLETED
+  - Benefit: Better test coverage and reliability for performance tracking
 
 ### Protocol Extensions
 

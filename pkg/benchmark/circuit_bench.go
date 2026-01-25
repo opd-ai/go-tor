@@ -159,8 +159,13 @@ func (s *Suite) BenchmarkCircuitBuildWithPool(ctx context.Context) error {
 		AdditionalMetrics: map[string]interface{}{
 			"pool_size":    poolSize,
 			"num_requests": numRequests,
-			"avg_latency":  totalDuration / time.Duration(numRequests),
-			"gc_runs":      memAfter.NumGC - memBefore.NumGC,
+			"avg_latency": func() time.Duration {
+				if numRequests > 0 {
+					return totalDuration / time.Duration(numRequests)
+				}
+				return 0
+			}(),
+			"gc_runs": memAfter.NumGC - memBefore.NumGC,
 		},
 	}
 
