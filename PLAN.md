@@ -154,7 +154,20 @@ The audit will follow a multi-phase approach: automated static analysis, specifi
   - Overall specification compliance: 31/31 requirements (100%)
   - Created audit document: `docs/audits/RENDEZVOUS_PROTOCOL_AUDIT.md`
   - Status: Production-ready for educational use
-- [ ] Audit descriptor encryption and publication [pkg/onion] [4h]
+- [x] **Audit descriptor encryption and publication [pkg/onion] [4h]** ✅ **COMPLETED** (January 25, 2026)
+  - Comprehensive audit completed against rend-spec-v3.txt §2.5 (Descriptor Format and Encryption)
+  - Assessment: Substantially compliant (92% overall compliance)
+  - Verified descriptor structure per rend-spec-v3.txt §2.5.1 (100% compliant)
+  - Verified certificate-based signing per cert-spec.txt (100% compliant)
+  - Verified outer layer encryption with XChaCha20-Poly1305 (100% compliant)
+  - Verified HSDir publishing protocol per dir-spec.txt §4.4 (100% compliant)
+  - Verified descriptor refresh and rotation per rend-spec-v3.txt §2.1 (100% compliant)
+  - Identified 2 important findings: inner layer encryption incomplete, link specifiers not implemented
+  - Identified 3 minor findings: superencrypted marker only, no rate limiting, HTTP upload not over Tor
+  - Test coverage: 17% for descriptor-specific tests (EncodeDescriptor, DecryptDescriptor, etc.)
+  - Security assessment: Cryptographic primitives correctly implemented, no critical vulnerabilities
+  - Created audit document: `docs/audits/DESCRIPTOR_ENCRYPTION_PUBLICATION_AUDIT.md`
+  - Status: Suitable for educational/research use, improvements needed for production deployment
 - [x] **Verify circuit teardown (DESTROY cells) per tor-spec.txt §5.4 [pkg/circuit] [2h]** ✅ **COMPLETED** (January 25, 2026)
 - [x] **Audit TRUNCATE/TRUNCATED handling per tor-spec.txt §5.5 [pkg/relay] [2h]** ✅ **COMPLETED** (January 25, 2026)
   - Verified RELAY_TRUNCATE cell handling in `pkg/relay/forwarding.go`
@@ -651,7 +664,7 @@ govulncheck ./...
 | Task Category | Completed | Total | Coverage |
 |--------------|-----------|-------|----------|
 | P0 (Critical) Core Protocol | 15 | 15 | 100% |
-| P1 (High) Extended Features | 6 | 10 | 60% |
+| P1 (High) Extended Features | 7 | 10 | 70% |
 | P2 (Medium) Advanced Features | 0 | 7 | 0% |
 
 ### P0 Tasks Completed
@@ -674,10 +687,16 @@ govulncheck ./...
 
 - ✅ Consensus document parsing (dir-spec)
 - ✅ Relay descriptor parsing and validation
-- ✅ Circuit teardown/DESTROY cells (tor-spec §5.4)
-- ✅ SHA-1 usage audit (protocol-mandated)
+- ✅ Guard node selection algorithm (path-spec)
+- ✅ Bandwidth-weighted relay selection (path-spec §2.2)
 - ✅ Control protocol authentication audit (control-spec §3.5)
 - ✅ Control protocol command handling (control-spec §3)
+- ✅ Introduction point protocol audit (rend-spec-v3 §3.1)
+- ✅ Rendezvous protocol audit (rend-spec-v3 §3.2-3.3)
+- ✅ Descriptor encryption and publication audit (rend-spec-v3 §2.5)
+- ✅ Circuit teardown/DESTROY cells (tor-spec §5.4)
+- ✅ TRUNCATE/TRUNCATED handling (tor-spec §5.5)
+- ✅ SHA-1 usage audit (protocol-mandated)
 
 ### Test Coverage Improvements
 
