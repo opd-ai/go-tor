@@ -24,11 +24,12 @@ type Config struct {
 	NumEntryGuards      int           // Number of entry guards to use (default: 3)
 
 	// Path selection
-	UseEntryGuards   bool     // Whether to use entry guards (default: true)
-	UseBridges       bool     // Whether to use bridges (default: false)
-	BridgeAddresses  []string // Bridge addresses if UseBridges is true
-	ExcludeNodes     []string // Nodes to exclude from path selection
-	ExcludeExitNodes []string // Exit nodes to exclude
+	UseEntryGuards   bool          // Whether to use entry guards (default: true)
+	UseBridges       bool          // Whether to use bridges (default: false)
+	BridgeAddresses  []string      // Bridge addresses if UseBridges is true (raw bridge lines)
+	Bridges          []*BridgeInfo // Parsed bridge information (populated after LoadFromFile)
+	ExcludeNodes     []string      // Nodes to exclude from path selection
+	ExcludeExitNodes []string      // Exit nodes to exclude
 
 	// Network behavior
 	ConnLimit      int           // Max concurrent connections (default: 1000)
@@ -514,6 +515,21 @@ func (c *Config) Validate() error {
 func (c *Config) Clone() *Config {
 	clone := *c
 	clone.BridgeAddresses = append([]string{}, c.BridgeAddresses...)
+
+	// Deep copy parsed bridges
+	clone.Bridges = make([]*BridgeInfo, len(c.Bridges))
+	for i, bridge := range c.Bridges {
+		if bridge != nil {
+			bridgeCopy := *bridge
+			// Deep copy the parameters map
+			bridgeCopy.Parameters = make(map[string]string, len(bridge.Parameters))
+			for k, v := range bridge.Parameters {
+				bridgeCopy.Parameters[k] = v
+			}
+			clone.Bridges[i] = &bridgeCopy
+		}
+	}
+
 	clone.ExcludeNodes = append([]string{}, c.ExcludeNodes...)
 	clone.ExcludeExitNodes = append([]string{}, c.ExcludeExitNodes...)
 	clone.OnionServices = make([]OnionServiceConfig, len(c.OnionServices))

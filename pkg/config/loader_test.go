@@ -230,7 +230,7 @@ func TestSaveToFile(t *testing.T) {
 	cfg.NumEntryGuards = 5
 	cfg.UseEntryGuards = false
 	cfg.UseBridges = true
-	cfg.BridgeAddresses = []string{"bridge1", "bridge2"}
+	cfg.BridgeAddresses = []string{"192.0.2.1:443", "192.0.2.2:9001"}
 	cfg.ExcludeNodes = []string{"node1"}
 	cfg.CircuitBuildTimeout = 90 * time.Second
 
@@ -500,7 +500,7 @@ ConnLimit 1000`
 func BenchmarkSaveToFile(b *testing.B) {
 	tmpDir := b.TempDir()
 	cfg := DefaultConfig()
-	cfg.BridgeAddresses = []string{"bridge1", "bridge2", "bridge3"}
+	cfg.BridgeAddresses = []string{"192.0.2.1:443", "192.0.2.2:9001", "obfs4 192.0.2.3:1234"}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

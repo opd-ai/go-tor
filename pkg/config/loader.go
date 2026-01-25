@@ -70,6 +70,11 @@ func LoadFromFile(path string, cfg *Config) error {
 		return fmt.Errorf("error reading config file: %w", err)
 	}
 
+	// Parse all bridge addresses into BridgeInfo structures
+	if err := parseBridges(cfg); err != nil {
+		return fmt.Errorf("failed to parse bridges: %w", err)
+	}
+
 	// Validate the loaded configuration
 	if err := cfg.Validate(); err != nil {
 		return fmt.Errorf("invalid configuration: %w", err)
@@ -248,6 +253,25 @@ func parseDuration(s string) (time.Duration, error) {
 		}
 		return time.Duration(val) * time.Second, nil
 	}
+}
+
+// parseBridges parses all bridge address strings into BridgeInfo structures
+func parseBridges(cfg *Config) error {
+	if len(cfg.BridgeAddresses) == 0 {
+		cfg.Bridges = nil
+		return nil
+	}
+
+	cfg.Bridges = make([]*BridgeInfo, 0, len(cfg.BridgeAddresses))
+	for i, bridgeLine := range cfg.BridgeAddresses {
+		bridge, err := ParseBridge(bridgeLine)
+		if err != nil {
+			return fmt.Errorf("bridge %d: %w", i+1, err)
+		}
+		cfg.Bridges = append(cfg.Bridges, bridge)
+	}
+
+	return nil
 }
 
 // parseBool parses a boolean value from various string formats.
