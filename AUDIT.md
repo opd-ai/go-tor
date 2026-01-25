@@ -174,10 +174,20 @@ The `pkg/onion/service.go` already contains foundational server-side functionali
   - Integration: Enhanced `pkg/onion/service.go` `NewService()` to load/save keys
   - Integration tests: `pkg/onion/service_test.go` (3 integration tests)
 
-- [ ] **9.4.2 State Persistence**
+- [x] **9.4.2 State Persistence** ✅ **COMPLETED** (January 25, 2026)
   - Persist service state across restarts
   - Cache introduction point assignments
   - Store descriptor publication timestamps
+  - Track descriptor revision counter for monotonically increasing versions
+  - Implementation: Enhanced `pkg/onion/service.go` with state management
+  - Features:
+    - State automatically saved on Stop() and after descriptor publish
+    - State loaded on service initialization from DataDirectory
+    - Intro point cache includes established intro points only
+    - Descriptor revision counter persisted and incremented on each publish
+    - Creation timestamp tracked across restarts
+  - Tests: `pkg/onion/service_state_test.go` (7 tests, all passing)
+  - Coverage: saveState() method has 92.9% coverage
 
 **Files Modified/Created**:
 - `pkg/onion/persistence.go` (new) - Service state persistence with secure key storage

@@ -57,6 +57,11 @@ type Service struct {
 	pendingIntros      map[string]*PendingIntro // cookie -> intro
 	rendezvousCircuits map[string]uint32        // cookie -> circuit ID
 	streamManager      *ServiceStreamManager    // Manages incoming streams
+
+	// Persistence
+	persistence   *ServicePersistence // Handles state persistence
+	createdAt     time.Time           // Service creation timestamp
+	descriptorRev uint64              // Descriptor revision counter
 }
 
 // CircuitGetter provides access to circuits by ID
@@ -139,6 +144,8 @@ func NewService(config *ServiceConfig, log *logger.Logger) (*Service, error) {
 	var privateKey ed25519.PrivateKey
 	var publicKey ed25519.PublicKey
 	var ntorKey []byte
+	var persistence *ServicePersistence
+	var loadedState *ServiceState
 
 	if len(config.PrivateKey) > 0 {
 		// Use provided key
@@ -157,7 +164,8 @@ func NewService(config *ServiceConfig, log *logger.Logger) (*Service, error) {
 		ntorKey = ntorKeyPair.Private[:]
 	} else if config.DataDirectory != "" {
 		// Try to load from persistent storage
-		persistence, err := NewServicePersistence(config.DataDirectory, log)
+		var err error
+		persistence, err = NewServicePersistence(config.DataDirectory, log)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create persistence: %w", err)
 		}
@@ -178,12 +186,25 @@ func NewService(config *ServiceConfig, log *logger.Logger) (*Service, error) {
 			}
 
 			publicKey = privateKey.Public().(ed25519.PublicKey)
+
+			// Try to load state if it exists
+			if persistence.StateExists() {
+				loadedState, err = persistence.LoadState()
+				if err != nil {
+					log.Warn("Failed to load service state, starting fresh", "error", err)
+					loadedState = nil
+				} else {
+					log.Info("Loaded service state from storage",
+						"last_publish", loadedState.LastDescriptorPublish,
+						"revision", loadedState.DescriptorRevision,
+						"intro_points_cached", len(loadedState.IntroPointCache))
+				}
+			}
 		} else {
 			// Generate new keys and save
 			log.Info("Generating new service keys",
 				"directory", config.DataDirectory)
 
-			var err error
 			publicKey, privateKey, err = ed25519.GenerateKey(rand.Reader)
 			if err != nil {
 				return nil, fmt.Errorf("failed to generate identity key: %w", err)
@@ -246,6 +267,16 @@ func NewService(config *ServiceConfig, log *logger.Logger) (*Service, error) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
+	// Initialize creation time and descriptor revision
+	createdAt := time.Now()
+	descriptorRev := uint64(1)
+
+	if loadedState != nil {
+		// Use loaded state
+		createdAt = loadedState.CreatedAt
+		descriptorRev = loadedState.DescriptorRevision
+	}
+
 	service := &Service{
 		identityKey:        privateKey,
 		publicKey:          publicKey,
@@ -259,6 +290,15 @@ func NewService(config *ServiceConfig, log *logger.Logger) (*Service, error) {
 		ctx:                ctx,
 		cancel:             cancel,
 		logger:             log.Component("onion-service"),
+		persistence:        persistence,
+		createdAt:          createdAt,
+		descriptorRev:      descriptorRev,
+	}
+
+	// If we have loaded state with cached intro points, we could restore them here
+	// For now, we'll just track the state for metrics and optimization
+	if loadedState != nil {
+		service.lastPublish = loadedState.LastDescriptorPublish
 	}
 
 	// Initialize introduction point manager
@@ -394,6 +434,55 @@ func (s *Service) Stop() error {
 
 	s.running = false
 	s.logger.Info("Onion service stopped", "address", s.address.String())
+
+	// Save state before stopping (if persistence is enabled)
+	if err := s.saveState(); err != nil {
+		s.logger.Warn("Failed to save service state on stop", "error", err)
+	}
+
+	return nil
+}
+
+// saveState persists the current service state to disk
+func (s *Service) saveState() error {
+	if s.persistence == nil {
+		return nil // No persistence configured
+	}
+
+	// Build intro point cache
+	introCache := make([]IntroPointState, 0, len(s.introPoints))
+	for _, intro := range s.introPoints {
+		if intro.Established {
+			fingerprint := ""
+			if intro.Relay != nil && intro.Relay.Fingerprint != "" {
+				fingerprint = intro.Relay.Fingerprint
+			}
+
+			introCache = append(introCache, IntroPointState{
+				Fingerprint: fingerprint,
+				AuthKeyHex:  fmt.Sprintf("%x", intro.AuthKey),
+				EncKeyHex:   fmt.Sprintf("%x", intro.EncKey),
+				CreatedAt:   intro.CreatedAt,
+			})
+		}
+	}
+
+	state := &ServiceState{
+		OnionAddress:          s.address.String(),
+		CreatedAt:             s.createdAt,
+		LastStarted:           s.startTime,
+		IntroPointCache:       introCache,
+		LastDescriptorPublish: s.lastPublish,
+		DescriptorRevision:    s.descriptorRev,
+	}
+
+	if err := s.persistence.SaveState(state); err != nil {
+		return fmt.Errorf("failed to save state: %w", err)
+	}
+
+	s.logger.Debug("Service state saved",
+		"intro_points", len(introCache),
+		"revision", s.descriptorRev)
 
 	return nil
 }
@@ -554,14 +643,13 @@ func (s *Service) createDescriptor() error {
 		introPoints = append(introPoints, intro)
 	}
 
-	// Safe conversion of timestamp to uint64
-	now := time.Now()
-	revisionCounter, err := security.SafeUnixToUint64(now)
-	if err != nil {
-		// In case of error, use 0 as revision counter
-		revisionCounter = 0
-	}
+	// Use the tracked descriptor revision counter
+	// This ensures monotonically increasing revisions across restarts
+	s.mu.RLock()
+	revisionCounter := s.descriptorRev
+	s.mu.RUnlock()
 
+	now := time.Now()
 	desc := &Descriptor{
 		Version:         3,
 		Address:         s.address,
@@ -721,6 +809,7 @@ func (s *Service) publishDescriptor(ctx context.Context, hsdirs []*HSDirectory) 
 
 	s.mu.Lock()
 	s.lastPublish = time.Now()
+	s.descriptorRev++ // Increment revision counter on each publish
 	s.mu.Unlock()
 
 	if s.config.Metrics != nil {
@@ -728,7 +817,13 @@ func (s *Service) publishDescriptor(ctx context.Context, hsdirs []*HSDirectory) 
 	}
 
 	s.logger.Info("Descriptor published successfully",
-		"hsdirs", published)
+		"hsdirs", published,
+		"revision", s.descriptorRev)
+
+	// Save state after successful publish
+	if err := s.saveState(); err != nil {
+		s.logger.Warn("Failed to save state after descriptor publish", "error", err)
+	}
 
 	return nil
 }
