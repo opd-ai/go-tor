@@ -227,7 +227,7 @@ func (h *ForwardingHandler) handleTruncate(circuitID uint32) error {
 	// Remove extended circuit if it exists
 	h.extendedMu.Lock()
 	defer h.extendedMu.Unlock()
-	
+
 	if ext, exists := h.extended[circuitID]; exists {
 		// Close connection to next hop
 		if ext.NextHopConn != nil {
@@ -237,7 +237,7 @@ func (h *ForwardingHandler) handleTruncate(circuitID uint32) error {
 		h.logger.Info("Truncated extended circuit",
 			"circuit_id", circuitID,
 			"next_hop_circuit_id", ext.NextHopCircuitID)
-		
+
 		// Note: RELAY_TRUNCATED response should be sent by the OR handler
 		// that has access to the client connection. The truncation itself
 		// is complete - we've torn down the extension to the next hop.
