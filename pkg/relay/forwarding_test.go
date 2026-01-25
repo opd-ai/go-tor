@@ -162,20 +162,43 @@ func TestHandleTruncate(t *testing.T) {
 	circuits := NewCircuitHandler(nil, log)
 	handler := NewForwardingHandler(circuits, log)
 
-	mockConn := newTestMockConn()
-	handler.RegisterExtendedCircuit(100, 200, "127.0.0.1:9001", mockConn)
+	// Register extended circuit
+	mockNextHopConn := newTestMockConn()
+	err := handler.RegisterExtendedCircuit(100, 200, "127.0.0.1:9001", mockNextHopConn)
+	if err != nil {
+		t.Fatalf("RegisterExtendedCircuit failed: %v", err)
+	}
 
-	err := handler.handleTruncate(100)
+	// Handle truncate
+	err = handler.handleTruncate(100)
 	if err != nil {
 		t.Fatalf("handleTruncate failed: %v", err)
 	}
 
-	if !mockConn.closed {
+	// Verify next hop connection was closed
+	if !mockNextHopConn.closed {
 		t.Error("Next hop connection was not closed")
 	}
 
+	// Verify extended circuit was removed
 	if handler.GetExtendedCircuitCount() != 0 {
 		t.Errorf("Expected 0 extended circuits after truncate, got %d", handler.GetExtendedCircuitCount())
+	}
+}
+
+func TestHandleTruncateNoExtension(t *testing.T) {
+	// Test truncate on a circuit that was never extended
+	log := logger.NewDefault()
+	circuits := NewCircuitHandler(nil, log)
+	handler := NewForwardingHandler(circuits, log)
+
+	err := handler.handleTruncate(100)
+	if err != nil {
+		t.Fatalf("handleTruncate failed on non-extended circuit: %v", err)
+	}
+
+	if handler.GetExtendedCircuitCount() != 0 {
+		t.Errorf("Expected 0 extended circuits, got %d", handler.GetExtendedCircuitCount())
 	}
 }
 

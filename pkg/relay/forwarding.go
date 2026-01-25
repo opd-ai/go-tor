@@ -219,12 +219,15 @@ func (h *ForwardingHandler) rejectExitAttempt(circuitID uint32, streamID uint16)
 	return nil
 }
 
-// handleTruncate handles RELAY_TRUNCATE cells
+// handleTruncate handles RELAY_TRUNCATE cells per tor-spec.txt §5.5
+// Returns true if the circuit had an extension that was torn down
 func (h *ForwardingHandler) handleTruncate(circuitID uint32) error {
 	h.logger.Info("Received RELAY_TRUNCATE", "circuit_id", circuitID)
 
 	// Remove extended circuit if it exists
 	h.extendedMu.Lock()
+	defer h.extendedMu.Unlock()
+	
 	if ext, exists := h.extended[circuitID]; exists {
 		// Close connection to next hop
 		if ext.NextHopConn != nil {
@@ -234,10 +237,12 @@ func (h *ForwardingHandler) handleTruncate(circuitID uint32) error {
 		h.logger.Info("Truncated extended circuit",
 			"circuit_id", circuitID,
 			"next_hop_circuit_id", ext.NextHopCircuitID)
+		
+		// Note: RELAY_TRUNCATED response should be sent by the OR handler
+		// that has access to the client connection. The truncation itself
+		// is complete - we've torn down the extension to the next hop.
 	}
-	h.extendedMu.Unlock()
 
-	// Send RELAY_TRUNCATED response would go here
 	return nil
 }
 

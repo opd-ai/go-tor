@@ -11,15 +11,17 @@ import (
 // This is a separate implementation from mockConn in or_handler_test.go
 // to avoid conflicts when running individual test files
 type testMockConn struct {
-	readData  []byte
-	readPos   int
-	writeData []byte
-	closed    bool
+	readData    []byte
+	readPos     int
+	writeData   []byte
+	writtenData [][]byte // Track individual writes
+	closed      bool
 }
 
 func newTestMockConn() *testMockConn {
 	return &testMockConn{
-		readData: make([]byte, 0),
+		readData:    make([]byte, 0),
+		writtenData: make([][]byte, 0),
 	}
 }
 
@@ -33,6 +35,11 @@ func (m *testMockConn) Read(b []byte) (n int, err error) {
 }
 
 func (m *testMockConn) Write(b []byte) (n int, err error) {
+	// Track the write
+	data := make([]byte, len(b))
+	copy(data, b)
+	m.writtenData = append(m.writtenData, data)
+	// Also append to the aggregate writeData for backward compatibility
 	m.writeData = append(m.writeData, b...)
 	return len(b), nil
 }

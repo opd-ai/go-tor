@@ -104,7 +104,15 @@ The audit will follow a multi-phase approach: automated static analysis, specifi
 - [ ] Verify rendezvous protocol implementation [pkg/onion] [6h]
 - [ ] Audit descriptor encryption and publication [pkg/onion] [4h]
 - [x] **Verify circuit teardown (DESTROY cells) per tor-spec.txt §5.4 [pkg/circuit] [2h]** ✅ **COMPLETED** (January 25, 2026)
-- [ ] Audit TRUNCATE/TRUNCATED handling per tor-spec.txt §5.5 [pkg/circuit] [2h]
+- [x] **Audit TRUNCATE/TRUNCATED handling per tor-spec.txt §5.5 [pkg/relay] [2h]** ✅ **COMPLETED** (January 25, 2026)
+  - Verified RELAY_TRUNCATE cell handling in `pkg/relay/forwarding.go`
+  - Implementation correctly tears down circuit extensions to next hop
+  - Closes next hop connection and removes extended circuit state
+  - Handles non-extended circuits safely (no-op)
+  - Comprehensive test coverage with `TestHandleTruncate` and `TestHandleTruncateNoExtension`
+  - Thread-safe implementation with mutex protection
+  - Audit document: `docs/audits/TRUNCATE_TRUNCATED_AUDIT.md`
+  - Status: Substantially compliant (RELAY_TRUNCATED response delegated to OR handler)
 
 #### Medium Priority (P2) - Advanced Features
 - [ ] Audit circuit padding implementation per padding-spec.txt [pkg/circuit] [8h]

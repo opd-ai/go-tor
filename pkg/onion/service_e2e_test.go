@@ -100,7 +100,7 @@ func TestE2EOnionServiceHosting(t *testing.T) {
 	if !established {
 		t.Fatal("Failed to establish introduction points within timeout")
 	}
-	
+
 	stats := service.GetStats()
 	t.Logf("Successfully established %d introduction points", stats.IntroPoints)
 
@@ -108,7 +108,7 @@ func TestE2EOnionServiceHosting(t *testing.T) {
 	t.Log("\n[5/7] Verifying descriptor publishing...")
 	// Wait briefly for descriptor to be published
 	time.Sleep(5 * time.Second)
-	
+
 	// Verify service is running
 	if service.GetAddress() != address {
 		t.Errorf("Service address mismatch: got %s, want %s", service.GetAddress(), address)
@@ -172,7 +172,7 @@ func waitForIntroPointsEstablished(t *testing.T, service *Service, target int, t
 	for time.Now().Before(deadline) {
 		stats := service.GetStats()
 		t.Logf("Introduction points established: %d/%d", stats.IntroPoints, target)
-		
+
 		if stats.IntroPoints >= target {
 			return true
 		}
