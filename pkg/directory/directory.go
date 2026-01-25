@@ -301,6 +301,7 @@ func (c *Client) parseConsensusWithMetadata(r io.Reader) ([]*Relay, *ConsensusMe
 	// SPEC-003: Metadata tracking
 	metadata := &ConsensusMetadata{
 		Signatures: make([]*ConsensusSignature, 0),
+		Params:     make(map[string]int),
 	}
 	var currentSignature *ConsensusSignature
 	var inSignatureBlock bool
@@ -332,6 +333,13 @@ func (c *Client) parseConsensusWithMetadata(r io.Reader) ([]*Relay, *ConsensusMe
 			if t, err := time.Parse("2006-01-02 15:04:05", timeStr); err == nil {
 				metadata.ValidUntil = t
 			}
+		}
+		
+		// Parse consensus parameters (dir-spec.txt §3.4.1)
+		// Format: "params key=value key=value ..."
+		if strings.HasPrefix(line, "params ") {
+			paramsStr := strings.TrimPrefix(line, "params ")
+			parseConsensusParams(paramsStr, metadata.Params)
 		}
 
 		// SPEC-003: Parse directory-signature lines
@@ -542,6 +550,21 @@ func (c *Client) parseConsensusWithMetadata(r io.Reader) ([]*Relay, *ConsensusMe
 	return relays, metadata, nil
 }
 
+// parseConsensusParams parses consensus network parameters from a "params" line
+// Format: "key1=value1 key2=value2 ..." per dir-spec.txt §3.4.1
+func parseConsensusParams(paramsStr string, params map[string]int) {
+	for _, param := range strings.Fields(paramsStr) {
+		parts := strings.SplitN(param, "=", 2)
+		if len(parts) == 2 {
+			key := parts[0]
+			var value int
+			if _, err := fmt.Sscanf(parts[1], "%d", &value); err == nil {
+				params[key] = value
+			}
+		}
+	}
+}
+
 // HasFlag checks if a relay has a specific flag
 func (r *Relay) HasFlag(flag string) bool {
 	for _, f := range r.Flags {
@@ -665,6 +688,7 @@ type ConsensusMetadata struct {
 	SignatureCount       int                   // Number of authority signatures
 	AuthorityCount       int                   // Number of authorities in consensus
 	NetworkStatusVersion int                   // Consensus format version
+	Params               map[string]int        // Network-wide consensus parameters (dir-spec.txt §3.4.1)
 }
 
 // ValidateConsensusMetadata performs enhanced validation on consensus metadata (SPEC-003)
@@ -713,6 +737,96 @@ func ValidateConsensusMetadata(meta *ConsensusMetadata) error {
 	}
 
 	return nil
+}
+
+// PaddingParams contains circuit padding parameters from consensus
+// These parameters control padding machine behavior network-wide
+type PaddingParams struct {
+	// Global padding settings
+	GlobalAllowedCells int  // Maximum padding cells allowed globally
+	PaddingDisabled    bool // Whether padding is disabled network-wide
+	
+	// APE (Adaptive Padding Engine) parameters
+	APEBurstMin  int // Minimum cells in a burst (default: 2)
+	APEBurstMax  int // Maximum cells in a burst (default: 10)
+	APEGapMinMS  int // Minimum gap between bursts in milliseconds (default: 1500)
+	APEGapMaxMS  int // Maximum gap between bursts in milliseconds (default: 9500)
+	APECellDelayMS int // Delay between cells in a burst in milliseconds (default: 20)
+	
+	// Circuit setup padding parameters
+	SetupBurstMin int // Minimum cells in setup burst (default: 1)
+	SetupBurstMax int // Maximum cells in setup burst (default: 5)
+	SetupGapMinMS int // Minimum setup gap in milliseconds (default: 500)
+	SetupGapMaxMS int // Maximum setup gap in milliseconds (default: 2000)
+	SetupCellDelayMS int // Setup cell delay in milliseconds (default: 50)
+}
+
+// GetPaddingParams extracts padding-related parameters from consensus metadata
+// Returns parameters with spec-compliant defaults if not present in consensus
+func GetPaddingParams(meta *ConsensusMetadata) *PaddingParams {
+	params := &PaddingParams{
+		// Defaults from padding-spec.txt §3 and implementation experience
+		GlobalAllowedCells: 0, // 0 means unlimited
+		PaddingDisabled:    false,
+		APEBurstMin:        2,
+		APEBurstMax:        10,
+		APEGapMinMS:        1500,
+		APEGapMaxMS:        9500,
+		APECellDelayMS:     20,
+		SetupBurstMin:      1,
+		SetupBurstMax:      5,
+		SetupGapMinMS:      500,
+		SetupGapMaxMS:      2000,
+		SetupCellDelayMS:   50,
+	}
+	
+	if meta == nil || meta.Params == nil {
+		return params
+	}
+	
+	// Parse global padding parameters
+	if val, ok := meta.Params["circpad_global_allowed_cells"]; ok {
+		params.GlobalAllowedCells = val
+	}
+	if val, ok := meta.Params["circpad_padding_disabled"]; ok {
+		params.PaddingDisabled = val != 0
+	}
+	
+	// Parse APE parameters (using nf_* prefix for network flow obfuscation)
+	if val, ok := meta.Params["nf_ito_low"]; ok && val > 0 {
+		params.APEGapMinMS = val
+	}
+	if val, ok := meta.Params["nf_ito_high"]; ok && val > 0 {
+		params.APEGapMaxMS = val
+	}
+	if val, ok := meta.Params["circpad_ape_burst_min"]; ok && val > 0 {
+		params.APEBurstMin = val
+	}
+	if val, ok := meta.Params["circpad_ape_burst_max"]; ok && val > 0 {
+		params.APEBurstMax = val
+	}
+	if val, ok := meta.Params["circpad_ape_cell_delay"]; ok && val > 0 {
+		params.APECellDelayMS = val
+	}
+	
+	// Parse circuit setup padding parameters
+	if val, ok := meta.Params["circpad_setup_burst_min"]; ok && val > 0 {
+		params.SetupBurstMin = val
+	}
+	if val, ok := meta.Params["circpad_setup_burst_max"]; ok && val > 0 {
+		params.SetupBurstMax = val
+	}
+	if val, ok := meta.Params["circpad_setup_gap_min"]; ok && val > 0 {
+		params.SetupGapMinMS = val
+	}
+	if val, ok := meta.Params["circpad_setup_gap_max"]; ok && val > 0 {
+		params.SetupGapMaxMS = val
+	}
+	if val, ok := meta.Params["circpad_setup_cell_delay"]; ok && val > 0 {
+		params.SetupCellDelayMS = val
+	}
+	
+	return params
 }
 
 // isKnownAuthority checks if a v3ident fingerprint belongs to a known directory authority (SPEC-003)

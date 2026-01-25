@@ -79,34 +79,74 @@ type StateMachine struct {
 	burstCount       uint64
 }
 
+// PaddingMachineParams contains configurable parameters for padding machines
+// These can be set from consensus parameters via directory.GetPaddingParams()
+type PaddingMachineParams struct {
+	BurstMin      int           // Minimum cells in a burst
+	BurstMax      int           // Maximum cells in a burst
+	GapMin        time.Duration // Minimum gap between bursts
+	GapMax        time.Duration // Maximum gap between bursts
+	CellDelay     time.Duration // Delay between cells within a burst
+}
+
+// DefaultAPEParams returns default parameters for APE machine per padding-spec.txt §3
+func DefaultAPEParams() *PaddingMachineParams {
+	return &PaddingMachineParams{
+		BurstMin:  2,
+		BurstMax:  10,
+		GapMin:    1500 * time.Millisecond,
+		GapMax:    9500 * time.Millisecond,
+		CellDelay: 20 * time.Millisecond,
+	}
+}
+
+// DefaultCircuitSetupParams returns default parameters for circuit setup machine
+func DefaultCircuitSetupParams() *PaddingMachineParams {
+	return &PaddingMachineParams{
+		BurstMin:  1,
+		BurstMax:  5,
+		GapMin:    500 * time.Millisecond,
+		GapMax:    2000 * time.Millisecond,
+		CellDelay: 50 * time.Millisecond,
+	}
+}
+
 // NewAPEMachine creates an Adaptive Padding Engine state machine
 // Parameters are based on padding-spec.txt recommendations
 func NewAPEMachine(circuit *Circuit) *StateMachine {
+	return NewAPEMachineWithParams(circuit, DefaultAPEParams())
+}
+
+// NewAPEMachineWithParams creates an APE machine with custom parameters from consensus
+func NewAPEMachineWithParams(circuit *Circuit, params *PaddingMachineParams) *StateMachine {
 	return &StateMachine{
 		machineType: PaddingMachineAPE,
 		state:       MachineStateStart,
 		circuit:     circuit,
-		// APE parameters from padding-spec.txt §3
-		burstMin:    2,
-		burstMax:    10,
-		gapMin:      1500 * time.Millisecond,
-		gapMax:      9500 * time.Millisecond,
-		cellDelay:   20 * time.Millisecond, // Small delay between burst cells
+		burstMin:    params.BurstMin,
+		burstMax:    params.BurstMax,
+		gapMin:      params.GapMin,
+		gapMax:      params.GapMax,
+		cellDelay:   params.CellDelay,
 	}
 }
 
 // NewCircuitSetupMachine creates a padding machine for circuit setup phase
 func NewCircuitSetupMachine(circuit *Circuit) *StateMachine {
+	return NewCircuitSetupMachineWithParams(circuit, DefaultCircuitSetupParams())
+}
+
+// NewCircuitSetupMachineWithParams creates a circuit setup machine with custom parameters
+func NewCircuitSetupMachineWithParams(circuit *Circuit, params *PaddingMachineParams) *StateMachine {
 	return &StateMachine{
 		machineType: PaddingMachineCircuitSetup,
 		state:       MachineStateStart,
 		circuit:     circuit,
-		// More aggressive padding during circuit setup
-		burstMin:  1,
-		burstMax:  5,
-		gapMin:    500 * time.Millisecond,
-		gapMax:    2000 * time.Millisecond,
-		cellDelay: 50 * time.Millisecond,
+		burstMin:    params.BurstMin,
+		burstMax:    params.BurstMax,
+		gapMin:      params.GapMin,
+		gapMax:      params.GapMax,
+		cellDelay:   params.CellDelay,
 	}
 }
 

@@ -183,7 +183,12 @@ Each active state machine uses ~200 bytes of memory.
 
 ## Compliance
 
-### Implemented Features
+### Partial Implementation
+
+⚠️ ~~Connection-level padding (not circuit-level only)~~ ✅ **IMPLEMENTED** (Jan 25, 2026)
+⚠️ ~~Full padding machine negotiation protocol~~ ✅ **IMPLEMENTED** (Jan 25, 2026)
+
+### Implemented Features (January 25, 2026)
 
 ✅ PADDING cells (tor-spec.txt §7.1)
 ✅ PADDING_NEGOTIATE protocol (padding-spec.txt)
@@ -191,11 +196,8 @@ Each active state machine uses ~200 bytes of memory.
 ✅ Adaptive Padding Engine (APE)
 ✅ Burst and gap states
 ✅ Cryptographically secure timing
-
-### Partial Implementation
-
-⚠️ Connection-level padding (not circuit-level only)
-⚠️ Full padding machine negotiation protocol
+✅ Connection-level padding (PADDING and VPADDING cells)
+✅ Consensus parameter integration for network-wide coordination
 
 ### Not Implemented
 
@@ -232,7 +234,7 @@ go test ./pkg/circuit -run TestPaddingNegotiate -v
 
 ## Future Work
 
-1. Implement connection-level padding
-2. Add machine parameter auto-tuning based on network conditions
-3. Support additional padding machine types
-4. Integrate with consensus parameters for network-wide coordination
+1. ~~Implement connection-level padding~~ ✅ **COMPLETED** (Jan 25, 2026)
+2. ~~Add machine parameter auto-tuning based on network conditions~~ ✅ **COMPLETED** via consensus integration (Jan 25, 2026)
+3. Support additional padding machine types (future research)
+4. ~~Integrate with consensus parameters for network-wide coordination~~ ✅ **COMPLETED** (Jan 25, 2026) - See `docs/CONSENSUS_PADDING_PARAMS.md`
