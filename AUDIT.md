@@ -340,10 +340,26 @@ The `pkg/onion/service.go` already contains foundational server-side functionali
 
 **Tasks**:
 
-- [ ] **10.3.1 Server Descriptor Generation**
-  - Generate signed server descriptor
-  - Include bridge-specific fields
-  - Support extra-info descriptor
+- [x] **10.3.1 Server Descriptor Generation** ✅ **COMPLETED** (January 25, 2026)
+  - Generated signed server descriptors per dir-spec.txt §2.1
+  - Included bridge-specific fields (DirPort=0 for bridges)
+  - Supported extra-info descriptor generation with statistics
+  - Implementation: `pkg/relay/descriptor.go` (`GenerateServerDescriptor`, `GenerateExtraInfo`)
+  - Tests: `pkg/relay/descriptor_test.go` (19 tests, all passing)
+  - Features:
+    - RSA-1024 and Ed25519 identity keys
+    - ntor onion key (Curve25519)
+    - IPv4 and optional IPv6 addresses
+    - Bandwidth advertisement (average, burst, observed)
+    - Reject-all exit policy for non-exit relays
+    - Relay family support
+    - Contact information
+    - Platform string
+    - Protocol version declaration (Link=3-5, Circuit=1-2)
+    - SHA-1 digest and RSA-PKCS1v15 signature
+    - Descriptor validation with comprehensive error checking
+    - Extra-info descriptor with custom statistics
+  - Crypto helpers: Added `RSAPublicKeyToPEM` to `pkg/crypto/crypto.go`
 
 - [ ] **10.3.2 Bridge Authority Communication**
   - Publish descriptors to bridge authority

@@ -18,6 +18,7 @@ import (
 	"crypto/sha1" // #nosec G505 - SHA1 required by Tor protocol specification (tor-spec.txt)
 	"crypto/sha256"
 	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"sync"
@@ -500,4 +501,20 @@ func GenerateEd25519KeyPair() (publicKey, privateKey []byte, err error) {
 		return nil, nil, fmt.Errorf("failed to generate Ed25519 key: %w", err)
 	}
 	return pub, priv, nil
+}
+
+// RSAPublicKeyToPEM converts an RSA public key to PEM format
+// This is used for encoding relay identity keys in server descriptors
+func RSAPublicKeyToPEM(key *rsa.PublicKey) ([]byte, error) {
+	if key == nil {
+		return nil, fmt.Errorf("public key is nil")
+	}
+	
+	derBytes := x509.MarshalPKCS1PublicKey(key)
+	block := &pem.Block{
+		Type:  "RSA PUBLIC KEY",
+		Bytes: derBytes,
+	}
+	
+	return pem.EncodeToMemory(block), nil
 }
