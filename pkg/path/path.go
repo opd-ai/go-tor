@@ -23,13 +23,14 @@ type Path struct {
 
 // Selector provides path selection for Tor circuits
 type Selector struct {
-	logger          *logger.Logger
-	dirClient       *directory.Client
-	guardManager    *GuardManager
+	logger            *logger.Logger
+	dirClient         *directory.Client
+	guardManager      *GuardManager
 	diversityAnalyzer *DiversityAnalyzer
-	mu              sync.RWMutex
-	guards          []*directory.Relay
-	relays          []*directory.Relay
+	biasDetector      *BiasDetector
+	mu                sync.RWMutex
+	guards            []*directory.Relay
+	relays            []*directory.Relay
 }
 
 // NewSelector creates a new path selector
@@ -42,6 +43,7 @@ func NewSelector(dirClient *directory.Client, log *logger.Logger) *Selector {
 		logger:            log.Component("path"),
 		dirClient:         dirClient,
 		diversityAnalyzer: NewDiversityAnalyzer(log),
+		biasDetector:      NewBiasDetector(DefaultThresholds()),
 		guards:            make([]*directory.Relay, 0),
 		relays:            make([]*directory.Relay, 0),
 	}
@@ -58,6 +60,7 @@ func NewSelectorWithGuards(dirClient *directory.Client, guardMgr *GuardManager, 
 		dirClient:         dirClient,
 		guardManager:      guardMgr,
 		diversityAnalyzer: NewDiversityAnalyzer(log),
+		biasDetector:      NewBiasDetector(DefaultThresholds()),
 		guards:            make([]*directory.Relay, 0),
 		relays:            make([]*directory.Relay, 0),
 	}
@@ -191,6 +194,7 @@ func (s *Selector) SelectPath(exitPort int) (*Path, error) {
 }
 
 // selectGuard selects a guard relay, preferring persistent guards
+// Avoids guards that appear to be biased based on path bias detection
 func (s *Selector) selectGuard() (*directory.Relay, error) {
 	if len(s.guards) == 0 {
 		return nil, fmt.Errorf("no guard relays available")
@@ -200,10 +204,18 @@ func (s *Selector) selectGuard() (*directory.Relay, error) {
 	if s.guardManager != nil {
 		persistentGuards := s.guardManager.GetGuards()
 
-		// Try to find a persistent guard that's still in the current consensus
+		// Try to find a persistent guard that's still in the current consensus and not biased
 		for _, pGuard := range persistentGuards {
 			for _, relay := range s.guards {
 				if relay.Fingerprint == pGuard.Fingerprint {
+					// Check if this guard is biased
+					if s.biasDetector != nil && s.biasDetector.IsBiased(relay.Fingerprint) {
+						s.logger.Warn("Skipping biased persistent guard",
+							"nickname", relay.Nickname,
+							"fingerprint", relay.Fingerprint)
+						continue
+					}
+					
 					s.logger.Debug("Using persistent guard", "nickname", relay.Nickname)
 					return relay, nil
 				}
@@ -214,13 +226,33 @@ func (s *Selector) selectGuard() (*directory.Relay, error) {
 		s.logger.Debug("No persistent guards available, selecting new guard")
 	}
 
+	// Filter out biased guards
+	availableGuards := s.guards
+	if s.biasDetector != nil {
+		filtered := make([]*directory.Relay, 0, len(s.guards))
+		for _, guard := range s.guards {
+			if !s.biasDetector.IsBiased(guard.Fingerprint) {
+				filtered = append(filtered, guard)
+			}
+		}
+		
+		if len(filtered) > 0 {
+			availableGuards = filtered
+			s.logger.Debug("Filtered biased guards",
+				"total", len(s.guards),
+				"available", len(filtered))
+		} else {
+			s.logger.Warn("All guards appear biased, using all guards")
+		}
+	}
+
 	// Select a random guard from available guards (bandwidth-weighted)
-	idx, err := weightedRandomIndex(s.guards)
+	idx, err := weightedRandomIndex(availableGuards)
 	if err != nil {
 		return nil, err
 	}
 
-	guard := s.guards[idx]
+	guard := availableGuards[idx]
 
 	// Add to persistent guards if we have a guard manager
 	if s.guardManager != nil {
@@ -417,4 +449,46 @@ func (s *Selector) GetDiversityStats() DiversityStats {
 		return DiversityStats{}
 	}
 	return s.diversityAnalyzer.GetStats()
+}
+
+// RecordCircuitOutcome records the outcome of a circuit for path bias detection
+func (s *Selector) RecordCircuitOutcome(circuitID uint32, guardFingerprint string, outcome CircuitOutcome) []BiasAlert {
+	if s.biasDetector == nil {
+		return nil
+	}
+	alerts := s.biasDetector.RecordOutcome(circuitID, guardFingerprint, outcome)
+	
+	// Log any new alerts
+	for _, alert := range alerts {
+		s.logger.Warn("Path bias detected",
+			"type", alert.Type,
+			"guard", alert.Fingerprint,
+			"message", alert.Message)
+	}
+	
+	return alerts
+}
+
+// GetBiasStats returns overall bias detection statistics
+func (s *Selector) GetBiasStats() BiasStats {
+	if s.biasDetector == nil {
+		return BiasStats{}
+	}
+	return s.biasDetector.GetStats()
+}
+
+// GetBiasAlerts returns recent bias alerts
+func (s *Selector) GetBiasAlerts(limit int) []BiasAlert {
+	if s.biasDetector == nil {
+		return nil
+	}
+	return s.biasDetector.GetAlerts(limit)
+}
+
+// IsGuardBiased checks if a guard appears to be biased
+func (s *Selector) IsGuardBiased(fingerprint string) bool {
+	if s.biasDetector == nil {
+		return false
+	}
+	return s.biasDetector.IsBiased(fingerprint)
 }
