@@ -376,9 +376,9 @@ func TestCellEncodingErrorCases(t *testing.T) {
 	t.Run("DecodePartialCell", func(t *testing.T) {
 		// Decoding truncated fixed-size cell should fail
 		var buf bytes.Buffer
-		binary.Write(&buf, binary.BigEndian, uint32(1))  // CircID
+		binary.Write(&buf, binary.BigEndian, uint32(1)) // CircID
 		binary.Write(&buf, binary.BigEndian, CmdCreate) // Command
-		buf.Write(make([]byte, 100))                     // Only 100 bytes instead of 509
+		buf.Write(make([]byte, 100))                    // Only 100 bytes instead of 509
 
 		_, err := DecodeCell(&buf)
 		if err == nil {
