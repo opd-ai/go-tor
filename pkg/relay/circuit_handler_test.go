@@ -207,7 +207,7 @@ func TestCircuitHandler_HandleDestroy(t *testing.T) {
 
 	// Create a circuit
 	handler.mu.Lock()
-	handler.circuits[4] = &ServerCircuit{
+	handler.circuits[2] = &ServerCircuit{
 		CircuitID: 2,
 		Created:   time.Now(),
 	}
@@ -227,7 +227,7 @@ func TestCircuitHandler_HandleDestroy(t *testing.T) {
 	}
 
 	// Circuit should be removed
-	_, exists := handler.GetCircuit(4)
+	_, exists := handler.GetCircuit(2)
 	if exists {
 		t.Error("Circuit should have been destroyed")
 	}
@@ -314,7 +314,7 @@ func TestCircuitHandler_HandleRelay(t *testing.T) {
 
 	// Create a circuit
 	handler.mu.Lock()
-	handler.circuits[5] = &ServerCircuit{
+	handler.circuits[2] = &ServerCircuit{
 		CircuitID:    2,
 		Created:      time.Now(),
 		LastActivity: time.Now().Add(-1 * time.Minute),
@@ -335,7 +335,7 @@ func TestCircuitHandler_HandleRelay(t *testing.T) {
 	}
 
 	// Verify LastActivity was updated
-	circuit, _ := handler.GetCircuit(5)
+	circuit, _ := handler.GetCircuit(2)
 	if time.Since(circuit.LastActivity) > 1*time.Second {
 		t.Error("LastActivity was not updated")
 	}
