@@ -6,6 +6,7 @@ package control
 import (
 	"bufio"
 	"context"
+	"crypto/subtle"
 	"fmt"
 	"net"
 	"strings"
@@ -30,10 +31,21 @@ type Server struct {
 	// Event management
 	dispatcher *EventDispatcher
 
+	// Authentication rate limiting (per-IP)
+	authAttempts   map[string]*authRateLimiter
+	authAttemptsMu sync.Mutex
+
 	// Lifecycle
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
+}
+
+// authRateLimiter tracks authentication attempts per IP
+type authRateLimiter struct {
+	attempts  int
+	lastTime  time.Time
+	backoffMs int
 }
 
 // ClientInfoGetter provides access to client information for control commands
@@ -89,6 +101,7 @@ func NewServerWithPassword(address string, clientGetter ClientInfoGetter, passwo
 		password:     password,
 		conns:        make(map[net.Conn]*connection),
 		dispatcher:   NewEventDispatcher(),
+		authAttempts: make(map[string]*authRateLimiter),
 		ctx:          ctx,
 		cancel:       cancel,
 	}
@@ -294,12 +307,32 @@ func (s *Server) handleAuthenticate(conn *connection, args []string) {
 	password := strings.Join(args, " ")
 	password = strings.Trim(password, `"`)
 
-	// Validate password
-	if password != s.password {
-		conn.writeReply(515, "Authentication failed: incorrect password")
-		s.logger.Warn("Authentication failed: incorrect password", "remote", conn.conn.RemoteAddr())
+	// Extract IP address (without port) for rate limiting
+	remoteIP := conn.conn.RemoteAddr().String()
+	if host, _, err := net.SplitHostPort(remoteIP); err == nil {
+		remoteIP = host
+	}
+
+	// Check rate limiting before attempting authentication
+	if !s.checkAuthRateLimit(remoteIP) {
+		conn.writeReply(515, "Authentication failed: too many attempts, try again later")
+		s.logger.Warn("Authentication rate limited", "remote", remoteIP)
 		return
 	}
+
+	// Validate password using constant-time comparison to prevent timing attacks
+	// Convert strings to byte slices for constant-time comparison
+	passwordMatch := subtle.ConstantTimeCompare([]byte(password), []byte(s.password)) == 1
+
+	if !passwordMatch {
+		s.recordFailedAuth(remoteIP)
+		conn.writeReply(515, "Authentication failed: incorrect password")
+		s.logger.Warn("Authentication failed: incorrect password", "remote", remoteIP)
+		return
+	}
+
+	// Reset rate limiter on successful authentication
+	s.resetAuthRateLimit(remoteIP)
 
 	// Authentication successful
 	conn.mu.Lock()
@@ -581,3 +614,64 @@ func (c *connection) writeDataReply(lines []string) {
 	// Handle Flush error (AUDIT-012)
 	_ = c.writer.Flush()
 }
+
+// checkAuthRateLimit checks if authentication attempts should be rate limited
+// Returns true if authentication attempt is allowed, false if rate limited
+func (s *Server) checkAuthRateLimit(remoteIP string) bool {
+	s.authAttemptsMu.Lock()
+	defer s.authAttemptsMu.Unlock()
+
+	limiter, exists := s.authAttempts[remoteIP]
+	if !exists {
+		// First attempt, allow
+		return true
+	}
+
+	// Check if backoff period has elapsed
+	elapsed := time.Since(limiter.lastTime)
+	backoffDuration := time.Duration(limiter.backoffMs) * time.Millisecond
+
+	if elapsed < backoffDuration {
+		// Still in backoff period
+		return false
+	}
+
+	// Backoff period elapsed, allow new attempt
+	return true
+}
+
+// recordFailedAuth records a failed authentication attempt
+func (s *Server) recordFailedAuth(remoteIP string) {
+	s.authAttemptsMu.Lock()
+	defer s.authAttemptsMu.Unlock()
+
+	limiter, exists := s.authAttempts[remoteIP]
+	if !exists {
+		limiter = &authRateLimiter{
+			attempts:  1,
+			lastTime:  time.Now(),
+			backoffMs: 1000, // 1 second initial backoff
+		}
+		s.authAttempts[remoteIP] = limiter
+		return
+	}
+
+	// Update attempt count and backoff with exponential backoff
+	limiter.attempts++
+	limiter.lastTime = time.Now()
+
+	// Exponential backoff: 1s, 2s, 4s, 8s, ..., max 60s
+	limiter.backoffMs = limiter.backoffMs * 2
+	if limiter.backoffMs > 60000 {
+		limiter.backoffMs = 60000
+	}
+}
+
+// resetAuthRateLimit resets rate limiting for an IP on successful authentication
+func (s *Server) resetAuthRateLimit(remoteIP string) {
+	s.authAttemptsMu.Lock()
+	defer s.authAttemptsMu.Unlock()
+
+	delete(s.authAttempts, remoteIP)
+}
+
