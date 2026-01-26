@@ -309,7 +309,29 @@ The audit will follow a multi-phase approach: automated static analysis, specifi
   - No critical or important security vulnerabilities found
   - Created audit document: `docs/audits/IV_NONCE_GENERATION_AUDIT.md`
   - Status: Production-ready for educational/research use
-- [ ] Verify layered encryption for onion routing [pkg/circuit] [4h]
+- [x] **Verify layered encryption for onion routing [pkg/circuit] [4h]** ✅ **COMPLETED** (January 26, 2026)
+  - Comprehensive audit completed against tor-spec.txt §5.1 (Relay Cell Encryption) and §6.1 (Relay Cell Digest)
+  - Assessment: 100% specification compliance (FULLY COMPLIANT - 16/16 requirements)
+  - Verified multi-hop onion encryption with AES-128-CTR
+  - Verified correct encryption order (reverse: exit → middle → guard)
+  - Verified correct decryption order (forward: guard → middle → exit)
+  - Verified per-hop cryptographic state (forward/backward ciphers and digests)
+  - Verified relay cell digest computation and verification
+  - Security: SECURE (constant-time digest comparison, key separation, no timing attacks)
+  - Test coverage: encryptForward (100%), decryptBackward (100%), updateHopDigests (90.5%), verifyRelayCellDigest (91.7%)
+  - Added comprehensive audit test suite with 19 new test cases:
+    - Edge cases: empty circuits, single hop, maximum hops (8), nil ciphers
+    - Payload size preservation (0, 1, 100, 509 bytes)
+    - Encryption determinism and non-mutation
+    - Digest recognition and verification
+    - Recognized field validation (must be zero)
+    - Short payload handling (< 11 bytes)
+    - Security properties: bit diffusion, key separation, ciphertext indistinguishability
+  - All tests pass with race detector clean (32 total test cases)
+  - No critical, important, or minor security vulnerabilities found
+  - Created audit document: `docs/audits/LAYERED_ENCRYPTION_AUDIT.md`
+  - Created comprehensive test file: `pkg/circuit/layered_encryption_audit_test.go`
+  - Status: Production-ready for educational/research use
 - [ ] Check for AES key reuse vulnerabilities [pkg/circuit, pkg/crypto] [2h]
 
 #### RSA and Asymmetric Operations
