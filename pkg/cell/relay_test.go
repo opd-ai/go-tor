@@ -2,6 +2,7 @@ package cell
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 )
 
@@ -82,14 +83,13 @@ func TestRelayCellEncodeTooLarge(t *testing.T) {
 	maxDataLen := PayloadLen - RelayCellHeaderLen
 	tooLargeData := make([]byte, maxDataLen+1)
 
-	rc, err := NewRelayCell(1, RelayData, tooLargeData)
-	if err != nil {
-		t.Fatalf("NewRelayCell() error = %v", err)
-	}
-
-	_, err = rc.Encode()
+	// NewRelayCell should now reject data that's too large
+	_, err := NewRelayCell(1, RelayData, tooLargeData)
 	if err == nil {
-		t.Error("Encode() expected error for data too large, got nil")
+		t.Error("NewRelayCell() expected error for data too large, got nil")
+	}
+	if !strings.Contains(err.Error(), "too large") {
+		t.Errorf("Expected 'too large' error, got: %v", err)
 	}
 }
 
@@ -104,21 +104,16 @@ func TestNewRelayCellDataTooLarge(t *testing.T) {
 }
 
 func TestNewRelayCellMaxSize(t *testing.T) {
-	// Test data at exactly uint16 max (65535 bytes) - should succeed in constructor
+	// Test data at exactly uint16 max (65535 bytes)
+	// NewRelayCell should reject this as it exceeds PayloadLen - RelayCellHeaderLen (498 bytes)
 	maxData := make([]byte, 65535)
 
-	rc, err := NewRelayCell(1, RelayData, maxData)
-	if err != nil {
-		t.Errorf("NewRelayCell() unexpected error for 65535 bytes: %v", err)
-	}
-	if rc.Length != 65535 {
-		t.Errorf("Length = %v, want 65535", rc.Length)
-	}
-
-	// But should fail in Encode() because it exceeds PayloadLen - RelayCellHeaderLen
-	_, err = rc.Encode()
+	_, err := NewRelayCell(1, RelayData, maxData)
 	if err == nil {
-		t.Error("Encode() expected error for data exceeding payload capacity")
+		t.Error("NewRelayCell() expected error for 65535 bytes (exceeds max relay data), got nil")
+	}
+	if !strings.Contains(err.Error(), "too large") {
+		t.Errorf("Expected 'too large' error, got: %v", err)
 	}
 }
 

@@ -156,15 +156,20 @@ func (c *Cell) Encode(w io.Writer) error {
 		if err := binary.Write(w, binary.BigEndian, payloadLen); err != nil {
 			return fmt.Errorf("failed to write payload length: %w", err)
 		}
-	}
-
-	// Write payload
-	if _, err := w.Write(c.Payload); err != nil {
-		return fmt.Errorf("failed to write payload: %w", err)
-	}
-
-	// Pad fixed-size cells
-	if !c.Command.IsVariableLength() {
+		// Write payload
+		if _, err := w.Write(c.Payload); err != nil {
+			return fmt.Errorf("failed to write payload: %w", err)
+		}
+	} else {
+		// Fixed-size cell: validate payload doesn't exceed PayloadLen
+		if len(c.Payload) > PayloadLen {
+			return fmt.Errorf("fixed cell payload too large: %d > %d", len(c.Payload), PayloadLen)
+		}
+		// Write payload (up to PayloadLen bytes)
+		if _, err := w.Write(c.Payload); err != nil {
+			return fmt.Errorf("failed to write payload: %w", err)
+		}
+		// Pad to PayloadLen
 		padding := PayloadLen - len(c.Payload)
 		if padding > 0 {
 			paddingBytes := make([]byte, padding)

@@ -68,6 +68,12 @@ const RelayCellHeaderLen = 11
 
 // NewRelayCell creates a new relay cell
 func NewRelayCell(streamID uint16, cmd byte, data []byte) (*RelayCell, error) {
+	// Validate data fits within relay cell maximum (PayloadLen - RelayCellHeaderLen)
+	maxDataLen := PayloadLen - RelayCellHeaderLen
+	if len(data) > maxDataLen {
+		return nil, fmt.Errorf("relay cell data too large: %d > %d", len(data), maxDataLen)
+	}
+
 	// Safely convert data length to uint16
 	length, err := security.SafeLenToUint16(data)
 	if err != nil {
