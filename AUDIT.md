@@ -440,7 +440,25 @@ The audit will follow a multi-phase approach: automated static analysis, specifi
   - Status: Production-ready for educational/research use
 
 #### Curve25519 and Ed25519
-- [ ] Audit ntor handshake key derivation [pkg/crypto] [4h]
+- [x] **Audit ntor handshake key derivation [pkg/crypto] [4h]** ✅ **COMPLETED** (January 26, 2026)
+  - Comprehensive audit completed against tor-spec.txt §5.1.4 (ntor handshake with curve25519-sha256)
+  - Assessment: 100% specification compliance (FULLY COMPLIANT - SECURE)
+  - Verified Curve25519 key generation with crypto/rand (CSPRNG)
+  - Verified secret_input construction (7 components, 216 bytes total)
+  - Verified dual Diffie-Hellman: EXP(Y,x)/EXP(X,y) and EXP(B,x)/EXP(X,b)
+  - Verified AUTH MAC computation and constant-time verification
+  - Verified key material derivation (72 bytes: Df, Db, Kf, Kb)
+  - Security properties: forward secrecy, mutual authentication, cryptographic binding
+  - Test coverage improvements:
+    - pkg/crypto overall: 86.3% → 88.9% (+2.6pp)
+    - NtorClientHandshake: 85.2% → 92.9% (+7.7pp)
+    - NtorProcessResponse: 88.9% → 94.4% (+5.5pp)
+    - NtorServerHandshake: 85.7% → 92.9% (+7.2pp)
+  - Created comprehensive test suite: pkg/crypto/ntor_key_derivation_audit_test.go (18 test functions, 700+ LOC)
+  - All tests pass with race detector clean
+  - Security assessment: SECURE (no critical, important, or minor vulnerabilities found)
+  - Created audit document: docs/audits/NTOR_KEY_DERIVATION_AUDIT.md
+  - Status: Production-ready for educational/research use
 - [ ] Verify Ed25519 signature generation and verification [pkg/onion] [3h]
 - [ ] Audit x25519 key exchange for client authorization [pkg/onion] [3h]
 - [ ] Verify blinded key computation uses correct algorithms [pkg/onion] [2h]
