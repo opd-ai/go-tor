@@ -76,13 +76,13 @@ This test confirms flow control windows are properly initialized per tor-spec.tx
 
 ## Current Limitations
 
-1. **EXTEND2 Not Fully Integrated**: Builder currently only performs CREATE2 for first hop. Middle and exit hops are simulated (see AUDIT.md section 3).
+1. **EXTEND2 Not Fully Integrated**: Builder currently only performs CREATE2 for first hop. Middle and exit hops are simulated (see PLAN.md section 3).
 2. **No Multi-Hop Extension Tests**: Integration tests for EXTEND2/EXTENDED2 would require full multi-hop implementation in builder.
 3. **No Data Relay Tests**: Tests validate circuit building but don't send RELAY_DATA cells.
 
 ## Future Enhancements
 
-As documented in AUDIT.md, future integration test additions include:
+As documented in PLAN.md, future integration test additions include:
 
 - Multi-hop EXTEND2 validation when builder integrates full extension
 - RELAY_DATA send/receive through established circuits
@@ -111,7 +111,7 @@ As documented in AUDIT.md, future integration test additions include:
 
 ## Implementation Reference
 
-See AUDIT.md section 3 ("Circuit Creation and Extension") for detailed specification compliance and progress tracking.
+See PLAN.md section 3 ("Circuit Creation and Extension") for detailed specification compliance and progress tracking.
 
 **Related Files:**
 - `pkg/circuit/builder.go` - Circuit building logic

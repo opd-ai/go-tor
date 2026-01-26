@@ -244,6 +244,6 @@ Update this implementation when:
 For questions or issues related to TLS pinning:
 
 1. Review this documentation
-2. Check audit findings in `AUDIT.md`
+2. Check audit findings in `PLAN.md`
 3. Examine test suite in `pkg/connection/connection_test.go`
 4. Review tor-spec.txt section 4.2 for link protocol requirements

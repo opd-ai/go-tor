@@ -10,7 +10,7 @@ import (
 )
 
 // TestNoGoroutineLeakOnHandshakeTimeout verifies that handshake timeouts don't leak goroutines.
-// This test addresses the CRITICAL BUG identified in AUDIT.md:
+// This test addresses the CRITICAL BUG identified in PLAN.md:
 // "Goroutine Leak in Protocol Handshake" - receiveVersions(), receiveNetinfo(), and receiveCERTS()
 // used to spawn goroutines that blocked indefinitely on timeout.
 //
@@ -113,7 +113,7 @@ func TestHandshakeDoesNotPanicWithNilConnection(t *testing.T) {
 	_ = h.NegotiatedVersion()
 }
 
-// TestGoroutineLeakPrevention documents the fix for AUDIT.md critical bug.
+// TestGoroutineLeakPrevention documents the fix for PLAN.md critical bug.
 // The actual goroutine leak testing requires integration tests with mock/real connections.
 // This test verifies the setup is correct.
 func TestGoroutineLeakPrevention(t *testing.T) {

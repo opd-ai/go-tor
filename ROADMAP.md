@@ -2,7 +2,7 @@
 
 ## Current Status (January 2026)
 
-The go-tor implementation has achieved **~98% protocol compliance** with all critical components implemented and functional. See [AUDIT.md](AUDIT.md) for the comprehensive compliance audit report.
+The go-tor implementation has achieved **~98% protocol compliance** with all critical components implemented and functional. See [PLAN.md](PLAN.md) for the comprehensive compliance audit report.
 
 ### Completed Major Features
 

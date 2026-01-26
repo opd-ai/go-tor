@@ -8,7 +8,7 @@ import (
 )
 
 // TestFileExporterResourceLeak tests that FileExporter doesn't leak file descriptors
-// This addresses the file descriptor leak identified in AUDIT.md line 166-182
+// This addresses the file descriptor leak identified in PLAN.md line 166-182
 func TestFileExporterResourceLeak(t *testing.T) {
 	tmpfile, err := os.CreateTemp("", "trace-leak-test-*.json")
 	if err != nil {

@@ -8,7 +8,7 @@ import (
 )
 
 // TestRateLimiterConcurrent tests that RateLimiter is thread-safe
-// This addresses the race condition identified in AUDIT.md line 185-203
+// This addresses the race condition identified in PLAN.md line 185-203
 func TestRateLimiterConcurrent(t *testing.T) {
 	limiter := newRateLimiter(100, time.Second)
 

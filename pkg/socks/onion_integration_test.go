@@ -21,7 +21,7 @@ import (
 )
 
 // TestIntegrationOnionServiceSOCKS tests end-to-end .onion connection via SOCKS5
-// This validates AUDIT.md Recommendations #2 & #9: "Add end-to-end .onion connection testing"
+// This validates PLAN.md Recommendations #2 & #9: "Add end-to-end .onion connection testing"
 //
 // Test flow:
 // 1. Fetch real Tor consensus

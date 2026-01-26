@@ -275,7 +275,7 @@ Circuit rate limiting is tested in:
 ## Related Documentation
 
 - [ROADMAP.md](../ROADMAP.md): Future enhancements
-- [AUDIT.md](../AUDIT.md): Compliance status
+- [PLAN.md](../PLAN.md): Compliance status
 - [Circuit Padding](CIRCUIT_PADDING.md): Traffic analysis resistance
 
 ## References

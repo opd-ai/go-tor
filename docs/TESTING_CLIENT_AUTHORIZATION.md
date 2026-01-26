@@ -203,7 +203,7 @@ No network calls or real Tor network access required.
 
 - [CLIENT_AUTHORIZATION.md](CLIENT_AUTHORIZATION.md) - User guide for client auth
 - [rend-spec-v3.txt](https://spec.torproject.org/rend-spec/v3.html) - Specification reference
-- [AUDIT.md](../AUDIT.md) - Protocol compliance audit
+- [PLAN.md](../PLAN.md) - Protocol compliance audit
 
 ## Contributing
 
