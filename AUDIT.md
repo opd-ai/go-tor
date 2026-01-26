@@ -1127,7 +1127,48 @@ The audit will follow a multi-phase approach: automated static analysis, specifi
   - Created audit document: `docs/audits/CIRCUIT_LIMIT_ENFORCEMENT_AUDIT.md`
   - Overall compliance: 100% (9/9 requirements verified)
   - Status: PRODUCTION-READY for educational/research use
-- [ ] Review stream multiplexing limits [pkg/stream] [2h]
+- [x] **Review stream multiplexing limits [pkg/stream] [2h]** ✅ **COMPLETED** (January 26, 2026)
+  - Comprehensive audit completed against Tor DoS prevention best practices
+  - Assessment: 12.5% compliance (1/8 requirements) - CRITICAL DoS vulnerabilities
+  - Security Grade: F (NOT PRODUCTION-READY)
+  - Identified 6 CRITICAL/MEDIUM vulnerabilities:
+    - VULN-STREAM-001 (CRITICAL): No global stream limit enforcement (CWE-770)
+    - VULN-STREAM-002 (CRITICAL): No per-circuit stream limit enforcement (CWE-400)
+    - VULN-STREAM-003 (MEDIUM): Stream ID wraparound without collision prevention (CWE-331)
+    - VULN-STREAM-004 (CRITICAL): No concurrent creation rate limiting (CWE-400)
+    - VULN-STREAM-005 (CRITICAL): No memory-based limit enforcement (CWE-789)
+    - VULN-STREAM-006 (CRITICAL): No burst rate limiting (CWE-770)
+  - DoS attack simulations (all succeed):
+    - Stream exhaustion: 10,000 streams created without limit
+    - Circuit overload: 1,000 streams on single circuit without limit
+    - Burst flooding: 5,000 streams created in 3ms (1.7M streams/sec)
+    - Concurrent flood: 10,000 streams from 100 goroutines
+    - Memory exhaustion: 32 MB consumed by 1,000 streams (unbounded)
+    - Stream ID collision: 70,000 streams created, IDs wrapped around
+  - Test coverage: 10 comprehensive test functions (387 LOC, 100% pass rate)
+  - Implemented protections: Manual cleanup only (Close + RemoveStream)
+  - Missing protections:
+    - ❌ Global stream limit (MaxStreams configuration)
+    - ❌ Per-circuit stream limit (MaxStreamsPerCircuit)
+    - ❌ Rate limiting (token bucket)
+    - ❌ Automatic stale stream cleanup
+    - ❌ Metrics tracking
+  - DoS resistance: 12.5% (only 1/8 attack vectors mitigated)
+  - Created audit document: `docs/audits/STREAM_MULTIPLEXING_LIMITS_AUDIT.md` (23KB)
+  - Created comprehensive test suite: `pkg/stream/multiplexing_limits_audit_test.go` (387 LOC)
+  - All tests pass (0.004s execution time - instant due to lack of limits)
+  - Security assessment: CRITICAL DoS vulnerabilities present
+  - Status: APPROVE for educational use ONLY (with DoS warnings)
+  - Status: REJECT for production relay/client operation
+  - Remediation required: 11 hours (config changes, limit enforcement, rate limiting, cleanup, tests)
+  - Recommendations:
+    1. Add MaxStreams to Config (default: 1000)
+    2. Add MaxStreamsPerCircuit to Config (default: 100)
+    3. Implement global/per-circuit limits in Manager.CreateStream()
+    4. Add token bucket rate limiter (golang.org/x/time/rate)
+    5. Implement automatic stale stream cleanup (30s timeout)
+    6. Fix stream ID collision with availability check
+    7. Add metrics: streams_created, streams_rejected, streams_active
 - [ ] Check for amplification vulnerabilities [pkg/relay] [2h]
 
 #### Information Disclosure
