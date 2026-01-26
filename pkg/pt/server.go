@@ -72,7 +72,7 @@ func (ms *ManagedServer) Name() string {
 // Start launches the PT server process and performs IPC handshake.
 func (ms *ManagedServer) Start(ctx context.Context) error {
 	ms.mu.Lock()
-	
+
 	if ms.running {
 		ms.mu.Unlock()
 		return nil
@@ -107,7 +107,7 @@ func (ms *ManagedServer) Start(ctx context.Context) error {
 
 	ms.running = true
 	ms.log.Info("PT server process started", "binary", ms.config.BinaryPath, "pid", ms.cmd.Process.Pid)
-	
+
 	// Unlock before handshake to avoid deadlock when parseSMethod tries to acquire lock
 	ms.mu.Unlock()
 

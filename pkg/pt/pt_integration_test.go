@@ -31,7 +31,7 @@ import (
 // TestPTConnectivity tests end-to-end PT connectivity with mock PT binaries.
 // This validates the complete PT lifecycle:
 // 1. PT server startup and SMETHOD reporting
-// 2. PT client startup and CMETHOD reporting  
+// 2. PT client startup and CMETHOD reporting
 // 3. Client connection through PT to server
 // 4. Data transmission through PT tunnel
 // 5. Graceful shutdown of both client and server
@@ -54,8 +54,8 @@ func TestPTConnectivity(t *testing.T) {
 	t.Log("\n[2/6] Starting PT server...")
 	serverStateDir := t.TempDir()
 	serverConfig := TransportConfig{
-		BinaryPath:  serverBinary,
-		StateDir:    serverStateDir,
+		BinaryPath:   serverBinary,
+		StateDir:     serverStateDir,
 		TorSOCKSPort: 9999, // Mock extended ORPort
 		Options: map[string]string{
 			"transport": "mock",
@@ -134,7 +134,7 @@ func TestPTConnectivity(t *testing.T) {
 
 	// Step 5: Test that PT infrastructure is working
 	t.Log("\n[5/6] Verifying PT methods are registered...")
-	
+
 	// Verify server methods
 	serverMethods := server.GetAllMethods()
 	if len(serverMethods) != 1 {
@@ -144,7 +144,7 @@ func TestPTConnectivity(t *testing.T) {
 		t.Fatalf("Expected method 'mock', got '%s'", serverMethods[0].Name)
 	}
 	t.Log("✓ Server method registered correctly")
-	
+
 	// Verify client methods
 	clientMethodsInfo := client.GetAllMethods()
 	if len(clientMethodsInfo) != 1 {
@@ -256,7 +256,7 @@ func createMockPTServer(t *testing.T) string {
 	t.Helper()
 
 	script := filepath.Join(t.TempDir(), "mock-pt-server")
-	
+
 	// Mock PT server that:
 	// 1. Reads TOR_PT_MANAGED_TRANSPORT_VER
 	// 2. Reports VERSION 1
@@ -283,11 +283,11 @@ while true; do
     sleep 0.5
 done
 `
-	
+
 	if err := os.WriteFile(script, []byte(scriptContent), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	
+
 	return script
 }
 
@@ -297,7 +297,7 @@ func createMockPTClient(t *testing.T, serverAddr string) string {
 	t.Helper()
 
 	script := filepath.Join(t.TempDir(), "mock-pt-client")
-	
+
 	// Mock PT client that:
 	// 1. Reads TOR_PT_MANAGED_TRANSPORT_VER
 	// 2. Reports VERSION 1
@@ -323,11 +323,11 @@ while true; do
     sleep 0.5
 done
 `
-	
+
 	if err := os.WriteFile(script, []byte(scriptContent), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	
+
 	return script
 }
 
@@ -341,11 +341,11 @@ func createCrashingPTServer(t *testing.T) string {
 echo "VERSION 1"
 exit 1
 `
-	
+
 	if err := os.WriteFile(script, []byte(scriptContent), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	
+
 	return script
 }
 
@@ -372,11 +372,11 @@ while true; do
     sleep 0.5
 done
 `
-	
+
 	if err := os.WriteFile(script, []byte(scriptContent), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	
+
 	return script
 }
 
@@ -400,7 +400,7 @@ env | grep TOR_PT_ | sort
 echo "CMETHODS DONE"
 sleep 1
 `
-	
+
 	if err := os.WriteFile(script, []byte(scriptContent), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -437,9 +437,9 @@ func TestPTErrorHandling(t *testing.T) {
 	}
 
 	tests := []struct {
-		name       string
-		createPT   func(*testing.T) string
-		expectErr  bool
+		name        string
+		createPT    func(*testing.T) string
+		expectErr   bool
 		errContains string
 	}{
 		{
@@ -454,7 +454,7 @@ sleep 1
 				os.WriteFile(script, []byte(content), 0o755)
 				return script
 			},
-			expectErr:  false, // Version negotiation is lenient
+			expectErr: false, // Version negotiation is lenient
 		},
 		{
 			name: "malformed_cmethod",
@@ -545,7 +545,7 @@ while [ $COUNTER -lt 30 ]; do
     COUNTER=$((COUNTER + 1))
 done
 `
-	
+
 	if err := os.WriteFile(script, []byte(scriptContent), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -582,13 +582,13 @@ done
 func readPTOutput(r io.Reader, lines int) []string {
 	scanner := bufio.NewScanner(r)
 	var output []string
-	
+
 	for i := 0; i < lines && scanner.Scan(); i++ {
 		line := strings.TrimSpace(scanner.Text())
 		if line != "" {
 			output = append(output, line)
 		}
 	}
-	
+
 	return output
 }

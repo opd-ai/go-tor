@@ -824,7 +824,44 @@ Each new package should have comprehensive unit tests:
     - Signal handling verified (SIGTERM, SIGINT)
     - Protocol compliance validated (VERSION, CMETHOD, CMETHODS DONE, SMETHOD, SMETHODS DONE)
   - Status: **All tests passing** - PT infrastructure fully validated
-- [ ] Mixed scenario tests
+- [x] **Mixed scenario tests** ✅ **COMPLETED** (January 26, 2026)
+  - Created comprehensive mixed scenario integration tests combining multiple features
+  - Tests verify multiple go-tor components working together under realistic conditions
+  - Implementation: `pkg/testing/integration/mixed_scenarios_test.go` (670+ lines, 5 test functions)
+  - Tests:
+    - `TestMixedOnionServiceAndBridge` - Onion service + bridge relay integration
+      - Bridge relay startup and operation
+      - Onion service with backend HTTP server
+      - Service persistence verification
+      - Component health monitoring
+    - `TestMixedPluggableTransportAndCircuit` - PT + circuit integration
+      - Mock PT server/client handshake
+      - Transport method registration
+      - Connection through PT tunnel (tested with mocks)
+      - Graceful shutdown verification
+    - `TestMixedMultiComponentStress` - Multi-component stress testing
+      - 3 concurrent bridge relays
+      - 2 concurrent onion services
+      - 2 backend HTTP servers
+      - All components operational under load
+      - Statistics tracking and health checks
+    - `TestMixedServicePersistenceAndRecovery` - Service recovery
+      - Service creation with persistence
+      - State file verification
+      - Service recreation from persisted keys
+      - Identity preservation across restarts
+    - `TestMixedConfigurationIntegration` - Configuration integration
+      - Bridge configuration
+      - PT client configuration
+      - Config validation
+      - Multi-component config handling
+  - Coverage: All major feature combinations tested
+  - Test utilities:
+    - Mock PT binaries for server/client testing
+    - Backend HTTP server simulation
+    - Component health verification helpers
+  - Status: **All 5 tests passing** - Mixed scenario testing complete
+  - Notes: Tests validate component integration without requiring live Tor network
 
 ### Compatibility Tests
 

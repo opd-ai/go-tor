@@ -460,4 +460,3 @@ func (s *ServerORConnection) ReceiveCell(ctx context.Context) (*cell.Cell, error
 		Payload: payload,
 	}, nil
 }
-

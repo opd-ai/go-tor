@@ -59,7 +59,7 @@ func (mc *ManagedClient) Name() string {
 // Start launches the PT process and performs IPC handshake.
 func (mc *ManagedClient) Start(ctx context.Context) error {
 	mc.mu.Lock()
-	
+
 	if mc.running {
 		mc.mu.Unlock()
 		return nil
@@ -94,7 +94,7 @@ func (mc *ManagedClient) Start(ctx context.Context) error {
 
 	mc.running = true
 	mc.log.Info("PT process started", "binary", mc.config.BinaryPath, "pid", mc.cmd.Process.Pid)
-	
+
 	// Unlock before handshake to avoid deadlock when parseCMethod tries to acquire lock
 	mc.mu.Unlock()
 

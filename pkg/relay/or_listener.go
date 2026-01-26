@@ -371,4 +371,3 @@ func (l *ORListener) GetStats() ORListenerStats {
 		ActiveConnections: activeConns,
 	}
 }
-

@@ -77,7 +77,7 @@ func TestBridgeRelayConnectivity(t *testing.T) {
 
 	// Step 3: Create client connection to bridge
 	t.Log("Connecting client to bridge relay...")
-	
+
 	// Parse the listening address to connect to it
 	host, port, err := net.SplitHostPort(actualAddr)
 	if err != nil {
@@ -104,7 +104,7 @@ func TestBridgeRelayConnectivity(t *testing.T) {
 
 	// Perform link protocol handshake (send VERSIONS, receive VERSIONS, CERTS, NETINFO)
 	t.Log("Performing link protocol handshake...")
-	
+
 	// Send VERSIONS cell
 	if err := sendVersionsCell(rawConn); err != nil {
 		t.Fatalf("Failed to send VERSIONS: %v", err)
@@ -146,7 +146,7 @@ func TestBridgeRelayConnectivity(t *testing.T) {
 
 	// Step 4: Perform CREATE2 handshake
 	t.Log("Performing CREATE2 handshake...")
-	
+
 	// Generate circuit ID
 	circuitID := uint32(0x80000001) // Client-originated circuit
 
@@ -164,7 +164,7 @@ func TestBridgeRelayConnectivity(t *testing.T) {
 		CircID:  circuitID,
 		Command: cell.CmdCreate2,
 	}
-	
+
 	// CREATE2 payload format: [2 bytes: handshake type][2 bytes: handshake data length][handshake data]
 	create2Cell.Payload = make([]byte, 2+2+len(handshakeData))
 	create2Cell.Payload[0] = 0x00 // HTYPE = 0x0002 (ntor)
@@ -186,7 +186,7 @@ func TestBridgeRelayConnectivity(t *testing.T) {
 	// Wait for CREATED2 response with timeout
 	rawConn.SetReadDeadline(time.Now().Add(10 * time.Second))
 	defer rawConn.SetReadDeadline(time.Time{})
-	
+
 	responseCell, err := receiveCell(rawConn)
 	if err != nil {
 		t.Fatalf("Failed to receive CREATED2 cell: %v", err)
@@ -211,7 +211,7 @@ func TestBridgeRelayConnectivity(t *testing.T) {
 	}
 	destroyCell.Payload = make([]byte, cell.PayloadLen)
 	destroyCell.Payload[0] = cell.DestroyReasonNone // Reason code
-	
+
 	if err := sendCell(rawConn, destroyCell); err != nil {
 		t.Logf("Warning: Failed to send DESTROY cell: %v", err)
 	}
@@ -222,13 +222,13 @@ func TestBridgeRelayConnectivity(t *testing.T) {
 	if stats.TotalConnections == 0 {
 		t.Error("Expected at least 1 connection in bridge stats")
 	}
-	t.Logf("Bridge stats - Total connections: %d, Active: %d", 
+	t.Logf("Bridge stats - Total connections: %d, Active: %d",
 		stats.TotalConnections, stats.ActiveConnections)
 
 	// Step 7: Clean shutdown
 	t.Log("Shutting down bridge relay...")
 	listenerCancel()
-	
+
 	// Wait for listener to stop
 	select {
 	case err := <-startErr:
@@ -365,12 +365,12 @@ func deriveNtorPublicKey(privateKey []byte) []byte {
 	if len(privateKey) != 32 {
 		return make([]byte, 32) // Return zero key for invalid input
 	}
-	
+
 	var private, public [32]byte
 	copy(private[:], privateKey)
-	
+
 	// Use x/crypto/curve25519 to derive public key
 	curve25519.ScalarBaseMult(&public, &private)
-	
+
 	return public[:]
 }
