@@ -150,5 +150,5 @@ This enables proper ntor handshake execution during circuit extension.
 
 - [Tor Directory Protocol Specification](https://spec.torproject.org/dir-spec)
 - [Tor Protocol Specification](https://spec.torproject.org/tor-spec)
-- AUDIT.md §4: Directory Protocol compliance
+- PLAN.md §4: Directory Protocol compliance
 - SPEC-001: Relay key extraction task

@@ -1,4 +1,4 @@
-# Fix Summary: Protocol Handshake Goroutine Leak (AUDIT.md Critical Bug)
+# Fix Summary: Protocol Handshake Goroutine Leak (PLAN.md Critical Bug)
 
 **Date:** January 24, 2026  
 **Issue:** CRITICAL BUG - Goroutine Leak in Protocol Handshake  
@@ -145,7 +145,7 @@ Added comprehensive test coverage across both packages:
 4. **pkg/connection/receive_cell_context_test.go** (NEW)
    - Added 5 tests covering context-aware receive functionality
 
-5. **AUDIT.md**
+5. **PLAN.md**
    - Updated to reflect completed fix
    - Moved issue from "CRITICAL BUG" to "✅ FIXED"
    - Updated summary counts and recommendations

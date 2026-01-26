@@ -1,6 +1,6 @@
 // Package stream provides Tor stream management for multiplexing connections over circuits.
 // This file implements stream isolation enforcement to prevent applications from different
-// sources sharing circuits, addressing AUDIT.md MED-006 and ROADMAP.md Phase 2.2.
+// sources sharing circuits, addressing PLAN.md MED-006 and ROADMAP.md Phase 2.2.
 package stream
 
 import (

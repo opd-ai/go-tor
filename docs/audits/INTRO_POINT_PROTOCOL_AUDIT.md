@@ -427,4 +427,4 @@ The introduction point protocol implementation in `pkg/onion` demonstrates **exc
 **Auditor Notes**: This audit focused on specification compliance, security, and code quality. The implementation exceeds minimum requirements with health monitoring, retry logic, and automatic rotation. The codebase is well-structured, thoroughly tested, and properly documented.
 
 **Audit Completed**: January 25, 2026  
-**Next Audit**: Rendezvous protocol implementation (PLAN.md §9.2)
+**Next Audit**: Rendezvous protocol implementation (AUDIT.md §9.2)

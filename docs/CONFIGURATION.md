@@ -527,7 +527,7 @@ LogLevel info
 - [Getting Started](TUTORIAL.md)
 - [Architecture](ARCHITECTURE.md)
 - [Production Guide](PRODUCTION.md)
-- [Security](../AUDIT.md)
+- [Security](../PLAN.md)
 - [Troubleshooting](TROUBLESHOOTING.md)
 ## Support
 - GitHub Issues: [github.com/opd-ai/go-tor/issues](https://github.com/opd-ai/go-tor/issues)

@@ -246,7 +246,7 @@ Potential improvements to state persistence:
 
 ## References
 
-- Task 9.4.2 in PLAN.md
+- Task 9.4.2 in AUDIT.md
 - `pkg/onion/persistence.go` - Persistence implementation
 - `pkg/onion/service.go` - Service integration
 - `pkg/onion/service_state_test.go` - State persistence tests

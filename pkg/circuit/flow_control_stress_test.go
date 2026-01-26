@@ -9,7 +9,7 @@ import (
 )
 
 // TestFlowControlHighThroughput tests flow control under high data volume
-// This addresses AUDIT.md line 1085: "⏳ Test with high-throughput scenarios"
+// This addresses PLAN.md line 1085: "⏳ Test with high-throughput scenarios"
 func TestFlowControlHighThroughput(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping high-throughput test in short mode")
