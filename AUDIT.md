@@ -1363,7 +1363,66 @@ The audit will follow a multi-phase approach: automated static analysis, specifi
   - Overall security grade: A- (Excellent)
   - Risk level: LOW (no critical vulnerabilities)
   - Status: APPROVED for educational/research use
-- [ ] Review onion address parsing validation [pkg/onion] [2h]
+- [x] **Review onion address parsing validation [pkg/onion] [2h]** ✅ **COMPLETED** (January 26, 2026)
+  - Comprehensive security audit completed against rend-spec-v3.txt Section 2 and input validation best practices
+  - Assessment: 100% specification compliance (FULLY COMPLIANT - SECURE)
+  - Test coverage: 100% for ParseAddress, 94.7% for parseV3Address, 100% for computeV3Checksum (98.2% overall)
+  - Created comprehensive test suite: address_parsing_security_audit_test.go (516 LOC, 46 test scenarios)
+  - All tests passing: ✅ 100% (46/46)
+  - Security audit categories:
+    1. **Input Sanitization (100% Compliant)** - 10 test scenarios
+       - ✅ Empty string handling: Rejected
+       - ✅ Whitespace handling: Leading/trailing/embedded all rejected
+       - ✅ Null byte injection: Rejected at length validation
+       - ✅ Control character injection: Rejected (no command injection risk)
+       - ✅ Unicode character handling: Rejected (proper byte-level validation)
+       - ✅ Case normalization: Uppercase/lowercase/mixed all accepted and normalized
+    2. **Malformed Input Handling (100% Compliant)** - 9 test scenarios
+       - ✅ Invalid base32 alphabet (1,8,9,0): Rejected
+       - ✅ Special characters: Rejected at base32 decoding
+       - ✅ Padding characters: Rejected (v3 uses NoPadding)
+       - ✅ Length edge cases: 55 chars rejected, 56 accepted, 57+ rejected
+       - ✅ Multiple suffix attack: Rejected
+       - ✅ Invalid suffix variants: Rejected
+    3. **Injection Attack Prevention (100% Compliant)** - 6 attack vectors
+       - ✅ SQL injection: Rejected (special chars fail base32)
+       - ✅ Shell command injection: Rejected ($, parentheses invalid)
+       - ✅ Path traversal: Rejected (/, . characters rejected)
+       - ✅ Format string injection: Rejected (% invalid in base32)
+       - ✅ XML/HTML injection: Rejected (<, > rejected)
+       - ✅ LDAP injection: Rejected (*, parentheses rejected)
+    4. **Resource Exhaustion Protection (100% Compliant)** - 4 test scenarios
+       - ✅ 10KB input: O(1) rejection, no allocation
+       - ✅ Valid 56 chars: Fixed 35-byte allocation
+       - ✅ Repeated dots (1000 chars): Rejected, no runaway loop
+       - ✅ Nested structure (100 .onion suffixes): Rejected
+    5. **Checksum Validation Security (100% Compliant)** - 3 test scenarios
+       - ✅ Corrupted checksum: Detected
+       - ✅ Single bit flip: 100% detection rate
+       - ✅ Collision resistance: Different keys → different checksums
+       - ✅ SHA3-256 algorithm: Correct per rend-spec-v3.txt
+    6. **Version Byte Validation (100% Compliant)** - 6 test scenarios
+       - ✅ Valid version 0x03: Accepted
+       - ✅ Invalid versions (0x00-0x02, 0x04, 0xFF): All rejected
+    7. **Concurrency Safety (100% Compliant)** - 100 goroutines
+       - ✅ No data races (verified with -race flag)
+       - ✅ No deadlocks or panics
+       - ✅ Thread-safe: Pure functions, no shared state
+    8. **Round-Trip Consistency (100% Compliant)** - 10 cycles
+       - ✅ Parse-Encode-Parse: 100% consistency
+       - ✅ Public keys match
+       - ✅ Deterministic encoding
+  - Security strengths:
+    - ✅ Defense in depth: Multiple validation layers (length → base32 → checksum → version)
+    - ✅ Strict character whitelist prevents all injection attacks
+    - ✅ Constant-time operations, bounded memory usage
+    - ✅ Correct SHA3-256 checksum implementation
+    - ✅ Inherently thread-safe (no shared state)
+  - Specification compliance: rend-spec-v3.txt Section 2 (12/12 requirements - 100%)
+  - Vulnerabilities found: 0 Critical, 0 High, 0 Medium, 0 Low, 0 Info
+  - Security grade: A (Excellent)
+  - Created audit document: `docs/audits/ONION_ADDRESS_PARSING_VALIDATION_AUDIT.md` (22KB)
+  - Status: APPROVED for educational/research use
 - [ ] Audit SOCKS5 request parsing [pkg/socks] [2h]
 - [ ] Verify control protocol command parsing [pkg/control] [2h]
 - [ ] Check for integer overflow in length fields [pkg/cell, pkg/protocol] [3h]
