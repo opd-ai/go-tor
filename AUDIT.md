@@ -759,7 +759,39 @@ Each new package should have comprehensive unit tests:
     - `waitForIntroPointsEstablished` - Polling helper for intro points
     - `createMockHSDirs` - Mock hidden service directories
   - Notes: Tests compile successfully and run until network I/O (expected without live Tor network)
-- [ ] Bridge relay connectivity test (with local client)
+- [x] **Bridge relay connectivity test (with local client)** ✅ **COMPLETED** (January 26, 2026)
+  - Created comprehensive integration tests for bridge relay connectivity
+  - Tests verify complete bridge relay lifecycle: startup → handshake → circuit → shutdown
+  - Implementation: `pkg/relay/bridge_integration_test.go` (370+ lines, 2 test functions)
+  - Tests:
+    - `TestBridgeRelayConnectivity` - Full bridge connectivity workflow
+      - Bridge relay key generation and startup
+      - Client TLS connection to bridge
+      - Link protocol handshake (VERSIONS, CERTS, NETINFO)
+      - CREATE2/CREATED2 circuit creation with ntor handshake
+      - Circuit cleanup with DESTROY cell
+      - Bridge statistics verification
+    - `TestBridgeRelayCircuitExtension` - Simplified (full extension requires multiple relays)
+  - Features tested:
+    - OR listener startup on random port
+    - TLS server certificate handling
+    - Server-side link protocol handshake
+    - Server-side CREATE2 circuit handling with ntor handshake
+    - Circuit state management
+    - Statistics tracking (total/active connections)
+    - Graceful shutdown and cleanup
+  - Infrastructure updates:
+    - Enhanced `ORListener` with circuit handler integration
+    - Added `Address()` and `GetStats()` methods to ORListener
+    - Added `ReceiveCell()` method to `ServerORConnection`
+    - Automatic circuit handler registration and cell processing
+    - Connection statistics tracking
+  - Helper functions:
+    - `sendCell()` / `receiveCell()` - Manual cell protocol helpers
+    - `sendVersionsCell()` / `sendNetinfoCell()` - Link protocol helpers
+    - `deriveNtorPublicKey()` - Curve25519 key derivation
+  - Test coverage: Full end-to-end bridge relay operation verified
+  - Status: **All tests passing** (1 test passing, 1 simplified placeholder)
 - [ ] Pluggable transport connectivity test
 - [ ] Mixed scenario tests
 

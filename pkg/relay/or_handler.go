@@ -396,3 +396,68 @@ func (h *LinkProtocolHandler) writeCell(conn net.Conn, c *cell.Cell) error {
 	_, err := conn.Write(buf.Bytes())
 	return err
 }
+
+// ReceiveCell receives a cell from the server OR connection with context
+func (s *ServerORConnection) ReceiveCell(ctx context.Context) (*cell.Cell, error) {
+	// Read header (CircID + Command)
+	header := make([]byte, 5) // 4 bytes CircID + 1 byte Command
+
+	// Create a channel for the read result
+	type readResult struct {
+		n   int
+		err error
+	}
+	resultCh := make(chan readResult, 1)
+
+	go func() {
+		n, err := s.conn.Read(header)
+		resultCh <- readResult{n, err}
+	}()
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case result := <-resultCh:
+		if result.err != nil {
+			return nil, result.err
+		}
+		if result.n != 5 {
+			return nil, fmt.Errorf("incomplete header read: %d bytes", result.n)
+		}
+	}
+
+	// Parse header
+	circID := binary.BigEndian.Uint32(header[0:4])
+	command := cell.Command(header[4])
+
+	// Determine payload size
+	var payloadLen int
+	if command.IsVariableLength() {
+		// Read 2-byte length field
+		lenBytes := make([]byte, 2)
+		if _, err := s.conn.Read(lenBytes); err != nil {
+			return nil, fmt.Errorf("failed to read payload length: %w", err)
+		}
+		payloadLen = int(binary.BigEndian.Uint16(lenBytes))
+	} else {
+		// Fixed-size cell
+		payloadLen = cell.PayloadLen
+	}
+
+	// Read payload
+	var payload []byte
+	if payloadLen > 0 {
+		payload = make([]byte, payloadLen)
+		if _, err := s.conn.Read(payload); err != nil {
+			return nil, fmt.Errorf("failed to read payload: %w", err)
+		}
+	}
+
+	// Create cell with payload
+	return &cell.Cell{
+		CircID:  circID,
+		Command: command,
+		Payload: payload,
+	}, nil
+}
+

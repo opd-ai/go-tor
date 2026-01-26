@@ -25,10 +25,17 @@ type ORListener struct {
 	stopCh      chan struct{}
 	wg          sync.WaitGroup
 
+	// Circuit handling
+	circuitHandler *CircuitHandler
+
 	// Configuration
 	maxConnections int
 	readTimeout    time.Duration
 	writeTimeout   time.Duration
+
+	// Statistics
+	statsMu          sync.RWMutex
+	totalConnections uint64
 }
 
 // ORListenerConfig holds configuration for the OR listener
@@ -61,12 +68,16 @@ func NewORListener(cfg *ORListenerConfig, log *logger.Logger) (*ORListener, erro
 		log = logger.NewDefault()
 	}
 
+	// Create circuit handler
+	circuitHandler := NewCircuitHandler(cfg.Keys, log)
+
 	return &ORListener{
 		address:        cfg.Address,
 		keys:           cfg.Keys,
 		logger:         log,
 		connections:    make(map[string]*ORConnection),
 		stopCh:         make(chan struct{}),
+		circuitHandler: circuitHandler,
 		maxConnections: cfg.MaxConnections,
 		readTimeout:    cfg.ReadTimeout,
 		writeTimeout:   cfg.WriteTimeout,
@@ -222,6 +233,11 @@ func (l *ORListener) handleConnection(ctx context.Context, rawConn net.Conn) {
 	l.connections[remoteAddr] = orConn
 	l.connsMu.Unlock()
 
+	// Update statistics
+	l.statsMu.Lock()
+	l.totalConnections++
+	l.statsMu.Unlock()
+
 	// Ensure cleanup from registry
 	defer func() {
 		l.connsMu.Lock()
@@ -231,13 +247,34 @@ func (l *ORListener) handleConnection(ctx context.Context, rawConn net.Conn) {
 
 	l.logger.Info("Link protocol handshake complete", "remote", remoteAddr, "version", serverConn.negotiatedVersion)
 
-	// Keep connection alive until context cancels or stop signal
-	// TODO: Handle circuit management (Task 10.1.3)
-	select {
-	case <-ctx.Done():
-		return
-	case <-l.stopCh:
-		return
+	// Process cells with circuit handler
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-l.stopCh:
+			return
+		default:
+		}
+
+		// Receive cell with timeout
+		cellCtx, cellCancel := context.WithTimeout(ctx, l.readTimeout)
+		receivedCell, err := serverConn.ReceiveCell(cellCtx)
+		cellCancel()
+
+		if err != nil {
+			if err == context.DeadlineExceeded {
+				continue // Timeout, try again
+			}
+			l.logger.Warn("Failed to receive cell", "remote", remoteAddr, "error", err)
+			return
+		}
+
+		// Handle cell with circuit handler
+		if err := l.circuitHandler.HandleCellFromConnection(serverConn.conn, receivedCell); err != nil {
+			l.logger.Warn("Failed to handle cell", "remote", remoteAddr, "circuit", receivedCell.CircID, "error", err)
+			// Continue processing other cells
+		}
 	}
 }
 
@@ -259,6 +296,11 @@ func (l *ORListener) Stop() error {
 		conn.Close()
 	}
 	l.connsMu.Unlock()
+
+	// Close circuit handler
+	if l.circuitHandler != nil {
+		l.circuitHandler.CloseAll()
+	}
 
 	// Wait for goroutines
 	l.wg.Wait()
@@ -299,3 +341,34 @@ func (c *ORConnection) Close() error {
 func (c *ORConnection) RemoteAddr() string {
 	return c.remoteAddr
 }
+
+// Address returns the listening address
+func (l *ORListener) Address() string {
+	if l.listener != nil {
+		return l.listener.Addr().String()
+	}
+	return l.address
+}
+
+// ORListenerStats holds statistics for the OR listener
+type ORListenerStats struct {
+	TotalConnections  uint64
+	ActiveConnections int
+}
+
+// GetStats returns current listener statistics
+func (l *ORListener) GetStats() ORListenerStats {
+	l.statsMu.RLock()
+	totalConns := l.totalConnections
+	l.statsMu.RUnlock()
+
+	l.connsMu.RLock()
+	activeConns := len(l.connections)
+	l.connsMu.RUnlock()
+
+	return ORListenerStats{
+		TotalConnections:  totalConns,
+		ActiveConnections: activeConns,
+	}
+}
+
