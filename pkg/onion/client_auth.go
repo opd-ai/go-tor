@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"sync"
 
 	"golang.org/x/crypto/curve25519"
 	"golang.org/x/crypto/hkdf"
@@ -26,6 +27,7 @@ type ClientAuthCredential struct {
 
 // ClientAuthStore manages client authorization credentials
 type ClientAuthStore struct {
+	mu          sync.RWMutex
 	credentials map[string]*ClientAuthCredential // key: onion address
 }
 
@@ -53,18 +55,25 @@ func (s *ClientAuthStore) AddCredential(onionAddress string, privateKey [32]byte
 		PublicKey:    publicKey,
 	}
 
+	s.mu.Lock()
 	s.credentials[onionAddress] = credential
+	s.mu.Unlock()
 	return nil
 }
 
 // GetCredential retrieves a client authorization credential for an onion service
 func (s *ClientAuthStore) GetCredential(onionAddress string) (*ClientAuthCredential, bool) {
+	s.mu.RLock()
 	cred, exists := s.credentials[onionAddress]
+	s.mu.RUnlock()
 	return cred, exists
 }
 
 // RemoveCredential removes a client authorization credential
 func (s *ClientAuthStore) RemoveCredential(onionAddress string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	if cred, exists := s.credentials[onionAddress]; exists {
 		// Securely zero the private key before removal
 		security.SecureZeroMemory(cred.PrivateKey[:])
@@ -74,6 +83,9 @@ func (s *ClientAuthStore) RemoveCredential(onionAddress string) {
 
 // Clear removes all credentials
 func (s *ClientAuthStore) Clear() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	for _, cred := range s.credentials {
 		security.SecureZeroMemory(cred.PrivateKey[:])
 	}
