@@ -60,6 +60,6 @@ The default behavior (RequireCERTS=false) maintains backward compatibility with 
 
 ## See Also
 
-- [AUDIT.md](../../AUDIT.md) - Section 7 (Protocol Handshake) for implementation details
+- [PLAN.md](../../PLAN.md) - Section 7 (Protocol Handshake) for implementation details
 - [pkg/connection](../../pkg/connection) - Connection configuration
 - [pkg/protocol](../../pkg/protocol) - Protocol handshake implementation

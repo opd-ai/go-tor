@@ -6,7 +6,7 @@ This document describes the client authorization implementation for v3 onion ser
 
 ## Implementation Status
 
-✅ **IMPLEMENTED** - Client authorization for v3 onion services (AUDIT.md P1 Priority)
+✅ **IMPLEMENTED** - Client authorization for v3 onion services (PLAN.md P1 Priority)
 
 ## Features
 

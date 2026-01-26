@@ -137,7 +137,7 @@ Coverage: >75% overall, 100% for critical paths.
 
 ## Future Enhancements
 
-See PLAN.md Task 9.3.2 and 9.3.3:
+See AUDIT.md Task 9.3.2 and 9.3.3:
 
 - **Service Backend Connection** - Enhanced connection pooling
 - **Service Metrics** - Track connection rates, data volumes, errors
@@ -148,4 +148,4 @@ See PLAN.md Task 9.3.2 and 9.3.3:
 - [rend-spec-v3.txt §3](https://spec.torproject.org/rend-spec-v3): v3 onion service protocol
 - `pkg/onion/service_stream.go` - Implementation
 - `pkg/onion/service_stream_test.go` - Test suite
-- `PLAN.md` - Complete implementation plan
+- `AUDIT.md` - Complete implementation plan

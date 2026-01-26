@@ -3,7 +3,7 @@
 // These tests validate cryptographic state progression through multi-hop circuits
 // using real EXTEND2/EXTENDED2 handshakes with actual Tor network relays.
 //
-// This addresses AUDIT.md Section 3 remaining work:
+// This addresses PLAN.md Section 3 remaining work:
 // "2. Validate cryptographic state progression through multi-hop circuits"
 //
 // Run with: go test -tags=integration -v -timeout=10m ./pkg/circuit -run TestIntegrationMultiHop

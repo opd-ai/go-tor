@@ -233,7 +233,7 @@ go tool cover -func=coverage.out | grep ValidateRelayIdentity
 - **tor-spec.txt §4.2**: CERTS cell format
 - **cert-spec.txt**: Ed25519 certificate specification
 - **dir-spec.txt**: Directory consensus format
-- **AUDIT.md**: Certificate pinning audit finding (P3)
+- **PLAN.md**: Certificate pinning audit finding (P3)
 
 ## Related Files
 

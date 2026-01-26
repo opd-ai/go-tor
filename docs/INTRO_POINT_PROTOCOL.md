@@ -255,7 +255,7 @@ Potential improvements for production use:
 
 - [rend-spec-v3.txt](https://spec.torproject.org/rend-spec-v3) - v3 Onion Service Specification
 - [tor-spec.txt](https://spec.torproject.org/tor-spec) - Core Tor Protocol
-- [PLAN.md](../../PLAN.md) - Implementation plan for onion service features
+- [AUDIT.md](../../AUDIT.md) - Implementation plan for onion service features
 
 ---
 

@@ -113,7 +113,7 @@ cfg.CircuitPoolMaxSize = 5
 
 ## References
 
-- [AUDIT.md](../AUDIT.md) - Security audit findings
+- [PLAN.md](../PLAN.md) - Security audit findings
 - [CIRCUIT_ISOLATION.md](./CIRCUIT_ISOLATION.md) - Circuit isolation documentation
 - [Tor Project Security](https://www.torproject.org/about/security/) - Official Tor security information
 - [Tor Specification](https://spec.torproject.org/) - Official Tor protocol specifications

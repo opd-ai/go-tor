@@ -25,7 +25,7 @@ import (
 
 // TestIntegrationCircuitBuildingWithRealRelays tests circuit building with real Tor relays.
 // NOTE: Currently tests first-hop CREATE2 handshake only. Middle and exit hops are
-// simulated (not yet using EXTEND2) as documented in AUDIT.md section 3.
+// simulated (not yet using EXTEND2) as documented in PLAN.md section 3.
 func TestIntegrationCircuitBuildingWithRealRelays(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
@@ -110,7 +110,7 @@ func TestIntegrationCircuitBuildingWithRealRelays(t *testing.T) {
 
 	// NOTE: Middle and exit hops are currently simulated in builder.go lines 94-115
 	// They have hop structures but not yet real EXTEND2 handshakes
-	// This is documented in AUDIT.md as "⏳ Integration tests with real Tor relays pending"
+	// This is documented in PLAN.md as "⏳ Integration tests with real Tor relays pending"
 
 	t.Logf("Circuit %d built: 1 real hop (CREATE2), 2 simulated hops, state=%s",
 		circuit.ID, circuit.GetState())

@@ -537,7 +537,7 @@ The rendezvous protocol implementation is complete and ready for use in the onio
 
 ### 11.4 Audit Completion
 
-**AUDIT.md Task 1.3 P1**: "Verify rendezvous protocol implementation [pkg/onion] [6h]"
+**PLAN.md Task 1.3 P1**: "Verify rendezvous protocol implementation [pkg/onion] [6h]"
 
 ✅ **COMPLETED** - January 25, 2026
 

@@ -20,7 +20,7 @@ For actual Tor usage:
 
 ## Current Status Summary
 
-Based on the comprehensive audit (see [AUDIT.md](AUDIT.md)), the implementation has achieved **~98% protocol compliance** with all critical client components implemented:
+Based on the comprehensive audit (see [PLAN.md](PLAN.md)), the implementation has achieved **~98% protocol compliance** with all critical client components implemented:
 
 - ✅ Cell Protocol (tor-spec §0-3) - 100% compliant
 - ✅ TLS and Link Protocol (tor-spec §1-2) - 100% compliant
@@ -478,7 +478,7 @@ The `pkg/onion/service.go` already contains foundational server-side functionali
     - `NewHTTPTransport`: 87.5%
     - `WrapHTTPClient`: 85.7%
     - `DialContext`: 80.0%
-  - Status: 99.3% of 80% target achieved (from AUDIT.md section 4.1, priority P3)
+  - Status: 99.3% of 80% target achieved (from PLAN.md section 4.1, priority P3)
 
 ---
 

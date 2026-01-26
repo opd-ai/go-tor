@@ -124,7 +124,7 @@ server := socks.NewServerWithConfig(":9050", circuitMgr, logger, config)
 - Tor Specification: Section 6.4 - RELAY_RESOLVE cells
 - RFC 1928: SOCKS Protocol Version 5
 - ROADMAP.md: Phase 1.2 - Missing DNS Leak Prevention Mechanisms
-- AUDIT.md: Medium Severity Issue #4 - Missing DNS leak prevention
+- PLAN.md: Medium Severity Issue #4 - Missing DNS leak prevention
 
 ## Related Issues
 

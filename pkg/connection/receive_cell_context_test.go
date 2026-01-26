@@ -10,7 +10,7 @@ import (
 // TestReceiveCellWithContextCancellation verifies that ReceiveCellWithContext
 // properly handles context cancellation without leaking goroutines.
 //
-// This test addresses the CRITICAL BUG in AUDIT.md: "Goroutine Leak in Protocol Handshake"
+// This test addresses the CRITICAL BUG in PLAN.md: "Goroutine Leak in Protocol Handshake"
 // The fix uses context-aware ReceiveCellWithContext which cancels blocking reads.
 func TestReceiveCellWithContextCancellation(t *testing.T) {
 	// Get baseline goroutine count

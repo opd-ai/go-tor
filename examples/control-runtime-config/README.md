@@ -244,4 +244,4 @@ SETCONF MaxCircuitDirtiness=10m
 - [Control Protocol Specification](https://github.com/torproject/torspec/blob/main/control-spec.txt)
 - [Control Authentication Example](../control-auth/)
 - [Control Configuration Example](../control-config/)
-- [AUDIT.md Section 10](../../AUDIT.md#10-control-protocol-control-spectxt) - Control Protocol compliance
+- [PLAN.md Section 10](../../PLAN.md#10-control-protocol-control-spectxt) - Control Protocol compliance
