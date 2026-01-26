@@ -114,8 +114,8 @@ func TestSHA256_NtorServerHandshake(t *testing.T) {
 
 	// Build client handshake: NODEID (20 bytes) || KEYID (32 bytes) || CLIENT_PK (32 bytes) = 84 bytes
 	clientHandshake := make([]byte, 84)
-	copy(clientHandshake[0:20], relayIdentity[:20])   // NODEID (first 20 bytes of identity)
-	copy(clientHandshake[20:52], relayPublicKey[:])   // KEYID (relay's public key)
+	copy(clientHandshake[0:20], relayIdentity[:20])        // NODEID (first 20 bytes of identity)
+	copy(clientHandshake[20:52], relayPublicKey[:])        // KEYID (relay's public key)
 	copy(clientHandshake[52:84], clientEphemeralPublic[:]) // CLIENT_PK
 
 	// Perform server-side handshake
@@ -139,10 +139,10 @@ func TestSHA256_NtorServerHandshake(t *testing.T) {
 	}
 
 	// Verify key material components
-	df := keyMaterial[0:32]   // Digest forward (32 bytes)
-	db := keyMaterial[32:48]  // Digest backward (16 bytes)
-	kf := keyMaterial[48:64]  // Key forward (16 bytes)
-	kb := keyMaterial[64:72]  // Key backward (8 bytes)
+	df := keyMaterial[0:32]  // Digest forward (32 bytes)
+	db := keyMaterial[32:48] // Digest backward (16 bytes)
+	kf := keyMaterial[48:64] // Key forward (16 bytes)
+	kb := keyMaterial[64:72] // Key backward (8 bytes)
 
 	// All components should be non-zero
 	if bytes.Equal(df, make([]byte, 32)) {
@@ -308,11 +308,11 @@ func TestSHA256_KeyMaterialDeterminism(t *testing.T) {
 // TestSHA256_UsageSummary documents all SHA-256 usage in pkg/crypto
 func TestSHA256_UsageSummary(t *testing.T) {
 	usageSummary := map[string]string{
-		"SHA256Hash function":          "crypto.go - General-purpose SHA-256 hashing",
-		"ntor client handshake":        "crypto.go - HKDF-SHA256 for key derivation",
-		"ntor server handshake":        "ntor_server.go - HKDF-SHA256 for key derivation",
-		"RSA signature verification":   "crypto.go - SHA-256 for message hashing",
-		"Protocol ID":                  "ntor - ntor-curve25519-sha256-1",
+		"SHA256Hash function":        "crypto.go - General-purpose SHA-256 hashing",
+		"ntor client handshake":      "crypto.go - HKDF-SHA256 for key derivation",
+		"ntor server handshake":      "ntor_server.go - HKDF-SHA256 for key derivation",
+		"RSA signature verification": "crypto.go - SHA-256 for message hashing",
+		"Protocol ID":                "ntor - ntor-curve25519-sha256-1",
 	}
 
 	t.Log("SHA-256 Usage in pkg/crypto:")

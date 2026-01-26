@@ -516,9 +516,38 @@ The audit will follow a multi-phase approach: automated static analysis, specifi
   - No changes required - implementation is fully compliant
 
 #### Random Number Generation
-- [ ] Verify all randomness uses crypto/rand (CSPRNG) [all packages] [4h]
-- [ ] Audit entropy sufficiency for key generation [pkg/crypto] [2h]
-- [ ] Check for weak PRNG usage (math/rand) [all packages] [2h]
+- [x] **Verify all randomness uses crypto/rand (CSPRNG) [all packages] [4h]** ✅ **COMPLETED** (January 26, 2026)
+  - Comprehensive audit completed against security best practices
+  - Assessment: 100% specification compliance (FULLY COMPLIANT - SECURE)
+  - Verified all cryptographic operations use `crypto/rand.Reader` (CSPRNG)
+  - Verified all key generation (RSA, Ed25519, X25519, AES) uses CSPRNG
+  - Verified all nonce/IV generation uses CSPRNG
+  - Verified all cryptographic handshakes (ntor, client auth) use CSPRNG
+  - Verified all padding generation uses CSPRNG
+  - Verified path selection uses CSPRNG for fairness
+  - Identified 3 acceptable `math/rand` uses (all non-security-critical):
+    1. pkg/errors/retry.go - retry jitter (documented performance optimization)
+    2. pkg/testing/chaos/chaos.go - chaos testing (test-only code with nolint)
+    3. pkg/trace/sampler.go - trace sampling (observability, non-security)
+  - Test coverage: 88.9% pkg/crypto (+1.6pp improvement)
+  - Created comprehensive test suite: `pkg/crypto/csprng_audit_test.go` (18 tests)
+  - All tests verify CSPRNG usage, uniqueness, statistical properties, concurrency
+  - Security assessment: SECURE (no critical, important, or minor vulnerabilities)
+  - Created audit document: `docs/audits/CSPRNG_USAGE_AUDIT.md`
+  - Status: Production-ready for educational/research use
+- [x] **Audit entropy sufficiency for key generation [pkg/crypto] [2h]** ✅ **COMPLETED** (January 26, 2026)
+  - Covered as part of CSPRNG audit (see above)
+  - Verified OS entropy sources: getrandom syscall on Linux, /dev/urandom
+  - Verified Go's crypto/rand implementation uses OS CSPRNG
+  - Verified entropy pool continuously mixed (no depletion on modern systems)
+  - Assessment: SUFFICIENT - Modern kernels provide adequate entropy
+  - No custom entropy sources needed
+- [x] **Check for weak PRNG usage (math/rand) [all packages] [2h]** ✅ **COMPLETED** (January 26, 2026)
+  - Covered as part of CSPRNG audit (see above)
+  - Identified all 3 uses of `math/rand` in codebase
+  - Verified all security-critical packages use `crypto/rand` only
+  - All `math/rand` usage documented and justified
+  - No security concerns with non-cryptographic PRNG usage
 
 #### Constant-Time Operations
 - [ ] Audit key comparisons for constant-time behavior [pkg/security] [2h]

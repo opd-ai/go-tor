@@ -28,7 +28,7 @@ func TestHKDFNtor_SpecCompliance(t *testing.T) {
 		rand.Read(secret)
 
 		info := []byte("ntor-curve25519-sha256-1:verify")
-		
+
 		// Verify HKDF uses SHA-256
 		kdf := hkdf.New(sha256.New, secret, nil, info)
 		output := make([]byte, 32)
@@ -297,9 +297,9 @@ func TestHKDFNtor_ServerHandshakeUsesHKDF(t *testing.T) {
 
 	// Build client handshake
 	clientHandshake := make([]byte, 84)
-	copy(clientHandshake[0:20], serverIdentity[0:20])  // NODEID
-	copy(clientHandshake[20:52], serverNtorKey)        // KEYID (will be recomputed)
-	copy(clientHandshake[52:84], clientPublic[:])      // CLIENT_PK
+	copy(clientHandshake[0:20], serverIdentity[0:20]) // NODEID
+	copy(clientHandshake[20:52], serverNtorKey)       // KEYID (will be recomputed)
+	copy(clientHandshake[52:84], clientPublic[:])     // CLIENT_PK
 
 	// Server performs handshake
 	response, keyMaterial, err := NtorServerHandshake(clientHandshake, serverNtorKey, serverIdentity)

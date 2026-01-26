@@ -390,10 +390,10 @@ func TestSHA256_UsageDocumentation(t *testing.T) {
 	usageSummary := map[string]string{
 		"Client-ID computation":         "client_auth.go - SHA256(client_public_key)[:8]",
 		"Client auth key derivation":    "client_auth.go - HKDF-SHA256 for encryption/MAC keys",
-		"Descriptor encryption":          "onion.go - HKDF-SHA256 for superencrypted layer",
-		"INTRODUCE2 encryption":          "introduce2.go - HKDF-SHA256 for enc/MAC keys",
-		"Rendezvous key derivation":      "rendezvous.go - HKDF-SHA256 for handshake keys",
-		"ntor handshake":                 "../crypto/ntor_server.go - ntor-curve25519-sha256-1",
+		"Descriptor encryption":         "onion.go - HKDF-SHA256 for superencrypted layer",
+		"INTRODUCE2 encryption":         "introduce2.go - HKDF-SHA256 for enc/MAC keys",
+		"Rendezvous key derivation":     "rendezvous.go - HKDF-SHA256 for handshake keys",
+		"ntor handshake":                "../crypto/ntor_server.go - ntor-curve25519-sha256-1",
 		"Service-side client ID lookup": "client_auth.go - SHA256 for identifying clients",
 	}
 

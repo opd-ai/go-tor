@@ -591,8 +591,8 @@ func TestEd25519TimingSafety(t *testing.T) {
 
 		// Test with multiple invalid signatures
 		invalidSigs := [][]byte{
-			make([]byte, 64), // All zeros
-			{}, // Empty
+			make([]byte, 64),    // All zeros
+			{},                  // Empty
 			validSignature[:32], // Too short
 		}
 
