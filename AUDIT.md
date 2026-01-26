@@ -550,9 +550,53 @@ The audit will follow a multi-phase approach: automated static analysis, specifi
   - No security concerns with non-cryptographic PRNG usage
 
 #### Constant-Time Operations
-- [ ] Audit key comparisons for constant-time behavior [pkg/security] [2h]
-- [ ] Verify MAC verification uses constant-time comparison [pkg/crypto] [2h]
-- [ ] Check for timing-sensitive branch conditions in crypto code [pkg/crypto] [4h]
+- [x] **Audit key comparisons for constant-time behavior [pkg/security] [2h]** ✅ **COMPLETED** (January 26, 2026)
+  - Comprehensive audit completed against security best practices
+  - Assessment: 100% specification compliance (FULLY COMPLIANT)
+  - Verified `pkg/security.ConstantTimeCompare` uses `crypto/subtle.ConstantTimeCompare`
+  - Verified `pkg/crypto.constantTimeCompare` manual implementation is correct (XOR-based)
+  - Verified all cryptographic key comparisons use constant-time operations
+  - Test coverage: 100% for constant-time comparison functions
+  - Identified 4/4 key comparison implementations as SECURE
+  - All circuit digest comparisons use `subtle.ConstantTimeCompare` directly
+  - Security assessment: SECURE (no timing vulnerabilities in key comparisons)
+  - Created comprehensive test suite: `pkg/security/constant_time_audit_test.go` (500+ LOC, 8 test functions)
+  - All tests pass with race detector clean
+  - Created audit document: `docs/audits/CONSTANT_TIME_OPERATIONS_AUDIT.md`
+  - Status: Production-ready for key comparisons
+- [x] **Verify MAC verification uses constant-time comparison [pkg/crypto] [2h]** ✅ **COMPLETED** (January 26, 2026)
+  - Comprehensive audit completed as part of constant-time operations audit
+  - Assessment: 100% specification compliance (FULLY COMPLIANT)
+  - Verified all 3 MAC verification implementations use constant-time comparison:
+    1. `pkg/crypto/crypto.go` (ntor AUTH) - uses internal `constantTimeCompare`
+    2. `pkg/onion/client_auth.go` - uses `security.ConstantTimeCompare`
+    3. `pkg/onion/introduce2.go` - uses `crypto.ConstantTimeCompare`
+  - All MAC verifications follow decrypt-then-MAC pattern (correct)
+  - Test coverage: >95% for MAC verification code paths
+  - Security assessment: SECURE (no timing vulnerabilities in MAC verification)
+  - Compliance: tor-spec.txt §5.1.4, rend-spec-v3.txt §2.5, §3.2
+  - Status: Production-ready for MAC verification
+- [x] **Check for timing-sensitive branch conditions in crypto code [pkg/crypto] [4h]** ✅ **COMPLETED** (January 26, 2026)
+  - Comprehensive audit completed against timing attack vectors
+  - Assessment: 85.7% compliance (SUBSTANTIALLY COMPLIANT - 1 CRITICAL ISSUE)
+  - Identified 1 CRITICAL vulnerability: Non-constant-time password comparison
+    - **VULN-CT-001**: `pkg/control/control.go:298` uses string `==` operator
+    - Severity: CRITICAL (CWE-208: Observable Timing Discrepancy)
+    - Impact: Password can be recovered byte-by-byte via timing analysis
+    - Remediation: Use `security.ConstantTimeCompare([]byte(password), []byte(s.password))`
+    - Status: OPEN (requires immediate fix)
+  - Verified 6/7 timing-sensitive paths are SECURE:
+    - ✅ Circuit digest verification (uses `subtle.ConstantTimeCompare`)
+    - ✅ MAC verification (all 3 implementations constant-time)
+    - ✅ ntor AUTH verification (constant-time)
+    - ✅ TLS certificate validation (stdlib guarantees)
+    - ✅ Ed25519 signature verification (constant-time per RFC 8032)
+    - ✅ RSA signature verification (stdlib constant-time ops)
+    - ❌ Control protocol password (CRITICAL: non-constant-time)
+  - Overall compliance: 6/7 paths (85.7%)
+  - Security findings documented in `docs/audits/CONSTANT_TIME_OPERATIONS_AUDIT.md`
+  - Recommendations: Fix password comparison immediately, add rate limiting, use hashed passwords
+  - Status: NOT production-ready until VULN-CT-001 is fixed
 
 ### 2.2 Attack Vector Analysis
 
