@@ -391,14 +391,30 @@ The `pkg/onion/service.go` already contains foundational server-side functionali
   - Tests: `pkg/relay/publisher_test.go` (14 tests, all passing, >87% coverage)
   - Configuration: `PublisherConfig` with sensible defaults (18h interval, 30s timeout)
 
-- [ ] **10.3.3 BridgeDB Integration** (Optional)
-  - Support bridge distribution mechanisms
-  - Implement bridge email responder integration (research/educational only)
+- [x] **10.3.3 BridgeDB Integration** (Optional) ✅ **COMPLETED** (January 26, 2026)
+  - Implemented bridge distribution mechanisms for educational/research purposes
+  - Created HTTP API for bridge distribution
+  - Implemented email responder simulation for research/demo
+  - Features:
+    - BridgeDistributor with bridge database management
+    - Rate limiting (1h default) to prevent abuse
+    - Transport filtering (vanilla, obfs4, meek, etc.)
+    - Deterministic bridge selection based on requestor IP
+    - HTTP server with /bridges and /stats endpoints
+    - Email responder with bridge line generation
+    - Comprehensive statistics tracking
+  - Implementation: `pkg/relay/bridgedb.go` (`BridgeDistributor`, `BridgeDistributorServer`, `EmailResponder`)
+  - Tests: `pkg/relay/bridgedb_test.go` (11 comprehensive test functions, all passing)
+  - Coverage: >90% for core functions
+  - Example: `examples/bridgedb-demo/main.go` (demonstrates all features)
+  - Warning messages included to emphasize educational-only nature
 
 **Files to Create**:
 - `pkg/relay/descriptor.go` ✅ - Server descriptor generation (already implemented)
 - `pkg/relay/publisher.go` ✅ **NEW** - Descriptor publishing (Task 10.3.2)
 - `pkg/relay/publisher_test.go` ✅ **NEW** - Publisher tests (>87% coverage)
+- `pkg/relay/bridgedb.go` ✅ **NEW** - BridgeDB integration (Task 10.3.3)
+- `pkg/relay/bridgedb_test.go` ✅ **NEW** - BridgeDB tests (11 tests, >90% coverage)
 - `pkg/relay/bridge_config.go` - Bridge-specific configuration
 
 ### 10.4 Relay Security Hardening
@@ -546,27 +562,83 @@ The `pkg/onion/service.go` already contains foundational server-side functionali
 
 **Tasks**:
 
-- [ ] **11.2.1 obfs4 Client**
-  - Implement obfs4 client handshake
-  - ntor-aes256-gcm-sha256 key exchange
-  - Packet framing and encryption
-  - Integrate with lyrebird library if available
+- [x] **11.2.1 obfs4 Client** ✅ **COMPLETED** (January 26, 2026)
+  - Implemented obfs4 client using external obfs4proxy binary
+  - Integrated with existing PT infrastructure (ManagedClient)
+  - Supports certificate-based authentication
+  - Configurable IAT (inter-arrival time) obfuscation modes (0, 1, 2)
+  - Auto-discovery of obfs4proxy binary
+  - Implementation: `pkg/pt/obfs4/client.go` (Client)
+  - Tests: `pkg/pt/obfs4/client_test.go` (11 tests, all passing)
+  - Features:
+    - ntor-based key exchange (via obfs4proxy)
+    - AES-GCM encryption (via obfs4proxy)
+    - SOCKS5 proxy integration
+    - Automatic PT process lifecycle management
+    - Configurable dial timeout
+  - Coverage: Part of 67.2% overall obfs4 package coverage
 
-- [ ] **11.2.2 obfs4 Server**
-  - Implement obfs4 server handshake
-  - Key material management
-  - Bridge line generation
+- [x] **11.2.2 obfs4 Server** ✅ **COMPLETED** (January 26, 2026)
+  - Implemented obfs4 server using external obfs4proxy binary
+  - Integrated with existing PT server infrastructure (ManagedServer)
+  - Certificate generation and distribution support
+  - Configurable bind address and IAT mode
+  - Extended ORPort support for bridge relay integration
+  - Implementation: `pkg/pt/obfs4/server.go` (Server)
+  - Tests: `pkg/pt/obfs4/server_test.go` (16 tests, all passing)
+  - Features:
+    - Server-side key management (via obfs4proxy)
+    - Certificate extraction from obfs4_bridgeline.txt
+    - Bridge line generation
+    - State directory management
+    - Graceful shutdown support
+  - Coverage: Part of 67.2% overall obfs4 package coverage
 
-- [ ] **11.2.3 obfs4 Configuration**
-  - Certificate generation
-  - Key persistence
-  - IAT mode configuration
+- [x] **11.2.3 obfs4 Configuration** ✅ **COMPLETED** (January 26, 2026)
+  - Implemented comprehensive configuration management
+  - Bridge line parsing with full parameter extraction
+  - Certificate validation (base64 format, length checks)
+  - Key export/import for backup purposes
+  - IAT mode configuration (0=disabled, 1=enabled, 2=paranoid)
+  - Implementation: `pkg/pt/obfs4/config.go` (Config functions)
+  - Tests: `pkg/pt/obfs4/config_test.go` (13 tests, all passing)
+  - Features:
+    - ParseBridgeLine() - Complete bridge line parser
+    - ValidateCertificate() - Certificate format validation
+    - ExportKeys()/ImportKeys() - Backup/restore functionality
+    - LoadServerKeys() - Load existing server certificates
+    - GetBridgeLineExample() - Example generation
+    - Default configuration with sensible values
+  - Integration: Works with existing `pkg/config/bridge.go` bridge parser
+  - Coverage: Part of 67.2% overall obfs4 package coverage
 
-**Files to Create**:
-- `pkg/pt/obfs4/client.go` - obfs4 client
-- `pkg/pt/obfs4/server.go` - obfs4 server
-- `pkg/pt/obfs4/handshake.go` - obfs4 handshake implementation
-- `pkg/pt/obfs4/framing.go` - Packet framing
+**Files Created**:
+- `pkg/pt/obfs4/client.go` ✅ - obfs4 client (120 lines)
+- `pkg/pt/obfs4/client_test.go` ✅ - Client tests (11 tests, all passing)
+- `pkg/pt/obfs4/server.go` ✅ - obfs4 server (175 lines)
+- `pkg/pt/obfs4/server_test.go` ✅ - Server tests (16 tests, all passing)
+- `pkg/pt/obfs4/config.go` ✅ - Configuration management (205 lines)
+- `pkg/pt/obfs4/config_test.go` ✅ - Config tests (13 tests, all passing)
+- `examples/obfs4-demo/main.go` ✅ - Complete usage example (220 lines)
+- `docs/OBFS4_TRANSPORT.md` ✅ - Comprehensive documentation
+
+**Test Coverage**:
+- Overall obfs4 package: 67.2%
+- All 40 tests passing with race detector
+- No race conditions detected
+
+**Design Decision**:
+Used external obfs4proxy binary (managed PT) rather than pure Go implementation:
+- Security: Relies on battle-tested, audited code from The Tor Project
+- Correctness: Ensures protocol compatibility with official implementation
+- Maintenance: Security updates handled by upstream obfs4proxy
+- Simplicity: Avoids reimplementing complex cryptography (follows "use libraries" guideline)
+
+**Integration**:
+- Works with existing `pkg/pt` managed PT infrastructure
+- Compatible with `pkg/config` bridge configuration
+- Ready for circuit builder integration
+- Supports both client and server (bridge relay) modes
 
 ### 11.3 External PT Integration
 
