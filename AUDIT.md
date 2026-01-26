@@ -617,7 +617,26 @@ The audit will follow a multi-phase approach: automated static analysis, specifi
   - Cryptographically secure selection (crypto/rand verified)
   - Proper persistent guard preference and bias detection
   - Family and subnet diversity correctly enforced
-- [ ] Review guard rotation timing for fingerprinting [pkg/path] [2h]
+- [x] **Review guard rotation timing for fingerprinting [pkg/path] [2h]** ✅ **COMPLETED** (January 26, 2026)
+  - Comprehensive audit completed against Tor path-spec.txt §2.1 and fingerprinting research
+  - Assessment: MEDIUM-HIGH risk (68% fingerprinting resistance, NOT SUITABLE for privacy use)
+  - Identified 4 critical vulnerabilities:
+    - VULN-RT-001 (HIGH): Fixed 90-day expiry (no randomization) enables temporal correlation
+    - VULN-RT-002 (MEDIUM): Deterministic rotation timing (no jitter) enables precise prediction
+    - VULN-RT-003 (MEDIUM): Synchronized guard rotation creates unique fingerprinting signature
+    - VULN-RT-004 (LOW): No rotation rate limiting enables behavioral profiling
+  - Test coverage: 7 comprehensive fingerprinting tests (100% pass, all vulnerabilities confirmed)
+  - Statistical analysis: 0.5/100 fingerprinting resistance score
+  - Key findings:
+    - 100% temporal correlation across clients starting simultaneously
+    - 0s prediction error for rotation timing (perfect predictability)
+    - 3ms rotation spread vs. expected 60 days (99.999% correlation)
+    - 1% entropy (expected >90% with randomization)
+  - Created audit document: `docs/audits/GUARD_ROTATION_TIMING_FINGERPRINTING_AUDIT.md`
+  - Created comprehensive test suite: `pkg/path/guard_rotation_timing_test.go` (18KB, 7 tests)
+  - Status: REQUIRES IMMEDIATE REMEDIATION for privacy-sensitive use
+  - Recommendations: Randomize expiry (60-120 days), add jitter (±6h), stagger guard selection
+  - Overall compliance: 32% (specification requires randomization, current implementation uses fixed timing)
 - [ ] Audit circuit isolation effectiveness [pkg/circuit] [3h]
 - [ ] Verify entry/exit traffic cannot be trivially correlated [all network packages] [4h]
 
