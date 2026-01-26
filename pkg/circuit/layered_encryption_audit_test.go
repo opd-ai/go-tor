@@ -220,7 +220,7 @@ func TestRelayCellDigestVerification(t *testing.T) {
 		circuit := &Circuit{Hops: hops}
 
 		payload := make([]byte, 509)
-		payload[0] = 3 // RELAY_DATA
+		payload[0] = 3                              // RELAY_DATA
 		binary.BigEndian.PutUint16(payload[1:3], 0) // Recognized = 0
 		// Set invalid digest
 		payload[5] = 0xFF
@@ -296,7 +296,7 @@ func TestRelayCellDigestVerification(t *testing.T) {
 		initialDigest := hop.BackwardDigest.Sum(nil)
 
 		payload := make([]byte, 509)
-		payload[0] = 3 // RELAY_DATA
+		payload[0] = 3                              // RELAY_DATA
 		binary.BigEndian.PutUint16(payload[1:3], 0) // Recognized = 0
 
 		// Compute digest

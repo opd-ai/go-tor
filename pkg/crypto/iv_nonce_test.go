@@ -91,7 +91,7 @@ func TestZeroIV_SpecCompliance(t *testing.T) {
 
 	// Test encryption with zero IV (per tor-spec.txt §5.1.1)
 	plaintext := []byte("Circuit encryption uses zero IV per Tor spec")
-	
+
 	cipher1, err := NewAESCTRCipher(key, zeroIV)
 	if err != nil {
 		t.Fatalf("Failed to create cipher with zero IV: %v", err)

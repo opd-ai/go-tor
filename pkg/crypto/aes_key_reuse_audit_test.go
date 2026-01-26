@@ -123,10 +123,10 @@ func TestForwardBackwardKeySeparation(t *testing.T) {
 
 	// Extract forward and backward keys per tor-spec.txt §5.2
 	// Df (20 bytes) | Db (20 bytes) | Kf (16 bytes) | Kb (16 bytes)
-	dfKey := keyMaterial[0:20]   // Forward digest key
-	dbKey := keyMaterial[20:40]  // Backward digest key
-	kfKey := keyMaterial[40:56]  // Forward cipher key
-	kbKey := keyMaterial[56:72]  // Backward cipher key
+	dfKey := keyMaterial[0:20]  // Forward digest key
+	dbKey := keyMaterial[20:40] // Backward digest key
+	kfKey := keyMaterial[40:56] // Forward cipher key
+	kbKey := keyMaterial[56:72] // Backward cipher key
 
 	// Verify forward and backward digest keys are different
 	if bytes.Equal(dfKey, dbKey) {
