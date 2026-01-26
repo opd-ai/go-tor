@@ -308,10 +308,12 @@ func createMockPT(t *testing.T) string {
 	mockScript := filepath.Join(tmpDir, "mock-pt")
 
 	script := `#!/bin/sh
+set -e
+trap 'exit 0' TERM INT
 echo "VERSION 1"
 echo "CMETHOD obfs4 socks5 127.0.0.1:9999"
 echo "CMETHODS DONE"
-sleep 60
+while true; do sleep 0.5; done
 `
 
 	if err := os.WriteFile(mockScript, []byte(script), 0o755); err != nil {

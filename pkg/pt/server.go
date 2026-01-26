@@ -72,13 +72,14 @@ func (ms *ManagedServer) Name() string {
 // Start launches the PT server process and performs IPC handshake.
 func (ms *ManagedServer) Start(ctx context.Context) error {
 	ms.mu.Lock()
-	defer ms.mu.Unlock()
-
+	
 	if ms.running {
+		ms.mu.Unlock()
 		return nil
 	}
 
 	if err := os.MkdirAll(ms.config.StateDir, 0o700); err != nil {
+		ms.mu.Unlock()
 		return errors.Wrap(errors.CategoryNetwork, errors.SeverityHigh, "failed to create state directory", err)
 	}
 
@@ -87,28 +88,36 @@ func (ms *ManagedServer) Start(ctx context.Context) error {
 
 	stdout, err := ms.cmd.StdoutPipe()
 	if err != nil {
+		ms.mu.Unlock()
 		return errors.Wrap(errors.CategoryNetwork, errors.SeverityHigh, "failed to create stdout pipe", err)
 	}
 	ms.stdout = stdout
 
 	stderr, err := ms.cmd.StderrPipe()
 	if err != nil {
+		ms.mu.Unlock()
 		return errors.Wrap(errors.CategoryNetwork, errors.SeverityHigh, "failed to create stderr pipe", err)
 	}
 	ms.stderr = stderr
 
 	if err := ms.cmd.Start(); err != nil {
+		ms.mu.Unlock()
 		return errors.Wrap(errors.CategoryNetwork, errors.SeverityHigh, "failed to start PT server process", err)
 	}
 
 	ms.running = true
 	ms.log.Info("PT server process started", "binary", ms.config.BinaryPath, "pid", ms.cmd.Process.Pid)
+	
+	// Unlock before handshake to avoid deadlock when parseSMethod tries to acquire lock
+	ms.mu.Unlock()
 
 	go ms.readStderr()
 
 	if err := ms.performHandshake(ctx); err != nil {
+		ms.mu.Lock()
 		ms.cmd.Process.Kill()
 		ms.running = false
+		ms.mu.Unlock()
 		return errors.Wrap(errors.CategoryProtocol, errors.SeverityHigh, "PT server handshake failed", err)
 	}
 
@@ -266,6 +275,25 @@ func (ms *ManagedServer) Methods() []string {
 	methods := make([]string, 0, len(ms.methods))
 	for name := range ms.methods {
 		methods = append(methods, name)
+	}
+	return methods
+}
+
+// GetMethod returns full method info for a server transport method.
+func (ms *ManagedServer) GetMethod(name string) *ServerMethodInfo {
+	ms.mu.RLock()
+	defer ms.mu.RUnlock()
+	return ms.methods[name]
+}
+
+// GetAllMethods returns all server method info.
+func (ms *ManagedServer) GetAllMethods() []*ServerMethodInfo {
+	ms.mu.RLock()
+	defer ms.mu.RUnlock()
+
+	methods := make([]*ServerMethodInfo, 0, len(ms.methods))
+	for _, method := range ms.methods {
+		methods = append(methods, method)
 	}
 	return methods
 }

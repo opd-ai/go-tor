@@ -59,13 +59,14 @@ func (mc *ManagedClient) Name() string {
 // Start launches the PT process and performs IPC handshake.
 func (mc *ManagedClient) Start(ctx context.Context) error {
 	mc.mu.Lock()
-	defer mc.mu.Unlock()
-
+	
 	if mc.running {
+		mc.mu.Unlock()
 		return nil
 	}
 
 	if err := os.MkdirAll(mc.config.StateDir, 0o700); err != nil {
+		mc.mu.Unlock()
 		return errors.Wrap(errors.CategoryNetwork, errors.SeverityHigh, "failed to create state directory", err)
 	}
 
@@ -74,28 +75,36 @@ func (mc *ManagedClient) Start(ctx context.Context) error {
 
 	stdout, err := mc.cmd.StdoutPipe()
 	if err != nil {
+		mc.mu.Unlock()
 		return errors.Wrap(errors.CategoryNetwork, errors.SeverityHigh, "failed to create stdout pipe", err)
 	}
 	mc.stdout = stdout
 
 	stderr, err := mc.cmd.StderrPipe()
 	if err != nil {
+		mc.mu.Unlock()
 		return errors.Wrap(errors.CategoryNetwork, errors.SeverityHigh, "failed to create stderr pipe", err)
 	}
 	mc.stderr = stderr
 
 	if err := mc.cmd.Start(); err != nil {
+		mc.mu.Unlock()
 		return errors.Wrap(errors.CategoryNetwork, errors.SeverityHigh, "failed to start PT process", err)
 	}
 
 	mc.running = true
 	mc.log.Info("PT process started", "binary", mc.config.BinaryPath, "pid", mc.cmd.Process.Pid)
+	
+	// Unlock before handshake to avoid deadlock when parseCMethod tries to acquire lock
+	mc.mu.Unlock()
 
 	go mc.readStderr()
 
 	if err := mc.performHandshake(ctx); err != nil {
+		mc.mu.Lock()
 		mc.cmd.Process.Kill()
 		mc.running = false
+		mc.mu.Unlock()
 		return errors.Wrap(errors.CategoryProtocol, errors.SeverityHigh, "PT handshake failed", err)
 	}
 
@@ -288,6 +297,25 @@ func (mc *ManagedClient) Methods() []string {
 	methods := make([]string, 0, len(mc.methods))
 	for name := range mc.methods {
 		methods = append(methods, name)
+	}
+	return methods
+}
+
+// GetMethod returns full method info for a transport method.
+func (mc *ManagedClient) GetMethod(name string) *MethodInfo {
+	mc.mu.RLock()
+	defer mc.mu.RUnlock()
+	return mc.methods[name]
+}
+
+// GetAllMethods returns all method info.
+func (mc *ManagedClient) GetAllMethods() []*MethodInfo {
+	mc.mu.RLock()
+	defer mc.mu.RUnlock()
+
+	methods := make([]*MethodInfo, 0, len(mc.methods))
+	for _, method := range mc.methods {
+		methods = append(methods, method)
 	}
 	return methods
 }
