@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -1166,8 +1167,7 @@ func (c *Circuit) DeliverRelayCell(cellData *cell.Cell) error {
 			// Send SENDME in background to avoid blocking
 			go func() {
 				if err := c.sendCircuitSendme(); err != nil {
-					// Log error but don't fail the delivery
-					// (in production, should have proper logging)
+					slog.Debug("Failed to send circuit SENDME", "circuit_id", c.ID, "error", err)
 				}
 			}()
 		}
