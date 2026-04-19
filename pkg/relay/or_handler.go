@@ -6,6 +6,7 @@ import (
 	"crypto/ed25519"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"net"
 	"time"
 
@@ -330,14 +331,13 @@ func (h *LinkProtocolHandler) readCellWithContext(ctx context.Context, conn net.
 
 	// Create a channel for the read result
 	type readResult struct {
-		n   int
 		err error
 	}
 	resultCh := make(chan readResult, 1)
 
 	go func() {
-		n, err := conn.Read(header)
-		resultCh <- readResult{n, err}
+		_, err := io.ReadFull(conn, header)
+		resultCh <- readResult{err}
 	}()
 
 	select {
@@ -346,9 +346,6 @@ func (h *LinkProtocolHandler) readCellWithContext(ctx context.Context, conn net.
 	case result := <-resultCh:
 		if result.err != nil {
 			return nil, result.err
-		}
-		if result.n != 5 {
-			return nil, fmt.Errorf("incomplete header read: %d bytes", result.n)
 		}
 	}
 
@@ -361,7 +358,7 @@ func (h *LinkProtocolHandler) readCellWithContext(ctx context.Context, conn net.
 	if command.IsVariableLength() {
 		// Read 2-byte length field
 		lenBytes := make([]byte, 2)
-		if _, err := conn.Read(lenBytes); err != nil {
+		if _, err := io.ReadFull(conn, lenBytes); err != nil {
 			return nil, fmt.Errorf("failed to read payload length: %w", err)
 		}
 		payloadLen = int(binary.BigEndian.Uint16(lenBytes))
@@ -373,7 +370,7 @@ func (h *LinkProtocolHandler) readCellWithContext(ctx context.Context, conn net.
 	// Read payload
 	payload := make([]byte, payloadLen)
 	if payloadLen > 0 {
-		if _, err := conn.Read(payload); err != nil {
+		if _, err := io.ReadFull(conn, payload); err != nil {
 			return nil, fmt.Errorf("failed to read payload: %w", err)
 		}
 	}
@@ -404,14 +401,13 @@ func (s *ServerORConnection) ReceiveCell(ctx context.Context) (*cell.Cell, error
 
 	// Create a channel for the read result
 	type readResult struct {
-		n   int
 		err error
 	}
 	resultCh := make(chan readResult, 1)
 
 	go func() {
-		n, err := s.conn.Read(header)
-		resultCh <- readResult{n, err}
+		_, err := io.ReadFull(s.conn, header)
+		resultCh <- readResult{err}
 	}()
 
 	select {
@@ -420,9 +416,6 @@ func (s *ServerORConnection) ReceiveCell(ctx context.Context) (*cell.Cell, error
 	case result := <-resultCh:
 		if result.err != nil {
 			return nil, result.err
-		}
-		if result.n != 5 {
-			return nil, fmt.Errorf("incomplete header read: %d bytes", result.n)
 		}
 	}
 
@@ -435,7 +428,7 @@ func (s *ServerORConnection) ReceiveCell(ctx context.Context) (*cell.Cell, error
 	if command.IsVariableLength() {
 		// Read 2-byte length field
 		lenBytes := make([]byte, 2)
-		if _, err := s.conn.Read(lenBytes); err != nil {
+		if _, err := io.ReadFull(s.conn, lenBytes); err != nil {
 			return nil, fmt.Errorf("failed to read payload length: %w", err)
 		}
 		payloadLen = int(binary.BigEndian.Uint16(lenBytes))
@@ -448,7 +441,7 @@ func (s *ServerORConnection) ReceiveCell(ctx context.Context) (*cell.Cell, error
 	var payload []byte
 	if payloadLen > 0 {
 		payload = make([]byte, payloadLen)
-		if _, err := s.conn.Read(payload); err != nil {
+		if _, err := io.ReadFull(s.conn, payload); err != nil {
 			return nil, fmt.Errorf("failed to read payload: %w", err)
 		}
 	}

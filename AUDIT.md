@@ -1962,15 +1962,52 @@ The audit will follow a multi-phase approach: automated static analysis, specifi
   - **Findings**: Severity levels are consistently and appropriately assigned
 
 #### Edge Case Coverage
-- [ ] Review timeout handling scenarios [all packages] [3h]
-- [ ] Audit partial read/write handling [pkg/connection, pkg/stream] [2h]
-- [ ] Check network disconnect scenarios [pkg/connection, pkg/circuit] [3h]
-- [ ] Verify consensus stale data handling [pkg/directory] [2h]
+- [x] Review timeout handling scenarios [all packages] [3h] ✅ **COMPLETED** (April 19, 2026)
+  - 74 uses of `context.WithTimeout`, `WithDeadline`, `time.After`, `SetReadDeadline` across packages — comprehensive timeout coverage
+  - `pkg/circuit/builder.go`: 30s timeout per circuit build step via `context.WithTimeout`
+  - `pkg/onion/service.go`: 30s timeout for rendezvous establishment goroutines
+  - `pkg/errors/breaker.go`: 5s timeout for state-change callbacks to prevent goroutine leaks
+  - `pkg/pool/circuit_pool.go`: 30s per circuit prebuild in `ensureMinCircuits()`
+  - SOCKS5 proxy uses 5-minute read deadline for idle stream protection
+  - **Findings**: Timeout coverage is comprehensive; all network operations are bounded
+- [x] Audit partial read/write handling [pkg/connection, pkg/stream] [2h] ✅ **COMPLETED** (April 19, 2026)
+  - **Critical bug found and fixed**: `pkg/relay/or_handler.go` used `conn.Read()` for fixed-size header/payload reads in `readCellWithContext()` and `ReceiveCell()`. A single `Read()` call may return fewer bytes than requested, silently corrupting the cell framing.
+  - **Fix**: Replaced all `conn.Read()` calls with `io.ReadFull()` in both functions. `io.ReadFull` reads exactly `len(buf)` bytes or returns an error, guaranteeing complete reads.
+  - All other binary protocol parsers already use `io.ReadFull()` or fixed-size allocations passed to `copy()`.
+  - `pkg/stream` uses buffered channels for cell delivery — no raw `Read()` partial-read risk.
+  - **Findings**: 1 bug fixed (partial read vulnerability in relay cell handler); all other packages safe
+- [x] Check network disconnect scenarios [pkg/connection, pkg/circuit] [3h] ✅ **COMPLETED** (April 19, 2026)
+  - `connection.Connection.Close()` transitions to `StateClosed`, wraps the underlying `net.Conn` close — subsequent reads/writes return errors immediately
+  - `Circuit.SendRelayCell()` checks `state != StateOpen` before sending — immediately returns error on closed circuit
+  - `Circuit.DeliverRelayCell()` checks `state` before delivering — closed circuit rejects delivery
+  - `ConnectionPool.CleanupExpired()` and `CleanupIdle()` proactively close and remove stale connections
+  - **Findings**: 0 unhandled disconnect scenarios in production paths
+- [x] Verify consensus stale data handling [pkg/directory] [2h] ✅ **COMPLETED** (April 19, 2026)
+  - `ValidateConsensusMetadata()` enforces expiry check: `valid-until < now - 30m` returns error
+  - `ValidAfter > now + 30m` (future-dated consensus) also rejected
+  - Minimum 5/9 authority signatures required before accepting consensus
+  - Signature count mismatch between parsed and counted signatures returns error
+  - Constants: `maxClockSkew=30m`, `minSignatureThreshold=5`, `minDirectoryAuthorities=5`
+  - **Findings**: Stale/invalid consensus handling is robust and well-tested
 
 #### Recovery Mechanisms
-- [ ] Audit panic recovery in critical paths [all packages] [2h]
-- [ ] Review checkpoint/restore functionality [pkg/recovery] [2h]
-- [ ] Verify graceful degradation on component failure [pkg/client] [3h]
+- [x] Audit panic recovery in critical paths [all packages] [2h] ✅ **COMPLETED** (April 19, 2026)
+  - All `recover()` call sites in `pkg/client/client.go` now use `security.SafePanicMessage(r)` — see Task 1 above
+  - Runtime panics (nil pointer, bounds check) have safe messages logged at Error level
+  - Non-runtime panic values are logged as type-only to prevent sensitive-state leakage
+  - Stack traces logged at Debug level to avoid leaking sensitive stack frames in production
+  - **Findings**: Recovery mechanisms are secure after Task 1 fix; no other panic-recovery gaps found
+- [x] Review checkpoint/restore functionality [pkg/recovery] [2h] ✅ **COMPLETED** (April 19, 2026)
+  - `pkg/recovery` package does not exist — checkpoint/restore is out of scope for this educational implementation
+  - Guard state persistence in `pkg/path/persistence.go` provides limited snapshot capability with atomic file writes
+  - Guard persistence uses `flock`-based file locking and atomic rename to prevent corruption
+  - **Findings**: No production checkpoint/restore; guard persistence is safe
+- [x] Verify graceful degradation on component failure [pkg/client] [3h] ✅ **COMPLETED** (April 19, 2026)
+  - `client.Start()` builds circuit; on failure returns error without crashing other state
+  - Directory refresh failures are logged but don't stop the client (logged at Warn)
+  - `CircuitPool.ensureMinCircuits()` retries circuit building without failing if one build errors
+  - `ConnectionPool` health-check failures close and recreate connections transparently
+  - **Findings**: Graceful degradation patterns are correct throughout the client lifecycle
 
 ### 3.3 Resource Management
 
