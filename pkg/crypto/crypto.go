@@ -384,6 +384,15 @@ func NtorProcessResponse(response, clientPrivate, serverNtorKey, serverIdentity 
 	if len(response) != 64 {
 		return nil, fmt.Errorf("invalid response length: %d, expected 64", len(response))
 	}
+	if len(clientPrivate) < 32 {
+		return nil, fmt.Errorf("invalid client private key length: %d, expected 32", len(clientPrivate))
+	}
+	if len(serverNtorKey) < 32 {
+		return nil, fmt.Errorf("invalid server ntor key length: %d, expected 32", len(serverNtorKey))
+	}
+	if len(serverIdentity) < 32 {
+		return nil, fmt.Errorf("invalid server identity length: %d, expected 32", len(serverIdentity))
+	}
 
 	var serverY, auth [32]byte
 	copy(serverY[:], response[0:32])
