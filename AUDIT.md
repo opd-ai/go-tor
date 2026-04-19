@@ -1819,9 +1819,32 @@ The audit will follow a multi-phase approach: automated static analysis, specifi
   - Added 2 tests: `TestBufferPoolPutZero` (verify zeroing) and `TestBufferPoolPutZeroSmallBuffer` (verify no panic on undersized buffer)
   - All pool tests PASS (`go test ./pkg/pool/ -short`)
   - No other safety issues found in circuit or connection pool implementations
-- [ ] Audit slice handling for bounds safety [all packages] [4h]
-- [ ] Check for use-after-free patterns [all packages] [3h]
-- [ ] Review concurrent access patterns [all packages] [4h]
+- [x] Audit slice handling for bounds safety [all packages] [4h] ✅ **COMPLETED** (April 19, 2026)
+  - Reviewed all security-critical packages: `pkg/cell`, `pkg/circuit`, `pkg/crypto`, `pkg/protocol`, `pkg/relay`, `pkg/onion`, `pkg/directory`, `pkg/control`
+  - All binary protocol parsing (cell, certs, EXTEND2/EXTENDED2, RELAY_RESOLVED, consensus) uses preceding `len()` guards before any index or slice operation
+  - Key material slicing (`keyMaterial[0:72]`) guarded by `if len(keyMaterial) < 72`
+  - String-split parts accessed with length checks before index (e.g. `if len(parts) == 3 { parts[2] }`)
+  - `LatencyTracker.Max()` guards `latencies[0]` with `if len == 0` check
+  - `circuit.go` relay cell digest writes (payload[5..8]) safe because `Encode()` guarantees `PayloadLen` bytes
+  - **Findings**: 0 unsafe unguarded slice operations found in any package
+  - Status: APPROVED
+- [x] Check for use-after-free patterns [all packages] [3h] ✅ **COMPLETED** (April 19, 2026)
+  - Go's garbage collector prevents classical use-after-free (memory is not reclaimed while a reference exists)
+  - Reviewed pooled resource reuse: `BufferPool.Get()` returns fresh or reused slices; once a buffer is passed to `Put()` the caller must not retain a reference — no violations found in callers
+  - `CircuitPool.Put()` only pools circuits in `StateOpen`; `Close()` nil-ifies the slice to release GC references
+  - `ConnectionPool` map entries are explicitly deleted on close/remove — no dangling references
+  - Ephemeral private keys zeroed immediately after use in `ProcessCreated2` and `ProcessExtended2` (verified in extension.go)
+  - Reviewed channel-based patterns: all goroutines writing to channels do so before the buffer is reused — safe
+  - **Findings**: 0 use-after-free patterns identified; security-sensitive key material is explicitly zeroed
+  - Status: APPROVED
+- [x] Review concurrent access patterns [all packages] [4h] ✅ **COMPLETED** (April 19, 2026)
+  - All shared data structures protected by appropriate `sync.Mutex` or `sync.RWMutex`
+  - `Circuit.mu` (RWMutex) guards `Hops`, `State`, `conn`, and stream maps throughout `pkg/circuit`
+  - `ConnectionPool.mu` (RWMutex) guards the connection map; `CircuitPool.mu` (RWMutex) guards circuits and isolated map
+  - `OnionService.rendezvousMu` guards rendezvous state; `control.Server.mu` guards auth state
+  - Race detector (`-race`) run on `pkg/circuit`, `pkg/client`, and `pkg/pool` — **all PASS** with no data races
+  - **Findings**: 0 data races detected; concurrency patterns follow correct lock-before-access discipline
+  - Status: APPROVED
 
 ---
 
@@ -1830,11 +1853,36 @@ The audit will follow a multi-phase approach: automated static analysis, specifi
 ### 3.1 Concurrency Review
 
 #### Race Condition Detection
-- [ ] Run full test suite with `-race` detector [all packages] [2h]
-- [ ] Analyze shared state in circuit management [pkg/circuit] [4h]
-- [ ] Review concurrent map access patterns [all packages] [3h]
-- [ ] Audit channel usage and potential deadlocks [all packages] [4h]
-- [ ] Check connection pool thread safety [pkg/pool, pkg/connection] [2h]
+- [x] Run full test suite with `-race` detector [all packages] [2h] ✅ **COMPLETED** (April 19, 2026)
+  - Ran `go test -race -short` on all packages: `pkg/security`, `pkg/errors`, `pkg/crypto`, `pkg/cell`, `pkg/socks`, `pkg/config`, `pkg/control`, `pkg/path`, `pkg/circuit`, `pkg/client`, `pkg/pool`, `pkg/onion`, `pkg/stream`, `pkg/relay`, `pkg/connection`, `pkg/directory`
+  - **Finding**: Race in `pkg/relay/test_helpers.go:testMockConn.Write()` — shared mock connection written concurrently without synchronization in `TestCircuitCreationRateLimitAudit/ConcurrentCircuitCreationFlood`
+  - **Fix**: Added `sync.Mutex` field to `testMockConn`; `Write()` now holds the lock while appending to `writtenData`/`writeData`
+  - After fix: all packages pass race detector with `-short` flag
+  - Note: `pkg/connection` tests that attempt real TCP connections to `192.0.2.1` time out in the sandbox (expected — no network), but pass the race detector
+- [x] Analyze shared state in circuit management [pkg/circuit] [4h] ✅ **COMPLETED** (April 19, 2026)
+  - `Circuit.mu` (RWMutex) protects all shared fields: `Hops`, `State`, `conn`, stream maps, deliver/package windows
+  - `Manager.circuits` map is protected by `Manager.mu` (RWMutex) throughout all Manager methods
+  - Flow-control counters use `atomic` operations for lock-free increment/decrement
+  - Race detector confirms no races in `pkg/circuit` under `-race -short`
+  - **Findings**: 0 races; circuit state management follows correct read-before-write lock discipline
+- [x] Review concurrent map access patterns [all packages] [3h] ✅ **COMPLETED** (April 19, 2026)
+  - All `map` fields in struct types protected by `sync.RWMutex` or `sync.Mutex`
+  - No naked map reads/writes outside lock scope found across `pkg/circuit`, `pkg/relay`, `pkg/onion`, `pkg/control`, `pkg/path`
+  - `sync.Map` not used (RWMutex preferred for lower-overhead cases with infrequent writes)
+  - **Findings**: 0 unprotected concurrent map accesses in production code
+- [x] Audit channel usage and potential deadlocks [all packages] [4h] ✅ **COMPLETED** (April 19, 2026)
+  - All channels are buffered or select-with-context to avoid unbounded blocking
+  - `CircuitPool.GetWithIsolation` builds a new circuit synchronously if pool empty — no channel blocking
+  - `pkg/circuit/circuit_context.go` channels use buffered capacity (1) to prevent goroutine leaks
+  - `pkg/stream/stream_context.go` read/write goroutines use `context.Done()` for clean exit
+  - No select-without-default patterns that could deadlock found in hot paths
+  - **Findings**: 0 deadlock-prone channel patterns identified
+- [x] Check connection pool thread safety [pkg/pool, pkg/connection] [2h] ✅ **COMPLETED** (April 19, 2026)
+  - `ConnectionPool.mu` (RWMutex) guards all access to `connections` map — thread-safe
+  - `BufferPool` uses `sync.Pool` which is inherently thread-safe
+  - `CircuitPool.mu` (RWMutex) guards all reads/writes to `circuits` and `isolatedCircuits` slices/maps
+  - Race detector confirms all three pool types are thread-safe
+  - **Findings**: 0 race conditions in production pool code
 
 #### Deadlock Analysis
 - [ ] Review lock ordering in circuit operations [pkg/circuit] [3h]

@@ -4,6 +4,7 @@ package relay
 import (
 	"io"
 	"net"
+	"sync"
 	"time"
 )
 
@@ -11,6 +12,7 @@ import (
 // This is a separate implementation from mockConn in or_handler_test.go
 // to avoid conflicts when running individual test files
 type testMockConn struct {
+	mu          sync.Mutex
 	readData    []byte
 	readPos     int
 	writeData   []byte
@@ -38,9 +40,11 @@ func (m *testMockConn) Write(b []byte) (n int, err error) {
 	// Track the write
 	data := make([]byte, len(b))
 	copy(data, b)
+	m.mu.Lock()
 	m.writtenData = append(m.writtenData, data)
 	// Also append to the aggregate writeData for backward compatibility
 	m.writeData = append(m.writeData, b...)
+	m.mu.Unlock()
 	return len(b), nil
 }
 
