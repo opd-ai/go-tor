@@ -1798,10 +1798,27 @@ The audit will follow a multi-phase approach: automated static analysis, specifi
   - Created audit document: docs/audits/ERROR_PROPAGATION_AUDIT.md (15KB, 8 sections)
   - Overall compliance: 17/17 requirements (100%)
   - Status: APPROVED for educational/research use and production deployment
-- [ ] Review panic recovery for state leakage [all packages] [3h]
+- [x] Review panic recovery for state leakage [all packages] [3h] ✅ **COMPLETED** (April 19, 2026)
+  - Reviewed all `recover()` call sites across the codebase (3 sites in `pkg/client/client.go`)
+  - Found: raw panic value `r` was logged at Error level, risking sensitive-state leakage if application code explicitly panics with a key/secret value
+  - Fix: added `SafePanicMessage(r interface{}) string` to `pkg/security/panic.go`; for `runtime.Error` values (nil-pointer, bounds check, etc.) the standardised runtime message is logged; for all other panic values only the type name is emitted (`type=T`)
+  - Updated all 3 recovery sites in `pkg/client/client.go` to call `security.SafePanicMessage(r)`
+  - Added `pkg/security/panic_test.go` (5 table-driven tests) covering runtime.Error, error values, strings, ints, and nil — all PASS
+  - Stack trace continues to be logged at Debug level only (no change needed)
+  - `go build ./...` and `go vet ./pkg/... ./cmd/...` both clean
 
 #### Memory Safety
-- [ ] Verify buffer pool implementations are safe [pkg/pool] [3h]
+- [x] Verify buffer pool implementations are safe [pkg/pool] [3h] ✅ **COMPLETED** (April 19, 2026)
+  - Reviewed all three pool types: `BufferPool`, `CircuitPool`, `ConnectionPool`
+  - `BufferPool.Get()`: safe — type assertion with fallback to fresh allocation; no panic
+  - `BufferPool.Put()`: safe — enforces `cap >= size` invariant, rejects undersized buffers
+  - `CircuitPool`: protected by `sync.RWMutex`; max-capacity guard prevents unbounded growth
+  - `ConnectionPool`: protected by `sync.RWMutex`; health-checks and lifetime bounds enforce stability
+  - **Finding**: `CryptoBufferPool`/`LargeCryptoBufferPool` buffers were returned without zeroing, risking residual sensitive data leakage to the next `Get()` caller
+  - **Fix**: added `(*BufferPool).PutZero(buf []byte)` that zeros contents before pooling; callers handling key material or plaintext should use `PutZero` instead of `Put`
+  - Added 2 tests: `TestBufferPoolPutZero` (verify zeroing) and `TestBufferPoolPutZeroSmallBuffer` (verify no panic on undersized buffer)
+  - All pool tests PASS (`go test ./pkg/pool/ -short`)
+  - No other safety issues found in circuit or connection pool implementations
 - [ ] Audit slice handling for bounds safety [all packages] [4h]
 - [ ] Check for use-after-free patterns [all packages] [3h]
 - [ ] Review concurrent access patterns [all packages] [4h]

@@ -50,6 +50,17 @@ func (p *BufferPool) Put(buf []byte) {
 	p.pool.Put(&buf)
 }
 
+// PutZero zeros the buffer contents before returning it to the pool.
+// Use this instead of Put when the buffer may have held sensitive data
+// (e.g. key material or decrypted plaintext) to prevent it from leaking
+// to the next caller that receives the same buffer via Get.
+func (p *BufferPool) PutZero(buf []byte) {
+	for i := range buf {
+		buf[i] = 0
+	}
+	p.Put(buf)
+}
+
 // CellBufferPool is a pre-configured pool for Tor cell buffers (514 bytes)
 var CellBufferPool = NewBufferPool(514)
 

@@ -189,3 +189,37 @@ func TestLargeCryptoBufferPool(t *testing.T) {
 
 	LargeCryptoBufferPool.Put(buf)
 }
+
+func TestBufferPoolPutZero(t *testing.T) {
+	p := NewBufferPool(64)
+
+	// Fill a buffer with non-zero sentinel values.
+	buf := p.Get()
+	for i := range buf {
+		buf[i] = 0xFF
+	}
+
+	// Return via PutZero; the underlying backing array must be zeroed.
+	p.PutZero(buf)
+
+	// The next Get() should return a buffer whose contents are all zero
+	// because PutZero zeroed it before pooling.
+	buf2 := p.Get()
+	for i, b := range buf2 {
+		if b != 0 {
+			t.Errorf("PutZero: byte %d not zeroed, got 0x%02x", i, b)
+		}
+	}
+	p.Put(buf2)
+}
+
+func TestBufferPoolPutZeroSmallBuffer(t *testing.T) {
+	p := NewBufferPool(64)
+
+	// PutZero on a buffer too small for the pool should not panic.
+	small := make([]byte, 10)
+	for i := range small {
+		small[i] = 0xAA
+	}
+	p.PutZero(small) // must not panic; buffer is rejected silently
+}

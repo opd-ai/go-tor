@@ -22,6 +22,7 @@ import (
 	"github.com/opd-ai/go-tor/pkg/path"
 	"github.com/opd-ai/go-tor/pkg/pool"
 	"github.com/opd-ai/go-tor/pkg/ratelimit"
+	"github.com/opd-ai/go-tor/pkg/security"
 	"github.com/opd-ai/go-tor/pkg/socks"
 )
 
@@ -217,7 +218,7 @@ func (c *Client) Start(ctx context.Context) error {
 		// AUDIT-R-005: Add panic recovery for goroutine resilience
 		defer func() {
 			if r := recover(); r != nil {
-				c.logger.Error("SOCKS5 server goroutine panic recovered", "panic", r)
+				c.logger.Error("SOCKS5 server goroutine panic recovered", "panic", security.SafePanicMessage(r))
 				// Log full stack trace at Debug level only to avoid information disclosure
 				c.logger.Debug("Panic stack trace", "stack", string(debug.Stack()))
 			}
@@ -248,7 +249,7 @@ func (c *Client) Start(ctx context.Context) error {
 		// AUDIT-R-005: Add panic recovery for goroutine resilience
 		defer func() {
 			if r := recover(); r != nil {
-				c.logger.Error("Circuit maintenance goroutine panic recovered", "panic", r)
+				c.logger.Error("Circuit maintenance goroutine panic recovered", "panic", security.SafePanicMessage(r))
 				// Log full stack trace at Debug level only to avoid information disclosure
 				c.logger.Debug("Panic stack trace", "stack", string(debug.Stack()))
 			}
@@ -263,7 +264,7 @@ func (c *Client) Start(ctx context.Context) error {
 		// AUDIT-R-005: Add panic recovery for goroutine resilience
 		defer func() {
 			if r := recover(); r != nil {
-				c.logger.Error("Bandwidth monitoring goroutine panic recovered", "panic", r)
+				c.logger.Error("Bandwidth monitoring goroutine panic recovered", "panic", security.SafePanicMessage(r))
 				// Log full stack trace at Debug level only to avoid information disclosure
 				c.logger.Debug("Panic stack trace", "stack", string(debug.Stack()))
 			}
