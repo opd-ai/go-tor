@@ -2190,7 +2190,17 @@ When planning or reviewing test work, always refer to the “Current Coverage An
   - TestNtorLowOrderPointHandling: security test for low-order Curve25519 points
   - TestNtorKeyPairGeneration: uniqueness, derivation correctness
   - TestNtorProcessResponseTamperedAuth: bit-flip tampering detection
-- [ ] Circuit encryption/decryption round-trip [pkg/circuit] [unit] [3h]
+- [x] Circuit encryption/decryption round-trip [pkg/circuit] [unit] [3h] ✅ **COMPLETED** (April 20, 2026)
+  - Created `pkg/circuit/encrypt_decrypt_roundtrip_test.go` with 12 test functions
+  - TestEncryptDecryptRoundTrip: 1/3/8-hop circuits
+  - TestEncryptDecryptVariousPayloadSizes: 0-1024 byte payloads
+  - TestSequentialEncryptDecryptCipherState: AES-CTR state advancement
+  - TestEncryptionNotIdentityTransform: cipher actually modifies data
+  - TestMultiHopLayeredEncryptionOrder: layer ordering verification
+  - TestDigestVerificationShortPayload/TestUpdateHopDigestsShortPayload: boundary checks
+  - TestAllZeroPayloadRoundTrip/TestAllOnesPayloadRoundTrip: edge values
+  - TestRandomPayloadRoundTrip: 20 random payloads
+  - TestEncryptForwardOriginalUnmodified/TestDecryptBackwardOriginalUnmodified: slice safety
 - [ ] Protocol negotiation failure scenarios [pkg/protocol] [unit] [4h]
 - [ ] Onion descriptor encryption edge cases [pkg/onion] [unit] [4h]
 - [ ] Key derivation boundary conditions [pkg/crypto] [unit] [2h]
