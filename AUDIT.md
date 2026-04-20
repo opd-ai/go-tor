@@ -2171,19 +2171,133 @@ When planning or reviewing test work, always refer to the “Current Coverage An
   - FuzzNewRelayCell: relay cell construction boundary conditions
   - All fuzz targets verified: no panics on 5s fuzzing run (48k execs/sec)
   - Seeds cover: empty input, truncated input, oversized payload, max-length cells
-- [ ] Fuzzing tests for consensus parsing [pkg/directory] [fuzzing] [8h]
-- [ ] ntor handshake edge cases and malformed inputs [pkg/crypto] [unit] [4h]
-- [ ] Circuit encryption/decryption round-trip [pkg/circuit] [unit] [3h]
-- [ ] Protocol negotiation failure scenarios [pkg/protocol] [unit] [4h]
-- [ ] Onion descriptor encryption edge cases [pkg/onion] [unit] [4h]
-- [ ] Key derivation boundary conditions [pkg/crypto] [unit] [2h]
-- [ ] Invalid cell command handling [pkg/cell] [unit] [2h]
+- [x] Fuzzing tests for consensus parsing [pkg/directory] [fuzzing] [8h] ✅ **COMPLETED** (April 20, 2026)
+  - Created `pkg/directory/fuzz_consensus_parsing_test.go` with 6 fuzz targets
+  - FuzzParseConsensus: consensus document parsing, 52k+ execs in 5s, no panics
+  - FuzzParseConsensusWithMetadata: metadata extraction, 99k+ execs in 5s, no panics
+  - FuzzParseConsensusParams: parameter line parsing, 26k+ execs in 5s, no panics
+  - FuzzParseMicrodescriptors: microdescriptor parsing, 51k+ execs in 5s, no panics
+  - FuzzParseAuthorityCert: authority certificate parsing, 74k+ execs in 5s, no panics
+  - FuzzValidateConsensusMetadata: metadata validation, 79k+ execs in 5s, no panics
+  - Seeds cover: empty input, malformed entries, truncated data, garbage values, edge cases
+- [x] ntor handshake edge cases and malformed inputs [pkg/crypto] [unit] [4h] ✅ **COMPLETED** (April 20, 2026)
+  - Created `pkg/crypto/ntor_edge_cases_test.go` with 8 test functions
+  - TestNtorClientHandshakeEdgeCases: 13 cases covering nil/empty/wrong-length keys
+  - TestNtorClientHandshakeDataFormat: validates NODEID||KEYID||CLIENT_PK structure
+  - TestNtorProcessResponseEdgeCases: 7 cases covering response length/auth validation
+  - TestNtorServerHandshakeEdgeCases: 9 cases covering all input validation paths
+  - TestNtorHandshakeRoundTripWithServerSide: full client→server round-trip
+  - TestNtorLowOrderPointHandling: security test for low-order Curve25519 points
+  - TestNtorKeyPairGeneration: uniqueness, derivation correctness
+  - TestNtorProcessResponseTamperedAuth: bit-flip tampering detection
+- [x] Circuit encryption/decryption round-trip [pkg/circuit] [unit] [3h] ✅ **COMPLETED** (April 20, 2026)
+  - Created `pkg/circuit/encrypt_decrypt_roundtrip_test.go` with 12 test functions
+  - TestEncryptDecryptRoundTrip: 1/3/8-hop circuits
+  - TestEncryptDecryptVariousPayloadSizes: 0-1024 byte payloads
+  - TestSequentialEncryptDecryptCipherState: AES-CTR state advancement
+  - TestEncryptionNotIdentityTransform: cipher actually modifies data
+  - TestMultiHopLayeredEncryptionOrder: layer ordering verification
+  - TestDigestVerificationShortPayload/TestUpdateHopDigestsShortPayload: boundary checks
+  - TestAllZeroPayloadRoundTrip/TestAllOnesPayloadRoundTrip: edge values
+  - TestRandomPayloadRoundTrip: 20 random payloads
+  - TestEncryptForwardOriginalUnmodified/TestDecryptBackwardOriginalUnmodified: slice safety
+- [x] Protocol negotiation failure scenarios [pkg/protocol] [unit] [4h] ✅ **COMPLETED** (April 20, 2026)
+  - Created `pkg/protocol/negotiation_failure_test.go` with 10 test functions
+  - TestSelectVersionNoOverlap: 9 cases for no-common-version scenarios
+  - TestSelectVersionPreferHighest: 9 cases for highest-version preference
+  - TestSetTimeoutBoundaryValidation: 8 cases for SEC-M004 timeout bounds
+  - TestNewHandshakeNilLogger/TestNewHandshakeWithLogger: initialization
+  - TestVersionsPayloadParsingEdgeCases: payload parsing edge cases
+  - TestProtocolConstantsNegotiation: constant consistency validation
+  - TestSelectVersionWithLargeList: DoS resistance (10000 versions)
+  - TestSelectVersionAllSupported: full range negotiation
+  - TestSetTimeoutIdempotent: repeated timeout changes
+- [x] Onion descriptor encryption edge cases [pkg/onion] [unit] [4h] ✅ **COMPLETED** (April 20, 2026)
+  - Created `pkg/onion/descriptor_encryption_edge_test.go` with 8 test functions
+  - TestDecryptDescriptorEdgeCases: 12 cases for nil/malformed/missing markers
+  - TestParseDescriptorEdgeCases: 11 cases for malformed descriptor parsing
+  - TestDecryptAuthDescriptorEdgeCases: 6 cases for client auth decryption
+  - TestDeriveDescriptorKeysEdgeCases: 8 cases for HKDF key derivation
+  - TestDeriveDescriptorKeysDeterministic: same input → same output
+  - TestDeriveDescriptorKeysDifferentInputs: different input → different output
+  - TestParseDecryptedLayerEdgeCases: 7 cases for decrypted layer parsing
+  - TestDeriveAuthKeysEdgeCases: 6 cases for auth key derivation
+- [x] Key derivation boundary conditions [pkg/crypto] [unit] [2h] ✅ **COMPLETED** (April 20, 2026)
+  - Created `pkg/crypto/kdf_boundary_test.go` with 12 test functions
+  - TestDeriveKeyBoundaryLengths: SHA-1 block boundary lengths (20n ± 1)
+  - TestDeriveKeyBlockAlignment: K_0 prefix verification
+  - TestDeriveKeyConsecutiveBlocks: K_0 → K_1 → K_2 chaining
+  - TestDeriveKeyInvalidLengths: zero/negative rejection
+  - TestDeriveKeySecretVariations: different secrets → different keys
+  - TestNewAESCTRCipherBoundaryKeys: AES-128/192/256 and invalid key/IV sizes
+  - TestAES256CTREncryptDecryptRoundTrip/TestAES256CTRInvalidKeySizes
+  - TestSHA1HashBoundaryInputs/TestSHA256HashBoundaryInputs
+  - TestDeriveKeyTorKeyMaterial: 72-byte Tor key material verification
+  - TestGenerateRandomBytesBoundary: random generation boundary cases
+- [x] Invalid cell command handling [pkg/cell] [unit] [2h] ✅ **COMPLETED** (April 20, 2026)
+  - Created `pkg/cell/invalid_command_test.go` with 14 test functions
+  - TestCellCommandString: all known + unknown commands
+  - TestCellCommandIsVariableLength: fixed/variable classification
+  - TestEncodeDecodeFixedCellUnknownCommand: unknown fixed commands round-trip
+  - TestEncodeDecodeVariableCellUnknownCommand: unknown variable commands round-trip
+  - TestDecodeFixedCellTruncatedPayload: truncation at various points
+  - TestDecodeVariableCellTruncatedLength/Payload: variable cell truncation
+  - TestFixedCellPayloadTooLarge: oversized payload rejection
+  - TestNewCellDefaults/TestNewCellMaxCircuitID: initialization edge cases
+  - TestRelayCellDecodeEdgeCases: 7 cases for relay cell decoding
+  - TestRelayCellNewEdgeCases: 9 cases for relay cell construction
+  - TestRelayCellEncodeDecodeRoundTrip: encode/decode round-trips
+  - TestRelayCmdStringUnknown: relay command string formatting
 
 #### High (P1) - Core Functionality
-- [ ] Circuit extension failure recovery [pkg/circuit] [integration] [4h]
-- [ ] Guard rotation persistence tests [pkg/path] [integration] [3h]
-- [ ] Connection reconnection scenarios [pkg/connection] [integration] [3h]
-- [ ] Stream multiplexing under load [pkg/stream] [stress] [4h]
+- [x] Circuit extension failure recovery [pkg/circuit] [integration] [4h] ✅ **COMPLETED** (April 20, 2026)
+  - Created `pkg/circuit/extension_failure_recovery_test.go` with 17 test functions
+  - **BUG FIX**: ProcessCreated2 and ProcessExtended2 crashed on nil cells (nil pointer dereference)
+  - Added nil checks to ProcessCreated2 and ProcessExtended2 in extension.go
+  - TestCreateFirstHopNoConnection/SendFailure/ReceiveFailure: connection errors
+  - TestExtendCircuitNoConnection: extension without connection
+  - TestGetConnectionTypeMismatch/NilConn: interface validation
+  - TestProcessCreated2NilCell/EmptyPayload: nil and empty inputs
+  - TestProcessExtended2NilCell/EmptyData: nil and empty inputs
+  - TestDeriveHopFromShortKeyMaterial/ValidKeyMaterial: key derivation
+  - TestDeriveKeysFromSharedSecret: various secret sizes
+  - TestNewExtensionNilLogger/WithLogger: initialization
+- [x] Guard rotation persistence tests [pkg/path] [integration] [3h] ✅ **COMPLETED** (April 20, 2026)
+  - Created `pkg/path/guard_persistence_test.go` with 12 test functions
+  - TestPersistenceSaveLoadRoundTrip: full save/load cycle
+  - TestPersistenceSaveEmptyGuards: empty guard list
+  - TestPersistenceLoadNonexistent: nonexistent file error
+  - TestPersistenceLoadCorruptedJSON/Checksum: corruption handling
+  - TestPersistenceV1MigrationRoundTrip: V1→V2 schema migration
+  - TestPersistenceMultipleSaves: overwrite and backup creation
+  - TestPersistenceFileExists: existence checking
+  - TestPersistenceGetBackupPaths: backup path generation
+  - TestPersistenceSaveNilGuards: nil guard list handling
+  - TestDefaultPersistenceConfigValues: default configuration
+  - TestNewPersistenceNilLogger: nil logger fallback
+- [x] Connection reconnection scenarios [pkg/connection] [integration] [3h] ✅ **COMPLETED** (April 20, 2026)
+  - Created `pkg/connection/reconnection_test.go` with 14 test functions
+  - **BUG FIX**: Pool.Close panicked on double-close (channel double-close). Fixed with sync.Once.
+  - TestCalculateBackoffExponentialGrowth: exponential increase verification
+  - TestCalculateBackoffMaxCap: cap at MaxBackoff
+  - TestCalculateBackoffWithJitterVariability: jitter adds variability
+  - TestCalculateBackoffZeroMultiplier: 1.0 multiplier = no growth
+  - TestCalculateBackoffMathOverflow: overflow handling documented
+  - TestDefaultRetryConfigValues: default configuration validation
+  - TestNewPoolDefaults/NilLogger/NilRetryConfig/CustomRetryConfig: pool creation
+  - TestPoolCloseIdempotent: double-close safety (triggered bug fix)
+  - TestBackoffValuesTable: specific value calculations
+- [x] Stream multiplexing under load [pkg/stream] [stress] [4h] ✅ **COMPLETED** (April 20, 2026)
+  - Created `pkg/stream/multiplexing_stress_test.go` with 14 test functions
+  - TestManagerConcurrentStreamCreation: 20 goroutines × 5 streams
+  - TestManagerConcurrentCreateRemove: concurrent create/remove
+  - TestManagerGetStreamsForCircuitMux: circuit-scoped queries
+  - TestStreamSendReceiveDataConcurrent: concurrent data operations
+  - TestStreamStateTransitionsMux: state machine transitions
+  - TestStreamStateString: readable state names
+  - TestManagerCloseAllStreams: manager close propagation
+  - TestManagerGetNonexistentStream/RemoveNonexistentStream
+  - TestStreamSendOnClosedStream/DoubleClose/FlowControlWindows
 - [ ] SOCKS5 protocol edge cases [pkg/socks] [unit] [3h]
 - [ ] Config validation comprehensive tests [pkg/config] [unit] [2h]
 - [ ] Pool exhaustion scenarios [pkg/pool] [stress] [3h]
