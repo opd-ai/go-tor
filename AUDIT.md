@@ -2314,7 +2314,18 @@ When planning or reviewing test work, always refer to the “Current Coverage An
   - TestSendDNSReplyHostnameEdgeCases: empty/max/over-255 hostnames
   - TestExtractClientIPEdgeCases: IPv6, invalid format, empty string
   - TestConfigEdgeCases: zero MaxConnections, defaults verification
-- [ ] Config validation comprehensive tests [pkg/config] [unit] [2h]
+- [x] Config validation comprehensive tests [pkg/config] [unit] [2h] ✅ **COMPLETED**
+  - Created `pkg/config/config_validation_comprehensive_test.go` with 10 test functions, 66 subtests
+  - TestValidateRateLimitingEdgeCases: rate limit enabled/disabled with zero/negative values
+  - TestValidatePaddingConfigEdgeCases: padding strategies, interval bounds, burst size
+  - TestValidateStreamBufferWatermarks: high/low watermark bounds and ordering
+  - TestValidateConnectionPoolEdgeCases: pool sizes, min/max relationships
+  - TestValidateIsolationLevelEdgeCases: all valid levels plus invalid strings
+  - TestValidateGuardPersistenceEdgeCases: backup count, interval, lock timeout bounds
+  - TestValidateCrashRecoveryEdgeCases: enabled/disabled with zero/negative values
+  - TestCloneComprehensive: deep copy correctness, nil bridge handling, bridge independence
+  - TestGetCheckpointPathEdgeCases: various data directory values
+  - TestDefaultConfigComprehensiveVerification: full field-by-field default verification
 - [ ] Pool exhaustion scenarios [pkg/pool] [stress] [3h]
 - [ ] Client startup/shutdown race conditions [pkg/client] [stress] [4h]
 
