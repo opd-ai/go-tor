@@ -2359,7 +2359,19 @@ When planning or reviewing test work, always refer to the “Current Coverage An
   - TestEffectivenessReserveDelay: delay accuracy verification
   - TestEffectivenessConcurrentLimiting: concurrent rate enforcement
   - TestEffectivenessDynamicRateUpdate: SetRate/SetBurst take effect
-- [ ] Circuit padding machine states [pkg/circuit] [unit] [4h]
+- [x] Circuit padding machine states [pkg/circuit] [unit] [4h] ✅ **COMPLETED**
+  - Created `pkg/circuit/padding_machine_states_test.go` with 11 test functions
+  - TestStateMachineInvalidTransitions: Start from BURST/GAP/END states
+  - TestStateMachineDoubleStart: second Start() returns error
+  - TestStateMachineProcessEventStart: ProcessEvent in START state
+  - TestStateMachineProcessEventUnknown: ProcessEvent with invalid state
+  - TestStateMachineFullLifecycle: START→BURST→GAP→BURST→END transitions
+  - TestStateMachineStopFromEachState: Stop from all four states
+  - TestStateMachineStatsAccuracy: totalPaddingSent/burstCount verification
+  - TestStateMachineCustomParamsEdge: deterministic burst/gap, single-cell
+  - TestDecodeNegotiatePayloadSizes: 0/1/2/3/extra byte payloads
+  - TestStateMachineConcurrentStartStop: race-free concurrent operations
+  - TestPaddingMachineTypeUniqueness: machine type constant uniqueness
 - [ ] Recovery checkpoint/restore [pkg/recovery] [integration] [3h]
 - [ ] Autoconfig network detection [pkg/autoconfig] [unit] [2h]
 - [ ] Trace context propagation [pkg/trace] [integration] [2h]
