@@ -2326,7 +2326,11 @@ When planning or reviewing test work, always refer to the “Current Coverage An
   - TestCloneComprehensive: deep copy correctness, nil bridge handling, bridge independence
   - TestGetCheckpointPathEdgeCases: various data directory values
   - TestDefaultConfigComprehensiveVerification: full field-by-field default verification
-- [ ] Pool exhaustion scenarios [pkg/pool] [stress] [3h]
+- [x] Pool exhaustion scenarios [pkg/pool] [stress] [3h] ✅ **COMPLETED**
+  - Created `pkg/pool/pool_exhaustion_stress_test.go` with 17 test functions
+  - BufferPool: TestStressBufferPoolRapidGet, TestStressBufferPoolConcurrentHeavyLoad (100 goroutines), TestStressBufferPoolWrongSizePut, TestStressMixedBufferPoolConcurrent
+  - CircuitPool: TestStressCircuitPoolGetWithFailingBuilder, TestStressCircuitPoolGetWithNilBuilder, TestStressCircuitPoolGetCancelledCtx, TestStressCircuitPoolPutNil, TestStressCircuitPoolPutClosed, TestStressCircuitPoolPutAtMaxCapacity, TestStressCircuitPoolConcurrentGetPut, TestStressCircuitPoolIsolatedExhaustion, TestStressCircuitPoolStatsAccuracy, TestStressCircuitPoolCloseThenGet
+  - ConnectionPool: TestStressConnectionPoolCloseEmpty, TestStressConnectionPoolStatsEmpty, TestStressConnectionPoolCleanupEmpty, TestStressConnectionPoolRemoveEmpty, TestStressConnectionPoolConcurrentOps
 - [ ] Client startup/shutdown race conditions [pkg/client] [stress] [4h]
 
 #### Medium (P2) - Extended Coverage
