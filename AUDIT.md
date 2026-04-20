@@ -2331,7 +2331,18 @@ When planning or reviewing test work, always refer to the “Current Coverage An
   - BufferPool: TestStressBufferPoolRapidGet, TestStressBufferPoolConcurrentHeavyLoad (100 goroutines), TestStressBufferPoolWrongSizePut, TestStressMixedBufferPoolConcurrent
   - CircuitPool: TestStressCircuitPoolGetWithFailingBuilder, TestStressCircuitPoolGetWithNilBuilder, TestStressCircuitPoolGetCancelledCtx, TestStressCircuitPoolPutNil, TestStressCircuitPoolPutClosed, TestStressCircuitPoolPutAtMaxCapacity, TestStressCircuitPoolConcurrentGetPut, TestStressCircuitPoolIsolatedExhaustion, TestStressCircuitPoolStatsAccuracy, TestStressCircuitPoolCloseThenGet
   - ConnectionPool: TestStressConnectionPoolCloseEmpty, TestStressConnectionPoolStatsEmpty, TestStressConnectionPoolCleanupEmpty, TestStressConnectionPoolRemoveEmpty, TestStressConnectionPoolConcurrentOps
-- [ ] Client startup/shutdown race conditions [pkg/client] [stress] [4h]
+- [x] Client startup/shutdown race conditions [pkg/client] [stress] [4h] ✅ **COMPLETED**
+  - Created `pkg/client/shutdown_race_test.go` with 10 test functions
+  - TestRaceConcurrentStop: 20 goroutines calling Stop() simultaneously
+  - TestRaceStopBeforeStart: Stop() on never-started client
+  - TestRaceGetStatsDuringShutdown: concurrent GetStats during Stop
+  - TestRaceRecordBandwidthDuringShutdown: concurrent bandwidth recording during Stop
+  - TestRaceSimpleClientCloseIdempotent: multiple Close() calls
+  - TestRaceConcurrentNew: 10 goroutines creating clients simultaneously
+  - TestRaceGetCircuitDuringStop: circuit access during shutdown
+  - TestRacePublishEventDuringStop: event publishing during shutdown
+  - TestRaceRapidCreateCloseCycles: 20 rapid create-close cycles
+  - TestRaceContextCancelDuringStart: parent context cancellation during Start
 
 #### Medium (P2) - Extended Coverage
 - [ ] Rate limiting effectiveness tests [pkg/ratelimit] [integration] [3h]
