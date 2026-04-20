@@ -204,7 +204,7 @@ func TestCertificateChainAudit_PublicKeyValidation(t *testing.T) {
 		// This is difficult to create with Go's x509 package, so we verify
 		// that the validation checks for nil public key
 		cert := createValidRSACert(t, 2048)
-		
+
 		// Parse and modify
 		parsedCert, err := x509.ParseCertificate(cert.Raw)
 		if err != nil {
@@ -221,7 +221,7 @@ func TestCertificateChainAudit_PublicKeyValidation(t *testing.T) {
 		// For this test, we verify that verifyTorRelayCertificate checks
 		// cert.PublicKey != nil. The actual x509.ParseCertificate will
 		// fail before this check, which is fine (defense in depth).
-		
+
 		// We can't easily create a cert with nil PublicKey that passes
 		// parsing, so we verify the check exists in the code
 		if parsedCert.PublicKey != nil {

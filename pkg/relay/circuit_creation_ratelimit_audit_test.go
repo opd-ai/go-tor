@@ -15,26 +15,26 @@ import (
 func TestCircuitCreationRateLimitAudit(t *testing.T) {
 	t.Run("GlobalRateLimitNotEnforced", func(t *testing.T) {
 		// This test DOCUMENTS the vulnerability: circuit creation is NOT rate limited
-		
+
 		keys, err := GenerateRelayKeys()
 		if err != nil {
 			t.Fatalf("Failed to generate test keys: %v", err)
 		}
 		defer keys.Destroy()
-		
+
 		handler := NewCircuitHandler(keys, nil)
-		
+
 		// Create mock connection
 		mockConn := newTestMockConn()
-		
+
 		// Attempt to create circuits rapidly (no rate limiting in current impl)
 		successCount := 0
 		failCount := 0
-		
+
 		for i := 0; i < 100; i++ {
 			circID := uint32(i + 1)
 			create2Cell := createMockCreate2Cell(circID, keys)
-			
+
 			err := handler.handleCreate2(mockConn, create2Cell)
 			if err == nil {
 				successCount++
@@ -42,91 +42,91 @@ func TestCircuitCreationRateLimitAudit(t *testing.T) {
 				failCount++
 			}
 		}
-		
+
 		// AUDIT FINDING: All 100 circuits created without rate limiting
 		if successCount != 100 {
-			t.Logf("UNEXPECTED: Some circuits failed (success: %d, fail: %d)", 
+			t.Logf("UNEXPECTED: Some circuits failed (success: %d, fail: %d)",
 				successCount, failCount)
 		}
-		
+
 		t.Logf("AUDIT RESULT: Created %d circuits without any rate limiting", successCount)
 		t.Logf("VULNERABILITY: Global circuit rate limit (10/sec) NOT enforced")
 		t.Logf("EXPECTED: Should be rate limited after ~20 circuits (burst)")
 		t.Logf("ACTUAL: All 100 circuits created immediately")
-		
+
 		// This documents the vulnerability - test passes to show current behavior
 		if successCount == 100 {
 			t.Logf("✅ Vulnerability confirmed: VULN-CIRC-001 is present")
 		}
 	})
-	
+
 	t.Run("PerConnectionLimitNotEnforced", func(t *testing.T) {
 		// This test DOCUMENTS VULN-CIRC-002: Per-connection circuit limits not enforced
-		
+
 		keys, err := GenerateRelayKeys()
 		if err != nil {
 			t.Fatalf("Failed to generate test keys: %v", err)
 		}
 		defer keys.Destroy()
-		
+
 		handler := NewCircuitHandler(keys, nil)
-		
+
 		mockConn := newTestMockConn()
-		
+
 		// Default per-connection limit: 1000 circuits
 		// Try to create 1500 circuits from same connection
 		successCount := 0
-		
+
 		for i := 0; i < 1500; i++ {
 			circID := uint32(i + 1)
 			create2Cell := createMockCreate2Cell(circID, keys)
-			
+
 			err := handler.handleCreate2(mockConn, create2Cell)
 			if err == nil {
 				successCount++
 			}
 		}
-		
+
 		t.Logf("AUDIT RESULT: Created %d circuits from single connection", successCount)
 		t.Logf("VULNERABILITY: Per-connection circuit limit (1000) NOT enforced")
 		t.Logf("EXPECTED: Should reject after 1000 circuits")
 		t.Logf("ACTUAL: Created %d circuits (limit not enforced)", successCount)
-		
+
 		if successCount > 1000 {
 			t.Logf("✅ Vulnerability confirmed: VULN-CIRC-002 is present")
 		}
 	})
-	
+
 	t.Run("DoSFloodAttackSimulation", func(t *testing.T) {
 		// Simulate DoS attack: rapid circuit creation flood
-		
+
 		keys, err := GenerateRelayKeys()
 		if err != nil {
 			t.Fatalf("Failed to generate test keys: %v", err)
 		}
 		defer keys.Destroy()
-		
+
 		handler := NewCircuitHandler(keys, nil)
-		
+
 		mockConn := newTestMockConn()
-		
+
 		// Measure time to create 100 circuits (DoS attack simulation)
 		start := time.Now()
 		successCount := 0
-		
+
 		for i := 0; i < 100; i++ {
 			circID := uint32(i + 1)
 			create2Cell := createMockCreate2Cell(circID, keys)
-			
+
 			err := handler.handleCreate2(mockConn, create2Cell)
 			if err == nil {
 				successCount++
 			}
 		}
-		
+
 		elapsed := time.Since(start)
 		circuitsPerSecond := float64(successCount) / elapsed.Seconds()
-		
+
 		t.Logf("DoS Attack Simulation Results:")
 		t.Logf("  Circuits created: %d", successCount)
 		t.Logf("  Time elapsed: %v", elapsed)
@@ -135,47 +135,47 @@ func TestCircuitCreationRateLimitAudit(t *testing.T) {
 		t.Logf("VULNERABILITY: No rate limiting applied")
 		t.Logf("EXPECTED rate: 10 circuits/sec (with burst of 20)")
 		t.Logf("ACTUAL rate: %.1f circuits/sec (UNLIMITED)", circuitsPerSecond)
-		
+
 		// With rate limiting, 100 circuits should take ~10 seconds
 		// Without rate limiting, it completes in < 1 second
 		if elapsed < 5*time.Second {
 			t.Logf("✅ DoS vulnerability confirmed: circuits created too quickly")
 		}
 	})
-	
+
 	t.Run("ConcurrentCircuitCreationFlood", func(t *testing.T) {
 		// Test concurrent circuit creation from multiple goroutines
 		// Simulates multi-threaded DoS attack
-		
+
 		keys, err := GenerateRelayKeys()
 		if err != nil {
 			t.Fatalf("Failed to generate test keys: %v", err)
 		}
 		defer keys.Destroy()
-		
+
 		handler := NewCircuitHandler(keys, nil)
-		
+
 		mockConn := newTestMockConn()
-		
+
 		// Launch 10 concurrent goroutines, each creating 20 circuits
 		numGoroutines := 10
 		circuitsPerGoroutine := 20
 		totalExpected := numGoroutines * circuitsPerGoroutine
-		
+
 		var successCount int32
 		var wg sync.WaitGroup
-		
+
 		start := time.Now()
-		
+
 		for g := 0; g < numGoroutines; g++ {
 			wg.Add(1)
 			go func(goroutineID int) {
 				defer wg.Done()
-				
+
 				for i := 0; i < circuitsPerGoroutine; i++ {
 					circID := uint32(goroutineID*1000 + i + 1)
 					create2Cell := createMockCreate2Cell(circID, keys)
-					
+
 					err := handler.handleCreate2(mockConn, create2Cell)
 					if err == nil {
 						atomic.AddInt32(&successCount, 1)
@@ -183,13 +183,13 @@ func TestCircuitCreationRateLimitAudit(t *testing.T) {
 				}
 			}(g)
 		}
-		
+
 		wg.Wait()
 		elapsed := time.Since(start)
-		
+
 		success := int(atomic.LoadInt32(&successCount))
 		circuitsPerSecond := float64(success) / elapsed.Seconds()
-		
+
 		t.Logf("Concurrent DoS Attack Results:")
 		t.Logf("  Goroutines: %d", numGoroutines)
 		t.Logf("  Circuits per goroutine: %d", circuitsPerGoroutine)
@@ -200,7 +200,7 @@ func TestCircuitCreationRateLimitAudit(t *testing.T) {
 		t.Logf("VULNERABILITY: No thread-safe rate limiting")
 		t.Logf("EXPECTED: Rate limiting should work across threads")
 		t.Logf("ACTUAL: %d circuits created concurrently (UNLIMITED)", success)
-		
+
 		if success == totalExpected && elapsed < 10*time.Second {
 			t.Logf("✅ Concurrent DoS vulnerability confirmed")
 		}
@@ -211,18 +211,18 @@ func TestCircuitCreationRateLimitAudit(t *testing.T) {
 func TestRateLimiterIntegrationAudit(t *testing.T) {
 	t.Run("RateLimiterNotIntegrated", func(t *testing.T) {
 		// Verify that CircuitHandler does NOT have RateLimiter field
-		
+
 		keys, err := GenerateRelayKeys()
 		if err != nil {
 			t.Fatalf("Failed to generate test keys: %v", err)
 		}
 		defer keys.Destroy()
-		
+
 		handler := NewCircuitHandler(keys, nil)
-		
+
 		// Check if handler has rateLimiter field (it should not in current impl)
 		// This is a compile-time verification
-		
+
 		t.Logf("CircuitHandler struct inspection:")
 		t.Logf("  keys: present")
 		t.Logf("  circuits: present")
@@ -232,54 +232,54 @@ func TestRateLimiterIntegrationAudit(t *testing.T) {
 		t.Logf("  protection: NOT PRESENT ❌")
 		t.Logf("")
 		t.Logf("AUDIT FINDING: RateLimiter infrastructure exists but not integrated")
-		
+
 		// Verify RateLimiter exists and works independently
 		cfg := DefaultRateLimiterConfig()
 		rl := NewRateLimiter(cfg)
-		
+
 		ctx := context.Background()
-		
+
 		// RateLimiter works correctly when called directly
 		err = rl.AllowCircuit(ctx)
 		if err != nil {
 			t.Errorf("RateLimiter.AllowCircuit failed: %v", err)
 		}
-		
+
 		t.Logf("✅ RateLimiter infrastructure is functional")
 		t.Logf("❌ But NOT integrated into CircuitHandler.handleCreate2()")
-		
+
 		// This confirms VULN-CIRC-001
 		_ = handler // Use handler to avoid unused variable warning
 	})
-	
+
 	t.Run("ProtectionManagerNotIntegrated", func(t *testing.T) {
 		// Verify that CircuitHandler does NOT have ProtectionManager field
-		
+
 		keys, err := GenerateRelayKeys()
 		if err != nil {
 			t.Fatalf("Failed to generate test keys: %v", err)
 		}
 		defer keys.Destroy()
-		
+
 		handler := NewCircuitHandler(keys, nil)
-		
+
 		t.Logf("CircuitHandler DoS protection check:")
 		t.Logf("  ProtectionManager field: NOT PRESENT ❌")
 		t.Logf("")
-		
+
 		// Verify ProtectionManager exists and works independently
 		cfg := DefaultProtectionConfig()
 		pm := NewProtectionManager(cfg)
-		
+
 		// ProtectionManager works correctly when called directly
 		err = pm.AllowCircuit("192.168.1.100:1234")
 		if err != nil {
 			t.Errorf("ProtectionManager.AllowCircuit failed: %v", err)
 		}
-		
+
 		t.Logf("✅ ProtectionManager infrastructure is functional")
 		t.Logf("❌ But NOT integrated into CircuitHandler.handleCreate2()")
-		
+
 		// This confirms VULN-CIRC-002
 		_ = handler
 	})
@@ -290,41 +290,41 @@ func TestResourceExhaustionAudit(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping resource exhaustion test in short mode")
 	}
-	
+
 	t.Run("MemoryExhaustionSimulation", func(t *testing.T) {
 		// Simulate memory exhaustion through unlimited circuit creation
-		
+
 		keys, err := GenerateRelayKeys()
 		if err != nil {
 			t.Fatalf("Failed to generate test keys: %v", err)
 		}
 		defer keys.Destroy()
-		
+
 		handler := NewCircuitHandler(keys, nil)
-		
+
 		mockConn := newTestMockConn()
-		
+
 		// Create 10,000 circuits to simulate memory exhaustion
 		successCount := 0
-		
+
 		for i := 0; i < 10000; i++ {
 			circID := uint32(i + 1)
 			create2Cell := createMockCreate2Cell(circID, keys)
-			
+
 			err := handler.handleCreate2(mockConn, create2Cell)
 			if err == nil {
 				successCount++
 			}
-			
+
 			// Check circuit count periodically
 			if i%1000 == 0 {
 				count := handler.GetCircuitCount()
 				t.Logf("Created %d circuits (total in memory: %d)", i, count)
 			}
 		}
-		
+
 		finalCount := handler.GetCircuitCount()
-		
+
 		t.Logf("Memory Exhaustion Test Results:")
 		t.Logf("  Circuits attempted: 10,000")
 		t.Logf("  Circuits created: %d", successCount)
@@ -333,46 +333,46 @@ func TestResourceExhaustionAudit(t *testing.T) {
 		t.Logf("VULNERABILITY: No memory limit enforcement")
 		t.Logf("EXPECTED: Should limit to reasonable number (e.g., 1000 per connection)")
 		t.Logf("ACTUAL: %d circuits stored in memory (UNLIMITED)", finalCount)
-		
+
 		// Estimated memory per circuit: ~500 bytes
 		estimatedMemoryMB := float64(finalCount) * 500 / 1024 / 1024
 		t.Logf("Estimated memory usage: %.2f MB", estimatedMemoryMB)
-		
+
 		if finalCount >= 10000 {
 			t.Logf("✅ Memory exhaustion vulnerability confirmed")
 		}
 	})
-	
+
 	t.Run("CPUExhaustionSimulation", func(t *testing.T) {
 		// Simulate CPU exhaustion through rapid ntor handshakes
-		
+
 		keys, err := GenerateRelayKeys()
 		if err != nil {
 			t.Fatalf("Failed to generate test keys: %v", err)
 		}
 		defer keys.Destroy()
-		
+
 		handler := NewCircuitHandler(keys, nil)
-		
+
 		mockConn := newTestMockConn()
-		
+
 		// Measure CPU time for 100 rapid circuit creations
 		start := time.Now()
 		successCount := 0
-		
+
 		for i := 0; i < 100; i++ {
 			circID := uint32(i + 1)
 			create2Cell := createMockCreate2Cell(circID, keys)
-			
+
 			err := handler.handleCreate2(mockConn, create2Cell)
 			if err == nil {
 				successCount++
 			}
 		}
-		
+
 		elapsed := time.Since(start)
 		avgCPUPerCircuit := elapsed / time.Duration(successCount)
-		
+
 		t.Logf("CPU Exhaustion Test Results:")
 		t.Logf("  Circuits created: %d", successCount)
 		t.Logf("  Total time: %v", elapsed)
@@ -381,7 +381,7 @@ func TestResourceExhaustionAudit(t *testing.T) {
 		t.Logf("VULNERABILITY: No CPU throttling")
 		t.Logf("EXPECTED: Rate limiting should prevent CPU exhaustion")
 		t.Logf("ACTUAL: All circuits processed immediately")
-		
+
 		// With rate limiting (10/sec), 100 circuits should take ~10 seconds
 		// Without rate limiting, it completes much faster
 		if elapsed < 5*time.Second {
@@ -394,28 +394,28 @@ func TestResourceExhaustionAudit(t *testing.T) {
 func TestDestroyReasonAudit(t *testing.T) {
 	t.Run("ResourceLimitReasonNotImplemented", func(t *testing.T) {
 		// Check if DestroyReasonResourceLimit exists
-		
+
 		// Current destroy reasons per cell package
 		reasons := map[byte]string{
-			cell.DestroyReasonNone:         "None",
-			cell.DestroyReasonProtocol:     "Protocol",
-			cell.DestroyReasonInternal:     "Internal",
-			cell.DestroyReasonRequested:    "Requested",
-			cell.DestroyReasonHibernating:  "Hibernating",
+			cell.DestroyReasonNone:          "None",
+			cell.DestroyReasonProtocol:      "Protocol",
+			cell.DestroyReasonInternal:      "Internal",
+			cell.DestroyReasonRequested:     "Requested",
+			cell.DestroyReasonHibernating:   "Hibernating",
 			cell.DestroyReasonResourceLimit: "ResourceLimit", // This should exist
 		}
-		
+
 		t.Logf("DESTROY reason codes audit:")
 		for code, name := range reasons {
 			t.Logf("  %d: %s", code, name)
 		}
-		
+
 		// Verify ResourceLimit reason is defined
 		if cell.DestroyReasonResourceLimit == 0 {
 			t.Logf("❌ DestroyReasonResourceLimit NOT defined (expected: 7)")
 			t.Logf("FINDING: Resource limit DESTROY reason needs to be implemented")
 		} else {
-			t.Logf("✅ DestroyReasonResourceLimit defined as %d", 
+			t.Logf("✅ DestroyReasonResourceLimit defined as %d",
 				cell.DestroyReasonResourceLimit)
 		}
 	})
@@ -425,33 +425,33 @@ func TestDestroyReasonAudit(t *testing.T) {
 func TestMetricsIntegrationAudit(t *testing.T) {
 	t.Run("RateLimitMetricsNotRecorded", func(t *testing.T) {
 		// Verify that circuit creation does NOT increment rate limit metrics
-		
+
 		keys, err := GenerateRelayKeys()
 		if err != nil {
 			t.Fatalf("Failed to generate test keys: %v", err)
 		}
 		defer keys.Destroy()
-		
+
 		metrics := NewRelayMetrics()
 		handler := NewCircuitHandler(keys, nil)
-		
+
 		mockConn := newTestMockConn()
-		
+
 		// Create 50 circuits (should trigger rate limiting if integrated)
 		for i := 0; i < 50; i++ {
 			circID := uint32(i + 1)
 			create2Cell := createMockCreate2Cell(circID, keys)
 			handler.handleCreate2(mockConn, create2Cell)
 		}
-		
+
 		// Check if rate limited circuits metric was incremented
 		rateLimitedCount := metrics.RateLimitedCircuits.Value()
-		
+
 		t.Logf("Metrics Integration Audit:")
 		t.Logf("  Circuits created: 50")
 		t.Logf("  RateLimitedCircuits metric: %d", rateLimitedCount)
 		t.Logf("")
-		
+
 		if rateLimitedCount == 0 {
 			t.Logf("❌ Rate limiting metrics NOT recorded")
 			t.Logf("FINDING: CircuitHandler does not integrate with metrics")
@@ -472,26 +472,26 @@ func createMockCreate2Cell(circID uint32, keys *RelayKeys) *cell.Cell {
 	// HTYPE (2 bytes) = 0x0002 (ntor)
 	// HLEN (2 bytes) = 84
 	// HDATA (84 bytes) = client handshake data
-	
+
 	payload := make([]byte, 4+84)
-	
+
 	// HTYPE = 0x0002 (ntor)
 	payload[0] = 0x00
 	payload[1] = 0x02
-	
+
 	// HLEN = 84
 	payload[2] = 0x00
 	payload[3] = 0x54
-	
+
 	// HDATA = 84 bytes of ntor handshake data
 	// For testing, use simplified format that passes basic validation
 	// The actual ntor handshake will fail, but that's OK for rate limiting tests
-	
+
 	// Fill with circuit-specific data for uniqueness
 	for i := 0; i < 84; i++ {
 		payload[4+i] = byte((circID + uint32(i)) & 0xFF)
 	}
-	
+
 	return &cell.Cell{
 		CircID:  circID,
 		Command: cell.CmdCreate2,

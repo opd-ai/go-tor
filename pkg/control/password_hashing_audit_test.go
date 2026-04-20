@@ -16,26 +16,26 @@ import (
 // TestPasswordStorageAudit verifies that password storage follows security best practices
 func TestPasswordStorageAudit(t *testing.T) {
 	tests := []struct {
-		name           string
-		password       string
+		name            string
+		password        string
 		expectPlaintext bool
 		expectHashed    bool
 	}{
 		{
-			name:           "Empty password (no auth)",
-			password:       "",
-			expectPlaintext: true,  // Empty string is plaintext ""
+			name:            "Empty password (no auth)",
+			password:        "",
+			expectPlaintext: true, // Empty string is plaintext ""
 			expectHashed:    false,
 		},
 		{
-			name:           "Plaintext password",
-			password:       "test-password-123",
+			name:            "Plaintext password",
+			password:        "test-password-123",
 			expectPlaintext: true,  // Current implementation
 			expectHashed:    false, // Should be true after fix
 		},
 		{
-			name:           "Long password",
-			password:       "SuperSecretPasswordWith!@#$%^&*()Characters",
+			name:            "Long password",
+			password:        "SuperSecretPasswordWith!@#$%^&*()Characters",
 			expectPlaintext: true,  // Current implementation
 			expectHashed:    false, // Should be true after fix
 		},
@@ -219,52 +219,52 @@ func TestHashPasswordValidation(t *testing.T) {
 	t.Skip("HASHEDPASSWORD not yet implemented - test shows expected behavior")
 
 	tests := []struct {
-		name          string
-		password      string
+		name           string
+		password       string
 		hashedPassword string
-		shouldMatch   bool
+		shouldMatch    bool
 	}{
 		{
-			name:          "Correct password",
-			password:      "test",
+			name:           "Correct password",
+			password:       "test",
 			hashedPassword: "16:872860B76453A77799A7D1E07DC64BB5$32A3D35BC76BD3A47ED5825CDD8BF9F70C7DE47B",
-			shouldMatch:   true,
+			shouldMatch:    true,
 		},
 		{
-			name:          "Incorrect password",
-			password:      "wrong",
+			name:           "Incorrect password",
+			password:       "wrong",
 			hashedPassword: "16:872860B76453A77799A7D1E07DC64BB5$32A3D35BC76BD3A47ED5825CDD8BF9F70C7DE47B",
-			shouldMatch:   false,
+			shouldMatch:    false,
 		},
 		{
-			name:          "Invalid format (no colon)",
-			password:      "test",
+			name:           "Invalid format (no colon)",
+			password:       "test",
 			hashedPassword: "16-872860B76453A77799A7D1E07DC64BB5$32A3D35BC76BD3A47ED5825CDD8BF9F70C7DE47B",
-			shouldMatch:   false,
+			shouldMatch:    false,
 		},
 		{
-			name:          "Invalid format (no dollar)",
-			password:      "test",
+			name:           "Invalid format (no dollar)",
+			password:       "test",
 			hashedPassword: "16:872860B76453A77799A7D1E07DC64BB5-32A3D35BC76BD3A47ED5825CDD8BF9F70C7DE47B",
-			shouldMatch:   false,
+			shouldMatch:    false,
 		},
 		{
-			name:          "Wrong algorithm ID",
-			password:      "test",
+			name:           "Wrong algorithm ID",
+			password:       "test",
 			hashedPassword: "99:872860B76453A77799A7D1E07DC64BB5$32A3D35BC76BD3A47ED5825CDD8BF9F70C7DE47B",
-			shouldMatch:   false,
+			shouldMatch:    false,
 		},
 		{
-			name:          "Invalid salt length",
-			password:      "test",
+			name:           "Invalid salt length",
+			password:       "test",
 			hashedPassword: "16:8728$32A3D35BC76BD3A47ED5825CDD8BF9F70C7DE47B",
-			shouldMatch:   false,
+			shouldMatch:    false,
 		},
 		{
-			name:          "Invalid hash length",
-			password:      "test",
+			name:           "Invalid hash length",
+			password:       "test",
 			hashedPassword: "16:872860B76453A77799A7D1E07DC64BB5$32A3D35BC76BD3A47E",
-			shouldMatch:   false,
+			shouldMatch:    false,
 		},
 	}
 
@@ -391,24 +391,24 @@ func TestMemoryLeakPrevention(t *testing.T) {
 	t.Skip("Memory zeroing not yet implemented - test shows expected behavior")
 
 	password := "sensitive-password-123"
-	
+
 	// Simulate password processing
 	passwordBytes := []byte(password)
-	
+
 	// After using password, it should be zeroed
 	// (Current implementation doesn't do this)
 	defer secureZeroMemory(passwordBytes)
-	
+
 	// Use password for authentication
 	_ = passwordBytes
-	
+
 	// After zeroing, should be all zeros
 	for i, b := range passwordBytes {
 		if b != 0 {
 			t.Errorf("Byte %d not zeroed: %d", i, b)
 		}
 	}
-	
+
 	t.Logf("✅ Password memory securely zeroed")
 }
 

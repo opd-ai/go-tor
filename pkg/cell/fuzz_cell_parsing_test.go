@@ -150,8 +150,8 @@ func FuzzCellEncode(f *testing.F) {
 	f.Add(uint32(0xFFFFFFFF), byte(CmdVersions), []byte{0x00, 0x04})
 
 	// Boundary conditions
-	f.Add(uint32(0), byte(0), []byte{})                  // Unknown command
-	f.Add(uint32(0), byte(255), []byte{})                // Max command byte
+	f.Add(uint32(0), byte(0), []byte{})                 // Unknown command
+	f.Add(uint32(0), byte(255), []byte{})               // Max command byte
 	f.Add(uint32(0), byte(CmdRelay), make([]byte, 510)) // Oversized payload
 
 	f.Fuzz(func(t *testing.T, circID uint32, cmdByte byte, payload []byte) {
@@ -180,7 +180,7 @@ func FuzzNewRelayCell(f *testing.F) {
 	f.Add(uint16(1), byte(RelayData), make([]byte, 498))
 
 	// Edge cases
-	f.Add(uint16(0xFFFF), byte(255), []byte{})          // Max stream ID, unknown cmd
+	f.Add(uint16(0xFFFF), byte(255), []byte{})           // Max stream ID, unknown cmd
 	f.Add(uint16(0), byte(0), make([]byte, 499))         // Oversized data
 	f.Add(uint16(1), byte(RelayData), make([]byte, 499)) // Just over limit
 

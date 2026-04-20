@@ -205,4 +205,3 @@ func TestDecodeCellRoundTrip(t *testing.T) {
 		})
 	}
 }
-

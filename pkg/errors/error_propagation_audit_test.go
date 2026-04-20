@@ -14,22 +14,22 @@ import (
 func TestErrorPropagationNoSensitiveDataLeak(t *testing.T) {
 	t.Run("NoPasswordInErrorMessage", func(t *testing.T) {
 		password := "SuperSecret123!"
-		
+
 		// Simulate authentication failure
 		err := New(CategoryConfiguration, SeverityHigh, "authentication failed")
-		
+
 		// Verify password not in error string
 		if strings.Contains(err.Error(), password) {
 			t.Errorf("Password leaked in error message: %v", err)
 		}
 	})
-	
+
 	t.Run("NoPrivateKeyInErrorMessage", func(t *testing.T) {
 		privateKey := []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08}
-		
+
 		// Simulate key validation failure
 		err := CryptoError("invalid key length", nil)
-		
+
 		// Verify private key bytes not in error string
 		errStr := err.Error()
 		for _, b := range privateKey {
@@ -39,13 +39,13 @@ func TestErrorPropagationNoSensitiveDataLeak(t *testing.T) {
 			}
 		}
 	})
-	
+
 	t.Run("NoSessionTokenInContext", func(t *testing.T) {
 		sessionToken := "tok_abc123def456"
-		
+
 		// Create error with generic context
 		err := New(CategoryCircuit, SeverityMedium, "circuit creation failed")
-		
+
 		// Don't add session token to context
 		if err.Context != nil {
 			for k, v := range err.Context {
@@ -56,22 +56,22 @@ func TestErrorPropagationNoSensitiveDataLeak(t *testing.T) {
 			}
 		}
 	})
-	
+
 	t.Run("WrappedErrorNoSensitiveData", func(t *testing.T) {
 		credential := "user:password@host"
-		
+
 		// Create underlying error (simulated from network layer)
 		underlying := fmt.Errorf("connection failed")
-		
+
 		// Wrap without exposing credentials
 		err := ConnectionError("failed to connect to relay", underlying)
-		
+
 		// Verify credential not in wrapped error chain
 		fullErr := err.Error()
 		if strings.Contains(fullErr, credential) {
 			t.Errorf("Credential leaked in wrapped error: %v", err)
 		}
-		
+
 		// Check unwrapped error
 		if unwrapped := errors.Unwrap(err); unwrapped != nil {
 			if strings.Contains(unwrapped.Error(), credential) {
@@ -79,22 +79,22 @@ func TestErrorPropagationNoSensitiveDataLeak(t *testing.T) {
 			}
 		}
 	})
-	
+
 	t.Run("ContextFieldsSanitized", func(t *testing.T) {
 		// Create error with sanitized context
 		err := CircuitError("circuit build failed", nil)
-		err = err.WithContext("circuit_id", "0x12345678") // OK: non-sensitive ID
+		err = err.WithContext("circuit_id", "0x12345678")                                      // OK: non-sensitive ID
 		err = err.WithContext("relay_fingerprint", "ABCD1234ABCD1234ABCD1234ABCD1234ABCD1234") // OK: public fingerprint
-		
+
 		// These should NOT be added (sensitive data)
 		// err = err.WithContext("onion_key", privateKey) // BAD
 		// err = err.WithContext("auth_token", token)     // BAD
-		
+
 		// Verify context only contains safe metadata
 		if err.Context != nil {
 			for k, v := range err.Context {
 				valStr := fmt.Sprintf("%v", v)
-				
+
 				// Check for patterns that indicate sensitive data
 				if matched, _ := regexp.MatchString(`(?i)(password|secret|key|token|auth|credential)`, k); matched {
 					// Key name suggests sensitive data, verify it's not present
@@ -102,14 +102,14 @@ func TestErrorPropagationNoSensitiveDataLeak(t *testing.T) {
 						t.Errorf("Context key suggests sensitive data: %q = %v", k, v)
 					}
 				}
-				
+
 				// Check for common sensitive data patterns in values
 				sensitivePatterns := []string{
-					`\b[A-Za-z0-9]{32,}\b`,        // Long hex strings (potential keys)
-					`\bBearer\s+[A-Za-z0-9\-_]+`,  // Bearer tokens
-					`\b(?i)password:\s*\S+`,       // Password in plaintext
+					`\b[A-Za-z0-9]{32,}\b`,       // Long hex strings (potential keys)
+					`\bBearer\s+[A-Za-z0-9\-_]+`, // Bearer tokens
+					`\b(?i)password:\s*\S+`,      // Password in plaintext
 				}
-				
+
 				for _, pattern := range sensitivePatterns {
 					if matched, _ := regexp.MatchString(pattern, valStr); matched {
 						// Allow relay fingerprints (40-char hex, public data)
@@ -130,10 +130,10 @@ func TestErrorContextIsolation(t *testing.T) {
 		// Create two independent errors
 		err1 := New(CategoryCircuit, SeverityMedium, "circuit 1 failed")
 		err2 := New(CategoryCircuit, SeverityMedium, "circuit 2 failed")
-		
+
 		// Add context to err1
 		err1 = err1.WithContext("circuit_id", "circuit_1")
-		
+
 		// Verify err2 doesn't have err1's context
 		if err2.Context != nil {
 			if _, exists := err2.Context["circuit_id"]; exists {
@@ -141,16 +141,16 @@ func TestErrorContextIsolation(t *testing.T) {
 			}
 		}
 	})
-	
+
 	t.Run("ContextIndependentAfterClone", func(t *testing.T) {
 		// Create error with context
 		err1 := New(CategoryNetwork, SeverityLow, "network error")
 		err1 = err1.WithContext("attempt", 1)
-		
+
 		// Create similar error (simulating retry)
 		err2 := New(CategoryNetwork, SeverityLow, "network error")
 		err2 = err2.WithContext("attempt", 2)
-		
+
 		// Verify contexts are independent
 		if err1.Context["attempt"] == err2.Context["attempt"] {
 			t.Error("Context values should be independent")
@@ -163,21 +163,21 @@ func TestErrorMessageSanitization(t *testing.T) {
 	t.Run("NoFilePathsInErrors", func(t *testing.T) {
 		// Simulate file operation error
 		err := ConfigurationError("failed to load configuration", nil)
-		
+
 		// Verify no absolute file paths in error
 		errStr := err.Error()
 		if strings.Contains(errStr, "/home/") || strings.Contains(errStr, "C:\\") {
 			t.Errorf("File path leaked in error: %v", err)
 		}
 	})
-	
+
 	t.Run("NoInternalStateInErrors", func(t *testing.T) {
 		// Create error about internal state
 		err := InternalError("state machine transition failed", nil)
-		
+
 		// Error should be generic, not exposing internal details
 		errStr := err.Error()
-		
+
 		// These internal details should NOT appear in errors
 		forbiddenTerms := []string{
 			"memory address",
@@ -185,18 +185,18 @@ func TestErrorMessageSanitization(t *testing.T) {
 			"goroutine",
 			"stacktrace",
 		}
-		
+
 		for _, term := range forbiddenTerms {
 			if matched, _ := regexp.MatchString(term, errStr); matched {
 				t.Errorf("Internal state leaked in error (term: %q): %v", term, err)
 			}
 		}
 	})
-	
+
 	t.Run("NoIPAddressesInErrors", func(t *testing.T) {
 		// Simulate connection error - should not expose target IP
 		err := ConnectionError("connection timeout", nil)
-		
+
 		// Check for IP address patterns
 		ipPattern := `\b(?:\d{1,3}\.){3}\d{1,3}\b`
 		if matched, _ := regexp.MatchString(ipPattern, err.Error()); matched {
@@ -213,13 +213,13 @@ func TestWrappedErrorChainSafety(t *testing.T) {
 		err1 := errors.New("low-level failure")
 		err2 := ConnectionError("connection failed", err1)
 		err3 := CircuitError("circuit build failed", err2)
-		
+
 		// Walk the error chain
 		current := error(err3)
 		depth := 0
 		for current != nil {
 			errStr := current.Error()
-			
+
 			// Verify no sensitive data at any level
 			sensitiveTerms := []string{"password", "secret", "key=", "token="}
 			for _, term := range sensitiveTerms {
@@ -227,23 +227,23 @@ func TestWrappedErrorChainSafety(t *testing.T) {
 					t.Errorf("Sensitive term %q found at depth %d: %v", term, depth, current)
 				}
 			}
-			
+
 			current = errors.Unwrap(current)
 			depth++
 		}
 	})
-	
+
 	t.Run("ErrorUnwrapSafety", func(t *testing.T) {
 		// Create wrapped error
 		underlying := errors.New("network unreachable")
 		wrapped := NetworkError("failed to establish connection", underlying)
-		
+
 		// Unwrap and verify safety
 		unwrapped := wrapped.Unwrap()
 		if unwrapped == nil {
 			t.Fatal("Expected non-nil unwrapped error")
 		}
-		
+
 		// Verify unwrapped error doesn't expose more than wrapped
 		if len(unwrapped.Error()) > len(wrapped.Error())*2 {
 			t.Logf("WARNING: Unwrapped error significantly longer than wrapped: wrapped=%d, unwrapped=%d",
@@ -257,17 +257,17 @@ func TestErrorComparisonSafety(t *testing.T) {
 	t.Run("ErrorIsDoesNotExposeSensitiveData", func(t *testing.T) {
 		err1 := New(CategoryCrypto, SeverityHigh, "decryption failed")
 		err2 := New(CategoryCrypto, SeverityHigh, "encryption failed")
-		
+
 		// Is() should only compare categories, not messages
 		if !errors.Is(err1, err2) {
 			// This is actually expected - they're different errors
 			// but the Is() implementation is safe
 		}
-		
+
 		// Verify Is() doesn't expose error details
 		result := err1.Is(err2)
 		_ = result // Should be true (same category)
-		
+
 		// The comparison should be based on category only
 		if err1.Category != err2.Category {
 			t.Error("Expected same category for crypto errors")
@@ -280,19 +280,19 @@ func TestErrorSerializationSafety(t *testing.T) {
 	t.Run("ErrorStringDoesNotContainPointers", func(t *testing.T) {
 		err := New(CategoryProtocol, SeverityMedium, "protocol error")
 		errStr := err.Error()
-		
+
 		// Check for pointer patterns like "0x1234abcd"
 		pointerPattern := `0x[0-9a-fA-F]{8,16}`
 		if matched, _ := regexp.MatchString(pointerPattern, errStr); matched {
 			t.Errorf("Pointer address leaked in error string: %v", err)
 		}
 	})
-	
+
 	t.Run("ErrorContextSafeForLogging", func(t *testing.T) {
 		err := DirectoryError("consensus fetch failed", nil)
 		err = err.WithContext("authority_count", 9)
 		err = err.WithContext("attempt", 3)
-		
+
 		// Verify context values are safe to log
 		for k, v := range err.Context {
 			// Should be simple types (int, string, bool)
@@ -315,7 +315,7 @@ func TestSeverityAndCategoryLeakage(t *testing.T) {
 			New(CategoryNetwork, SeverityLow, "operation failed"),
 			New(CategoryCircuit, SeverityMedium, "operation failed"),
 		}
-		
+
 		// Verify severity doesn't reveal what operation failed
 		for _, err := range errors {
 			if strings.Contains(err.Error(), "decrypt") ||
@@ -325,11 +325,11 @@ func TestSeverityAndCategoryLeakage(t *testing.T) {
 			}
 		}
 	})
-	
+
 	t.Run("CategoryDoesNotRevealCircuitPath", func(t *testing.T) {
 		// Circuit error should not reveal circuit path or relay identity
 		err := CircuitError("operation failed", nil)
-		
+
 		// Should not contain relay addresses or fingerprints
 		errStr := err.Error()
 		if matched, _ := regexp.MatchString(`\d+\.\d+\.\d+\.\d+:\d+`, errStr); matched {
@@ -344,16 +344,16 @@ func TestRetryableFlagSafety(t *testing.T) {
 		// Create retryable and non-retryable errors
 		retryable := NewRetryable(CategoryConnection, SeverityMedium, "connection failed")
 		nonRetryable := New(CategoryCrypto, SeverityHigh, "signature verification failed")
-		
+
 		// Verify retryable flag doesn't appear in error message
 		if strings.Contains(retryable.Error(), "retryable") {
 			t.Error("Retryable flag leaked in error message")
 		}
-		
+
 		if strings.Contains(nonRetryable.Error(), "not retryable") {
 			t.Error("Non-retryable status leaked in error message")
 		}
-		
+
 		// The flag should only be accessible programmatically
 		if !retryable.Retryable {
 			t.Error("Expected retryable error")
@@ -381,19 +381,19 @@ func TestErrorConstructorSafety(t *testing.T) {
 		{"NetworkError", NetworkError, "network failed"},
 		{"InternalError", InternalError, "internal error"},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			err := tc.constructor(tc.message, nil)
-			
+
 			// Verify error doesn't contain implementation details
 			errStr := err.Error()
-			
+
 			// Should not contain function names or line numbers
 			if matched, _ := regexp.MatchString(`:\d+`, errStr); matched {
 				t.Errorf("Line number leaked in %s: %v", tc.name, err)
 			}
-			
+
 			// Should not contain internal package paths
 			if strings.Contains(errStr, "github.com/opd-ai/go-tor") {
 				t.Errorf("Package path leaked in %s: %v", tc.name, err)
@@ -406,27 +406,27 @@ func TestErrorConstructorSafety(t *testing.T) {
 func TestErrorHelperFunctionsSafety(t *testing.T) {
 	t.Run("IsRetryableSafe", func(t *testing.T) {
 		err := NewRetryable(CategoryTimeout, SeverityMedium, "timeout")
-		
+
 		// IsRetryable should not panic or leak info
 		result := IsRetryable(err)
 		if !result {
 			t.Error("Expected retryable error")
 		}
-		
+
 		// Test with nil
 		if IsRetryable(nil) {
 			t.Error("nil should not be retryable")
 		}
 	})
-	
+
 	t.Run("GetCategorySafe", func(t *testing.T) {
 		err := New(CategoryCrypto, SeverityHigh, "test")
-		
+
 		category := GetCategory(err)
 		if category != CategoryCrypto {
 			t.Errorf("Expected CategoryCrypto, got %v", category)
 		}
-		
+
 		// Test with non-TorError
 		stdErr := errors.New("standard error")
 		category = GetCategory(stdErr)
@@ -434,15 +434,15 @@ func TestErrorHelperFunctionsSafety(t *testing.T) {
 			t.Errorf("Expected CategoryInternal for standard error, got %v", category)
 		}
 	})
-	
+
 	t.Run("GetSeveritySafe", func(t *testing.T) {
 		err := New(CategoryProtocol, SeverityCritical, "test")
-		
+
 		severity := GetSeverity(err)
 		if severity != SeverityCritical {
 			t.Errorf("Expected SeverityCritical, got %v", severity)
 		}
-		
+
 		// Test with nil
 		severity = GetSeverity(nil)
 		if severity != SeverityMedium {

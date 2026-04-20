@@ -347,7 +347,7 @@ func TestPersistentGuardPreference(t *testing.T) {
 
 	// Create selector with guard manager
 	selector := NewSelectorWithGuards(directory.NewClient(log), guardMgr, log)
-	
+
 	// Directly set guards for testing (bypass consensus)
 	selector.mu.Lock()
 	selector.guards = relays
@@ -395,7 +395,7 @@ func TestFamilyDiversityEnforcement(t *testing.T) {
 		{
 			Nickname:    "Relay1",
 			Fingerprint: "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-			Address:     "10.0.1.1:9001", // Different /16 subnet
+			Address:     "10.0.1.1:9001",              // Different /16 subnet
 			Flags:       []string{"Running", "Valid"}, // Not Exit flag
 			Bandwidth:   1000000,
 			Family:      []string{"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}, // Related to Guard1
@@ -411,7 +411,7 @@ func TestFamilyDiversityEnforcement(t *testing.T) {
 		{
 			Nickname:    "Exit3",
 			Fingerprint: "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
-			Address:     "203.0.113.1:9001", // Different /16 subnet  
+			Address:     "203.0.113.1:9001", // Different /16 subnet
 			Flags:       []string{"Exit", "Running", "Valid"},
 			Bandwidth:   1000000,
 			// No family relationship
@@ -419,7 +419,7 @@ func TestFamilyDiversityEnforcement(t *testing.T) {
 	}
 
 	selector := NewSelector(directory.NewClient(log), log)
-	
+
 	// Directly set relays for testing
 	selector.mu.Lock()
 	selector.relays = relays
@@ -472,7 +472,7 @@ func TestSubnetDiversityEnforcement(t *testing.T) {
 	}
 
 	selector := NewSelector(directory.NewClient(log), log)
-	
+
 	// Directly set relays for testing
 	selector.mu.Lock()
 	selector.relays = relays
@@ -617,7 +617,7 @@ func TestBiasDetectorFiltersBiasedGuards(t *testing.T) {
 	}
 
 	selector := NewSelector(directory.NewClient(log), log)
-	
+
 	// Directly set guards for testing
 	selector.mu.Lock()
 	selector.guards = relays
@@ -785,8 +785,6 @@ func TestThreadSafeConcurrentGuardAccess(t *testing.T) {
 		t.Errorf("After concurrent access, %d guards exist, want 3", len(finalGuards))
 	}
 }
-
-
 
 // TestGuardSetSizeLimitEnforcement verifies max guards limit is enforced
 func TestGuardSetSizeLimitEnforcement(t *testing.T) {

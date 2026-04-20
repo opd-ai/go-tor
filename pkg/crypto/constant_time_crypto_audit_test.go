@@ -184,7 +184,7 @@ func TestCurve25519ConstantTime(t *testing.T) {
 		// All zeros scalar
 		var zeroScalar [32]byte
 
-		// All ones scalar  
+		// All ones scalar
 		var onesScalar [32]byte
 		for i := range onesScalar {
 			onesScalar[i] = 0xFF

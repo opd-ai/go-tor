@@ -406,9 +406,9 @@ func TestKeyZeroingInProductionCode(t *testing.T) {
 		// Document where callers are responsible for zeroing
 
 		responsibilities := []struct {
-			api      string
-			caller   string
-			method   string
+			api    string
+			caller string
+			method string
 		}{
 			{
 				api:    "DeriveKey()",

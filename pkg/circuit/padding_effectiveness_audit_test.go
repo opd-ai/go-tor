@@ -82,11 +82,11 @@ func TestPaddingEffectivenessAgainstTimingAnalysis(t *testing.T) {
 // obscures traffic volume patterns.
 func TestPaddingEffectivenessAgainstVolumeFingerprinting(t *testing.T) {
 	tests := []struct {
-		name                  string
-		strategy              PaddingStrategy
-		burstSize             int
-		minPaddingRatio       float64 // Minimum expected padding/total ratio
-		maxVolumeCorrelation  float64 // Maximum correlation with real traffic
+		name                 string
+		strategy             PaddingStrategy
+		burstSize            int
+		minPaddingRatio      float64 // Minimum expected padding/total ratio
+		maxVolumeCorrelation float64 // Maximum correlation with real traffic
 	}{
 		{
 			name:                 "no_padding",
@@ -369,13 +369,13 @@ func TestPaddingEffectivenessStateMachineBurstPattern(t *testing.T) {
 
 		// Record gap start
 		gapStart := time.Now()
-		
+
 		// Wait for gap to complete
 		for sm.GetState() == MachineStateGap {
 			_, delay := sm.ProcessEvent()
 			time.Sleep(delay)
 		}
-		
+
 		gapDuration := time.Since(gapStart)
 		gapDurations = append(gapDurations, gapDuration)
 	}
@@ -400,11 +400,11 @@ func TestPaddingEffectivenessStateMachineBurstPattern(t *testing.T) {
 	if len(gapDurations) > 0 {
 		avgGap := averageDuration(gapDurations)
 		t.Logf("Average gap: %v", avgGap)
-		
+
 		// Gaps should be within spec range (1500-9500ms)
 		const minGap = 1400 * time.Millisecond // Allow 100ms tolerance
 		const maxGap = 9600 * time.Millisecond
-		
+
 		if avgGap < minGap || avgGap > maxGap {
 			t.Logf("Note: Average gap %v outside typical range [%v, %v]", avgGap, minGap, maxGap)
 		}
@@ -498,13 +498,13 @@ func TestPaddingEffectivenessConcurrentCircuits(t *testing.T) {
 // TestPaddingEffectivenessOverheadAnalysis measures bandwidth overhead.
 func TestPaddingEffectivenessOverheadAnalysis(t *testing.T) {
 	strategies := []struct {
-		name           string
-		strategy       PaddingStrategy
-		maxOverhead    float64 // Maximum acceptable overhead ratio
+		name        string
+		strategy    PaddingStrategy
+		maxOverhead float64 // Maximum acceptable overhead ratio
 	}{
 		{"none", PaddingStrategyNone, 0.0},
-		{"fixed", PaddingStrategyFixed, 0.3},   // 30% overhead acceptable
-		{"random", PaddingStrategyRandom, 0.4},  // 40% overhead acceptable
+		{"fixed", PaddingStrategyFixed, 0.3},       // 30% overhead acceptable
+		{"random", PaddingStrategyRandom, 0.4},     // 40% overhead acceptable
 		{"adaptive", PaddingStrategyAdaptive, 0.5}, // 50% overhead acceptable
 	}
 
@@ -548,11 +548,11 @@ func TestPaddingEffectivenessOverheadAnalysis(t *testing.T) {
 
 			// Estimate overhead (padding cells as fraction of test duration)
 			cellsPerSecond := float64(paddingCells) / 0.2 // 200ms test
-			
+
 			// Each cell is 514 bytes
 			const cellSize = 514
 			bytesPerSecond := cellsPerSecond * cellSize
-			
+
 			t.Logf("%s: %.1f cells/sec, %.1f KB/s overhead", tt.name, cellsPerSecond, bytesPerSecond/1024)
 
 			// For educational purposes, any overhead is informational

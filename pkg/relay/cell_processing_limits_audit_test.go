@@ -210,7 +210,7 @@ func TestCellFloodDoSAudit(t *testing.T) {
 		expectedMin := 50 * time.Second // Conservative estimate
 		if elapsed < expectedMin {
 			t.Logf("✅ VULNERABILITY CONFIRMED: Cell flooding not rate limited")
-			t.Logf("   Attack successful: %d cells processed in %v (< %v expected)", 
+			t.Logf("   Attack successful: %d cells processed in %v (< %v expected)",
 				cellCount, elapsed, expectedMin)
 		}
 	})
@@ -260,9 +260,9 @@ func TestCellFloodDoSAudit(t *testing.T) {
 		elapsed := time.Since(start)
 
 		totalCells := numCircuits * cellsPerCircuit
-		t.Logf("❌ Processed %d cells across %d circuits in %v", 
+		t.Logf("❌ Processed %d cells across %d circuits in %v",
 			totalCells, numCircuits, elapsed)
-		t.Logf("   Rate: %.0f cells/sec (UNLIMITED)", 
+		t.Logf("   Rate: %.0f cells/sec (UNLIMITED)",
 			float64(totalCells)/elapsed.Seconds())
 		t.Logf("   Expected with per-circuit rate limiting: ~50+ seconds")
 		t.Logf("   Vulnerability: No global or per-circuit cell rate limiting")

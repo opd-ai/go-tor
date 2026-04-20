@@ -94,7 +94,7 @@ func TestAddressParsingInputSanitization(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			parsed, err := ParseAddress(tt.address)
-			
+
 			if tt.expectErr {
 				if err == nil {
 					t.Errorf("Expected error, got nil")
@@ -179,7 +179,7 @@ func TestAddressParsingMalformedInput(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			parsed, err := ParseAddress(tt.address)
-			
+
 			if tt.expectErr {
 				if err == nil {
 					t.Errorf("Expected error, got nil")
@@ -247,7 +247,7 @@ func TestAddressParsingInjectionAttackPrevention(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			parsed, err := ParseAddress(tt.address)
-			
+
 			if tt.expectErr {
 				if err == nil {
 					t.Errorf("%s: expected error, got nil", tt.desc)
@@ -314,7 +314,7 @@ func TestAddressParsingResourceExhaustion(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			addr := tt.setup()
 			parsed, err := ParseAddress(addr)
-			
+
 			if tt.expectErr {
 				if err == nil {
 					t.Errorf("%s: expected error, got nil", tt.desc)
@@ -342,22 +342,22 @@ func TestAddressParsingChecksumValidation(t *testing.T) {
 
 		// Compute correct checksum
 		checksum := computeV3Checksum(pub, V3Version)
-		
+
 		// Corrupt the checksum
 		corruptedChecksum := make([]byte, 2)
 		corruptedChecksum[0] = checksum[0] ^ 0xFF
 		corruptedChecksum[1] = checksum[1] ^ 0xFF
-		
+
 		// Build address with corrupted checksum
 		data := make([]byte, 0, 35)
 		data = append(data, pub...)
 		data = append(data, corruptedChecksum...)
 		data = append(data, V3Version)
-		
+
 		encoder := base32.StdEncoding.WithPadding(base32.NoPadding)
 		encoded := strings.ToLower(encoder.EncodeToString(data))
 		addr := encoded + ".onion"
-		
+
 		// Should fail checksum validation
 		_, err = ParseAddress(addr)
 		if err == nil {
@@ -371,21 +371,21 @@ func TestAddressParsingChecksumValidation(t *testing.T) {
 	t.Run("single bit flip in checksum", func(t *testing.T) {
 		pub, _, _ := ed25519.GenerateKey(rand.Reader)
 		checksum := computeV3Checksum(pub, V3Version)
-		
+
 		// Flip single bit in first checksum byte
 		corruptedChecksum := make([]byte, 2)
 		copy(corruptedChecksum, checksum)
 		corruptedChecksum[0] ^= 0x01
-		
+
 		data := make([]byte, 0, 35)
 		data = append(data, pub...)
 		data = append(data, corruptedChecksum...)
 		data = append(data, V3Version)
-		
+
 		encoder := base32.StdEncoding.WithPadding(base32.NoPadding)
 		encoded := strings.ToLower(encoder.EncodeToString(data))
 		addr := encoded + ".onion"
-		
+
 		_, err := ParseAddress(addr)
 		if err == nil {
 			t.Error("Single bit flip should be detected")
@@ -396,10 +396,10 @@ func TestAddressParsingChecksumValidation(t *testing.T) {
 		// Generate two different keys
 		pub1, _, _ := ed25519.GenerateKey(rand.Reader)
 		pub2, _, _ := ed25519.GenerateKey(rand.Reader)
-		
+
 		checksum1 := computeV3Checksum(pub1, V3Version)
 		checksum2 := computeV3Checksum(pub2, V3Version)
-		
+
 		// Checksums should be different for different keys
 		if bytes.Equal(checksum1, checksum2) {
 			t.Error("Checksum collision detected (unlikely but should not happen)")
@@ -458,11 +458,11 @@ func TestAddressParsingVersionValidation(t *testing.T) {
 			data = append(data, pub...)
 			data = append(data, checksum...)
 			data = append(data, tt.version)
-			
+
 			encoder := base32.StdEncoding.WithPadding(base32.NoPadding)
 			encoded := strings.ToLower(encoder.EncodeToString(data))
 			addr := encoded + ".onion"
-			
+
 			_, err = ParseAddress(addr)
 			if tt.expectErr {
 				if err == nil {
@@ -527,7 +527,7 @@ func TestAddressParsingLengthValidation(t *testing.T) {
 			} else {
 				addr = strings.Repeat("a", tt.length) + ".onion"
 			}
-			
+
 			_, err := ParseAddress(addr)
 			if tt.expectErr {
 				if err == nil {
@@ -546,10 +546,10 @@ func TestAddressParsingLengthValidation(t *testing.T) {
 func TestAddressParsingConcurrentSafety(t *testing.T) {
 	validAddr := generateValidAddress(t)
 	invalidAddr := "invalid" + strings.Repeat("x", 50) + ".onion"
-	
+
 	const numGoroutines = 100
 	done := make(chan bool, numGoroutines)
-	
+
 	for i := 0; i < numGoroutines; i++ {
 		go func(id int) {
 			defer func() {
@@ -558,13 +558,13 @@ func TestAddressParsingConcurrentSafety(t *testing.T) {
 				}
 				done <- true
 			}()
-			
+
 			// Parse valid address
 			_, err := ParseAddress(validAddr)
 			if err != nil {
 				t.Errorf("Goroutine %d: unexpected error on valid address: %v", id, err)
 			}
-			
+
 			// Parse invalid address
 			_, err = ParseAddress(invalidAddr)
 			if err == nil {
@@ -572,7 +572,7 @@ func TestAddressParsingConcurrentSafety(t *testing.T) {
 			}
 		}(i)
 	}
-	
+
 	for i := 0; i < numGoroutines; i++ {
 		<-done
 	}
@@ -583,27 +583,27 @@ func TestAddressParsingRoundTrip(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		// Generate valid address
 		original := generateValidAddress(t)
-		
+
 		// Parse it
 		parsed1, err := ParseAddress(original)
 		if err != nil {
 			t.Fatalf("Round trip %d: first parse failed: %v", i, err)
 		}
-		
+
 		// Encode it back
 		encoded := parsed1.Encode()
-		
+
 		// Parse again
 		parsed2, err := ParseAddress(encoded)
 		if err != nil {
 			t.Fatalf("Round trip %d: second parse failed: %v", i, err)
 		}
-		
+
 		// Verify public keys match
 		if !bytes.Equal(parsed1.Pubkey, parsed2.Pubkey) {
 			t.Errorf("Round trip %d: public keys don't match", i)
 		}
-		
+
 		// Verify versions match
 		if parsed1.Version != parsed2.Version {
 			t.Errorf("Round trip %d: versions don't match", i)
@@ -619,16 +619,16 @@ func generateValidAddress(t *testing.T) string {
 	if err != nil {
 		t.Fatalf("Failed to generate key: %v", err)
 	}
-	
+
 	checksum := computeV3Checksum(pub, V3Version)
 	data := make([]byte, 0, 35)
 	data = append(data, pub...)
 	data = append(data, checksum...)
 	data = append(data, V3Version)
-	
+
 	encoder := base32.StdEncoding.WithPadding(base32.NoPadding)
 	encoded := strings.ToLower(encoder.EncodeToString(data))
-	
+
 	return encoded + ".onion"
 }
 
@@ -639,10 +639,10 @@ func generateValidAddressWithCase(caseType string) string {
 	data = append(data, pub...)
 	data = append(data, checksum...)
 	data = append(data, V3Version)
-	
+
 	encoder := base32.StdEncoding.WithPadding(base32.NoPadding)
 	encoded := encoder.EncodeToString(data)
-	
+
 	switch caseType {
 	case "UPPER":
 		encoded = strings.ToUpper(encoded)
@@ -660,6 +660,6 @@ func generateValidAddressWithCase(caseType string) string {
 	default:
 		encoded = strings.ToLower(encoded)
 	}
-	
+
 	return encoded + ".onion"
 }

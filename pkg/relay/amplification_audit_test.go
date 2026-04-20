@@ -24,7 +24,7 @@ func TestAmplificationFactorCellForwarding(t *testing.T) {
 	// Create test relay
 	keys := generateTestKeys(t)
 	handler := NewCircuitHandler(keys, logger.NewDefault())
-	
+
 	// Track output cells
 	var outputCount atomic.Int32
 	mockConn := &amplificationTracker{
@@ -33,32 +33,32 @@ func TestAmplificationFactorCellForwarding(t *testing.T) {
 			return len(p), nil
 		},
 	}
-	
+
 	// Create circuit
 	circuitID := uint32(12345)
 	createAndEstablishCircuit(t, handler, mockConn, circuitID)
-	
+
 	// Send RELAY cell
 	relayCell := &cell.Cell{
 		CircID:  circuitID,
 		Command: cell.CmdRelay,
 		Payload: make([]byte, 509),
 	}
-	
+
 	// Count should be 1 from CREATED2, reset counter
 	outputCount.Store(0)
-	
+
 	err := handler.HandleCellFromConnection(mockConn, relayCell)
 	if err != nil {
 		t.Fatalf("HandleCellFromConnection failed: %v", err)
 	}
-	
+
 	// Verify amplification factor: 1 input = at most 1 output
 	count := outputCount.Load()
 	if count > 1 {
 		t.Errorf("Amplification detected: 1 input cell produced %d output cells (expected ≤1)", count)
 	}
-	
+
 	t.Logf("✓ Cell forwarding amplification factor: 1:%d (SAFE)", count)
 }
 
@@ -68,11 +68,11 @@ func TestAmplificationFactorExtendedCircuit(t *testing.T) {
 	keys := generateTestKeys(t)
 	silentLogger := logger.New(slog.LevelError, io.Discard)
 	handler := NewCircuitHandler(keys, silentLogger)
-	
+
 	circuitID := uint32(23456)
 	mockClient := &amplificationTracker{}
 	createAndEstablishCircuit(t, handler, mockClient, circuitID)
-	
+
 	// Create mock next hop connection
 	nextHopBuffer := &bytes.Buffer{}
 	mockNextHop := &amplificationTracker{
@@ -81,7 +81,7 @@ func TestAmplificationFactorExtendedCircuit(t *testing.T) {
 			return len(p), nil
 		},
 	}
-	
+
 	// Register extended circuit
 	err := handler.forwarder.RegisterExtendedCircuit(
 		circuitID,
@@ -92,7 +92,7 @@ func TestAmplificationFactorExtendedCircuit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RegisterExtendedCircuit failed: %v", err)
 	}
-	
+
 	// Send 10 RELAY cells
 	for i := 0; i < 10; i++ {
 		relayCell := &cell.Cell{
@@ -100,22 +100,22 @@ func TestAmplificationFactorExtendedCircuit(t *testing.T) {
 			Command: cell.CmdRelay,
 			Payload: make([]byte, 509),
 		}
-		
+
 		err = handler.HandleCellFromConnection(mockClient, relayCell)
 		if err != nil {
 			t.Fatalf("Forward cell %d failed: %v", i, err)
 		}
 	}
-	
+
 	// Verify 1:1 forwarding (10 cells * 514 bytes = 5140 bytes)
 	expectedBytes := 10 * 514
 	actualBytes := nextHopBuffer.Len()
-	
+
 	if actualBytes != expectedBytes {
 		t.Errorf("Forwarding amplification: 10 input cells produced %d bytes (expected %d bytes)",
 			actualBytes, expectedBytes)
 	}
-	
+
 	t.Logf("✓ Extended circuit forwarding: 10 cells → %d bytes (expected %d bytes, 1:1 ratio)",
 		actualBytes, expectedBytes)
 }
@@ -127,7 +127,7 @@ func TestAmplificationFactorCreate2Response(t *testing.T) {
 	// Use silent logger to avoid counting log writes
 	silentLogger := logger.New(slog.LevelError, io.Discard)
 	handler := NewCircuitHandler(keys, silentLogger)
-	
+
 	responseBuffer := &bytes.Buffer{}
 	mockConn := &amplificationTracker{
 		WriteFunc: func(p []byte) (int, error) {
@@ -135,21 +135,21 @@ func TestAmplificationFactorCreate2Response(t *testing.T) {
 			return len(p), nil
 		},
 	}
-	
+
 	// Send CREATE2
 	circuitID := uint32(34567)
 	create2Cell := buildCreate2Cell(t, circuitID, keys)
-	
+
 	err := handler.HandleCellFromConnection(mockConn, create2Cell)
 	if err != nil {
 		t.Fatalf("CREATE2 failed: %v", err)
 	}
-	
+
 	// Verify exactly 1 CREATED2 response (514 bytes)
 	if responseBuffer.Len() != 514 {
 		t.Errorf("CREATE2 amplification: expected 514 bytes (1 cell), got %d bytes", responseBuffer.Len())
 	}
-	
+
 	t.Logf("✓ CREATE2 response amplification: 1 input → %d bytes (expected 514)", responseBuffer.Len())
 }
 
@@ -158,11 +158,11 @@ func TestAmplificationFactorCreate2Response(t *testing.T) {
 func TestAmplificationFactorDestroyPropagation(t *testing.T) {
 	keys := generateTestKeys(t)
 	handler := NewCircuitHandler(keys, logger.NewDefault())
-	
+
 	circuitID := uint32(45678)
 	mockClient := &amplificationTracker{}
 	createAndEstablishCircuit(t, handler, mockClient, circuitID)
-	
+
 	// Create extended circuit
 	var destroyCount atomic.Int32
 	mockNextHop := &amplificationTracker{
@@ -174,27 +174,27 @@ func TestAmplificationFactorDestroyPropagation(t *testing.T) {
 			return len(p), nil
 		},
 	}
-	
+
 	handler.forwarder.RegisterExtendedCircuit(circuitID, 88888, "10.0.0.2:9001", mockNextHop)
-	
+
 	// Send DESTROY
 	destroyCell := &cell.Cell{
 		CircID:  circuitID,
 		Command: cell.CmdDestroy,
 		Payload: []byte{cell.DestroyReasonDestroyed},
 	}
-	
+
 	err := handler.HandleCellFromConnection(mockClient, destroyCell)
 	if err != nil {
 		t.Fatalf("DESTROY failed: %v", err)
 	}
-	
+
 	// Verify at most 1 DESTROY propagated
 	count := destroyCount.Load()
 	if count > 1 {
 		t.Errorf("DESTROY amplification: 1 input produced %d DESTROY cells (expected ≤1)", count)
 	}
-	
+
 	t.Logf("✓ DESTROY propagation amplification: 1:%d (SAFE)", count)
 }
 
@@ -203,9 +203,9 @@ func TestAmplificationFactorDestroyPropagation(t *testing.T) {
 func TestAmplificationResistanceRelayCellBurst(t *testing.T) {
 	keys := generateTestKeys(t)
 	handler := NewCircuitHandler(keys, logger.NewDefault())
-	
+
 	circuitID := uint32(56789)
-	
+
 	var outputCount atomic.Int32
 	mockConn := &amplificationTracker{
 		WriteFunc: func(p []byte) (int, error) {
@@ -213,10 +213,10 @@ func TestAmplificationResistanceRelayCellBurst(t *testing.T) {
 			return len(p), nil
 		},
 	}
-	
+
 	createAndEstablishCircuit(t, handler, mockConn, circuitID)
 	outputCount.Store(0) // Reset after CREATED2
-	
+
 	// Send burst of 100 cells rapidly
 	const burstSize = 100
 	for i := 0; i < burstSize; i++ {
@@ -227,16 +227,16 @@ func TestAmplificationResistanceRelayCellBurst(t *testing.T) {
 		}
 		handler.HandleCellFromConnection(mockConn, relayCell)
 	}
-	
+
 	// Verify no amplification (should be 0 or very small responses)
 	count := outputCount.Load()
 	amplificationFactor := float64(count) / float64(burstSize)
-	
+
 	if amplificationFactor > 1.1 {
 		t.Errorf("Burst amplification detected: %d inputs → %d outputs (factor: %.2f)",
 			burstSize, count, amplificationFactor)
 	}
-	
+
 	t.Logf("✓ Burst amplification resistance: %d:%d (factor: %.2f, SAFE)",
 		burstSize, count, amplificationFactor)
 }
@@ -246,7 +246,7 @@ func TestAmplificationResistanceRelayCellBurst(t *testing.T) {
 func TestAmplificationResistanceInvalidCells(t *testing.T) {
 	keys := generateTestKeys(t)
 	handler := NewCircuitHandler(keys, logger.NewDefault())
-	
+
 	var destroyCount atomic.Int32
 	mockConn := &amplificationTracker{
 		WriteFunc: func(p []byte) (int, error) {
@@ -257,7 +257,7 @@ func TestAmplificationResistanceInvalidCells(t *testing.T) {
 			return len(p), nil
 		},
 	}
-	
+
 	// Send 50 malformed CREATE2 cells
 	const malformedCount = 50
 	for i := 0; i < malformedCount; i++ {
@@ -268,16 +268,16 @@ func TestAmplificationResistanceInvalidCells(t *testing.T) {
 		}
 		handler.HandleCellFromConnection(mockConn, badCell)
 	}
-	
+
 	// Verify limited responses (at most 1 DESTROY per invalid cell)
 	count := destroyCount.Load()
 	amplificationFactor := float64(count) / float64(malformedCount)
-	
+
 	if amplificationFactor > 1.0 {
 		t.Errorf("Invalid cell amplification: %d malformed → %d DESTROY cells (factor: %.2f)",
 			malformedCount, count, amplificationFactor)
 	}
-	
+
 	t.Logf("✓ Invalid cell amplification resistance: %d:%d (factor: %.2f, SAFE)",
 		malformedCount, count, amplificationFactor)
 }
@@ -287,9 +287,9 @@ func TestAmplificationResistanceInvalidCells(t *testing.T) {
 func TestAmplificationBandwidthRatio(t *testing.T) {
 	keys := generateTestKeys(t)
 	handler := NewCircuitHandler(keys, logger.NewDefault())
-	
+
 	circuitID := uint32(67890)
-	
+
 	var inputBytes, outputBytes atomic.Int64
 	mockConn := &amplificationTracker{
 		ReadFunc: func(p []byte) (int, error) {
@@ -301,13 +301,13 @@ func TestAmplificationBandwidthRatio(t *testing.T) {
 			return len(p), nil
 		},
 	}
-	
+
 	createAndEstablishCircuit(t, handler, mockConn, circuitID)
-	
+
 	// Reset counters after circuit creation
 	inputBytes.Store(0)
 	outputBytes.Store(0)
-	
+
 	// Send 10 RELAY cells (514 bytes each = 5140 bytes input)
 	for i := 0; i < 10; i++ {
 		relayCell := &cell.Cell{
@@ -318,20 +318,20 @@ func TestAmplificationBandwidthRatio(t *testing.T) {
 		cellBytes := new(bytes.Buffer)
 		relayCell.Encode(cellBytes)
 		inputBytes.Add(int64(cellBytes.Len()))
-		
+
 		handler.HandleCellFromConnection(mockConn, relayCell)
 	}
-	
+
 	in := inputBytes.Load()
 	out := outputBytes.Load()
 	ratio := float64(out) / float64(in)
-	
+
 	// Bandwidth amplification should be minimal (<10% overhead)
 	if ratio > 1.1 {
 		t.Errorf("Bandwidth amplification: %d bytes in → %d bytes out (ratio: %.2f)",
 			in, out, ratio)
 	}
-	
+
 	t.Logf("✓ Bandwidth amplification ratio: %d:%d (%.2fx, SAFE)", in, out, ratio)
 }
 
@@ -342,17 +342,17 @@ func TestAmplificationResistanceConcurrentCircuits(t *testing.T) {
 	// Use silent logger to avoid counting log writes
 	silentLogger := logger.New(slog.LevelError, io.Discard)
 	handler := NewCircuitHandler(keys, silentLogger)
-	
+
 	var totalBytes atomic.Int64
 	var wg sync.WaitGroup
-	
+
 	// Create 20 circuits concurrently
 	const numCircuits = 20
 	for i := 0; i < numCircuits; i++ {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
-			
+
 			buf := &bytes.Buffer{}
 			mockConn := &amplificationTracker{
 				WriteFunc: func(p []byte) (int, error) {
@@ -360,26 +360,26 @@ func TestAmplificationResistanceConcurrentCircuits(t *testing.T) {
 					return len(p), nil
 				},
 			}
-			
+
 			circuitID := uint32(100000 + id)
 			create2 := buildCreate2Cell(t, circuitID, keys)
 			handler.HandleCellFromConnection(mockConn, create2)
-			
+
 			totalBytes.Add(int64(buf.Len()))
 		}(i)
 	}
-	
+
 	wg.Wait()
-	
+
 	// Verify 1:1 response ratio (20 CREATE2 * 514 bytes = 10,280 expected)
 	expectedBytes := int64(numCircuits * 514)
 	actualBytes := totalBytes.Load()
-	
+
 	if actualBytes != expectedBytes {
 		t.Errorf("Concurrent circuit amplification: expected %d bytes (%d circuits × 514), got %d bytes",
 			expectedBytes, numCircuits, actualBytes)
 	}
-	
+
 	t.Logf("✓ Concurrent circuit creation: %d circuits → %d bytes (expected %d bytes, 1:1 ratio)",
 		numCircuits, actualBytes, expectedBytes)
 }
@@ -440,49 +440,49 @@ func (a *amplificationTracker) SetWriteDeadline(t time.Time) error { return nil 
 
 func generateTestKeys(t *testing.T) *RelayKeys {
 	t.Helper()
-	
+
 	// Generate Ed25519 identity keypair
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatalf("Failed to generate identity: %v", err)
 	}
-	
+
 	keys := &RelayKeys{
 		Ed25519Public:  pub,
 		Ed25519Private: priv,
 	}
-	
+
 	// Set compatibility fields
 	keys.Identity.Public = pub
 	keys.Identity.Private = priv
-	
+
 	ntorKey := make([]byte, 32)
 	if _, err := rand.Read(ntorKey); err != nil {
 		t.Fatalf("Failed to generate ntor key: %v", err)
 	}
 	keys.NtorOnionKey = ntorKey
-	
+
 	return keys
 }
 
 func buildCreate2Cell(t *testing.T, circuitID uint32, keys *RelayKeys) *cell.Cell {
 	t.Helper()
-	
+
 	// Build ntor handshake data (84 bytes)
 	clientPublic := make([]byte, 32)
 	rand.Read(clientPublic)
-	
+
 	relayPublic := make([]byte, 32)
 	rand.Read(relayPublic)
-	
+
 	identityHash := make([]byte, 20)
 	rand.Read(identityHash)
-	
+
 	handshakeData := make([]byte, 84)
 	copy(handshakeData[0:32], identityHash)
 	copy(handshakeData[32:64], relayPublic)
 	copy(handshakeData[64:84], clientPublic[:20])
-	
+
 	// Build CREATE2 payload
 	payload := make([]byte, 4+len(handshakeData))
 	payload[0] = 0x00
@@ -490,7 +490,7 @@ func buildCreate2Cell(t *testing.T, circuitID uint32, keys *RelayKeys) *cell.Cel
 	payload[2] = byte(len(handshakeData) >> 8)
 	payload[3] = byte(len(handshakeData) & 0xff)
 	copy(payload[4:], handshakeData)
-	
+
 	return &cell.Cell{
 		CircID:  circuitID,
 		Command: cell.CmdCreate2,
@@ -500,13 +500,13 @@ func buildCreate2Cell(t *testing.T, circuitID uint32, keys *RelayKeys) *cell.Cel
 
 func createAndEstablishCircuit(t *testing.T, handler *CircuitHandler, conn net.Conn, circuitID uint32) {
 	t.Helper()
-	
+
 	create2 := buildCreate2Cell(t, circuitID, handler.keys)
 	err := handler.HandleCellFromConnection(conn, create2)
 	if err != nil {
 		t.Fatalf("Failed to create circuit: %v", err)
 	}
-	
+
 	// Verify circuit exists
 	_, exists := handler.GetCircuit(circuitID)
 	if !exists {

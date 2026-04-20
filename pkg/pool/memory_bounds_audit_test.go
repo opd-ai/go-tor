@@ -238,8 +238,8 @@ func TestChannelBufferMemoryBounds(t *testing.T) {
 
 	t.Run("CircuitFlowControlWindow_MemoryBound", func(t *testing.T) {
 		// Circuit flow control windows (pkg/circuit/circuit.go:130-131)
-		const packageWindow = 1000  // Cells we can send
-		const deliverWindow = 1000  // Cells we can receive
+		const packageWindow = 1000 // Cells we can send
+		const deliverWindow = 1000 // Cells we can receive
 
 		// Assuming max payload per cell (509 bytes)
 		maxPendingData := deliverWindow * cell.PayloadLen
@@ -257,7 +257,7 @@ func TestChannelBufferMemoryBounds(t *testing.T) {
 // TestConcurrentBufferPoolMemorySafety verifies concurrent access doesn't cause unbounded growth
 func TestConcurrentBufferPoolMemorySafety(t *testing.T) {
 	const (
-		numGoroutines = 100
+		numGoroutines          = 100
 		iterationsPerGoroutine = 1000
 	)
 
