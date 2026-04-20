@@ -2298,24 +2298,114 @@ When planning or reviewing test work, always refer to the “Current Coverage An
   - TestManagerCloseAllStreams: manager close propagation
   - TestManagerGetNonexistentStream/RemoveNonexistentStream
   - TestStreamSendOnClosedStream/DoubleClose/FlowControlWindows
-- [ ] SOCKS5 protocol edge cases [pkg/socks] [unit] [3h]
-- [ ] Config validation comprehensive tests [pkg/config] [unit] [2h]
-- [ ] Pool exhaustion scenarios [pkg/pool] [stress] [3h]
-- [ ] Client startup/shutdown race conditions [pkg/client] [stress] [4h]
+- [x] SOCKS5 protocol edge cases [pkg/socks] [unit] [3h] ✅ **COMPLETED**
+  - Created `pkg/socks/socks5_edge_cases_test.go` with 14 test functions
+  - TestHandshakeEdgeZeroMethods: zero nmethods offered
+  - TestHandshakeEdgeMaxMethods: 255 identical methods
+  - TestHandshakeEdgeMidClose: connection closed mid-handshake
+  - TestPasswordAuthEdgeLengths: zero/max username+password
+  - TestPasswordAuthEdgeVersionMismatch: wrong auth sub-version
+  - TestReadRequestEdgeDomainLengths: zero and 255-byte domains
+  - TestReadRequestEdgePortBounds: port 0 and 65535
+  - TestReadRequestEdgeIPBounds: IPv4 0.0.0.0/255.255.255.255, IPv6 ::
+  - TestServerLifecycleEdgeCases: double shutdown, SetCircuitPool/Metrics nil
+  - TestSendReplyEdgeCases: nil/IPv4/IPv6 bind addresses
+  - TestSendDNSReplyEdgeCases: empty/IPv6 addresses, TTL encoding
+  - TestSendDNSReplyHostnameEdgeCases: empty/max/over-255 hostnames
+  - TestExtractClientIPEdgeCases: IPv6, invalid format, empty string
+  - TestConfigEdgeCases: zero MaxConnections, defaults verification
+- [x] Config validation comprehensive tests [pkg/config] [unit] [2h] ✅ **COMPLETED**
+  - Created `pkg/config/config_validation_comprehensive_test.go` with 10 test functions, 66 subtests
+  - TestValidateRateLimitingEdgeCases: rate limit enabled/disabled with zero/negative values
+  - TestValidatePaddingConfigEdgeCases: padding strategies, interval bounds, burst size
+  - TestValidateStreamBufferWatermarks: high/low watermark bounds and ordering
+  - TestValidateConnectionPoolEdgeCases: pool sizes, min/max relationships
+  - TestValidateIsolationLevelEdgeCases: all valid levels plus invalid strings
+  - TestValidateGuardPersistenceEdgeCases: backup count, interval, lock timeout bounds
+  - TestValidateCrashRecoveryEdgeCases: enabled/disabled with zero/negative values
+  - TestCloneComprehensive: deep copy correctness, nil bridge handling, bridge independence
+  - TestGetCheckpointPathEdgeCases: various data directory values
+  - TestDefaultConfigComprehensiveVerification: full field-by-field default verification
+- [x] Pool exhaustion scenarios [pkg/pool] [stress] [3h] ✅ **COMPLETED**
+  - Created `pkg/pool/pool_exhaustion_stress_test.go` with 17 test functions
+  - BufferPool: TestStressBufferPoolRapidGet, TestStressBufferPoolConcurrentHeavyLoad (100 goroutines), TestStressBufferPoolWrongSizePut, TestStressMixedBufferPoolConcurrent
+  - CircuitPool: TestStressCircuitPoolGetWithFailingBuilder, TestStressCircuitPoolGetWithNilBuilder, TestStressCircuitPoolGetCancelledCtx, TestStressCircuitPoolPutNil, TestStressCircuitPoolPutClosed, TestStressCircuitPoolPutAtMaxCapacity, TestStressCircuitPoolConcurrentGetPut, TestStressCircuitPoolIsolatedExhaustion, TestStressCircuitPoolStatsAccuracy, TestStressCircuitPoolCloseThenGet
+  - ConnectionPool: TestStressConnectionPoolCloseEmpty, TestStressConnectionPoolStatsEmpty, TestStressConnectionPoolCleanupEmpty, TestStressConnectionPoolRemoveEmpty, TestStressConnectionPoolConcurrentOps
+- [x] Client startup/shutdown race conditions [pkg/client] [stress] [4h] ✅ **COMPLETED**
+  - Created `pkg/client/shutdown_race_test.go` with 10 test functions
+  - TestRaceConcurrentStop: 20 goroutines calling Stop() simultaneously
+  - TestRaceStopBeforeStart: Stop() on never-started client
+  - TestRaceGetStatsDuringShutdown: concurrent GetStats during Stop
+  - TestRaceRecordBandwidthDuringShutdown: concurrent bandwidth recording during Stop
+  - TestRaceSimpleClientCloseIdempotent: multiple Close() calls
+  - TestRaceConcurrentNew: 10 goroutines creating clients simultaneously
+  - TestRaceGetCircuitDuringStop: circuit access during shutdown
+  - TestRacePublishEventDuringStop: event publishing during shutdown
+  - TestRaceRapidCreateCloseCycles: 20 rapid create-close cycles
+  - TestRaceContextCancelDuringStart: parent context cancellation during Start
 
 #### Medium (P2) - Extended Coverage
-- [ ] Rate limiting effectiveness tests [pkg/ratelimit] [integration] [3h]
-- [ ] Circuit padding machine states [pkg/circuit] [unit] [4h]
-- [ ] Recovery checkpoint/restore [pkg/recovery] [integration] [3h]
-- [ ] Autoconfig network detection [pkg/autoconfig] [unit] [2h]
-- [ ] Trace context propagation [pkg/trace] [integration] [2h]
-- [ ] HTTP metrics endpoint stress [pkg/httpmetrics] [stress] [2h]
-- [ ] Helper HTTP client scenarios [pkg/helpers] [unit] [2h]
+- [x] Rate limiting effectiveness tests [pkg/ratelimit] [integration] [3h] ✅ **COMPLETED**
+  - Created `pkg/ratelimit/effectiveness_test.go` with 12 test functions
+  - TestEffectivenessTokenRefillAccuracy: token refill rate verification
+  - TestEffectivenessBurstCapacity: burst enforcement in zero time
+  - TestEffectivenessRateOverTime: rate compliance over 500ms window
+  - TestEffectivenessMultiLimiterAtomicity: slower limiter is bottleneck
+  - TestEffectivenessMultiLimiterEmpty: empty MultiLimiter always allows
+  - TestEffectivenessKeyedIsolation: per-key isolation verification
+  - TestEffectivenessKeyedCleanup: stale key cleanup effectiveness
+  - TestEffectivenessWaitContextCancel: context cancellation responsiveness
+  - TestEffectivenessWaitNLargeN: large token requests fulfilled over time
+  - TestEffectivenessReserveDelay: delay accuracy verification
+  - TestEffectivenessConcurrentLimiting: concurrent rate enforcement
+  - TestEffectivenessDynamicRateUpdate: SetRate/SetBurst take effect
+- [x] Circuit padding machine states [pkg/circuit] [unit] [4h] ✅ **COMPLETED**
+  - Created `pkg/circuit/padding_machine_states_test.go` with 11 test functions
+  - TestStateMachineInvalidTransitions: Start from BURST/GAP/END states
+  - TestStateMachineDoubleStart: second Start() returns error
+  - TestStateMachineProcessEventStart: ProcessEvent in START state
+  - TestStateMachineProcessEventUnknown: ProcessEvent with invalid state
+  - TestStateMachineFullLifecycle: START→BURST→GAP→BURST→END transitions
+  - TestStateMachineStopFromEachState: Stop from all four states
+  - TestStateMachineStatsAccuracy: totalPaddingSent/burstCount verification
+  - TestStateMachineCustomParamsEdge: deterministic burst/gap, single-cell
+  - TestDecodeNegotiatePayloadSizes: 0/1/2/3/extra byte payloads
+  - TestStateMachineConcurrentStartStop: race-free concurrent operations
+  - TestPaddingMachineTypeUniqueness: machine type constant uniqueness
+- [x] Recovery checkpoint/restore [pkg/recovery] [integration] [3h] ✅ **COMPLETED**
+  - Created `pkg/recovery/checkpoint_integration_test.go` with 15 test functions
+  - TestIntegrationFullSaveLoadRoundtrip, TestIntegrationChecksumIntegrity,
+    TestIntegrationBackupRotation, TestIntegrationRecoveryFromBackup,
+    TestIntegrationConcurrentStateUpdates, TestIntegrationCheckpointLoopStartStop,
+    TestIntegrationCheckpointLoopIdempotent, TestIntegrationStopBeforeStart,
+    TestIntegrationRestoreNil, TestIntegrationBootstrapPhases,
+    TestIntegrationBandwidthAccumulation, TestIntegrationCircuitBuildEMA,
+    TestIntegrationFileExistsAndBackupPaths, TestIntegrationDefaultConfig,
+    TestIntegrationSaveCancelledContext
+- [x] Autoconfig network detection [pkg/autoconfig] [unit] [2h] ✅ **COMPLETED**
+  - Created `pkg/autoconfig/autoconfig_edge_test.go` with 22 test functions
+  - EnsureDataDir: nested dirs, correct perms, wrong perms, empty path
+  - EnsureSubDir: empty name, nested paths, non-existent parent
+  - CleanupTempFiles: empty dir, non-temp files, mixed files, patterns, non-existent dir
+  - FindAvailablePort: port 0, in-use port, high port
+  - isPortAvailable: already bound port
+  - GetDefaultDataDir: contains "go-tor", absolute path
+  - Permission handling: 0700 verification on Linux/Unix
+- [x] Trace context propagation [pkg/trace] [integration] [2h] ✅ **COMPLETED**
+  - Created `pkg/trace/propagation_test.go` with 10 test functions
+  - Nested span propagation, attribute isolation, error propagation,
+    concurrent child spans, context cancellation, multiple exporters,
+    sampler decision propagation, empty context, lifecycle ordering, End idempotency
+- [x] HTTP metrics endpoint stress [pkg/httpmetrics] [stress] [2h] ✅ **COMPLETED**
+  - Created `pkg/httpmetrics/stress_test.go` with 7 test functions
+  - Concurrent metrics/health/mixed endpoints, rapid start/stop,
+    concurrent start/stop, requests during shutdown, large responses
+- [x] Helper HTTP client scenarios [pkg/helpers] [unit] [2h] ✅ **COMPLETED**
 
 #### Low (P3) - Nice to Have
 - [ ] Bine integration scenarios [pkg/bine] [integration] [4h]
-- [ ] Profiling endpoint coverage [pkg/profiling] [unit] [2h]
-- [ ] Benchmark accuracy validation [pkg/benchmark] [unit] [2h]
+- [x] Profiling endpoint coverage [pkg/profiling] [unit] [2h] ✅ **COMPLETED**
+- [x] Benchmark accuracy validation [pkg/benchmark] [unit] [2h] ✅ **COMPLETED**
 
 ### 4.3 Test Infrastructure Improvements
 
