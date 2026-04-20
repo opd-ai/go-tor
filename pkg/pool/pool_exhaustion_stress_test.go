@@ -83,6 +83,7 @@ func TestStressMixedBufferPoolsConcurrent(t *testing.T) {
 	sizes := []int{514, 509, 1024, 8192}
 
 	wg.Add(goroutines * len(pools))
+	var sizeMismatches atomic.Int64
 	for pi, p := range pools {
 		expectedSize := sizes[pi]
 		for i := 0; i < goroutines; i++ {
@@ -91,6 +92,7 @@ func TestStressMixedBufferPoolsConcurrent(t *testing.T) {
 				for j := 0; j < 500; j++ {
 					buf := bp.Get()
 					if len(buf) != sz {
+						sizeMismatches.Add(1)
 						return
 					}
 					bp.Put(buf)
@@ -99,6 +101,9 @@ func TestStressMixedBufferPoolsConcurrent(t *testing.T) {
 		}
 	}
 	wg.Wait()
+	if n := sizeMismatches.Load(); n > 0 {
+		t.Errorf("buffer size mismatches detected: %d goroutines got wrong-sized buffers", n)
+	}
 }
 
 // --- CircuitPool Exhaustion Tests ---

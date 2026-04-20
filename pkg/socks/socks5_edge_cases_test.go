@@ -46,7 +46,8 @@ func helperHandshake(t *testing.T, srv *Server, input []byte) ([]byte, error) {
 	select {
 	case err := <-errCh:
 		return buf[:n], err
-	case <-time.After(time.Second):
+	case <-time.After(2 * time.Second):
+		t.Fatal("helperHandshake: handshake timed out")
 		return buf[:n], nil
 	}
 }
@@ -148,8 +149,13 @@ func TestEdgePasswordAuthBoundary(t *testing.T) {
 			client.Write(handshakeMsg)
 
 			// Read method selection response
+			if err := client.SetReadDeadline(time.Now().Add(2 * time.Second)); err != nil {
+				t.Fatalf("set read deadline: %v", err)
+			}
 			resp := make([]byte, 2)
-			io.ReadFull(client, resp)
+			if _, err := io.ReadFull(client, resp); err != nil {
+				t.Fatalf("read method-selection response: %v", err)
+			}
 
 			// Send auth sub-negotiation (RFC 1929)
 			var authMsg bytes.Buffer
@@ -162,7 +168,12 @@ func TestEdgePasswordAuthBoundary(t *testing.T) {
 
 			// Read auth response
 			authResp := make([]byte, 2)
-			io.ReadFull(client, authResp)
+			if _, err := io.ReadFull(client, authResp); err != nil {
+				t.Fatalf("read auth response: %v", err)
+			}
+			if err := client.SetReadDeadline(time.Time{}); err != nil {
+				t.Fatalf("clear read deadline: %v", err)
+			}
 
 			select {
 			case r := <-resCh:
@@ -193,8 +204,16 @@ func TestEdgePasswordAuthVersionMismatch(t *testing.T) {
 
 	// Offer password auth
 	client.Write([]byte{socks5Version, 0x01, authPassword})
+	if err := client.SetReadDeadline(time.Now().Add(2 * time.Second)); err != nil {
+		t.Fatalf("set read deadline: %v", err)
+	}
 	resp := make([]byte, 2)
-	io.ReadFull(client, resp)
+	if _, err := io.ReadFull(client, resp); err != nil {
+		t.Fatalf("read method-selection response: %v", err)
+	}
+	if err := client.SetReadDeadline(time.Time{}); err != nil {
+		t.Fatalf("clear read deadline: %v", err)
+	}
 
 	// Send auth with wrong version (0x02 instead of 0x01) in a goroutine
 	// because the server will return error after reading version byte,
