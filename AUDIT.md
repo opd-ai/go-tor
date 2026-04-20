@@ -2180,7 +2180,16 @@ When planning or reviewing test work, always refer to the “Current Coverage An
   - FuzzParseAuthorityCert: authority certificate parsing, 74k+ execs in 5s, no panics
   - FuzzValidateConsensusMetadata: metadata validation, 79k+ execs in 5s, no panics
   - Seeds cover: empty input, malformed entries, truncated data, garbage values, edge cases
-- [ ] ntor handshake edge cases and malformed inputs [pkg/crypto] [unit] [4h]
+- [x] ntor handshake edge cases and malformed inputs [pkg/crypto] [unit] [4h] ✅ **COMPLETED** (April 20, 2026)
+  - Created `pkg/crypto/ntor_edge_cases_test.go` with 8 test functions
+  - TestNtorClientHandshakeEdgeCases: 13 cases covering nil/empty/wrong-length keys
+  - TestNtorClientHandshakeDataFormat: validates NODEID||KEYID||CLIENT_PK structure
+  - TestNtorProcessResponseEdgeCases: 7 cases covering response length/auth validation
+  - TestNtorServerHandshakeEdgeCases: 9 cases covering all input validation paths
+  - TestNtorHandshakeRoundTripWithServerSide: full client→server round-trip
+  - TestNtorLowOrderPointHandling: security test for low-order Curve25519 points
+  - TestNtorKeyPairGeneration: uniqueness, derivation correctness
+  - TestNtorProcessResponseTamperedAuth: bit-flip tampering detection
 - [ ] Circuit encryption/decryption round-trip [pkg/circuit] [unit] [3h]
 - [ ] Protocol negotiation failure scenarios [pkg/protocol] [unit] [4h]
 - [ ] Onion descriptor encryption edge cases [pkg/onion] [unit] [4h]
