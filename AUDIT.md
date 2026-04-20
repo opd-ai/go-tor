@@ -2382,7 +2382,15 @@ When planning or reviewing test work, always refer to the “Current Coverage An
     TestIntegrationBandwidthAccumulation, TestIntegrationCircuitBuildEMA,
     TestIntegrationFileExistsAndBackupPaths, TestIntegrationDefaultConfig,
     TestIntegrationSaveCancelledContext
-- [ ] Autoconfig network detection [pkg/autoconfig] [unit] [2h]
+- [x] Autoconfig network detection [pkg/autoconfig] [unit] [2h] ✅ **COMPLETED**
+  - Created `pkg/autoconfig/autoconfig_edge_test.go` with 22 test functions
+  - EnsureDataDir: nested dirs, correct perms, wrong perms, empty path
+  - EnsureSubDir: empty name, nested paths, non-existent parent
+  - CleanupTempFiles: empty dir, non-temp files, mixed files, patterns, non-existent dir
+  - FindAvailablePort: port 0, in-use port, high port
+  - isPortAvailable: already bound port
+  - GetDefaultDataDir: contains "go-tor", absolute path
+  - Permission handling: 0700 verification on Linux/Unix
 - [ ] Trace context propagation [pkg/trace] [integration] [2h]
 - [ ] HTTP metrics endpoint stress [pkg/httpmetrics] [stress] [2h]
 - [ ] Helper HTTP client scenarios [pkg/helpers] [unit] [2h]
