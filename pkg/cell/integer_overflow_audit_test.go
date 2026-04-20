@@ -288,10 +288,10 @@ func TestIntegerOverflow_DecodeRelayCell(t *testing.T) {
 				payloadSize = RelayCellHeaderLen + tt.actualData
 			}
 			payload := make([]byte, payloadSize)
-			payload[0] = RelayData                                // Command
-			binary.BigEndian.PutUint16(payload[1:3], 0)           // Recognized
-			binary.BigEndian.PutUint16(payload[3:5], 1)           // StreamID
-			copy(payload[5:9], []byte{0, 0, 0, 0})                // Digest
+			payload[0] = RelayData                                    // Command
+			binary.BigEndian.PutUint16(payload[1:3], 0)               // Recognized
+			binary.BigEndian.PutUint16(payload[3:5], 1)               // StreamID
+			copy(payload[5:9], []byte{0, 0, 0, 0})                    // Digest
 			binary.BigEndian.PutUint16(payload[9:11], tt.lengthField) // Length (manipulated)
 			// Data starts at offset 11, we only provide tt.actualData bytes
 			if tt.actualData > 0 && payloadSize >= RelayCellHeaderLen+tt.actualData {

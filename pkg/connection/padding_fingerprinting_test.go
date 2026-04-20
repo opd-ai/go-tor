@@ -46,12 +46,12 @@ func TestConnectionPaddingFingerprintingResistance(t *testing.T) {
 // sufficient entropy to prevent timing-based fingerprinting.
 func testTimingEntropyFingerprinting(t *testing.T) {
 	strategies := []struct {
-		name            string
-		strategy        ConnectionPaddingStrategy
-		minInterval     time.Duration
-		maxInterval     time.Duration
-		minEntropyBits  float64
-		maxCorrelation  float64
+		name           string
+		strategy       ConnectionPaddingStrategy
+		minInterval    time.Duration
+		maxInterval    time.Duration
+		minEntropyBits float64
+		maxCorrelation float64
 	}{
 		{
 			name:           "random strategy",
@@ -705,11 +705,11 @@ func simulateConnectionWithPadding(realDuration time.Duration, config *Connectio
 	// Simulate connection with padding overhead
 	paddingCells := 0
 	elapsed := time.Duration(0)
-	
+
 	for elapsed < realDuration {
 		delay := pm.calculateNextDelay()
 		elapsed += delay
-		
+
 		// Each padding cell adds a small overhead to connection duration
 		if pm.shouldSendPadding() {
 			paddingCells++

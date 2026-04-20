@@ -160,13 +160,13 @@ func TestCellEncodingTimingDifference(t *testing.T) {
 func TestRelayCellValidationTiming(t *testing.T) {
 	// Test 1: Valid relay cell with maximum length
 	validPayload := make([]byte, PayloadLen)
-	validPayload[0] = RelayData                                         // Command
-	validPayload[1] = 0                                                 // Recognized (high byte)
-	validPayload[2] = 0                                                 // Recognized (low byte)
-	validPayload[3] = 0                                                 // StreamID (high byte)
-	validPayload[4] = 1                                                 // StreamID (low byte)
-	validPayload[9] = byte((PayloadLen - RelayCellHeaderLen) >> 8)     // Length (high byte)
-	validPayload[10] = byte((PayloadLen - RelayCellHeaderLen) & 0xFF)  // Length (low byte)
+	validPayload[0] = RelayData                                       // Command
+	validPayload[1] = 0                                               // Recognized (high byte)
+	validPayload[2] = 0                                               // Recognized (low byte)
+	validPayload[3] = 0                                               // StreamID (high byte)
+	validPayload[4] = 1                                               // StreamID (low byte)
+	validPayload[9] = byte((PayloadLen - RelayCellHeaderLen) >> 8)    // Length (high byte)
+	validPayload[10] = byte((PayloadLen - RelayCellHeaderLen) & 0xFF) // Length (low byte)
 
 	validResult := testing.Benchmark(func(b *testing.B) {
 		for i := 0; i < b.N; i++ {

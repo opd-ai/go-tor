@@ -45,11 +45,11 @@ func TestNoLocalInterfaceEnumeration(t *testing.T) {
 	// Verification: Code inspection confirms no such calls in pkg/socks/
 
 	t.Log("AUDIT CHECK: No local interface enumeration")
-	
+
 	// Verify socks.go does not import or use network interface functions
 	// This is verified by grep audit - see results above showing no matches
 	// for "net\.Interfaces" in pkg/socks/socks.go
-	
+
 	t.Log("✓ No net.Interfaces() calls in SOCKS5 implementation")
 	t.Log("✓ No net.InterfaceAddrs() calls in SOCKS5 implementation")
 	t.Log("✓ No local network adapter enumeration")
@@ -59,84 +59,84 @@ func TestNoLocalInterfaceEnumeration(t *testing.T) {
 // expose the client's local IP address to the target server
 func TestNoLocalIPAddressExposure(t *testing.T) {
 	log := logger.NewDefault()
-	
+
 	// Create circuit manager
 	circuitMgr := circuit.NewManager()
-	
+
 	// Create SOCKS5 server
 	server := NewServer("127.0.0.1:0", circuitMgr, log)
-	
+
 	// Create circuit pool
 	circuitPool := newMockCircuitPool(log)
 	server.SetCircuitPool(circuitPool)
-	
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	
+
 	// Start server
 	go server.ListenAndServe(ctx)
 	time.Sleep(100 * time.Millisecond)
 	defer server.Shutdown(context.Background())
-	
+
 	// Get actual listening address
 	addr := server.ListenerAddr()
 	if addr == nil {
 		t.Fatal("Server listener address is nil")
 	}
-	
+
 	// Connect to SOCKS5 server
 	conn, err := net.Dial("tcp", addr.String())
 	if err != nil {
 		t.Fatalf("Failed to connect to SOCKS5 server: %v", err)
 	}
 	defer conn.Close()
-	
+
 	// Perform handshake (no auth)
 	handshake := []byte{0x05, 0x01, 0x00} // SOCKS5, 1 method, no auth
 	if _, err := conn.Write(handshake); err != nil {
 		t.Fatalf("Failed to send handshake: %v", err)
 	}
-	
+
 	response := make([]byte, 2)
 	if _, err := io.ReadFull(conn, response); err != nil {
 		t.Fatalf("Failed to read handshake response: %v", err)
 	}
-	
+
 	// Verify the connection does NOT expose local IP in any reply
 	// The SOCKS5 reply should use 0.0.0.0 or the proxy's address, never the client's LAN IP
-	
+
 	// Send CONNECT request to example.com:80
 	connectReq := []byte{
-		0x05,       // SOCKS5
-		0x01,       // CONNECT
-		0x00,       // Reserved
-		0x03,       // Domain name
-		0x0b,       // Length: 11
+		0x05, // SOCKS5
+		0x01, // CONNECT
+		0x00, // Reserved
+		0x03, // Domain name
+		0x0b, // Length: 11
 		'e', 'x', 'a', 'm', 'p', 'l', 'e', '.', 'c', 'o', 'm',
 		0x00, 0x50, // Port 80
 	}
-	
+
 	if _, err := conn.Write(connectReq); err != nil {
 		t.Fatalf("Failed to send CONNECT request: %v", err)
 	}
-	
+
 	// Read SOCKS5 reply
 	replyHeader := make([]byte, 4)
 	if _, err := io.ReadFull(conn, replyHeader); err != nil {
 		t.Fatalf("Failed to read reply header: %v", err)
 	}
-	
+
 	// Read address based on type
 	addrType := replyHeader[3]
 	var bindAddr []byte
-	
+
 	switch addrType {
 	case 0x01: // IPv4
 		bindAddr = make([]byte, 4)
 		if _, err := io.ReadFull(conn, bindAddr); err != nil {
 			t.Fatalf("Failed to read IPv4 address: %v", err)
 		}
-		
+
 		// Verify bind address is NOT a private LAN IP (RFC 1918)
 		// Common WebRTC leak: exposes 192.168.x.x, 10.x.x.x, 172.16-31.x.x
 		if bindAddr[0] == 192 && bindAddr[1] == 168 {
@@ -148,10 +148,10 @@ func TestNoLocalIPAddressExposure(t *testing.T) {
 		if bindAddr[0] == 172 && bindAddr[1] >= 16 && bindAddr[1] <= 31 {
 			t.Error("SECURITY ISSUE: SOCKS5 reply exposes private 172.16-31.x.x address")
 		}
-		
-		t.Logf("✓ Bind address in reply: %d.%d.%d.%d (not a private LAN IP)", 
+
+		t.Logf("✓ Bind address in reply: %d.%d.%d.%d (not a private LAN IP)",
 			bindAddr[0], bindAddr[1], bindAddr[2], bindAddr[3])
-		
+
 	case 0x03: // Domain name
 		lenByte := make([]byte, 1)
 		if _, err := io.ReadFull(conn, lenByte); err != nil {
@@ -162,13 +162,13 @@ func TestNoLocalIPAddressExposure(t *testing.T) {
 			t.Fatalf("Failed to read domain name: %v", err)
 		}
 		t.Logf("✓ Bind address is domain: %s", string(bindAddr))
-		
+
 	case 0x04: // IPv6
 		bindAddr = make([]byte, 16)
 		if _, err := io.ReadFull(conn, bindAddr); err != nil {
 			t.Fatalf("Failed to read IPv6 address: %v", err)
 		}
-		
+
 		// Verify not a link-local IPv6 (fe80::/10) which leaks local network info
 		if bindAddr[0] == 0xfe && (bindAddr[1]&0xc0) == 0x80 {
 			t.Error("SECURITY ISSUE: SOCKS5 reply exposes link-local IPv6 address")
@@ -177,16 +177,16 @@ func TestNoLocalIPAddressExposure(t *testing.T) {
 		if (bindAddr[0] & 0xfe) == 0xfc {
 			t.Error("SECURITY ISSUE: SOCKS5 reply exposes unique local IPv6 address")
 		}
-		
+
 		t.Logf("✓ Bind address is IPv6: %x (not link-local or unique local)", bindAddr)
 	}
-	
+
 	// Read port
 	port := make([]byte, 2)
 	if _, err := io.ReadFull(conn, port); err != nil {
 		t.Fatalf("Failed to read port: %v", err)
 	}
-	
+
 	t.Log("✓ SOCKS5 reply does not expose client's local IP address")
 	t.Log("✓ No WebRTC-like IP leak through bind address")
 }
@@ -202,16 +202,16 @@ func TestNoSTUNFunctionality(t *testing.T) {
 	// - NOT respond to STUN binding requests
 	// - NOT expose TURN server functionality
 	// - NOT support UDP ASSOCIATE for STUN
-	
+
 	t.Log("AUDIT CHECK: No STUN/ICE functionality")
-	
+
 	// Verify no STUN protocol constants or packet handling
 	// Code inspection confirms:
 	// - cmdUDP = 0x03 (SOCKS5 UDP ASSOCIATE) returns cmdNotSupported error
 	// - No STUN packet parsing
 	// - No TURN relay functionality
 	// - No ICE candidate gathering
-	
+
 	t.Log("✓ No STUN protocol implementation")
 	t.Log("✓ No ICE candidate gathering")
 	t.Log("✓ No TURN relay functionality")
@@ -222,23 +222,23 @@ func TestNoSTUNFunctionality(t *testing.T) {
 func TestNoUDPHolePunching(t *testing.T) {
 	log := logger.NewDefault()
 	circuitMgr := circuit.NewManager()
-	
+
 	server := NewServer("127.0.0.1:0", circuitMgr, log)
-	
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	
+
 	go server.ListenAndServe(ctx)
 	time.Sleep(100 * time.Millisecond)
 	defer server.Shutdown(context.Background())
-	
+
 	addr := server.ListenerAddr()
 	conn, err := net.Dial("tcp", addr.String())
 	if err != nil {
 		t.Fatalf("Failed to connect: %v", err)
 	}
 	defer conn.Close()
-	
+
 	// Handshake
 	if _, err := conn.Write([]byte{0x05, 0x01, 0x00}); err != nil {
 		t.Fatal(err)
@@ -247,7 +247,7 @@ func TestNoUDPHolePunching(t *testing.T) {
 	if _, err := io.ReadFull(conn, response); err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Try UDP ASSOCIATE command (used for UDP hole punching)
 	udpAssociateReq := []byte{
 		0x05,       // SOCKS5
@@ -257,17 +257,17 @@ func TestNoUDPHolePunching(t *testing.T) {
 		0, 0, 0, 0, // 0.0.0.0
 		0x00, 0x00, // Port 0
 	}
-	
+
 	if _, err := conn.Write(udpAssociateReq); err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Read reply
 	replyHeader := make([]byte, 4)
 	if _, err := io.ReadFull(conn, replyHeader); err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Verify UDP ASSOCIATE is rejected (cmdUDP returns cmdNotSupported)
 	if replyHeader[1] == 0x00 { // Success
 		t.Error("SECURITY ISSUE: UDP ASSOCIATE succeeded (enables UDP hole punching)")
@@ -288,12 +288,12 @@ func TestNoMDNSDiscovery(t *testing.T) {
 	// - Listen on multicast addresses (224.0.0.251 for mDNS)
 	// - Send mDNS queries
 	// - Respond to service discovery requests
-	
+
 	t.Log("AUDIT CHECK: No mDNS/DNS-SD functionality")
-	
+
 	// Code inspection: net.Listen only accepts TCP addresses, no multicast
 	// No mDNS packet parsing or service announcement
-	
+
 	t.Log("✓ No mDNS multicast listener")
 	t.Log("✓ No DNS-SD service advertisement")
 	t.Log("✓ No .local hostname resolution")
@@ -311,12 +311,12 @@ func TestNoUPnPNATTraversal(t *testing.T) {
 	// - Discover UPnP IGD (Internet Gateway Device)
 	// - Send SSDP (Simple Service Discovery Protocol) requests
 	// - Create port mappings via NAT-PMP
-	
+
 	t.Log("AUDIT CHECK: No UPnP/NAT-PMP functionality")
-	
+
 	// Code inspection: No UPnP library imports, no SSDP multicast
 	// No NAT-PMP protocol implementation
-	
+
 	t.Log("✓ No UPnP IGD discovery")
 	t.Log("✓ No SSDP multicast requests")
 	t.Log("✓ No NAT-PMP port mapping")
@@ -333,15 +333,15 @@ func TestNoRawSocketAccess(t *testing.T) {
 	// The SOCKS5 implementation should only use:
 	// - net.Listen("tcp", ...)  for the SOCKS server
 	// - Circuit-based connections for target communication
-	
+
 	t.Log("AUDIT CHECK: No raw socket access")
-	
+
 	// Code inspection of socks.go:
 	// - Line 256: listener, err := net.Listen("tcp", s.address)
 	// - No net.ListenPacket() calls (UDP)
 	// - No syscall.Socket() calls (raw sockets)
 	// - No pcap/packet capture libraries
-	
+
 	t.Log("✓ Only TCP listener used (net.Listen)")
 	t.Log("✓ No raw socket creation")
 	t.Log("✓ No packet capture functionality")
@@ -352,31 +352,31 @@ func TestNoRawSocketAccess(t *testing.T) {
 func TestConnectionMetadataPrivacy(t *testing.T) {
 	log := logger.NewDefault()
 	circuitMgr := circuit.NewManager()
-	
+
 	server := NewServer("127.0.0.1:0", circuitMgr, log)
 	circuitPool := newMockCircuitPool(log)
 	server.SetCircuitPool(circuitPool)
-	
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	
+
 	go server.ListenAndServe(ctx)
 	time.Sleep(100 * time.Millisecond)
 	defer server.Shutdown(context.Background())
-	
+
 	addr := server.ListenerAddr()
 	conn, err := net.Dial("tcp", addr.String())
 	if err != nil {
 		t.Fatalf("Failed to connect: %v", err)
 	}
 	defer conn.Close()
-	
+
 	// The connection's LocalAddr() and RemoteAddr() are used internally
 	// but should never be forwarded to the target server
 	localAddr := conn.LocalAddr()
-	
+
 	t.Logf("Local connection address: %s (should NOT be sent to target)", localAddr)
-	
+
 	// Verify that the local address is only used for:
 	// 1. Logging (sanitized in production)
 	// 2. Rate limiting by IP (no forwarding)
@@ -386,7 +386,7 @@ func TestConnectionMetadataPrivacy(t *testing.T) {
 	// - The exit node's IP address (Tor circuit)
 	// - NOT the SOCKS client's IP
 	// - NOT the SOCKS proxy's IP
-	
+
 	t.Log("✓ Client IP only used for server-side rate limiting")
 	t.Log("✓ Client IP not forwarded in SOCKS protocol")
 	t.Log("✓ Target sees only Tor exit node IP")
@@ -404,16 +404,16 @@ func TestDNSLeakPrevention(t *testing.T) {
 	// 1. Supporting RESOLVE (0xF0) and RESOLVE_PTR (0xF1) commands
 	// 2. Routing all DNS through Tor circuits via circuit.ResolveHostname()
 	// 3. Never calling system DNS functions (net.LookupHost, net.LookupIP)
-	
+
 	t.Log("AUDIT CHECK: DNS leak prevention")
-	
+
 	// Verified in socks.go:
 	// - Lines 1194-1252: handleResolve() uses circuit.ResolveHostname()
 	// - Lines 1254-1328: handleResolvePTR() uses circuit.ResolveIP()
 	// - No net.LookupHost() calls
 	// - No net.LookupIP() calls
 	// - No direct DNS queries
-	
+
 	t.Log("✓ DNS RESOLVE command routes through Tor (RELAY_RESOLVE)")
 	t.Log("✓ DNS RESOLVE_PTR routes through Tor (RELAY_RESOLVE)")
 	t.Log("✓ No system DNS resolver calls")
@@ -434,9 +434,9 @@ func TestNoSystemNetworkCalls(t *testing.T) {
 	// - No net.InterfaceAddrs calls in pkg/socks/
 	// - Only net.Listen("tcp") for SOCKS server
 	// - Only net.Dial("tcp") in tests
-	
+
 	t.Log("AUDIT CHECK: No system network enumeration")
-	
+
 	t.Log("✓ No net.Interfaces() calls")
 	t.Log("✓ No net.InterfaceAddrs() calls")
 	t.Log("✓ No syscall network enumeration")
@@ -446,7 +446,7 @@ func TestNoSystemNetworkCalls(t *testing.T) {
 // TestSOCKS5PrivacyCompliance verifies overall SOCKS5 privacy compliance
 func TestSOCKS5PrivacyCompliance(t *testing.T) {
 	t.Log("=== SOCKS5 WebRTC-like IP Leak Prevention Audit ===")
-	
+
 	privacyChecks := []struct {
 		category string
 		status   string
@@ -503,10 +503,10 @@ func TestSOCKS5PrivacyCompliance(t *testing.T) {
 			details:  "No network enumeration, only circuit-based connections",
 		},
 	}
-	
+
 	t.Log("\nPrivacy Compliance Matrix:")
 	t.Log("---------------------------")
-	
+
 	allSecure := true
 	for _, check := range privacyChecks {
 		t.Logf("%-30s | %s | %s", check.category, check.status, check.details)
@@ -514,7 +514,7 @@ func TestSOCKS5PrivacyCompliance(t *testing.T) {
 			allSecure = false
 		}
 	}
-	
+
 	t.Log("\n=== Audit Results ===")
 	if allSecure {
 		t.Log("✅ ALL PRIVACY CHECKS PASSED")
@@ -523,7 +523,7 @@ func TestSOCKS5PrivacyCompliance(t *testing.T) {
 	} else {
 		t.Error("❌ PRIVACY VULNERABILITIES DETECTED")
 	}
-	
+
 	t.Log("\n=== Overall Assessment ===")
 	t.Log("Specification Compliance: 100% (RFC 1928 + Tor extensions)")
 	t.Log("Privacy Protection: EXCELLENT")

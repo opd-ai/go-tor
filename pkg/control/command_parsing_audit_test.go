@@ -92,23 +92,23 @@ func TestCommandParsingBufferSafety(t *testing.T) {
 // TestCommandParsingInputValidation verifies proper command syntax validation
 func TestCommandParsingInputValidation(t *testing.T) {
 	tests := []struct {
-		name           string
-		command        string
-		expectCode     string
-		authenticated  bool
-		requiresAuth   bool
-		skipTest       bool // Skip this test due to known behavior
+		name          string
+		command       string
+		expectCode    string
+		authenticated bool
+		requiresAuth  bool
+		skipTest      bool // Skip this test due to known behavior
 	}{
 		{
 			name:       "empty_command_line",
 			command:    "",
-			expectCode: "", // Empty lines are ignored
+			expectCode: "",   // Empty lines are ignored
 			skipTest:   true, // Skip - empty lines cause server to wait indefinitely
 		},
 		{
 			name:       "whitespace_only",
 			command:    "   \t  ",
-			expectCode: "", // Whitespace-only lines are ignored
+			expectCode: "",   // Whitespace-only lines are ignored
 			skipTest:   true, // Skip - whitespace lines cause server to wait indefinitely
 		},
 		{

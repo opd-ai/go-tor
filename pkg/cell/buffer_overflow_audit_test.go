@@ -403,11 +403,11 @@ func (r *errorAfterNReader) Read(p []byte) (n int, err error) {
 // TestBufferOverflow_EdgeCases verifies various edge cases
 func TestBufferOverflow_EdgeCases(t *testing.T) {
 	testCases := []struct {
-		name     string
-		circID   uint32
-		cmd      Command
+		name       string
+		circID     uint32
+		cmd        Command
 		payloadLen int
-		expectErr bool
+		expectErr  bool
 	}{
 		{"MinCircID", 0, CmdRelay, 10, false},
 		{"MaxCircID", 0xFFFFFFFF, CmdRelay, 10, false},

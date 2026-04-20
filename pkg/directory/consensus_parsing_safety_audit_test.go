@@ -278,12 +278,12 @@ func TestConsensusParsingMalformedInput(t *testing.T) {
 // TestConsensusParsingDoSResistance verifies DoS resistance
 func TestConsensusParsingDoSResistance(t *testing.T) {
 	tests := []struct {
-		name         string
-		inputFunc    func() string
-		timeout      time.Duration
-		maxMemoryMB  int
-		expectError  bool
-		description  string
+		name        string
+		inputFunc   func() string
+		timeout     time.Duration
+		maxMemoryMB int
+		expectError bool
+		description string
 	}{
 		{
 			name: "many relays",
@@ -361,7 +361,7 @@ func TestConsensusParsingDoSResistance(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			input := tt.inputFunc()
-			
+
 			done := make(chan bool, 1)
 			var relays []*Relay
 			var err error
@@ -527,9 +527,9 @@ func TestConsensusParsingMemoryExhaustion(t *testing.T) {
 // TestConsensusParsingMetadataSafety verifies metadata parsing safety
 func TestConsensusParsingMetadataSafety(t *testing.T) {
 	tests := []struct {
-		name        string
-		input       string
-		checkFunc   func(*testing.T, *ConsensusMetadata, error)
+		name      string
+		input     string
+		checkFunc func(*testing.T, *ConsensusMetadata, error)
 	}{
 		{
 			name: "malformed timestamp",

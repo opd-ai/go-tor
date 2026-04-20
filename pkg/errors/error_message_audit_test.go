@@ -13,11 +13,11 @@ import (
 // TestErrorMessageNoSensitiveDataLeak audits error messages for sensitive information
 func TestErrorMessageNoSensitiveDataLeak(t *testing.T) {
 	tests := []struct {
-		name      string
-		errorMsg  string
-		safe      bool
-		reason    string
-		category  string
+		name     string
+		errorMsg string
+		safe     bool
+		reason   string
+		category string
 	}{
 		// SAFE: Generic error messages
 		{
@@ -46,7 +46,7 @@ func TestErrorMessageNoSensitiveDataLeak(t *testing.T) {
 			reason:   "Cell command types are protocol-defined constants, not sensitive",
 			category: "protocol",
 		},
-		
+
 		// UNSAFE: Sensitive data leakage examples
 		{
 			name:     "password_in_error",
@@ -83,7 +83,7 @@ func TestErrorMessageNoSensitiveDataLeak(t *testing.T) {
 			reason:   "Hints at key material content",
 			category: "crypto",
 		},
-		
+
 		// SAFE: Proper error message patterns
 		{
 			name:     "sanitized_auth_failure",
@@ -126,13 +126,13 @@ func TestErrorMessageNoSensitiveDataLeak(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				leaked := containsSensitiveData(tt.errorMsg)
-				
+
 				if tt.safe && leaked {
 					t.Errorf("Error message marked as SAFE but contains sensitive patterns: %s\n"+
 						"Message: %s\nReason: %s",
 						tt.name, tt.errorMsg, tt.reason)
 				}
-				
+
 				if !tt.safe && !leaked {
 					t.Logf("INFO: Error message marked UNSAFE but no automatic detection (manual review required)\n"+
 						"Message: %s\nReason: %s",
@@ -148,10 +148,10 @@ func TestErrorFormattingBestPractices(t *testing.T) {
 	// Generate test key material
 	key := make([]byte, 32)
 	rand.Read(key)
-	
+
 	password := "test_password_123"
 	token := "session_token_abc123"
-	
+
 	tests := []struct {
 		name         string
 		errorFormat  string
@@ -221,14 +221,14 @@ func TestErrorFormattingBestPractices(t *testing.T) {
 			reason:       "Operation type and circuit ID are not secret",
 		},
 	}
-	
+
 	t.Run("error_formatting_patterns", func(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				msg := fmt.Sprintf(tt.errorFormat, tt.args...)
-				
+
 				leaked := containsSensitiveData(msg)
-				
+
 				if tt.expectUnsafe && !leaked {
 					// Manual pattern check for cases auto-detection might miss
 					if tt.pattern != "" {
@@ -244,7 +244,7 @@ func TestErrorFormattingBestPractices(t *testing.T) {
 						}
 					}
 				}
-				
+
 				if !tt.expectUnsafe && leaked {
 					t.Errorf("Safe error message triggered sensitive data detection\n"+
 						"Message: %s\nReason: %s",
@@ -259,7 +259,7 @@ func TestErrorFormattingBestPractices(t *testing.T) {
 func TestErrorContextPropagation(t *testing.T) {
 	key := make([]byte, 16)
 	rand.Read(key)
-	
+
 	tests := []struct {
 		name      string
 		baseError error
@@ -295,20 +295,20 @@ func TestErrorContextPropagation(t *testing.T) {
 			reason: "Wrapper adds non-sensitive metadata",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			wrapped := tt.wrapper(tt.baseError)
 			msg := wrapped.Error()
-			
+
 			leaked := containsSensitiveData(msg)
-			
+
 			if !tt.safe && !leaked {
 				t.Logf("WARN: Unsafe wrapper expected but not auto-detected\n"+
 					"Message: %s\nReason: %s",
 					msg, tt.reason)
 			}
-			
+
 			if tt.safe && leaked {
 				t.Errorf("Safe wrapper triggered leak detection\n"+
 					"Message: %s\nReason: %s",
@@ -346,7 +346,7 @@ func TestCommonVulnerablePatterns(t *testing.T) {
 			pattern:     `password[:\s=]+['"]?[\w!@#$%^&*()]+['"]?`,
 			example:     "error: password='secret123'",
 			description: "Password value exposed after keyword",
-			severity:     "CRITICAL",
+			severity:    "CRITICAL",
 		},
 		{
 			name:        "key_keyword_with_value",
@@ -363,18 +363,18 @@ func TestCommonVulnerablePatterns(t *testing.T) {
 			severity:    "HIGH",
 		},
 	}
-	
+
 	t.Run("vulnerable_pattern_detection", func(t *testing.T) {
 		for _, vp := range vulnerablePatterns {
 			t.Run(vp.name, func(t *testing.T) {
 				re := regexp.MustCompile(vp.pattern)
-				
+
 				// Test that example matches pattern
 				if !re.MatchString(vp.example) {
 					t.Errorf("Pattern %s does not match its example\nPattern: %s\nExample: %s",
 						vp.name, vp.pattern, vp.example)
 				}
-				
+
 				// Test that safe messages don't match
 				safeMessages := []string{
 					"connection failed",
@@ -383,14 +383,14 @@ func TestCommonVulnerablePatterns(t *testing.T) {
 					"circuit 123 closed",
 					"expected 32 bytes, got 16",
 				}
-				
+
 				for _, safe := range safeMessages {
 					if re.MatchString(safe) {
 						t.Errorf("Pattern %s incorrectly matched safe message: %s",
 							vp.name, safe)
 					}
 				}
-				
+
 				t.Logf("PATTERN: %s [%s]\nDescription: %s\nExample: %s",
 					vp.name, vp.severity, vp.description, vp.example)
 			})
@@ -429,7 +429,7 @@ func TestErrorMessageGuidelines(t *testing.T) {
 			`  - fmt.Errorf("secret: %v", secretData)`,
 			`  - logger.Error("auth failed", "password", password)`,
 		}
-		
+
 		for _, line := range guidelines {
 			t.Log(line)
 		}
@@ -439,7 +439,7 @@ func TestErrorMessageGuidelines(t *testing.T) {
 // containsSensitiveData checks if a string contains patterns indicative of sensitive data
 func containsSensitiveData(s string) bool {
 	lower := strings.ToLower(s)
-	
+
 	// Check for sensitive keywords followed by data
 	sensitivePatterns := []string{
 		`password[:\s=]+['"]?[^\s'"]+`,
@@ -448,14 +448,14 @@ func containsSensitiveData(s string) bool {
 		`key[:\s=]+[0-9a-f]{16,}`,
 		`[0-9a-f]{64,}`, // Long hex strings (SHA256 hashes, keys)
 	}
-	
+
 	for _, pattern := range sensitivePatterns {
 		matched, _ := regexp.MatchString(pattern, lower)
 		if matched {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -504,17 +504,17 @@ func TestRealWorldErrorExamples(t *testing.T) {
 			notes:    "Protocol constant, not secret",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			leaked := containsSensitiveData(tt.errorMsg)
-			
+
 			if leaked && tt.safe {
 				t.Errorf("Real-world safe error triggered leak detection\n"+
 					"Source: %s\nMessage: %s\nNotes: %s",
 					tt.source, tt.errorMsg, tt.notes)
 			}
-			
+
 			t.Logf("VERIFIED: %s [SAFE: %v]\n  Message: %s\n  Notes: %s",
 				tt.source, tt.safe, tt.errorMsg, tt.notes)
 		})

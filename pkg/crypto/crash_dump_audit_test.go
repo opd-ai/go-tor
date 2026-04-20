@@ -35,7 +35,7 @@ func TestNoKeyMaterialInStringConversion(t *testing.T) {
 		// Verify no String() method exists by checking fmt.Sprintf behavior
 		// If String() exists, it would be called automatically
 		str := fmt.Sprintf("%v", key)
-		
+
 		// The default format should be "&{key:0x...}" not actual key material
 		if strings.Contains(str, "D:") || strings.Contains(str, "Primes:") {
 			t.Errorf("RSAPrivateKey String representation leaks key material: %s", str)
@@ -79,7 +79,7 @@ func TestNoKeyMaterialInStringConversion(t *testing.T) {
 
 		// Convert private key to hex to check if it appears in output
 		privHex := hex.EncodeToString(kp.Private[:])
-		
+
 		if strings.Contains(str, privHex) {
 			t.Errorf("NtorKeyPair String representation leaks private key material")
 		}
@@ -102,7 +102,7 @@ func TestNoKeyMaterialInStringConversion(t *testing.T) {
 
 		// Ed25519 private keys in Go are 64 bytes (seed + public key)
 		privHex := hex.EncodeToString(priv[:32]) // First 32 bytes are the seed
-		
+
 		if strings.Contains(str, privHex) {
 			t.Errorf("Ed25519 PrivateKey String representation leaks private key seed")
 		}
@@ -124,13 +124,13 @@ func TestPanicDoesNotLeakKeys(t *testing.T) {
 			if r := recover(); r != nil {
 				// Get stack trace
 				stack := string(debug.Stack())
-				
+
 				// Verify the panic message doesn't contain key material
 				panicMsg := fmt.Sprintf("%v", r)
 				if len(panicMsg) > 100 {
 					t.Errorf("Panic message too long, might contain key material: %d bytes", len(panicMsg))
 				}
-				
+
 				// Stack trace should not contain hex-encoded key material
 				// (function args are sometimes shown in stack traces)
 				if strings.Contains(stack, "0x") && len(stack) > 5000 {
@@ -160,7 +160,7 @@ func TestMemoryDumpDoesNotContainKeys(t *testing.T) {
 		// Generate random key material
 		keyMaterial := make([]byte, 32)
 		copy(keyMaterial, []byte("supersecretkey123456789012345678"))
-		
+
 		// Create a copy to verify later
 		original := make([]byte, 32)
 		copy(original, keyMaterial)
@@ -280,19 +280,19 @@ func TestErrorMessagesDoNotLeakKeys(t *testing.T) {
 		// Try to encrypt data that's too large (will fail)
 		largeData := make([]byte, 2048) // Too large for 1024-bit RSA
 		_, err = pubKey.Encrypt(largeData)
-		
+
 		if err == nil {
 			t.Fatal("Expected encryption to fail with large data")
 		}
 
 		// Error message should not contain key material
 		errMsg := err.Error()
-		
+
 		// Check for hex-encoded key components
 		if strings.Contains(errMsg, hex.EncodeToString(key.key.D.Bytes())) {
 			t.Error("RSA error message leaks private exponent D")
 		}
-		
+
 		// Error should be generic
 		if !strings.Contains(errMsg, "failed") || !strings.Contains(errMsg, "encryption") {
 			t.Logf("Error message format: %s", errMsg)
@@ -332,16 +332,16 @@ func TestErrorMessagesDoNotLeakKeys(t *testing.T) {
 		// Error message should not leak client private key
 		errMsg := err.Error()
 		privHex := hex.EncodeToString(clientPriv)
-		
+
 		if strings.Contains(errMsg, privHex[:32]) {
 			t.Error("Ntor error message leaks client private key")
 		}
-		
+
 		// Should be a generic error
 		if !strings.Contains(errMsg, "failed") && !strings.Contains(errMsg, "invalid") {
 			t.Logf("Error message: %s", errMsg)
 		}
-		
+
 		// Cleanup
 		_ = handshakeData // Use handshakeData to avoid unused variable warning
 	})
@@ -353,26 +353,26 @@ func TestBufferPoolDoesNotRetainKeys(t *testing.T) {
 	t.Run("GetBuffer_NoResidualData", func(t *testing.T) {
 		// Get a buffer from the pool
 		buf1 := GetBuffer()
-		
+
 		// Write sensitive data
 		copy(buf1, []byte("supersecret"))
-		
+
 		// Explicitly zero before returning (best practice)
 		security.SecureZeroMemory(buf1)
-		
+
 		// Return to pool
 		PutBuffer(buf1)
-		
+
 		// Get another buffer (might be the same one)
 		buf2 := GetBuffer()
-		
+
 		// Verify no residual data
 		for i, b := range buf2[:11] {
 			if b != 0 {
 				t.Errorf("Buffer position %d contains residual data: 0x%02x", i, b)
 			}
 		}
-		
+
 		PutBuffer(buf2)
 	})
 }
@@ -389,14 +389,14 @@ func TestNoFinalizersOnKeyTypes(t *testing.T) {
 
 		// runtime.SetFinalizer is not used in crypto package
 		// (verifying by code inspection, not runtime check)
-		
+
 		// Clean up immediately instead of relying on finalizers
 		key.key.D = nil
 		key.key.Primes = nil
-		
+
 		// Finalizers would delay cleanup until GC
 		runtime.GC()
-		
+
 		// Key should be immediately cleared, not waiting for finalizer
 		if key.key.D != nil {
 			t.Error("RSA key not immediately cleared")
@@ -410,7 +410,7 @@ func TestKeyMaterialNotInJSONEncoding(t *testing.T) {
 	t.Run("RSAPrivateKey_NoJSONMarshal", func(t *testing.T) {
 		// RSAPrivateKey and RSAPublicKey don't implement json.Marshaler
 		// This is intentional to prevent accidental key leakage
-		
+
 		key, err := GenerateRSAKey(1024)
 		if err != nil {
 			t.Fatalf("Failed to generate RSA key: %v", err)
@@ -418,10 +418,10 @@ func TestKeyMaterialNotInJSONEncoding(t *testing.T) {
 
 		// If someone tries to JSON marshal our key wrapper, it will fail
 		// or produce empty/safe output (no key material)
-		
+
 		// Note: We can't directly test json.Marshal here without importing encoding/json
 		// But we verify that our wrappers don't have MarshalJSON methods
-		
+
 		// Verify struct has no exported fields
 		// (private fields won't be marshaled)
 		str := fmt.Sprintf("%#v", key)

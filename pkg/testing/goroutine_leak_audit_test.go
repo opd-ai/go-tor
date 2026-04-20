@@ -41,10 +41,10 @@ func captureGoroutines() goroutineSnapshot {
 	// Force GC to clean up any finished goroutines
 	runtime.GC()
 	time.Sleep(10 * time.Millisecond)
-	
+
 	buf := make([]byte, 1<<20) // 1MB buffer for stack traces
 	n := runtime.Stack(buf, true)
-	
+
 	return goroutineSnapshot{
 		count:      runtime.NumGoroutine(),
 		stackTrace: string(buf[:n]),
@@ -54,7 +54,7 @@ func captureGoroutines() goroutineSnapshot {
 // checkLeaks verifies that goroutine count returns to baseline within timeout
 func checkLeaks(t *testing.T, before, after goroutineSnapshot, tolerance int) {
 	t.Helper()
-	
+
 	leaked := after.count - before.count
 	if leaked > tolerance {
 		t.Errorf("GOROUTINE LEAK DETECTED: %d goroutines leaked (before: %d, after: %d, tolerance: %d)",
@@ -70,11 +70,11 @@ func waitForGoroutineStabilization(timeout time.Duration) int {
 	deadline := time.Now().Add(timeout)
 	lastCount := runtime.NumGoroutine()
 	stableFor := 0
-	
+
 	for time.Now().Before(deadline) {
 		runtime.GC()
 		time.Sleep(50 * time.Millisecond)
-		
+
 		currentCount := runtime.NumGoroutine()
 		if currentCount == lastCount {
 			stableFor++
@@ -86,19 +86,19 @@ func waitForGoroutineStabilization(timeout time.Duration) int {
 			lastCount = currentCount
 		}
 	}
-	
+
 	return lastCount
 }
 
 // TestClientGoroutineLifecycle verifies Client goroutines terminate properly
 func TestClientGoroutineLifecycle(t *testing.T) {
 	before := captureGoroutines()
-	
+
 	// Simulate client lifecycle pattern used in pkg/client/client.go
 	ctx, cancel := context.WithCancel(context.Background())
 	var wg sync.WaitGroup
 	shutdown := make(chan struct{})
-	
+
 	// Pattern 1: SOCKS5 server goroutine (line 216)
 	wg.Add(1)
 	go func() {
@@ -110,14 +110,14 @@ func TestClientGoroutineLifecycle(t *testing.T) {
 			return
 		}
 	}()
-	
+
 	// Pattern 2: Circuit maintenance goroutine (line 247)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		ticker := time.NewTicker(100 * time.Millisecond)
 		defer ticker.Stop()
-		
+
 		for {
 			select {
 			case <-ctx.Done():
@@ -129,14 +129,14 @@ func TestClientGoroutineLifecycle(t *testing.T) {
 			}
 		}
 	}()
-	
+
 	// Pattern 3: Bandwidth monitoring goroutine (line 262)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		ticker := time.NewTicker(100 * time.Millisecond)
 		defer ticker.Stop()
-		
+
 		for {
 			select {
 			case <-ctx.Done():
@@ -148,32 +148,32 @@ func TestClientGoroutineLifecycle(t *testing.T) {
 			}
 		}
 	}()
-	
+
 	// Verify goroutines are running
 	time.Sleep(50 * time.Millisecond)
-	
+
 	// Graceful shutdown
 	close(shutdown)
 	cancel()
-	
+
 	// Wait for all goroutines with timeout
 	done := make(chan struct{})
 	go func() {
 		wg.Wait()
 		close(done)
 	}()
-	
+
 	select {
 	case <-done:
 		t.Log("All client goroutines terminated successfully")
 	case <-time.After(5 * time.Second):
 		t.Fatal("Client goroutines did not terminate within timeout")
 	}
-	
+
 	// Allow time for cleanup
 	time.Sleep(100 * time.Millisecond)
 	after := captureGoroutines()
-	
+
 	// Check for leaks (tolerance: 2 for test harness overhead)
 	checkLeaks(t, before, after, 2)
 }
@@ -181,11 +181,11 @@ func TestClientGoroutineLifecycle(t *testing.T) {
 // TestCircuitSendmeGoroutines verifies SENDME goroutines don't leak
 func TestCircuitSendmeGoroutines(t *testing.T) {
 	before := captureGoroutines()
-	
+
 	// Simulate circuit SENDME pattern from pkg/circuit/circuit.go:1167
 	iterations := 100
 	resultCh := make(chan error, iterations)
-	
+
 	for i := 0; i < iterations; i++ {
 		// Pattern: Send SENDME in background without blocking (line 1167)
 		go func(id int) {
@@ -194,7 +194,7 @@ func TestCircuitSendmeGoroutines(t *testing.T) {
 			resultCh <- nil
 		}(i)
 	}
-	
+
 	// Collect all results (ensures goroutines complete)
 	for i := 0; i < iterations; i++ {
 		select {
@@ -204,11 +204,11 @@ func TestCircuitSendmeGoroutines(t *testing.T) {
 			t.Fatalf("SENDME goroutine %d did not complete", i)
 		}
 	}
-	
+
 	// Allow cleanup
 	time.Sleep(100 * time.Millisecond)
 	after := captureGoroutines()
-	
+
 	// Check for leaks (tolerance: 2)
 	checkLeaks(t, before, after, 2)
 }
@@ -216,19 +216,19 @@ func TestCircuitSendmeGoroutines(t *testing.T) {
 // TestSocksRelayGoroutines verifies bidirectional relay goroutines terminate
 func TestSocksRelayGoroutines(t *testing.T) {
 	before := captureGoroutines()
-	
+
 	// Simulate SOCKS relay pattern from pkg/socks/socks.go:927
 	ctx, cancel := context.WithCancel(context.Background())
 	var wg sync.WaitGroup
-	
+
 	dataCh := make(chan []byte, 10)
-	
+
 	// Pattern 1: SOCKS client -> Tor circuit (line 927)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		defer close(dataCh)
-		
+
 		for i := 0; i < 10; i++ {
 			select {
 			case <-ctx.Done():
@@ -238,12 +238,12 @@ func TestSocksRelayGoroutines(t *testing.T) {
 			}
 		}
 	}()
-	
+
 	// Pattern 2: Tor circuit -> SOCKS client (line 971)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		
+
 		for {
 			select {
 			case <-ctx.Done():
@@ -257,47 +257,47 @@ func TestSocksRelayGoroutines(t *testing.T) {
 			}
 		}
 	}()
-	
+
 	// Let goroutines run
 	time.Sleep(200 * time.Millisecond)
-	
+
 	// Cancel context to trigger shutdown
 	cancel()
-	
+
 	// Wait for completion
 	done := make(chan struct{})
 	go func() {
 		wg.Wait()
 		close(done)
 	}()
-	
+
 	select {
 	case <-done:
 		t.Log("SOCKS relay goroutines terminated successfully")
 	case <-time.After(5 * time.Second):
 		t.Fatal("SOCKS relay goroutines did not terminate")
 	}
-	
+
 	// Allow cleanup
 	time.Sleep(100 * time.Millisecond)
 	after := captureGoroutines()
-	
+
 	checkLeaks(t, before, after, 2)
 }
 
 // TestConnectionNonBlockingRead verifies non-blocking read goroutines terminate
 func TestConnectionNonBlockingRead(t *testing.T) {
 	before := captureGoroutines()
-	
+
 	// Simulate connection read pattern from pkg/connection/connection.go:392
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
-	
+
 	resultCh := make(chan struct {
 		data []byte
 		err  error
 	}, 1)
-	
+
 	// Pattern: Non-blocking read with context cancellation (line 392)
 	go func() {
 		// Simulate blocking read that respects context
@@ -315,7 +315,7 @@ func TestConnectionNonBlockingRead(t *testing.T) {
 			}{[]byte("data"), nil}
 		}
 	}()
-	
+
 	// Wait for result or timeout
 	select {
 	case result := <-resultCh:
@@ -325,27 +325,27 @@ func TestConnectionNonBlockingRead(t *testing.T) {
 	case <-time.After(1 * time.Second):
 		t.Fatal("Non-blocking read goroutine did not complete")
 	}
-	
+
 	// Allow cleanup
 	time.Sleep(100 * time.Millisecond)
 	after := captureGoroutines()
-	
+
 	checkLeaks(t, before, after, 2)
 }
 
 // TestRelayORHandlerGoroutines verifies OR handler goroutines terminate
 func TestRelayORHandlerGoroutines(t *testing.T) {
 	before := captureGoroutines()
-	
+
 	// Simulate OR handler pattern from pkg/relay/or_handler.go:338
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	type readResult struct {
 		n   int
 		err error
 	}
 	resultCh := make(chan readResult, 1)
-	
+
 	// Pattern: Context-cancellable read (line 338)
 	go func() {
 		select {
@@ -355,10 +355,10 @@ func TestRelayORHandlerGoroutines(t *testing.T) {
 			resultCh <- readResult{5, nil}
 		}
 	}()
-	
+
 	// Cancel immediately
 	cancel()
-	
+
 	// Wait for result
 	select {
 	case result := <-resultCh:
@@ -368,30 +368,30 @@ func TestRelayORHandlerGoroutines(t *testing.T) {
 	case <-time.After(1 * time.Second):
 		t.Fatal("OR handler goroutine did not complete")
 	}
-	
+
 	// Allow cleanup
 	time.Sleep(100 * time.Millisecond)
 	after := captureGoroutines()
-	
+
 	checkLeaks(t, before, after, 2)
 }
 
 // TestOnionServiceRendezvousGoroutine verifies rendezvous builder goroutines terminate
 func TestOnionServiceRendezvousGoroutine(t *testing.T) {
 	before := captureGoroutines()
-	
+
 	// Simulate onion service pattern from pkg/onion/service.go:1049
 	parentCtx, parentCancel := context.WithCancel(context.Background())
 	var wg sync.WaitGroup
-	
+
 	wg.Add(1)
 	// Pattern: Asynchronous rendezvous circuit building (line 1049)
 	go func() {
 		defer wg.Done()
-		
+
 		ctx, cancel := context.WithTimeout(parentCtx, 200*time.Millisecond)
 		defer cancel()
-		
+
 		select {
 		case <-ctx.Done():
 			// Context cancelled or timed out
@@ -401,44 +401,44 @@ func TestOnionServiceRendezvousGoroutine(t *testing.T) {
 			return
 		}
 	}()
-	
+
 	// Allow goroutine to run
 	time.Sleep(50 * time.Millisecond)
-	
+
 	// Cancel parent context
 	parentCancel()
-	
+
 	// Wait for completion
 	done := make(chan struct{})
 	go func() {
 		wg.Wait()
 		close(done)
 	}()
-	
+
 	select {
 	case <-done:
 		t.Log("Rendezvous goroutine terminated successfully")
 	case <-time.After(5 * time.Second):
 		t.Fatal("Rendezvous goroutine did not terminate")
 	}
-	
+
 	// Allow cleanup
 	time.Sleep(100 * time.Millisecond)
 	after := captureGoroutines()
-	
+
 	checkLeaks(t, before, after, 2)
 }
 
 // TestCircuitContextOperations verifies circuit context helper goroutines
 func TestCircuitContextOperations(t *testing.T) {
 	before := captureGoroutines()
-	
+
 	// Simulate circuit context pattern from pkg/circuit/circuit_context.go:164
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
-	
+
 	done := make(chan error, 1)
-	
+
 	// Pattern: Context-wrapped operation (line 164)
 	go func() {
 		select {
@@ -449,7 +449,7 @@ func TestCircuitContextOperations(t *testing.T) {
 			done <- nil
 		}
 	}()
-	
+
 	// Wait for result
 	select {
 	case err := <-done:
@@ -459,29 +459,29 @@ func TestCircuitContextOperations(t *testing.T) {
 	case <-time.After(1 * time.Second):
 		t.Fatal("Circuit context goroutine did not complete")
 	}
-	
+
 	// Allow cleanup
 	time.Sleep(100 * time.Millisecond)
 	after := captureGoroutines()
-	
+
 	checkLeaks(t, before, after, 2)
 }
 
 // TestControlEventDispatcher verifies event dispatcher goroutines terminate
 func TestControlEventDispatcher(t *testing.T) {
 	before := captureGoroutines()
-	
+
 	// Simulate control event pattern from pkg/control/events.go:279
 	ctx, cancel := context.WithCancel(context.Background())
 	var wg sync.WaitGroup
-	
+
 	eventCh := make(chan string, 10)
-	
+
 	// Pattern: Event dispatcher goroutine (line 279)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		
+
 		for {
 			select {
 			case <-ctx.Done():
@@ -492,52 +492,52 @@ func TestControlEventDispatcher(t *testing.T) {
 			}
 		}
 	}()
-	
+
 	// Send some events
 	for i := 0; i < 5; i++ {
 		eventCh <- fmt.Sprintf("event%d", i)
 	}
-	
+
 	// Cancel context
 	cancel()
-	
+
 	// Wait for completion
 	done := make(chan struct{})
 	go func() {
 		wg.Wait()
 		close(done)
 	}()
-	
+
 	select {
 	case <-done:
 		t.Log("Event dispatcher terminated successfully")
 	case <-time.After(5 * time.Second):
 		t.Fatal("Event dispatcher did not terminate")
 	}
-	
+
 	// Allow cleanup
 	time.Sleep(100 * time.Millisecond)
 	after := captureGoroutines()
-	
+
 	checkLeaks(t, before, after, 2)
 }
 
 // TestStreamContextGoroutines verifies stream context goroutines terminate
 func TestStreamContextGoroutines(t *testing.T) {
 	before := captureGoroutines()
-	
+
 	// Simulate stream context pattern from pkg/stream/stream_context.go:101
 	ctx, cancel := context.WithCancel(context.Background())
 	var wg sync.WaitGroup
-	
+
 	streamCh := make(chan []byte, 10)
-	
+
 	// Pattern: Stream processing goroutine (line 101)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		defer close(streamCh)
-		
+
 		for i := 0; i < 10; i++ {
 			select {
 			case <-ctx.Done():
@@ -547,51 +547,51 @@ func TestStreamContextGoroutines(t *testing.T) {
 			}
 		}
 	}()
-	
+
 	// Let it run briefly
 	time.Sleep(50 * time.Millisecond)
-	
+
 	// Cancel context
 	cancel()
-	
+
 	// Wait for completion
 	done := make(chan struct{})
 	go func() {
 		wg.Wait()
 		close(done)
 	}()
-	
+
 	select {
 	case <-done:
 		t.Log("Stream context goroutine terminated successfully")
 	case <-time.After(5 * time.Second):
 		t.Fatal("Stream context goroutine did not terminate")
 	}
-	
+
 	// Allow cleanup
 	time.Sleep(100 * time.Millisecond)
 	after := captureGoroutines()
-	
+
 	checkLeaks(t, before, after, 2)
 }
 
 // TestGoroutineStressScenario verifies no leaks under concurrent goroutine creation
 func TestGoroutineStressScenario(t *testing.T) {
 	before := captureGoroutines()
-	
+
 	const numGoroutines = 100
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
-	
+
 	var wg sync.WaitGroup
 	resultCh := make(chan int, numGoroutines)
-	
+
 	// Launch many short-lived goroutines
 	for i := 0; i < numGoroutines; i++ {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
-			
+
 			select {
 			case <-ctx.Done():
 				resultCh <- id
@@ -600,7 +600,7 @@ func TestGoroutineStressScenario(t *testing.T) {
 			}
 		}(i)
 	}
-	
+
 	// Wait for all goroutines
 	done := make(chan struct{})
 	go func() {
@@ -608,28 +608,28 @@ func TestGoroutineStressScenario(t *testing.T) {
 		close(done)
 		close(resultCh)
 	}()
-	
+
 	select {
 	case <-done:
 		t.Logf("All %d stress goroutines terminated successfully", numGoroutines)
 	case <-time.After(10 * time.Second):
 		t.Fatal("Stress test goroutines did not terminate")
 	}
-	
+
 	// Count results
 	count := 0
 	for range resultCh {
 		count++
 	}
-	
+
 	if count != numGoroutines {
 		t.Errorf("Expected %d results, got %d", numGoroutines, count)
 	}
-	
+
 	// Allow cleanup
 	time.Sleep(200 * time.Millisecond)
 	after := captureGoroutines()
-	
+
 	// Higher tolerance for stress test
 	checkLeaks(t, before, after, 5)
 }
@@ -637,19 +637,19 @@ func TestGoroutineStressScenario(t *testing.T) {
 // TestChannelCleanupPreventsLeaks verifies channel cleanup patterns
 func TestChannelCleanupPreventsLeaks(t *testing.T) {
 	before := captureGoroutines()
-	
+
 	// Test pattern: Producer and consumer with proper cleanup
 	ctx, cancel := context.WithCancel(context.Background())
 	var wg sync.WaitGroup
-	
+
 	ch := make(chan int, 10)
-	
+
 	// Producer
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		defer close(ch) // Critical: Close channel when done
-		
+
 		for i := 0; i < 100; i++ {
 			select {
 			case <-ctx.Done():
@@ -659,12 +659,12 @@ func TestChannelCleanupPreventsLeaks(t *testing.T) {
 			}
 		}
 	}()
-	
+
 	// Consumer
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		
+
 		for {
 			select {
 			case <-ctx.Done():
@@ -680,42 +680,42 @@ func TestChannelCleanupPreventsLeaks(t *testing.T) {
 			}
 		}
 	}()
-	
+
 	// Let them run
 	time.Sleep(50 * time.Millisecond)
-	
+
 	// Cancel
 	cancel()
-	
+
 	// Wait for completion
 	done := make(chan struct{})
 	go func() {
 		wg.Wait()
 		close(done)
 	}()
-	
+
 	select {
 	case <-done:
 		t.Log("Channel cleanup goroutines terminated successfully")
 	case <-time.After(5 * time.Second):
 		t.Fatal("Channel cleanup goroutines did not terminate")
 	}
-	
+
 	// Allow cleanup
 	time.Sleep(100 * time.Millisecond)
 	after := captureGoroutines()
-	
+
 	checkLeaks(t, before, after, 2)
 }
 
 // TestPanicRecoveryNoLeaks verifies panic recovery doesn't leak goroutines
 func TestPanicRecoveryNoLeaks(t *testing.T) {
 	before := captureGoroutines()
-	
+
 	// Simulate panic recovery pattern from pkg/client/client.go:218
 	var wg sync.WaitGroup
 	panicRecovered := false
-	
+
 	wg.Add(1)
 	go func() {
 		defer func() {
@@ -724,18 +724,18 @@ func TestPanicRecoveryNoLeaks(t *testing.T) {
 			}
 		}()
 		defer wg.Done()
-		
+
 		// Simulate panic
 		panic("test panic")
 	}()
-	
+
 	// Wait for completion
 	done := make(chan struct{})
 	go func() {
 		wg.Wait()
 		close(done)
 	}()
-	
+
 	select {
 	case <-done:
 		if !panicRecovered {
@@ -745,35 +745,35 @@ func TestPanicRecoveryNoLeaks(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("Panic recovery goroutine did not terminate")
 	}
-	
+
 	// Allow cleanup
 	time.Sleep(100 * time.Millisecond)
 	after := captureGoroutines()
-	
+
 	checkLeaks(t, before, after, 2)
 }
 
 // TestHelperGoroutineCleanup verifies helper goroutines terminate
 func TestHelperGoroutineCleanup(t *testing.T) {
 	before := captureGoroutines()
-	
+
 	// Simulate helper goroutine pattern from pkg/client/client.go:290
 	var wg sync.WaitGroup
-	
+
 	wg.Add(3) // Simulate 3 worker goroutines
-	
+
 	// Helper goroutine that waits for workers
 	done := make(chan struct{})
 	go func() {
 		wg.Wait()
 		close(done)
 	}()
-	
+
 	// Complete workers
 	for i := 0; i < 3; i++ {
 		wg.Done()
 	}
-	
+
 	// Wait for helper completion
 	select {
 	case <-done:
@@ -781,11 +781,11 @@ func TestHelperGoroutineCleanup(t *testing.T) {
 	case <-time.After(1 * time.Second):
 		t.Fatal("Helper goroutine did not terminate")
 	}
-	
+
 	// Allow cleanup
 	time.Sleep(100 * time.Millisecond)
 	after := captureGoroutines()
-	
+
 	checkLeaks(t, before, after, 2)
 }
 

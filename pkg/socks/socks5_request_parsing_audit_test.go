@@ -81,9 +81,9 @@ func (m *mockConn) SetWriteDeadline(t time.Time) error { return nil }
 func buildSOCKS5Request(cmd byte, addrType byte, addr []byte, port uint16) []byte {
 	buf := make([]byte, 0, 512)
 	buf = append(buf, socks5Version) // Version
-	buf = append(buf, cmd)            // Command
-	buf = append(buf, 0x00)           // Reserved
-	buf = append(buf, addrType)       // Address type
+	buf = append(buf, cmd)           // Command
+	buf = append(buf, 0x00)          // Reserved
+	buf = append(buf, addrType)      // Address type
 
 	// Add address based on type
 	if addrType == addrDomain {
@@ -163,7 +163,7 @@ func TestReadRequestBufferSafety(t *testing.T) {
 			description: "Truncated domain should be rejected",
 		},
 		{
-			name:        "TruncatedPort",
+			name: "TruncatedPort",
 			requestData: func() []byte {
 				// Build a complete request but remove the last port byte
 				full := buildSOCKS5Request(cmdConnect, addrIPv4, net.ParseIP("1.2.3.4").To4(), 80)
@@ -179,13 +179,13 @@ func TestReadRequestBufferSafety(t *testing.T) {
 			description: "Maximum domain length (255) should be accepted",
 		},
 		{
-			name: "EmptyRequest",
+			name:        "EmptyRequest",
 			requestData: []byte{},
 			expectError: true,
 			description: "Empty request should be rejected",
 		},
 		{
-			name: "SingleByte",
+			name:        "SingleByte",
 			requestData: []byte{0x05},
 			expectError: true,
 			description: "Single byte request should be rejected",
@@ -319,7 +319,7 @@ func TestReadRequestInputValidation(t *testing.T) {
 func TestReadRequestProtocolCompliance(t *testing.T) {
 	log := logger.NewDefault()
 	mgr := &circuit.Manager{}
-	
+
 	tests := []struct {
 		name               string
 		enableDNS          bool

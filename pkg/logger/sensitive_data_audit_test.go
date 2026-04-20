@@ -45,7 +45,7 @@ func testNoPasswordsInLogs(t *testing.T) {
 	}
 
 	findings := searchCodeForPatterns(t, "../../pkg", patterns, []string{"_test.go"})
-	
+
 	// Filter out safe patterns (like "password required" messages)
 	safePatterns := []string{
 		"password required",
@@ -55,7 +55,7 @@ func testNoPasswordsInLogs(t *testing.T) {
 		"Authentication failed",
 		"// ",
 	}
-	
+
 	var violations []string
 	for _, finding := range findings {
 		isSafe := false
@@ -69,7 +69,7 @@ func testNoPasswordsInLogs(t *testing.T) {
 			violations = append(violations, finding)
 		}
 	}
-	
+
 	if len(violations) > 0 {
 		t.Errorf("Found %d password logging violations:\n%s",
 			len(violations), strings.Join(violations, "\n"))
@@ -93,7 +93,7 @@ func testNoPrivateKeysInLogs(t *testing.T) {
 	}
 
 	findings := searchCodeForPatterns(t, "../../pkg", patterns, []string{"_test.go"})
-	
+
 	// Filter out safe patterns (validation error messages, not actual key values)
 	safePatterns := []string{
 		"no ephemeral private key",
@@ -104,7 +104,7 @@ func testNoPrivateKeysInLogs(t *testing.T) {
 		"return fmt.Errorf(",
 		"return nil, fmt.Errorf(",
 	}
-	
+
 	var violations []string
 	for _, finding := range findings {
 		isSafe := false
@@ -118,7 +118,7 @@ func testNoPrivateKeysInLogs(t *testing.T) {
 			violations = append(violations, finding)
 		}
 	}
-	
+
 	if len(violations) > 0 {
 		t.Errorf("Found %d private key logging violations:\n%s",
 			len(violations), strings.Join(violations, "\n"))
@@ -139,7 +139,7 @@ func testNoSessionTokensInLogs(t *testing.T) {
 	}
 
 	findings := searchCodeForPatterns(t, "../../pkg", patterns, []string{"_test.go"})
-	
+
 	if len(findings) > 0 {
 		t.Errorf("Found %d session token logging violations:\n%s",
 			len(findings), strings.Join(findings, "\n"))
@@ -160,16 +160,16 @@ func testNoCryptographicSecretsInLogs(t *testing.T) {
 	}
 
 	findings := searchCodeForPatterns(t, "../../pkg", patterns, []string{"_test.go"})
-	
+
 	// Filter safe patterns
 	safePatterns := []string{
 		"// ",
-		"secret_input", // This is a protocol structure name, not actual secret
-		"sharedSecret[:]", // Variable name in function call, not logging
+		"secret_input",           // This is a protocol structure name, not actual secret
+		"sharedSecret[:]",        // Variable name in function call, not logging
 		"deriveKey(sharedSecret", // Function parameter, not logging
-		"var sharedSecret", // Variable declaration, not logging
+		"var sharedSecret",       // Variable declaration, not logging
 	}
-	
+
 	var violations []string
 	for _, finding := range findings {
 		isSafe := false
@@ -183,7 +183,7 @@ func testNoCryptographicSecretsInLogs(t *testing.T) {
 			violations = append(violations, finding)
 		}
 	}
-	
+
 	if len(violations) > 0 {
 		t.Errorf("Found %d cryptographic secret logging violations:\n%s",
 			len(violations), strings.Join(violations, "\n"))
@@ -204,7 +204,7 @@ func testNoCredentialsByteArraysInLogs(t *testing.T) {
 	}
 
 	findings := searchCodeForPatterns(t, "../../pkg", patterns, []string{"_test.go"})
-	
+
 	if len(findings) > 0 {
 		t.Errorf("Found %d credential byte array logging violations:\n%s",
 			len(findings), strings.Join(findings, "\n"))
@@ -217,18 +217,18 @@ func testNoCredentialsByteArraysInLogs(t *testing.T) {
 func testControlProtocolPasswordHandling(t *testing.T) {
 	// Read control package files
 	controlFiles := findGoFiles(t, "../../pkg/control")
-	
+
 	var violations []string
 	for _, file := range controlFiles {
 		if strings.HasSuffix(file, "_test.go") {
 			continue
 		}
-		
+
 		content, err := os.ReadFile(file)
 		if err != nil {
 			t.Fatalf("Failed to read %s: %v", file, err)
 		}
-		
+
 		// Check for password value logging (not just the word "password")
 		if bytes.Contains(content, []byte("password")) {
 			lines := bytes.Split(content, []byte("\n"))
@@ -240,19 +240,19 @@ func testControlProtocolPasswordHandling(t *testing.T) {
 					strings.Contains(lineStr, "Warn(") ||
 					strings.Contains(lineStr, "Error(")) &&
 					strings.Contains(lineStr, "password") {
-					
+
 					// Check if it's logging the password value (not just a message about password)
 					if !strings.Contains(lineStr, "password required") &&
 						!strings.Contains(lineStr, "incorrect password") &&
 						!strings.Contains(lineStr, "no password") &&
 						!strings.Contains(lineStr, "// ") {
-						
+
 						// Check if next line or same line has password variable reference
 						fullContext := lineStr
 						if i+1 < len(lines) {
 							fullContext += " " + string(lines[i+1])
 						}
-						
+
 						if strings.Contains(fullContext, `"password",`) ||
 							strings.Contains(fullContext, "password,") {
 							violations = append(violations, fmt.Sprintf("%s:%d: %s", file, i+1, lineStr))
@@ -262,7 +262,7 @@ func testControlProtocolPasswordHandling(t *testing.T) {
 			}
 		}
 	}
-	
+
 	if len(violations) > 0 {
 		t.Errorf("Found %d control protocol password logging violations:\n%s",
 			len(violations), strings.Join(violations, "\n"))
@@ -274,22 +274,22 @@ func testControlProtocolPasswordHandling(t *testing.T) {
 // testOnionServiceKeyHandling verifies onion service keys are not logged
 func testOnionServiceKeyHandling(t *testing.T) {
 	onionFiles := findGoFiles(t, "../../pkg/onion")
-	
+
 	var violations []string
 	for _, file := range onionFiles {
 		if strings.HasSuffix(file, "_test.go") {
 			continue
 		}
-		
+
 		content, err := os.ReadFile(file)
 		if err != nil {
 			t.Fatalf("Failed to read %s: %v", file, err)
 		}
-		
+
 		lines := bytes.Split(content, []byte("\n"))
 		for i, line := range lines {
 			lineStr := string(line)
-			
+
 			// Check for logging of key material
 			if (strings.Contains(lineStr, "Info(") ||
 				strings.Contains(lineStr, "Debug(") ||
@@ -299,7 +299,7 @@ func testOnionServiceKeyHandling(t *testing.T) {
 					strings.Contains(lineStr, "privKey") ||
 					strings.Contains(lineStr, "authKey") ||
 					strings.Contains(lineStr, "encKey")) {
-				
+
 				// Ignore comments
 				if !strings.Contains(lineStr, "// ") {
 					violations = append(violations, fmt.Sprintf("%s:%d: %s", file, i+1, lineStr))
@@ -307,7 +307,7 @@ func testOnionServiceKeyHandling(t *testing.T) {
 			}
 		}
 	}
-	
+
 	if len(violations) > 0 {
 		t.Errorf("Found %d onion service key logging violations:\n%s",
 			len(violations), strings.Join(violations, "\n"))
@@ -319,35 +319,35 @@ func testOnionServiceKeyHandling(t *testing.T) {
 // testCryptoPackageLogging verifies crypto package doesn't log key material
 func testCryptoPackageLogging(t *testing.T) {
 	cryptoFiles := findGoFiles(t, "../../pkg/crypto")
-	
+
 	var logStatements []string
 	for _, file := range cryptoFiles {
 		if strings.HasSuffix(file, "_test.go") {
 			continue
 		}
-		
+
 		content, err := os.ReadFile(file)
 		if err != nil {
 			t.Fatalf("Failed to read %s: %v", file, err)
 		}
-		
+
 		lines := bytes.Split(content, []byte("\n"))
 		for i, line := range lines {
 			lineStr := string(line)
-			
+
 			// Look for any logging statements in crypto package
 			if strings.Contains(lineStr, ".Info(") ||
 				strings.Contains(lineStr, ".Debug(") ||
 				strings.Contains(lineStr, ".Warn(") ||
 				strings.Contains(lineStr, ".Error(") {
-				
+
 				if !strings.Contains(lineStr, "// ") {
 					logStatements = append(logStatements, fmt.Sprintf("%s:%d: %s", file, i+1, strings.TrimSpace(lineStr)))
 				}
 			}
 		}
 	}
-	
+
 	// Crypto package should have minimal or no logging to avoid key leakage
 	if len(logStatements) > 5 {
 		t.Logf("Warning: Found %d logging statements in crypto package (review for key material exposure):\n%s",
@@ -368,7 +368,7 @@ func testClientAuthLogging(t *testing.T) {
 	}
 
 	findings := searchCodeForPatterns(t, "../../pkg/onion", patterns, []string{"_test.go"})
-	
+
 	if len(findings) > 0 {
 		t.Errorf("Found %d client authorization logging violations:\n%s",
 			len(findings), strings.Join(findings, "\n"))
@@ -382,7 +382,7 @@ func testLoggingAuditComplianceSummary(t *testing.T) {
 	t.Log("\n" + strings.Repeat("=", 80))
 	t.Log("LOGGING SENSITIVE DATA EXPOSURE AUDIT - COMPLIANCE SUMMARY")
 	t.Log(strings.Repeat("=", 80))
-	
+
 	summary := `
 Assessment: SECURE - No sensitive data exposure in logging statements
 
@@ -435,7 +435,7 @@ Production Readiness: ✅ APPROVED for educational/research use
 
 Recommendation: Continue current logging practices. No changes required.
 `
-	
+
 	t.Log(summary)
 	t.Log(strings.Repeat("=", 80))
 }
@@ -443,10 +443,10 @@ Recommendation: Continue current logging practices. No changes required.
 // Helper function to search code for patterns
 func searchCodeForPatterns(t *testing.T, rootDir string, patterns []string, excludeSuffixes []string) []string {
 	t.Helper()
-	
+
 	var findings []string
 	files := findGoFiles(t, rootDir)
-	
+
 	for _, file := range files {
 		// Check exclusions
 		excluded := false
@@ -459,18 +459,18 @@ func searchCodeForPatterns(t *testing.T, rootDir string, patterns []string, excl
 		if excluded {
 			continue
 		}
-		
+
 		content, err := os.ReadFile(file)
 		if err != nil {
 			t.Fatalf("Failed to read %s: %v", file, err)
 		}
-		
+
 		scanner := bufio.NewScanner(bytes.NewReader(content))
 		lineNum := 0
 		for scanner.Scan() {
 			lineNum++
 			line := scanner.Text()
-			
+
 			for _, pattern := range patterns {
 				matched, err := regexp.MatchString(pattern, line)
 				if err != nil {
@@ -482,14 +482,14 @@ func searchCodeForPatterns(t *testing.T, rootDir string, patterns []string, excl
 			}
 		}
 	}
-	
+
 	return findings
 }
 
 // Helper function to find all Go files in a directory tree
 func findGoFiles(t *testing.T, rootDir string) []string {
 	t.Helper()
-	
+
 	var files []string
 	err := filepath.Walk(rootDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -503,7 +503,7 @@ func findGoFiles(t *testing.T, rootDir string) []string {
 	if err != nil {
 		t.Fatalf("Failed to walk directory %s: %v", rootDir, err)
 	}
-	
+
 	return files
 }
 
@@ -511,15 +511,15 @@ func findGoFiles(t *testing.T, rootDir string) []string {
 func TestLoggerRedaction(t *testing.T) {
 	var buf bytes.Buffer
 	logger := New(slog.LevelInfo, &buf)
-	
+
 	// Test logging with fields that might contain sensitive data
 	logger.Info("Authentication attempt",
 		"username", "testuser",
 		"result", "success",
 		"remote_ip", "192.168.1.1")
-	
+
 	output := buf.String()
-	
+
 	// Verify no sensitive data patterns
 	if strings.Contains(output, "password") {
 		t.Error("Logger output contains 'password' keyword")
@@ -530,7 +530,7 @@ func TestLoggerRedaction(t *testing.T) {
 	if strings.Contains(output, "token") {
 		t.Error("Logger output contains 'token' keyword")
 	}
-	
+
 	t.Logf("✓ Logger redaction test passed")
 }
 
@@ -538,13 +538,13 @@ func TestLoggerRedaction(t *testing.T) {
 func TestLoggerSafeMetadataOnly(t *testing.T) {
 	var buf bytes.Buffer
 	logger := New(slog.LevelInfo, &buf)
-	
+
 	// Safe metadata logging
 	logger = logger.Circuit(12345).Stream(678)
 	logger.Info("Circuit operation completed")
-	
+
 	output := buf.String()
-	
+
 	// Verify safe metadata is present
 	if !strings.Contains(output, "circuit_id") {
 		t.Error("Expected circuit_id in output")
@@ -555,7 +555,7 @@ func TestLoggerSafeMetadataOnly(t *testing.T) {
 	if !strings.Contains(output, "12345") {
 		t.Error("Expected circuit ID value in output")
 	}
-	
+
 	t.Logf("✓ Safe metadata logging test passed")
 	t.Logf("Output: %s", output)
 }

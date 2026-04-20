@@ -674,4 +674,3 @@ func (s *Server) resetAuthRateLimit(remoteIP string) {
 
 	delete(s.authAttempts, remoteIP)
 }
-

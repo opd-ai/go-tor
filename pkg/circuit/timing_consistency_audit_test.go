@@ -429,8 +429,8 @@ func createTestCircuitWithHops(t *testing.T, hopCount int) *Circuit {
 		hop := NewHop(
 			"test-fingerprint",
 			"127.0.0.1:9001",
-			i == 0,            // First hop is guard
-			i == hopCount-1,   // Last hop is exit
+			i == 0,          // First hop is guard
+			i == hopCount-1, // Last hop is exit
 		)
 
 		// Create AES-CTR ciphers for this hop

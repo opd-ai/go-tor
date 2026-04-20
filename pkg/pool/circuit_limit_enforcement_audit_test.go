@@ -213,7 +213,7 @@ func TestCircuitLimitEnforcementPerIsolationPool(t *testing.T) {
 
 	t.Logf("  Isolation pool 1: %d circuits", len(pool.isolatedCircuits[isolationKey1.Key()]))
 	t.Logf("  Isolation pool 2: %d circuits", len(pool.isolatedCircuits[isolationKey2.Key()]))
-	
+
 	rejectedCount := beforeStats.Total - afterStats.Total
 	if rejectedCount == 0 {
 		rejectedCount = 1 // We know at least one was rejected
