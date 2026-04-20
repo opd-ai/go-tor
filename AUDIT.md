@@ -2391,8 +2391,15 @@ When planning or reviewing test work, always refer to the “Current Coverage An
   - isPortAvailable: already bound port
   - GetDefaultDataDir: contains "go-tor", absolute path
   - Permission handling: 0700 verification on Linux/Unix
-- [ ] Trace context propagation [pkg/trace] [integration] [2h]
-- [ ] HTTP metrics endpoint stress [pkg/httpmetrics] [stress] [2h]
+- [x] Trace context propagation [pkg/trace] [integration] [2h] ✅ **COMPLETED**
+  - Created `pkg/trace/propagation_test.go` with 10 test functions
+  - Nested span propagation, attribute isolation, error propagation,
+    concurrent child spans, context cancellation, multiple exporters,
+    sampler decision propagation, empty context, lifecycle ordering, End idempotency
+- [x] HTTP metrics endpoint stress [pkg/httpmetrics] [stress] [2h] ✅ **COMPLETED**
+  - Created `pkg/httpmetrics/stress_test.go` with 7 test functions
+  - Concurrent metrics/health/mixed endpoints, rapid start/stop,
+    concurrent start/stop, requests during shutdown, large responses
 - [ ] Helper HTTP client scenarios [pkg/helpers] [unit] [2h]
 
 #### Low (P3) - Nice to Have
