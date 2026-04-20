@@ -2345,7 +2345,20 @@ When planning or reviewing test work, always refer to the “Current Coverage An
   - TestRaceContextCancelDuringStart: parent context cancellation during Start
 
 #### Medium (P2) - Extended Coverage
-- [ ] Rate limiting effectiveness tests [pkg/ratelimit] [integration] [3h]
+- [x] Rate limiting effectiveness tests [pkg/ratelimit] [integration] [3h] ✅ **COMPLETED**
+  - Created `pkg/ratelimit/effectiveness_test.go` with 12 test functions
+  - TestEffectivenessTokenRefillAccuracy: token refill rate verification
+  - TestEffectivenessBurstCapacity: burst enforcement in zero time
+  - TestEffectivenessRateOverTime: rate compliance over 500ms window
+  - TestEffectivenessMultiLimiterAtomicity: slower limiter is bottleneck
+  - TestEffectivenessMultiLimiterEmpty: empty MultiLimiter always allows
+  - TestEffectivenessKeyedIsolation: per-key isolation verification
+  - TestEffectivenessKeyedCleanup: stale key cleanup effectiveness
+  - TestEffectivenessWaitContextCancel: context cancellation responsiveness
+  - TestEffectivenessWaitNLargeN: large token requests fulfilled over time
+  - TestEffectivenessReserveDelay: delay accuracy verification
+  - TestEffectivenessConcurrentLimiting: concurrent rate enforcement
+  - TestEffectivenessDynamicRateUpdate: SetRate/SetBurst take effect
 - [ ] Circuit padding machine states [pkg/circuit] [unit] [4h]
 - [ ] Recovery checkpoint/restore [pkg/recovery] [integration] [3h]
 - [ ] Autoconfig network detection [pkg/autoconfig] [unit] [2h]
