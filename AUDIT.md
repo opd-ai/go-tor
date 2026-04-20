@@ -2400,12 +2400,12 @@ When planning or reviewing test work, always refer to the “Current Coverage An
   - Created `pkg/httpmetrics/stress_test.go` with 7 test functions
   - Concurrent metrics/health/mixed endpoints, rapid start/stop,
     concurrent start/stop, requests during shutdown, large responses
-- [ ] Helper HTTP client scenarios [pkg/helpers] [unit] [2h]
+- [x] Helper HTTP client scenarios [pkg/helpers] [unit] [2h] ✅ **COMPLETED**
 
 #### Low (P3) - Nice to Have
 - [ ] Bine integration scenarios [pkg/bine] [integration] [4h]
-- [ ] Profiling endpoint coverage [pkg/profiling] [unit] [2h]
-- [ ] Benchmark accuracy validation [pkg/benchmark] [unit] [2h]
+- [x] Profiling endpoint coverage [pkg/profiling] [unit] [2h] ✅ **COMPLETED**
+- [x] Benchmark accuracy validation [pkg/benchmark] [unit] [2h] ✅ **COMPLETED**
 
 ### 4.3 Test Infrastructure Improvements
 
