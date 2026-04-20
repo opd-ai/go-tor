@@ -2212,7 +2212,16 @@ When planning or reviewing test work, always refer to the “Current Coverage An
   - TestSelectVersionWithLargeList: DoS resistance (10000 versions)
   - TestSelectVersionAllSupported: full range negotiation
   - TestSetTimeoutIdempotent: repeated timeout changes
-- [ ] Onion descriptor encryption edge cases [pkg/onion] [unit] [4h]
+- [x] Onion descriptor encryption edge cases [pkg/onion] [unit] [4h] ✅ **COMPLETED** (April 20, 2026)
+  - Created `pkg/onion/descriptor_encryption_edge_test.go` with 8 test functions
+  - TestDecryptDescriptorEdgeCases: 12 cases for nil/malformed/missing markers
+  - TestParseDescriptorEdgeCases: 11 cases for malformed descriptor parsing
+  - TestDecryptAuthDescriptorEdgeCases: 6 cases for client auth decryption
+  - TestDeriveDescriptorKeysEdgeCases: 8 cases for HKDF key derivation
+  - TestDeriveDescriptorKeysDeterministic: same input → same output
+  - TestDeriveDescriptorKeysDifferentInputs: different input → different output
+  - TestParseDecryptedLayerEdgeCases: 7 cases for decrypted layer parsing
+  - TestDeriveAuthKeysEdgeCases: 6 cases for auth key derivation
 - [ ] Key derivation boundary conditions [pkg/crypto] [unit] [2h]
 - [ ] Invalid cell command handling [pkg/cell] [unit] [2h]
 
