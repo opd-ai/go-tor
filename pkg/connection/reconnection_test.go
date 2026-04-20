@@ -258,7 +258,7 @@ func TestRetryConfigString(t *testing.T) {
 	}
 
 	conn := New(cfg, logger.NewDefault())
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 
 	err := conn.ConnectWithRetry(ctx, cfg, retryCfg)
