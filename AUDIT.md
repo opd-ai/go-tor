@@ -2222,7 +2222,18 @@ When planning or reviewing test work, always refer to the “Current Coverage An
   - TestDeriveDescriptorKeysDifferentInputs: different input → different output
   - TestParseDecryptedLayerEdgeCases: 7 cases for decrypted layer parsing
   - TestDeriveAuthKeysEdgeCases: 6 cases for auth key derivation
-- [ ] Key derivation boundary conditions [pkg/crypto] [unit] [2h]
+- [x] Key derivation boundary conditions [pkg/crypto] [unit] [2h] ✅ **COMPLETED** (April 20, 2026)
+  - Created `pkg/crypto/kdf_boundary_test.go` with 12 test functions
+  - TestDeriveKeyBoundaryLengths: SHA-1 block boundary lengths (20n ± 1)
+  - TestDeriveKeyBlockAlignment: K_0 prefix verification
+  - TestDeriveKeyConsecutiveBlocks: K_0 → K_1 → K_2 chaining
+  - TestDeriveKeyInvalidLengths: zero/negative rejection
+  - TestDeriveKeySecretVariations: different secrets → different keys
+  - TestNewAESCTRCipherBoundaryKeys: AES-128/192/256 and invalid key/IV sizes
+  - TestAES256CTREncryptDecryptRoundTrip/TestAES256CTRInvalidKeySizes
+  - TestSHA1HashBoundaryInputs/TestSHA256HashBoundaryInputs
+  - TestDeriveKeyTorKeyMaterial: 72-byte Tor key material verification
+  - TestGenerateRandomBytesBoundary: random generation boundary cases
 - [ ] Invalid cell command handling [pkg/cell] [unit] [2h]
 
 #### High (P1) - Core Functionality
