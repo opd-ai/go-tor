@@ -2234,7 +2234,20 @@ When planning or reviewing test work, always refer to the “Current Coverage An
   - TestSHA1HashBoundaryInputs/TestSHA256HashBoundaryInputs
   - TestDeriveKeyTorKeyMaterial: 72-byte Tor key material verification
   - TestGenerateRandomBytesBoundary: random generation boundary cases
-- [ ] Invalid cell command handling [pkg/cell] [unit] [2h]
+- [x] Invalid cell command handling [pkg/cell] [unit] [2h] ✅ **COMPLETED** (April 20, 2026)
+  - Created `pkg/cell/invalid_command_test.go` with 14 test functions
+  - TestCellCommandString: all known + unknown commands
+  - TestCellCommandIsVariableLength: fixed/variable classification
+  - TestEncodeDecodeFixedCellUnknownCommand: unknown fixed commands round-trip
+  - TestEncodeDecodeVariableCellUnknownCommand: unknown variable commands round-trip
+  - TestDecodeFixedCellTruncatedPayload: truncation at various points
+  - TestDecodeVariableCellTruncatedLength/Payload: variable cell truncation
+  - TestFixedCellPayloadTooLarge: oversized payload rejection
+  - TestNewCellDefaults/TestNewCellMaxCircuitID: initialization edge cases
+  - TestRelayCellDecodeEdgeCases: 7 cases for relay cell decoding
+  - TestRelayCellNewEdgeCases: 9 cases for relay cell construction
+  - TestRelayCellEncodeDecodeRoundTrip: encode/decode round-trips
+  - TestRelayCmdStringUnknown: relay command string formatting
 
 #### High (P1) - Core Functionality
 - [ ] Circuit extension failure recovery [pkg/circuit] [integration] [4h]
