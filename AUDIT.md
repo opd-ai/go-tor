@@ -2287,7 +2287,17 @@ When planning or reviewing test work, always refer to the “Current Coverage An
   - TestNewPoolDefaults/NilLogger/NilRetryConfig/CustomRetryConfig: pool creation
   - TestPoolCloseIdempotent: double-close safety (triggered bug fix)
   - TestBackoffValuesTable: specific value calculations
-- [ ] Stream multiplexing under load [pkg/stream] [stress] [4h]
+- [x] Stream multiplexing under load [pkg/stream] [stress] [4h] ✅ **COMPLETED** (April 20, 2026)
+  - Created `pkg/stream/multiplexing_stress_test.go` with 14 test functions
+  - TestManagerConcurrentStreamCreation: 20 goroutines × 5 streams
+  - TestManagerConcurrentCreateRemove: concurrent create/remove
+  - TestManagerGetStreamsForCircuitMux: circuit-scoped queries
+  - TestStreamSendReceiveDataConcurrent: concurrent data operations
+  - TestStreamStateTransitionsMux: state machine transitions
+  - TestStreamStateString: readable state names
+  - TestManagerCloseAllStreams: manager close propagation
+  - TestManagerGetNonexistentStream/RemoveNonexistentStream
+  - TestStreamSendOnClosedStream/DoubleClose/FlowControlWindows
 - [ ] SOCKS5 protocol edge cases [pkg/socks] [unit] [3h]
 - [ ] Config validation comprehensive tests [pkg/config] [unit] [2h]
 - [ ] Pool exhaustion scenarios [pkg/pool] [stress] [3h]
