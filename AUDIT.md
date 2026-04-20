@@ -2171,7 +2171,15 @@ When planning or reviewing test work, always refer to the “Current Coverage An
   - FuzzNewRelayCell: relay cell construction boundary conditions
   - All fuzz targets verified: no panics on 5s fuzzing run (48k execs/sec)
   - Seeds cover: empty input, truncated input, oversized payload, max-length cells
-- [ ] Fuzzing tests for consensus parsing [pkg/directory] [fuzzing] [8h]
+- [x] Fuzzing tests for consensus parsing [pkg/directory] [fuzzing] [8h] ✅ **COMPLETED** (April 20, 2026)
+  - Created `pkg/directory/fuzz_consensus_parsing_test.go` with 6 fuzz targets
+  - FuzzParseConsensus: consensus document parsing, 52k+ execs in 5s, no panics
+  - FuzzParseConsensusWithMetadata: metadata extraction, 99k+ execs in 5s, no panics
+  - FuzzParseConsensusParams: parameter line parsing, 26k+ execs in 5s, no panics
+  - FuzzParseMicrodescriptors: microdescriptor parsing, 51k+ execs in 5s, no panics
+  - FuzzParseAuthorityCert: authority certificate parsing, 74k+ execs in 5s, no panics
+  - FuzzValidateConsensusMetadata: metadata validation, 79k+ execs in 5s, no panics
+  - Seeds cover: empty input, malformed entries, truncated data, garbage values, edge cases
 - [ ] ntor handshake edge cases and malformed inputs [pkg/crypto] [unit] [4h]
 - [ ] Circuit encryption/decryption round-trip [pkg/circuit] [unit] [3h]
 - [ ] Protocol negotiation failure scenarios [pkg/protocol] [unit] [4h]
