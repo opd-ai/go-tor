@@ -366,6 +366,9 @@ func getRelayKeys(relay interface{}) (identityKey, ntorKey []byte, err error) {
 // ProcessCreated2 processes a CREATED2 response from the first hop
 // AUDIT-001 FIX: Now properly verifies ntor handshake and derives keys
 func (e *Extension) ProcessCreated2(created2Cell *cell.Cell) error {
+	if created2Cell == nil {
+		return fmt.Errorf("CREATED2 cell is nil")
+	}
 	if created2Cell.Command != cell.CmdCreated2 {
 		return fmt.Errorf("expected CREATED2 cell, got %s", created2Cell.Command)
 	}
@@ -436,6 +439,9 @@ func (e *Extension) ProcessCreated2(created2Cell *cell.Cell) error {
 // ProcessExtended2 processes an EXTENDED2 response from circuit extension
 // AUDIT-001 FIX: Now properly verifies ntor handshake and derives keys
 func (e *Extension) ProcessExtended2(extended2Cell *cell.RelayCell) error {
+	if extended2Cell == nil {
+		return fmt.Errorf("EXTENDED2 relay cell is nil")
+	}
 	if extended2Cell.Command != cell.RelayExtended2 {
 		return fmt.Errorf("expected RELAY_EXTENDED2 cell, got %d", extended2Cell.Command)
 	}

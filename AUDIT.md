@@ -2250,7 +2250,18 @@ When planning or reviewing test work, always refer to the “Current Coverage An
   - TestRelayCmdStringUnknown: relay command string formatting
 
 #### High (P1) - Core Functionality
-- [ ] Circuit extension failure recovery [pkg/circuit] [integration] [4h]
+- [x] Circuit extension failure recovery [pkg/circuit] [integration] [4h] ✅ **COMPLETED** (April 20, 2026)
+  - Created `pkg/circuit/extension_failure_recovery_test.go` with 17 test functions
+  - **BUG FIX**: ProcessCreated2 and ProcessExtended2 crashed on nil cells (nil pointer dereference)
+  - Added nil checks to ProcessCreated2 and ProcessExtended2 in extension.go
+  - TestCreateFirstHopNoConnection/SendFailure/ReceiveFailure: connection errors
+  - TestExtendCircuitNoConnection: extension without connection
+  - TestGetConnectionTypeMismatch/NilConn: interface validation
+  - TestProcessCreated2NilCell/EmptyPayload: nil and empty inputs
+  - TestProcessExtended2NilCell/EmptyData: nil and empty inputs
+  - TestDeriveHopFromShortKeyMaterial/ValidKeyMaterial: key derivation
+  - TestDeriveKeysFromSharedSecret: various secret sizes
+  - TestNewExtensionNilLogger/WithLogger: initialization
 - [ ] Guard rotation persistence tests [pkg/path] [integration] [3h]
 - [ ] Connection reconnection scenarios [pkg/connection] [integration] [3h]
 - [ ] Stream multiplexing under load [pkg/stream] [stress] [4h]
