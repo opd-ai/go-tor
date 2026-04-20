@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/opd-ai/go-tor/pkg/logger"
@@ -131,6 +132,7 @@ type Pool struct {
 	conns     []*Connection
 	retryCfg  *RetryConfig
 	available chan *Connection
+	closeOnce sync.Once
 }
 
 // NewPool creates a new connection pool
@@ -195,17 +197,20 @@ func (p *Pool) Put(conn *Connection) {
 	}
 }
 
-// Close closes all connections in the pool
+// Close closes all connections in the pool.
+// It is safe to call Close multiple times.
 func (p *Pool) Close() {
-	p.logger.Info("Closing connection pool")
-	close(p.available)
+	p.closeOnce.Do(func() {
+		p.logger.Info("Closing connection pool")
+		close(p.available)
 
-	// Drain available channel and close connections (AUDIT-013)
-	for conn := range p.available {
-		if err := conn.Close(); err != nil {
-			p.logger.Error("Failed to close pooled connection", "error", err)
+		// Drain available channel and close connections (AUDIT-013)
+		for conn := range p.available {
+			if err := conn.Close(); err != nil {
+				p.logger.Error("Failed to close pooled connection", "error", err)
+			}
 		}
-	}
 
-	p.logger.Info("Connection pool closed")
+		p.logger.Info("Connection pool closed")
+	})
 }

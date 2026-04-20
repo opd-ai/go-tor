@@ -2275,7 +2275,18 @@ When planning or reviewing test work, always refer to the “Current Coverage An
   - TestPersistenceSaveNilGuards: nil guard list handling
   - TestDefaultPersistenceConfigValues: default configuration
   - TestNewPersistenceNilLogger: nil logger fallback
-- [ ] Connection reconnection scenarios [pkg/connection] [integration] [3h]
+- [x] Connection reconnection scenarios [pkg/connection] [integration] [3h] ✅ **COMPLETED** (April 20, 2026)
+  - Created `pkg/connection/reconnection_test.go` with 14 test functions
+  - **BUG FIX**: Pool.Close panicked on double-close (channel double-close). Fixed with sync.Once.
+  - TestCalculateBackoffExponentialGrowth: exponential increase verification
+  - TestCalculateBackoffMaxCap: cap at MaxBackoff
+  - TestCalculateBackoffWithJitterVariability: jitter adds variability
+  - TestCalculateBackoffZeroMultiplier: 1.0 multiplier = no growth
+  - TestCalculateBackoffMathOverflow: overflow handling documented
+  - TestDefaultRetryConfigValues: default configuration validation
+  - TestNewPoolDefaults/NilLogger/NilRetryConfig/CustomRetryConfig: pool creation
+  - TestPoolCloseIdempotent: double-close safety (triggered bug fix)
+  - TestBackoffValuesTable: specific value calculations
 - [ ] Stream multiplexing under load [pkg/stream] [stress] [4h]
 - [ ] SOCKS5 protocol edge cases [pkg/socks] [unit] [3h]
 - [ ] Config validation comprehensive tests [pkg/config] [unit] [2h]
