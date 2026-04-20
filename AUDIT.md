@@ -2298,7 +2298,22 @@ When planning or reviewing test work, always refer to the “Current Coverage An
   - TestManagerCloseAllStreams: manager close propagation
   - TestManagerGetNonexistentStream/RemoveNonexistentStream
   - TestStreamSendOnClosedStream/DoubleClose/FlowControlWindows
-- [ ] SOCKS5 protocol edge cases [pkg/socks] [unit] [3h]
+- [x] SOCKS5 protocol edge cases [pkg/socks] [unit] [3h] ✅ **COMPLETED**
+  - Created `pkg/socks/socks5_edge_cases_test.go` with 14 test functions
+  - TestHandshakeEdgeZeroMethods: zero nmethods offered
+  - TestHandshakeEdgeMaxMethods: 255 identical methods
+  - TestHandshakeEdgeMidClose: connection closed mid-handshake
+  - TestPasswordAuthEdgeLengths: zero/max username+password
+  - TestPasswordAuthEdgeVersionMismatch: wrong auth sub-version
+  - TestReadRequestEdgeDomainLengths: zero and 255-byte domains
+  - TestReadRequestEdgePortBounds: port 0 and 65535
+  - TestReadRequestEdgeIPBounds: IPv4 0.0.0.0/255.255.255.255, IPv6 ::
+  - TestServerLifecycleEdgeCases: double shutdown, SetCircuitPool/Metrics nil
+  - TestSendReplyEdgeCases: nil/IPv4/IPv6 bind addresses
+  - TestSendDNSReplyEdgeCases: empty/IPv6 addresses, TTL encoding
+  - TestSendDNSReplyHostnameEdgeCases: empty/max/over-255 hostnames
+  - TestExtractClientIPEdgeCases: IPv6, invalid format, empty string
+  - TestConfigEdgeCases: zero MaxConnections, defaults verification
 - [ ] Config validation comprehensive tests [pkg/config] [unit] [2h]
 - [ ] Pool exhaustion scenarios [pkg/pool] [stress] [3h]
 - [ ] Client startup/shutdown race conditions [pkg/client] [stress] [4h]

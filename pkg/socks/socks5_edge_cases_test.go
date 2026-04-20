@@ -617,10 +617,10 @@ func TestEdgeConfigZeroMaxConnections(t *testing.T) {
 	mgr := circuit.NewManager()
 
 	cfg := &Config{
-		MaxConnections:  0, // unlimited
-		IsolationMode:   "off",
+		MaxConnections:      0, // unlimited
+		IsolationMode:       "off",
 		EnableDNSResolution: true,
-		DNSTimeout:      30 * time.Second,
+		DNSTimeout:          30 * time.Second,
 	}
 
 	srv := NewServerWithConfig("127.0.0.1:0", mgr, log, cfg)
