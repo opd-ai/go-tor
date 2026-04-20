@@ -127,15 +127,15 @@ func TestManagerGetStreamsForCircuitMux(t *testing.T) {
 	}
 }
 
-// TestStreamSendReceiveDataConcurrent verifies that sending and
-// receiving data on a stream works concurrently.
-func TestStreamSendReceiveDataConcurrent(t *testing.T) {
+// TestStreamReceiveDataConcurrentWithConsumer verifies that enqueueing
+// data via ReceiveData and consuming it via Receive works concurrently.
+func TestStreamReceiveDataConcurrentWithConsumer(t *testing.T) {
 	log := logger.NewDefault()
 	s := NewStream(1, 100, "example.com", 80, log)
 
 	var wg sync.WaitGroup
 
-	// Writer: send multiple data chunks
+	// Producer: enqueue multiple data chunks via ReceiveData
 	wg.Add(1)
 	go func() {
 		defer wg.Done()

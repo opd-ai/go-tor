@@ -12,6 +12,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"crypto/sha1" // #nosec G401 - SHA-1 required by Tor protocol
+	"fmt"
 	"testing"
 
 	"github.com/opd-ai/go-tor/pkg/crypto"
@@ -94,7 +95,7 @@ func TestEncryptDecryptVariousPayloadSizes(t *testing.T) {
 	sizes := []int{0, 1, 15, 16, 17, 128, 256, 509, 510, 1024}
 
 	for _, sz := range sizes {
-		t.Run("size_"+string(rune('0'+sz/100))+string(rune('0'+(sz%100)/10))+string(rune('0'+sz%10)), func(t *testing.T) {
+		t.Run(fmt.Sprintf("size_%d", sz), func(t *testing.T) {
 			// Need fresh ciphers for each sub-test since AES-CTR is stateful
 			freshKey := make([]byte, 16)
 			freshKey[0] = byte(sz)

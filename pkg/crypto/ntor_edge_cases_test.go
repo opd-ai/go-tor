@@ -532,7 +532,9 @@ func TestNtorProcessResponseTamperedAuth(t *testing.T) {
 	var serverNtorPublic [32]byte
 	curve25519.ScalarBaseMult(&serverNtorPublic, &serverNtorPrivate)
 
-	clientHandshake, _, err := NtorClientHandshake(serverIdentity, serverNtorPublic[:])
+	// Capture clientPrivate (second return value) — it is the ephemeral
+	// private key needed for NtorProcessResponse.
+	clientHandshake, clientPrivate, err := NtorClientHandshake(serverIdentity, serverNtorPublic[:])
 	if err != nil {
 		t.Fatalf("client handshake failed: %v", err)
 	}
@@ -544,17 +546,19 @@ func TestNtorProcessResponseTamperedAuth(t *testing.T) {
 		t.Fatalf("server handshake failed: %v", err)
 	}
 
+	// First verify that the untampered response succeeds with the real key.
+	_, err = NtorProcessResponse(response, clientPrivate, serverNtorPublic[:], serverIdentity)
+	if err != nil {
+		t.Fatalf("valid response was rejected: %v", err)
+	}
+
 	// Tamper with each byte of the AUTH portion (bytes 32-63)
 	for i := 32; i < 64; i++ {
 		tampered := make([]byte, 64)
 		copy(tampered, response)
 		tampered[i] ^= 0x01 // Flip one bit
 
-		// Use a dummy private key (we don't have the real one)
-		dummyPrivate := make([]byte, 32)
-		_, _ = rand.Read(dummyPrivate)
-
-		_, err := NtorProcessResponse(tampered, dummyPrivate, serverNtorPublic[:], serverIdentity)
+		_, err := NtorProcessResponse(tampered, clientPrivate, serverNtorPublic[:], serverIdentity)
 		if err == nil {
 			t.Errorf("byte %d: tampered AUTH was accepted", i)
 		}

@@ -8,6 +8,7 @@
 package connection
 
 import (
+	"context"
 	"math"
 	"strings"
 	"testing"
@@ -243,11 +244,28 @@ func TestBackoffValuesTable(t *testing.T) {
 	}
 }
 
-// TestRetryConfigString verifies string representation of retry errors.
+// TestRetryConfigString verifies that ConnectWithRetry returns an error
+// message containing attempt count information on exhausted retries.
 func TestRetryConfigString(t *testing.T) {
-	// ConnectWithRetry error format should contain attempt info
-	errorMsg := "connection failed after 4 attempts: dial error"
-	if !strings.Contains(errorMsg, "failed after") {
-		t.Error("error message format unexpected")
+	// Use localhost port 1 — connection is refused immediately
+	cfg := DefaultConfig("127.0.0.1:1")
+	retryCfg := &RetryConfig{
+		MaxAttempts:       2,
+		InitialBackoff:    1 * time.Millisecond,
+		MaxBackoff:        5 * time.Millisecond,
+		BackoffMultiplier: 1.0,
+		Jitter:            false,
+	}
+
+	conn := New(cfg, logger.NewDefault())
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	err := conn.ConnectWithRetry(ctx, cfg, retryCfg)
+	if err == nil {
+		t.Fatal("expected connection failure")
+	}
+	if !strings.Contains(err.Error(), "failed after") {
+		t.Errorf("error message %q does not contain 'failed after'", err.Error())
 	}
 }
