@@ -2262,7 +2262,19 @@ When planning or reviewing test work, always refer to the “Current Coverage An
   - TestDeriveHopFromShortKeyMaterial/ValidKeyMaterial: key derivation
   - TestDeriveKeysFromSharedSecret: various secret sizes
   - TestNewExtensionNilLogger/WithLogger: initialization
-- [ ] Guard rotation persistence tests [pkg/path] [integration] [3h]
+- [x] Guard rotation persistence tests [pkg/path] [integration] [3h] ✅ **COMPLETED** (April 20, 2026)
+  - Created `pkg/path/guard_persistence_test.go` with 12 test functions
+  - TestPersistenceSaveLoadRoundTrip: full save/load cycle
+  - TestPersistenceSaveEmptyGuards: empty guard list
+  - TestPersistenceLoadNonexistent: nonexistent file error
+  - TestPersistenceLoadCorruptedJSON/Checksum: corruption handling
+  - TestPersistenceV1MigrationRoundTrip: V1→V2 schema migration
+  - TestPersistenceMultipleSaves: overwrite and backup creation
+  - TestPersistenceFileExists: existence checking
+  - TestPersistenceGetBackupPaths: backup path generation
+  - TestPersistenceSaveNilGuards: nil guard list handling
+  - TestDefaultPersistenceConfigValues: default configuration
+  - TestNewPersistenceNilLogger: nil logger fallback
 - [ ] Connection reconnection scenarios [pkg/connection] [integration] [3h]
 - [ ] Stream multiplexing under load [pkg/stream] [stress] [4h]
 - [ ] SOCKS5 protocol edge cases [pkg/socks] [unit] [3h]
