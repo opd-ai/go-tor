@@ -14,6 +14,7 @@ package pool
 import (
 	"sync"
 	"testing"
+	"time"
 )
 
 // TestBufferNotUsedAfterPut verifies that the pool's internal Get/Put
@@ -107,13 +108,6 @@ func TestClosedChannelSafety(t *testing.T) {
 	cfg := DefaultCircuitPoolConfig()
 	cfg.PrebuildEnabled = false // Disable prebuilding to avoid nil builder panic
 
-	var called int
-	builder := func(_ interface{ Done() <-chan struct{} }) (*interface{}, error) {
-		called++
-		return nil, nil
-	}
-	_ = builder // builder is provided to test pool creation safety
-
 	// Create and immediately close a pool
 	p := NewCircuitPool(cfg, nil, nil) // nil builder means no circuits built
 	defer func() {
@@ -142,11 +136,13 @@ func TestPrebuildLoopShutdown(t *testing.T) {
 
 	// Shut down cleanly
 	done := make(chan struct{})
+	panicCh := make(chan interface{}, 1)
 	go func() {
 		defer close(done)
 		defer func() {
 			if r := recover(); r != nil {
 				// Any panic here means the pool has a use-after-close bug
+				panicCh <- r
 			}
 		}()
 		p.Close()
@@ -155,6 +151,15 @@ func TestPrebuildLoopShutdown(t *testing.T) {
 	select {
 	case <-done:
 		// Clean shutdown achieved
+	case <-time.After(5 * time.Second):
+		t.Error("CircuitPool.Close() deadlocked: did not return within 5s")
+	}
+
+	// Fail the test if Close() panicked
+	select {
+	case r := <-panicCh:
+		t.Errorf("CircuitPool.Close() panicked: %v", r)
+	default:
 	}
 }
 

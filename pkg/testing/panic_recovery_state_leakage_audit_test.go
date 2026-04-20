@@ -272,7 +272,17 @@ func TestPanicInDeadlockedMutexDoesNotHang(t *testing.T) {
 		panic("goroutine panicked after releasing lock")
 	}()
 
-	wg.Wait()
+	// Wait for the goroutine with a timeout to avoid hanging on unexpected failures
+	wgDone := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(wgDone)
+	}()
+	select {
+	case <-wgDone:
+	case <-ctx.Done():
+		t.Fatal("timeout waiting for goroutine to complete after panic")
+	}
 
 	// Verify another goroutine can acquire the lock
 	lockAcquired := make(chan bool, 1)
