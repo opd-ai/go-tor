@@ -2201,7 +2201,17 @@ When planning or reviewing test work, always refer to the “Current Coverage An
   - TestAllZeroPayloadRoundTrip/TestAllOnesPayloadRoundTrip: edge values
   - TestRandomPayloadRoundTrip: 20 random payloads
   - TestEncryptForwardOriginalUnmodified/TestDecryptBackwardOriginalUnmodified: slice safety
-- [ ] Protocol negotiation failure scenarios [pkg/protocol] [unit] [4h]
+- [x] Protocol negotiation failure scenarios [pkg/protocol] [unit] [4h] ✅ **COMPLETED** (April 20, 2026)
+  - Created `pkg/protocol/negotiation_failure_test.go` with 10 test functions
+  - TestSelectVersionNoOverlap: 9 cases for no-common-version scenarios
+  - TestSelectVersionPreferHighest: 9 cases for highest-version preference
+  - TestSetTimeoutBoundaryValidation: 8 cases for SEC-M004 timeout bounds
+  - TestNewHandshakeNilLogger/TestNewHandshakeWithLogger: initialization
+  - TestVersionsPayloadParsingEdgeCases: payload parsing edge cases
+  - TestProtocolConstantsNegotiation: constant consistency validation
+  - TestSelectVersionWithLargeList: DoS resistance (10000 versions)
+  - TestSelectVersionAllSupported: full range negotiation
+  - TestSetTimeoutIdempotent: repeated timeout changes
 - [ ] Onion descriptor encryption edge cases [pkg/onion] [unit] [4h]
 - [ ] Key derivation boundary conditions [pkg/crypto] [unit] [2h]
 - [ ] Invalid cell command handling [pkg/cell] [unit] [2h]
