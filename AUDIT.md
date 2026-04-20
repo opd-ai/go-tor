@@ -2372,7 +2372,16 @@ When planning or reviewing test work, always refer to the “Current Coverage An
   - TestDecodeNegotiatePayloadSizes: 0/1/2/3/extra byte payloads
   - TestStateMachineConcurrentStartStop: race-free concurrent operations
   - TestPaddingMachineTypeUniqueness: machine type constant uniqueness
-- [ ] Recovery checkpoint/restore [pkg/recovery] [integration] [3h]
+- [x] Recovery checkpoint/restore [pkg/recovery] [integration] [3h] ✅ **COMPLETED**
+  - Created `pkg/recovery/checkpoint_integration_test.go` with 15 test functions
+  - TestIntegrationFullSaveLoadRoundtrip, TestIntegrationChecksumIntegrity,
+    TestIntegrationBackupRotation, TestIntegrationRecoveryFromBackup,
+    TestIntegrationConcurrentStateUpdates, TestIntegrationCheckpointLoopStartStop,
+    TestIntegrationCheckpointLoopIdempotent, TestIntegrationStopBeforeStart,
+    TestIntegrationRestoreNil, TestIntegrationBootstrapPhases,
+    TestIntegrationBandwidthAccumulation, TestIntegrationCircuitBuildEMA,
+    TestIntegrationFileExistsAndBackupPaths, TestIntegrationDefaultConfig,
+    TestIntegrationSaveCancelledContext
 - [ ] Autoconfig network detection [pkg/autoconfig] [unit] [2h]
 - [ ] Trace context propagation [pkg/trace] [integration] [2h]
 - [ ] HTTP metrics endpoint stress [pkg/httpmetrics] [stress] [2h]
