@@ -222,12 +222,12 @@ func TestBackoffValuesTable(t *testing.T) {
 		attempt int
 		want    time.Duration
 	}{
-		{0, 100 * time.Millisecond},                                                    // 100ms * 2^0 = 100ms
-		{1, time.Duration(float64(100*time.Millisecond) * math.Pow(2.0, 1))},           // 200ms
-		{2, time.Duration(float64(100*time.Millisecond) * math.Pow(2.0, 2))},           // 400ms
-		{3, time.Duration(float64(100*time.Millisecond) * math.Pow(2.0, 3))},           // 800ms
-		{4, time.Duration(float64(100*time.Millisecond) * math.Pow(2.0, 4))},           // 1600ms
-		{10, time.Duration(float64(100*time.Millisecond) * math.Pow(2.0, 10))},         // 102400ms > 10s -> capped
+		{0, 100 * time.Millisecond}, // 100ms * 2^0 = 100ms
+		{1, time.Duration(float64(100*time.Millisecond) * math.Pow(2.0, 1))},   // 200ms
+		{2, time.Duration(float64(100*time.Millisecond) * math.Pow(2.0, 2))},   // 400ms
+		{3, time.Duration(float64(100*time.Millisecond) * math.Pow(2.0, 3))},   // 800ms
+		{4, time.Duration(float64(100*time.Millisecond) * math.Pow(2.0, 4))},   // 1600ms
+		{10, time.Duration(float64(100*time.Millisecond) * math.Pow(2.0, 10))}, // 102400ms > 10s -> capped
 	}
 
 	for _, tc := range tests {

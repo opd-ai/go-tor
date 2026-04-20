@@ -174,7 +174,7 @@ func TestStreamStateTransitionsMux(t *testing.T) {
 
 	// Initial state
 	if s.GetState() != StateNew {
-		t.Errorf("initial state = %v, want Init", s.GetState())
+		t.Errorf("initial state = %v, want StateNew", s.GetState())
 	}
 
 	// Transition to Connected

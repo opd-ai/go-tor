@@ -43,27 +43,27 @@ func TestDecryptDescriptorEdgeCases(t *testing.T) {
 			errContains: "address is nil",
 		},
 		{
-			name:       "empty pubkey in address",
-			descriptor: &Descriptor{RawDescriptor: []byte("test")},
-			address:    &Address{Pubkey: []byte{}},
-			timePeriod: 1,
-			wantErr:    true,
+			name:        "empty pubkey in address",
+			descriptor:  &Descriptor{RawDescriptor: []byte("test")},
+			address:     &Address{Pubkey: []byte{}},
+			timePeriod:  1,
+			wantErr:     true,
 			errContains: "invalid public key length",
 		},
 		{
-			name:       "short pubkey (31 bytes)",
-			descriptor: &Descriptor{RawDescriptor: []byte("test")},
-			address:    &Address{Pubkey: make([]byte, 31)},
-			timePeriod: 1,
-			wantErr:    true,
+			name:        "short pubkey (31 bytes)",
+			descriptor:  &Descriptor{RawDescriptor: []byte("test")},
+			address:     &Address{Pubkey: make([]byte, 31)},
+			timePeriod:  1,
+			wantErr:     true,
 			errContains: "invalid public key length",
 		},
 		{
-			name:       "long pubkey (33 bytes)",
-			descriptor: &Descriptor{RawDescriptor: []byte("test")},
-			address:    &Address{Pubkey: make([]byte, 33)},
-			timePeriod: 1,
-			wantErr:    true,
+			name:        "long pubkey (33 bytes)",
+			descriptor:  &Descriptor{RawDescriptor: []byte("test")},
+			address:     &Address{Pubkey: make([]byte, 33)},
+			timePeriod:  1,
+			wantErr:     true,
 			errContains: "invalid public key length",
 		},
 		{
@@ -74,11 +74,11 @@ func TestDecryptDescriptorEdgeCases(t *testing.T) {
 			wantErr:    false, // Returns descriptor as-is
 		},
 		{
-			name:       "superencrypted but no BEGIN marker",
-			descriptor: &Descriptor{RawDescriptor: []byte("superencrypted\nsome data\n")},
-			address:    &Address{Pubkey: make([]byte, 32)},
-			timePeriod: 1,
-			wantErr:    true,
+			name:        "superencrypted but no BEGIN marker",
+			descriptor:  &Descriptor{RawDescriptor: []byte("superencrypted\nsome data\n")},
+			address:     &Address{Pubkey: make([]byte, 32)},
+			timePeriod:  1,
+			wantErr:     true,
 			errContains: "missing BEGIN MESSAGE marker",
 		},
 		{
@@ -86,9 +86,9 @@ func TestDecryptDescriptorEdgeCases(t *testing.T) {
 			descriptor: &Descriptor{
 				RawDescriptor: []byte("superencrypted\n-----BEGIN MESSAGE-----\ndata\n"),
 			},
-			address:    &Address{Pubkey: make([]byte, 32)},
-			timePeriod: 1,
-			wantErr:    true,
+			address:     &Address{Pubkey: make([]byte, 32)},
+			timePeriod:  1,
+			wantErr:     true,
 			errContains: "missing END MESSAGE marker",
 		},
 		{
@@ -96,9 +96,9 @@ func TestDecryptDescriptorEdgeCases(t *testing.T) {
 			descriptor: &Descriptor{
 				RawDescriptor: []byte("superencrypted\n-----BEGIN MESSAGE-----\n!!!invalid!!!\n-----END MESSAGE-----\n"),
 			},
-			address:    &Address{Pubkey: make([]byte, 32)},
-			timePeriod: 1,
-			wantErr:    true,
+			address:     &Address{Pubkey: make([]byte, 32)},
+			timePeriod:  1,
+			wantErr:     true,
 			errContains: "failed to decode encrypted data",
 		},
 		{
@@ -106,9 +106,9 @@ func TestDecryptDescriptorEdgeCases(t *testing.T) {
 			descriptor: &Descriptor{
 				RawDescriptor: []byte("superencrypted\n-----BEGIN MESSAGE-----\ndGVzdA==\n-----END MESSAGE-----\n"),
 			},
-			address:    &Address{Pubkey: make([]byte, 32)},
-			timePeriod: 1,
-			wantErr:    true,
+			address:     &Address{Pubkey: make([]byte, 32)},
+			timePeriod:  1,
+			wantErr:     true,
 			errContains: "encrypted data too short",
 		},
 		{
@@ -279,15 +279,15 @@ func TestDecryptAuthDescriptorEdgeCases(t *testing.T) {
 			errContains: "MAC verification failed",
 		},
 		{
-			name:    "data 41 bytes (minimum with 1 byte ciphertext)",
-			data:    make([]byte, 41),
-			wantErr: true, // Will fail MAC verification
+			name:        "data 41 bytes (minimum with 1 byte ciphertext)",
+			data:        make([]byte, 41),
+			wantErr:     true, // Will fail MAC verification
 			errContains: "MAC verification failed",
 		},
 		{
-			name:    "random data sufficient length",
-			data:    randomBytesOnion(t, 100),
-			wantErr: true, // Will fail MAC verification
+			name:        "random data sufficient length",
+			data:        randomBytesOnion(t, 100),
+			wantErr:     true, // Will fail MAC verification
 			errContains: "MAC verification failed",
 		},
 	}

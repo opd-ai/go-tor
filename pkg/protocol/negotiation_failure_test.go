@@ -107,19 +107,19 @@ func TestSetTimeoutBoundaryValidation(t *testing.T) {
 			errContains: "too short",
 		},
 		{
-			name:        "exact minimum (5s)",
-			timeout:     5 * time.Second,
-			wantErr:     false,
+			name:    "exact minimum (5s)",
+			timeout: 5 * time.Second,
+			wantErr: false,
 		},
 		{
-			name:        "in range (30s)",
-			timeout:     30 * time.Second,
-			wantErr:     false,
+			name:    "in range (30s)",
+			timeout: 30 * time.Second,
+			wantErr: false,
 		},
 		{
-			name:        "exact maximum (60s)",
-			timeout:     60 * time.Second,
-			wantErr:     false,
+			name:    "exact maximum (60s)",
+			timeout: 60 * time.Second,
+			wantErr: false,
 		},
 		{
 			name:        "above maximum (61s)",
@@ -194,40 +194,40 @@ func TestNewHandshakeWithLogger(t *testing.T) {
 // cell payloads including edge cases.
 func TestVersionsPayloadParsingEdgeCases(t *testing.T) {
 	tests := []struct {
-		name            string
-		payload         []byte
+		name             string
+		payload          []byte
 		expectedVersions []int
-		isOddLength     bool
+		isOddLength      bool
 	}{
 		{
-			name:            "empty payload",
-			payload:         []byte{},
+			name:             "empty payload",
+			payload:          []byte{},
 			expectedVersions: nil,
-			isOddLength:     false,
+			isOddLength:      false,
 		},
 		{
-			name:            "single version 4",
-			payload:         []byte{0x00, 0x04},
+			name:             "single version 4",
+			payload:          []byte{0x00, 0x04},
 			expectedVersions: []int{4},
 		},
 		{
-			name:            "versions 3, 4, 5",
-			payload:         []byte{0x00, 0x03, 0x00, 0x04, 0x00, 0x05},
+			name:             "versions 3, 4, 5",
+			payload:          []byte{0x00, 0x03, 0x00, 0x04, 0x00, 0x05},
 			expectedVersions: []int{3, 4, 5},
 		},
 		{
-			name:            "high byte set",
-			payload:         []byte{0x01, 0x00}, // Version 256
+			name:             "high byte set",
+			payload:          []byte{0x01, 0x00}, // Version 256
 			expectedVersions: []int{256},
 		},
 		{
-			name:            "version 0",
-			payload:         []byte{0x00, 0x00},
+			name:             "version 0",
+			payload:          []byte{0x00, 0x00},
 			expectedVersions: []int{0},
 		},
 		{
-			name:            "max uint16 version",
-			payload:         []byte{0xFF, 0xFF},
+			name:             "max uint16 version",
+			payload:          []byte{0xFF, 0xFF},
 			expectedVersions: []int{65535},
 		},
 		{

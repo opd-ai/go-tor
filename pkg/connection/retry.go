@@ -132,7 +132,7 @@ type Pool struct {
 	conns     []*Connection
 	retryCfg  *RetryConfig
 	available chan *Connection
-	closeOnce sync.Once
+	closeOnce sync.Once // Prevents panic from double-closing the available channel
 }
 
 // NewPool creates a new connection pool

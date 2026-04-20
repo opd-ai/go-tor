@@ -234,7 +234,7 @@ func TestAES256CTREncryptDecryptRoundTrip(t *testing.T) {
 	plaintexts := [][]byte{
 		{},
 		{0x00},
-		bytes.Repeat([]byte{0xAB}, 16), // One AES block
+		bytes.Repeat([]byte{0xAB}, 16),  // One AES block
 		bytes.Repeat([]byte{0xCD}, 509), // Relay cell size
 		bytes.Repeat([]byte{0xFF}, 1024),
 	}

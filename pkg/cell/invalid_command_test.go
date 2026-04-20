@@ -439,11 +439,11 @@ func TestRelayCellEncodeDecodeRoundTrip(t *testing.T) {
 // TestRelayCmdStringUnknown verifies human-readable relay command names.
 func TestRelayCmdStringUnknown(t *testing.T) {
 	known := map[byte]string{
-		RelayBegin:    "RELAY_BEGIN",
-		RelayData:     "RELAY_DATA",
-		RelayEnd:      "RELAY_END",
-		RelaySendme:   "RELAY_SENDME",
-		RelayExtend2:  "RELAY_EXTEND2",
+		RelayBegin:     "RELAY_BEGIN",
+		RelayData:      "RELAY_DATA",
+		RelayEnd:       "RELAY_END",
+		RelaySendme:    "RELAY_SENDME",
+		RelayExtend2:   "RELAY_EXTEND2",
 		RelayExtended2: "RELAY_EXTENDED2",
 	}
 
