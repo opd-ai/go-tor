@@ -1,11 +1,10 @@
 {
   "description": "HKDF-SHA256 test vectors for ntor key derivation, compatible with Arti",
-  "source": "tor-spec.txt §5.1.4, RFC 5869, Arti tor-proto ntor handshake",
+  "source": "tor-spec.txt \u00a75.1.4, RFC 5869, Arti tor-proto ntor handshake",
   "source_repo": "https://gitlab.torproject.org/tpo/core/arti",
   "source_path": "crates/tor-proto/src/crypto/handshake/ntor.rs",
-  "source": "Independently computed from tor-spec.txt (https://spec.torproject.org/)",
   "algorithm": "HKDF-SHA256 (RFC 5869) with nil salt",
-  "note": "Arti uses the hkdf crate from RustCrypto. These vectors match the ntor key derivation info strings from tor-spec.txt §5.1.4.",
+  "note": "Arti uses the hkdf crate from RustCrypto. These vectors match the ntor key derivation info strings from tor-spec.txt \u00a75.1.4.",
   "vectors": [
     {
       "comment": "HKDF key_extract: sequential IKM",

@@ -1,8 +1,7 @@
 {
   "description": "Variable-length cell encoding test vectors, compatible with C Tor wire format",
-  "source": "tor-spec.txt §3 (Cell Packet Format)",
+  "source": "tor-spec.txt \u00a73 (Cell Packet Format)",
   "source_repo": "https://gitlab.torproject.org/tpo/core/tor",
-  "source": "Independently computed from tor-spec.txt (https://spec.torproject.org/)",
   "note": "Variable cells: CircID(4)||CMD(1)||LENGTH(2)||PAYLOAD(LENGTH). Commands >= 128 and VERSIONS (7) are variable-length. VERSIONS cells have CircID=0 per spec.",
   "vectors": [
     {

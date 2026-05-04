@@ -1,9 +1,8 @@
 {
   "description": "AES-CTR test vectors compatible with Arti (Rust Tor implementation)",
-  "source": "tor-spec.txt §0.4, NIST SP 800-38A, Arti tor-llcrypto",
+  "source": "tor-spec.txt \u00a70.4, NIST SP 800-38A, Arti tor-llcrypto",
   "source_repo": "https://gitlab.torproject.org/tpo/core/arti",
   "source_path": "crates/tor-llcrypto/src/cipher/",
-  "source": "Independently computed from tor-spec.txt (https://spec.torproject.org/)",
   "algorithm": "AES-CTR",
   "note": "Arti uses the aes and ctr crates from RustCrypto. These vectors match NIST SP 800-38A test vectors and are confirmed correct by both Arti and C Tor test suites.",
   "aes128_vectors": [

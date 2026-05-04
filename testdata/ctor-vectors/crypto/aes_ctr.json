@@ -1,8 +1,7 @@
 {
-  "description": "AES-CTR test vectors compatible with C Tor (tor-spec.txt §0.4)",
-  "source": "tor-spec.txt §0.4, NIST SP 800-38A, AES-CTR mode",
+  "description": "AES-CTR test vectors compatible with C Tor (tor-spec.txt \u00a70.4)",
+  "source": "tor-spec.txt \u00a70.4, NIST SP 800-38A, AES-CTR mode",
   "source_repo": "https://gitlab.torproject.org/tpo/core/tor",
-  "source": "Independently computed from tor-spec.txt (https://spec.torproject.org/)",
   "algorithm": "AES-CTR",
   "note": "Tor uses AES-128-CTR for cell stream encryption (link layer) and AES-256-CTR for onion layers. IV is incremented as a big-endian counter.",
   "aes128_vectors": [

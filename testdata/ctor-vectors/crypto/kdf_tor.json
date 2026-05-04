@@ -1,8 +1,7 @@
 {
   "description": "KDF-TOR test vectors as implemented by go-tor's DeriveKey function",
-  "source": "tor-spec.txt §5.2.1 (TAP handshake key derivation)",
+  "source": "tor-spec.txt \u00a75.2.1 (TAP handshake key derivation)",
   "source_repo": "https://gitlab.torproject.org/tpo/core/tor",
-  "source": "Independently computed from tor-spec.txt (https://spec.torproject.org/)",
   "algorithm": "KDF-TOR (iterative SHA-1)",
   "note": "KDF-TOR derives key material from a shared secret using iterative SHA-1. go-tor computes: K0=SHA1(secret), Ki=SHA1(K0|i) for i>=1. Output is first key_len bytes of K0|K1|K2|...",
   "vectors": [

@@ -2,7 +2,6 @@
   "description": "Fixed-size cell encoding test vectors, compatible with C Tor wire format",
   "source": "tor-spec.txt \u00a73 (Cell Packet Format)",
   "source_repo": "https://gitlab.torproject.org/tpo/core/tor",
-  "source": "Independently computed from tor-spec.txt (https://spec.torproject.org/)",
   "note": "Fixed cells are 514 bytes: CircID(4)||CMD(1)||PAYLOAD(509). Payload is zero-padded to 509 bytes. Link protocol version >=4 uses 4-byte CircID.",
   "vectors": [
     {

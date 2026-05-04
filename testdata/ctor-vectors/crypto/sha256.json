@@ -1,8 +1,7 @@
 {
-  "description": "SHA-256 test vectors compatible with C Tor (tor-spec.txt §0.3)",
-  "source": "tor-spec.txt §0.3, FIPS 180-4, NIST CAVS",
+  "description": "SHA-256 test vectors compatible with C Tor (tor-spec.txt \u00a70.3)",
+  "source": "tor-spec.txt \u00a70.3, FIPS 180-4, NIST CAVS",
   "source_repo": "https://gitlab.torproject.org/tpo/core/tor",
-  "source": "Independently computed from tor-spec.txt (https://spec.torproject.org/)",
   "algorithm": "SHA-256",
   "note": "SHA-256 is used in ntor HKDF and ed25519 signature verification. FIPS 180-4 vectors ensure interoperability.",
   "vectors": [

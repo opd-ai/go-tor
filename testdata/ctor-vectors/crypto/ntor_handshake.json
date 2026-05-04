@@ -2,7 +2,6 @@
   "description": "ntor handshake end-to-end test vectors, compatible with C Tor ntor_ref.py and Arti",
   "source": "tor-spec.txt \u00a75.1.4, ntor proposal (Proposal 216)",
   "source_repo": "https://gitlab.torproject.org/tpo/core/tor",
-  "source_commit": "Independently computed from tor-spec.txt (https://spec.torproject.org/)",
   "algorithm": "ntor-curve25519-sha256-1 (tor-spec.txt \u00a75.1.4)",
   "note": "Keys use Curve25519 with RFC 7748 clamping applied. The handshake data is NODEID(20)||KEYID(32)||CLIENT_PK(32)=84 bytes. Server response is SERVER_EPH_PK(32)||AUTH(32)=64 bytes. Key material is 72 bytes for circuit keys: Df(20)||Db(20)||Kf(16)||Kb(16). server_identity is 32 bytes used in the HKDF secret_input (go-tor uses full 32-byte identity).",
   "vectors": [
