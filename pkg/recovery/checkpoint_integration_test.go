@@ -546,7 +546,7 @@ func TestIntegrationCircuitBuildEMAAccuracy(t *testing.T) {
 	// Second successful build: EMA = 1000 * 0.9 + 2000 * 0.1 = 900 + 200 = 1100
 	sc.RecordCircuitBuild(true, 2000)
 	state = sc.GetState()
-	expected := int64((1 - emaAlpha) * 1000 + emaAlpha*2000)
+	expected := int64((1-emaAlpha)*1000 + emaAlpha*2000)
 	if state.Circuits.AverageBuildTimeMs != expected {
 		t.Errorf("After 2nd build: AverageBuildTimeMs = %d, want %d", state.Circuits.AverageBuildTimeMs, expected)
 	}

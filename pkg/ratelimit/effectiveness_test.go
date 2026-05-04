@@ -163,7 +163,7 @@ func TestKeyedRateLimiterCleanupEffectiveness(t *testing.T) {
 
 func TestWaitWithContextCancellation(t *testing.T) {
 	rl := NewRateLimiter(0.1, 1) // Very slow refill.
-	rl.Allow()                    // Exhaust.
+	rl.Allow()                   // Exhaust.
 
 	ctx, cancel := context.WithCancel(context.Background())
 

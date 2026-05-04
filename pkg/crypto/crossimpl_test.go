@@ -127,9 +127,9 @@ func TestCrossImpl_SHA256_Arti(t *testing.T) {
 // ---- AES-CTR vectors -----------------------------------------------------
 
 type aesCTRVectorFile struct {
-	Description    string `json:"description"`
-	AES128Vectors  []aesCTRVector `json:"aes128_vectors"`
-	AES256Vectors  []aesCTRVector `json:"aes256_vectors"`
+	Description   string         `json:"description"`
+	AES128Vectors []aesCTRVector `json:"aes128_vectors"`
+	AES256Vectors []aesCTRVector `json:"aes256_vectors"`
 }
 
 type aesCTRVector struct {
@@ -255,8 +255,8 @@ func TestCrossImpl_HKDF_Arti(t *testing.T) {
 // ---- ntor handshake vectors ----------------------------------------------
 
 type ntorVectorFile struct {
-	Description string        `json:"description"`
-	Vectors     []ntorVector  `json:"vectors"`
+	Description string       `json:"description"`
+	Vectors     []ntorVector `json:"vectors"`
 }
 
 type ntorVector struct {

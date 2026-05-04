@@ -49,12 +49,12 @@ func decodeCellHex(t *testing.T, s string) []byte {
 type fixedCellVectorFile struct {
 	Description string `json:"description"`
 	Vectors     []struct {
-		Comment          string `json:"comment"`
-		CircID           uint32 `json:"circ_id"`
-		Command          byte   `json:"command"`
-		CommandName      string `json:"command_name"`
-		TotalEncodedLen  int    `json:"total_encoded_len"`
-		Encoded          string `json:"encoded"`
+		Comment         string `json:"comment"`
+		CircID          uint32 `json:"circ_id"`
+		Command         byte   `json:"command"`
+		CommandName     string `json:"command_name"`
+		TotalEncodedLen int    `json:"total_encoded_len"`
+		Encoded         string `json:"encoded"`
 	} `json:"vectors"`
 }
 
@@ -188,18 +188,18 @@ func TestCrossImpl_VariableCell_CTor(t *testing.T) {
 // ---- Arti cell encoding vectors ------------------------------------------
 
 type artiCellVectorFile struct {
-	Description         string `json:"description"`
-	FixedCellVectors    []struct {
-		Comment  string `json:"comment"`
-		CircID   uint32 `json:"circ_id"`
-		Command  byte   `json:"command"`
-		Encoded  string `json:"encoded"`
+	Description      string `json:"description"`
+	FixedCellVectors []struct {
+		Comment string `json:"comment"`
+		CircID  uint32 `json:"circ_id"`
+		Command byte   `json:"command"`
+		Encoded string `json:"encoded"`
 	} `json:"fixed_cell_vectors"`
 	VariableCellVectors []struct {
-		Comment  string `json:"comment"`
-		CircID   uint32 `json:"circ_id"`
-		Command  byte   `json:"command"`
-		Encoded  string `json:"encoded"`
+		Comment string `json:"comment"`
+		CircID  uint32 `json:"circ_id"`
+		Command byte   `json:"command"`
+		Encoded string `json:"encoded"`
 	} `json:"variable_cell_vectors"`
 }
 
@@ -260,5 +260,3 @@ func TestCrossImpl_Cell_Arti(t *testing.T) {
 		}
 	})
 }
-
-// TestCrossImpl_Cell_Arti verifies cell encoding against Arti compatible vectors.
