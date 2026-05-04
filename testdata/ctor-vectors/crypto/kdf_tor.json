@@ -1,0 +1,33 @@
+{
+  "description": "KDF-TOR test vectors as implemented by go-tor's DeriveKey function",
+  "source": "tor-spec.txt \u00a75.2.1 (TAP handshake key derivation)",
+  "source_repo": "https://gitlab.torproject.org/tpo/core/tor",
+  "algorithm": "KDF-TOR (iterative SHA-1)",
+  "note": "KDF-TOR derives key material from a shared secret using iterative SHA-1. go-tor computes: K0=SHA1(secret), Ki=SHA1(K0|i) for i>=1. Output is first key_len bytes of K0|K1|K2|...",
+  "vectors": [
+    {
+      "comment": "KDF-TOR with 32 zero bytes secret, 72 bytes output",
+      "secret": "0000000000000000000000000000000000000000000000000000000000000000",
+      "key_len": 72,
+      "output": "de8a847bff8c343d69b853a215e6ee775ef2ef9669a3da038ce05f6b99c425db58223c1f2ade1d77f86761c4bbbb9fe4e6cb7fa40ed8d180bc8db5dff538d27d2186bfbe95516776"
+    },
+    {
+      "comment": "KDF-TOR with sequential 32 bytes secret, 72 bytes output",
+      "secret": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "key_len": 72,
+      "output": "ae5bd8efea5322c4d9986d06680a781392f9a6427e4e0a5476d694897b7af0c9e13d0ba19f398baa5ce69a8b437c1b72b9d3b028af21420af8c23af4512d5c6f8a8af5678fd8a85b"
+    },
+    {
+      "comment": "KDF-TOR with named secret bytes, 20 bytes output (forward digest only)",
+      "secret": "746573745f7365637265745f6b65795f6d6174657269616c5f61626364656630",
+      "key_len": 20,
+      "output": "a4db62e97ba4d1212847e54e4d86fc0199a46ae6"
+    },
+    {
+      "comment": "KDF-TOR with sequential secret, 40 bytes output (Df+Db)",
+      "secret": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "key_len": 40,
+      "output": "ae5bd8efea5322c4d9986d06680a781392f9a6427e4e0a5476d694897b7af0c9e13d0ba19f398baa"
+    }
+  ]
+}

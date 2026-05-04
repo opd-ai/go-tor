@@ -27,6 +27,27 @@ import (
 //
 // Implements tor-spec.txt section 5.1.4 (server side)
 func NtorServerHandshake(clientHandshake, serverNtorKey, serverIdentity []byte) (response, keyMaterial []byte, err error) {
+	return ntorServerHandshakeCore(clientHandshake, serverNtorKey, serverIdentity, nil)
+}
+
+// ntorServerHandshakeWithKeys performs the server side of the ntor handshake
+// using a caller-supplied ephemeral private key. This enables deterministic
+// testing against known test vectors.
+//
+// Parameters:
+//   - clientHandshake: The client's handshake data (84 bytes)
+//   - serverNtorKey: The server's long-term private key (32 bytes)
+//   - serverIdentity: The server's identity key (32 bytes)
+//   - ephemeralPrivate: Caller-provided ephemeral private key (must be exactly 32 bytes)
+//
+// Implements tor-spec.txt section 5.1.4 (deterministic variant for testing only)
+func ntorServerHandshakeWithKeys(clientHandshake, serverNtorKey, serverIdentity, ephemeralPrivate []byte) (response, keyMaterial []byte, err error) {
+	return ntorServerHandshakeCore(clientHandshake, serverNtorKey, serverIdentity, ephemeralPrivate)
+}
+
+// ntorServerHandshakeCore is the shared implementation for NtorServerHandshake
+// and NtorServerHandshakeWithKeys.
+func ntorServerHandshakeCore(clientHandshake, serverNtorKey, serverIdentity, ephemeralPrivate []byte) (response, keyMaterial []byte, err error) {
 	// Validate input lengths
 	if len(clientHandshake) != 84 {
 		return nil, nil, fmt.Errorf("invalid client handshake length: %d, expected 84", len(clientHandshake))
@@ -43,10 +64,21 @@ func NtorServerHandshake(clientHandshake, serverNtorKey, serverIdentity []byte) 
 	var clientPK [32]byte
 	copy(clientPK[:], clientHandshake[52:84])
 
-	// Generate ephemeral server keypair (y, Y)
-	serverEphemeral, err := GenerateNtorKeyPair()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to generate server ephemeral key: %w", err)
+	// Use caller-supplied ephemeral key if provided, otherwise generate a fresh one.
+	var serverEphemeral *NtorKeyPair
+	if ephemeralPrivate != nil {
+		if len(ephemeralPrivate) != 32 {
+			return nil, nil, fmt.Errorf("ephemeralPrivate must be exactly 32 bytes, got %d", len(ephemeralPrivate))
+		}
+		serverEphemeral = &NtorKeyPair{}
+		copy(serverEphemeral.Private[:], ephemeralPrivate)
+		curve25519.ScalarBaseMult(&serverEphemeral.Public, &serverEphemeral.Private)
+	} else {
+		var genErr error
+		serverEphemeral, genErr = GenerateNtorKeyPair()
+		if genErr != nil {
+			return nil, nil, fmt.Errorf("failed to generate server ephemeral key: %w", genErr)
+		}
 	}
 
 	// Convert server long-term private key to array

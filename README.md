@@ -229,6 +229,41 @@ Key dependencies from `go.mod`:
 
 ---
 
+## Cross-Implementation Testing
+
+go-tor includes a test suite that validates protocol compliance against known-good
+vectors from [C Tor](https://gitlab.torproject.org/tpo/core/tor) (the reference
+implementation) and [Arti](https://gitlab.torproject.org/tpo/core/arti) (the Rust
+implementation). This ensures interoperability at the wire level.
+
+### Covered Operations
+
+| Operation | Spec Section | C Tor | Arti |
+|-----------|-------------|-------|------|
+| SHA-1 | tor-spec §0.3 | ✓ | — |
+| SHA-256 | tor-spec §0.3 | ✓ | ✓ |
+| AES-128/256-CTR | tor-spec §0.4 | ✓ | ✓ |
+| HKDF-SHA256 (ntor) | tor-spec §5.1.4 | ✓ | ✓ |
+| ntor handshake | tor-spec §5.1.4 | ✓ | ✓ |
+| KDF-TOR | tor-spec §5.2.1 | ✓ | — |
+| Fixed cell encoding | tor-spec §3 | ✓ | ✓ |
+| Variable cell encoding | tor-spec §3 | ✓ | ✓ |
+
+### Running Cross-Implementation Tests
+
+```bash
+# Run only cross-implementation tests
+go test -run TestCrossImpl ./pkg/crypto/... ./pkg/cell/...
+
+# Run with race detector
+go test -race -run TestCrossImpl ./pkg/crypto/... ./pkg/cell/...
+```
+
+Test vectors are stored in `testdata/` at the repository root.
+See [testdata/README.md](testdata/README.md) for vector sources and update instructions.
+
+---
+
 ## License
 
 BSD 3-Clause License

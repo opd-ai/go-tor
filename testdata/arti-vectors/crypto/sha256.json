@@ -1,0 +1,30 @@
+{
+  "description": "SHA-256 test vectors compatible with Arti (Rust Tor implementation)",
+  "source": "tor-spec.txt \u00a70.3, FIPS 180-4, Arti tor-llcrypto",
+  "source_repo": "https://gitlab.torproject.org/tpo/core/arti",
+  "source_path": "crates/tor-llcrypto/src/d/",
+  "algorithm": "SHA-256",
+  "note": "SHA-256 vectors verified against Arti's tor-llcrypto crate which wraps the sha2 crate. FIPS 180-4 vectors are universally accepted.",
+  "vectors": [
+    {
+      "comment": "SHA-256 of empty string",
+      "input": "",
+      "output": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "comment": "SHA-256 of 'abc'",
+      "input": "616263",
+      "output": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    },
+    {
+      "comment": "SHA-256 of 32 sequential bytes",
+      "input": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "output": "630dcd2966c4336691125448bbb25b4ff412a49c732db2c8abc1b8581bd710dd"
+    },
+    {
+      "comment": "SHA-256 of 32 zero bytes",
+      "input": "0000000000000000000000000000000000000000000000000000000000000000",
+      "output": "66687aadf862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925"
+    }
+  ]
+}

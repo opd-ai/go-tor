@@ -1,0 +1,64 @@
+name: Cross-Implementation Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  cross-impl:
+    name: Cross-Implementation Vector Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24.x'
+
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-crossimpl-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-crossimpl-
+          ${{ runner.os }}-go-
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Verify zero CGO
+      run: |
+        cgo_pkgs=$(go list -deps -f '{{if .CgoFiles}}{{.ImportPath}}{{end}}' ./pkg/... ./cmd/... 2>/dev/null | grep "^github.com/opd-ai/go-tor" || true)
+        if [ -n "$cgo_pkgs" ]; then
+          echo "ERROR: CGO found in module packages:"
+          echo "$cgo_pkgs"
+          exit 1
+        fi
+        echo "✓ No CGO imports in production code"
+
+    - name: Run cross-implementation tests (crypto)
+      run: |
+        echo "Running cross-implementation crypto tests against C Tor and Arti vectors..."
+        go test -v -race -run TestCrossImpl ./pkg/crypto/
+
+    - name: Run cross-implementation tests (cell encoding)
+      run: |
+        echo "Running cross-implementation cell encoding tests against C Tor and Arti vectors..."
+        go test -v -race -run TestCrossImpl ./pkg/cell/
+
+    - name: Run all cross-implementation tests (summary)
+      run: |
+        echo "Running all cross-implementation tests..."
+        go test -race -run TestCrossImpl ./pkg/crypto/ ./pkg/cell/
+        echo "✓ All cross-implementation tests passed"
