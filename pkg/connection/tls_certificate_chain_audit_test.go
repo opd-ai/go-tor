@@ -692,7 +692,7 @@ func createCertWithExtensions(t *testing.T) *x509.Certificate {
 	return cert
 }
 
-func createCert(t *testing.T, priv interface{}, pub interface{}, sigAlg x509.SignatureAlgorithm) *x509.Certificate {
+func createCert(t *testing.T, priv, pub interface{}, sigAlg x509.SignatureAlgorithm) *x509.Certificate {
 	template := &x509.Certificate{
 		SerialNumber: big.NewInt(1),
 		Subject: pkix.Name{

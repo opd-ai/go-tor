@@ -479,7 +479,6 @@ func TestDNSLocalAddressResolutionNoLeak(t *testing.T) {
 
 			ctx := context.Background()
 			result, err := c.ResolveHostname(ctx, addr)
-
 			// Even localhost should go through circuit (no system DNS bypass)
 			if err != nil {
 				t.Logf("Resolution failed (expected for security): %v", err)
