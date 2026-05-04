@@ -441,7 +441,7 @@ Recommendation: Continue current logging practices. No changes required.
 }
 
 // Helper function to search code for patterns
-func searchCodeForPatterns(t *testing.T, rootDir string, patterns []string, excludeSuffixes []string) []string {
+func searchCodeForPatterns(t *testing.T, rootDir string, patterns, excludeSuffixes []string) []string {
 	t.Helper()
 
 	var findings []string

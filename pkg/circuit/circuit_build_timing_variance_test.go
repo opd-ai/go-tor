@@ -420,7 +420,7 @@ func calculateTimingStats(timings []time.Duration) (mean, stddev time.Duration, 
 		cv = float64(stddevNs) / float64(meanNs)
 	}
 
-	return
+	return mean, stddev, cv
 }
 
 // Helper function to calculate Pearson correlation coefficient

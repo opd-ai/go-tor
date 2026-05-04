@@ -272,10 +272,14 @@ func (pm *ConnectionPaddingMachine) calculateNextDelay() time.Duration {
 
 	case ConnectionPaddingAdaptive:
 		// Adaptive: reduce padding during active periods
-		if pm.activityBursts > 0 {
-			pm.mu.Lock()
+		pm.mu.Lock()
+		inBurst := pm.activityBursts > 0 && time.Since(pm.lastActivityTime) < config.MaxInterval
+		if inBurst {
 			pm.activityBursts--
-			pm.mu.Unlock()
+		}
+		pm.mu.Unlock()
+
+		if inBurst {
 			return pm.randomDuration(config.MaxInterval, config.MaxInterval*2)
 		}
 		// Quiet period - more aggressive padding

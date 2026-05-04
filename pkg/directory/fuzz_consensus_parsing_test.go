@@ -328,7 +328,7 @@ func FuzzParseAuthorityCert(f *testing.F) {
 	// Seed: garbage PEM content
 	f.Add("fingerprint TEST\n-----BEGIN RSA PUBLIC KEY-----\nNOTBASE64!!!\n-----END RSA PUBLIC KEY-----\n", "TEST")
 
-	f.Fuzz(func(t *testing.T, data string, identity string) {
+	f.Fuzz(func(t *testing.T, data, identity string) {
 		defer func() {
 			if r := recover(); r != nil {
 				t.Errorf("parseAuthorityCert panicked on %d bytes: %v",
@@ -355,7 +355,7 @@ func FuzzValidateConsensusMetadata(f *testing.F) {
 	// Seed: large values
 	f.Add(1000, 1000, true, false)
 
-	f.Fuzz(func(t *testing.T, sigCount int, authCount int, hasValidAfter bool, hasValidUntil bool) {
+	f.Fuzz(func(t *testing.T, sigCount, authCount int, hasValidAfter, hasValidUntil bool) {
 		defer func() {
 			if r := recover(); r != nil {
 				t.Errorf("ValidateConsensusMetadata panicked: sigCount=%d authCount=%d: %v",

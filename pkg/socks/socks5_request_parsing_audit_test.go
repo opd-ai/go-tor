@@ -78,7 +78,7 @@ func (m *mockConn) SetReadDeadline(t time.Time) error  { return nil }
 func (m *mockConn) SetWriteDeadline(t time.Time) error { return nil }
 
 // buildSOCKS5Request builds a valid SOCKS5 request for testing
-func buildSOCKS5Request(cmd byte, addrType byte, addr []byte, port uint16) []byte {
+func buildSOCKS5Request(cmd, addrType byte, addr []byte, port uint16) []byte {
 	buf := make([]byte, 0, 512)
 	buf = append(buf, socks5Version) // Version
 	buf = append(buf, cmd)           // Command

@@ -26,10 +26,12 @@ import (
 )
 
 func main() {
-	fmt.Println("=== obfs4 Pluggable Transport Demo ===\n")
+	fmt.Println("=== obfs4 Pluggable Transport Demo ===")
+	fmt.Println()
 	fmt.Println("⚠️  EDUCATIONAL PURPOSE ONLY")
 	fmt.Println("This is an experimental implementation.")
-	fmt.Println("For real Tor usage, use official Tor Browser.\n")
+	fmt.Println("For real Tor usage, use official Tor Browser.")
+	fmt.Println()
 
 	// Demonstrate PT discovery
 	demonstratePTDiscovery()

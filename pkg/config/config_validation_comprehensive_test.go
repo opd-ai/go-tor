@@ -844,7 +844,7 @@ func assertFloat(t *testing.T, field string, got, want float64) {
 	}
 }
 
-func assertString(t *testing.T, field string, got, want string) {
+func assertString(t *testing.T, field, got, want string) {
 	t.Helper()
 	if got != want {
 		t.Errorf("%s = %q, want %q", field, got, want)

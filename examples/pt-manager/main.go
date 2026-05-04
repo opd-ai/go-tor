@@ -14,7 +14,8 @@ import (
 )
 
 func main() {
-	fmt.Println("=== Pluggable Transport Manager Demo ===\n")
+	fmt.Println("=== Pluggable Transport Manager Demo ===")
+	fmt.Println()
 
 	// 1. Discover available PTs
 	fmt.Println("1. Discovering available PTs...")
@@ -22,7 +23,9 @@ func main() {
 	if len(discoveredPTs) == 0 {
 		fmt.Println("   No common PTs found. This demo requires obfs4proxy or other PTs.")
 		fmt.Println("   Install with: apt-get install obfs4proxy")
-		fmt.Println("\n   Continuing with mock demonstration...\n")
+		fmt.Println()
+		fmt.Println("   Continuing with mock demonstration...")
+		fmt.Println()
 	} else {
 		fmt.Printf("   Found %d PTs:\n", len(discoveredPTs))
 		for name, path := range discoveredPTs {

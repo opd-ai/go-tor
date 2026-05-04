@@ -465,8 +465,10 @@ func TestNtorLowOrderPointHandling(t *testing.T) {
 		// The all-zero point
 		make([]byte, 32),
 		// Point of order 1 (identity element)
-		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{
+			1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		},
 	}
 
 	identity := make([]byte, 32)
