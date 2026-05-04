@@ -1,0 +1,35 @@
+{
+  "description": "SHA-1 test vectors compatible with C Tor (tor-spec.txt §0.3)",
+  "source": "tor-spec.txt §0.3, FIPS 180-4, RFC 3174",
+  "source_repo": "https://gitlab.torproject.org/tpo/core/tor",
+  "source_commit": "tor-0.4.8.x",
+  "algorithm": "SHA-1",
+  "note": "SHA-1 is required by Tor protocol for specific operations (digest chains, KDF-TOR). FIPS 180-4 vectors ensure interoperability.",
+  "vectors": [
+    {
+      "comment": "SHA-1 of empty string (FIPS 180-4 example)",
+      "input": "",
+      "output": "da39a3ee5e6b4b0d3255bfef95601890afd80709"
+    },
+    {
+      "comment": "SHA-1 of 'abc' (FIPS 180-4 example)",
+      "input": "616263",
+      "output": "a9993e364706816aba3e25717850c26c9cd0d89d"
+    },
+    {
+      "comment": "SHA-1 of 'test'",
+      "input": "74657374",
+      "output": "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3"
+    },
+    {
+      "comment": "SHA-1 of 32 sequential bytes 0x00..0x1f",
+      "input": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "output": "ae5bd8efea5322c4d9986d06680a781392f9a642"
+    },
+    {
+      "comment": "SHA-1 of 32 zero bytes",
+      "input": "0000000000000000000000000000000000000000000000000000000000000000",
+      "output": "de8a847bff8c343d69b853a215e6ee775ef2ef96"
+    }
+  ]
+}

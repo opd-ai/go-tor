@@ -1,0 +1,26 @@
+{
+  "description": "ntor handshake test vectors compatible with Arti",
+  "source": "tor-spec.txt §5.1.4, Arti tor-proto ntor handshake",
+  "source_repo": "https://gitlab.torproject.org/tpo/core/arti",
+  "source_path": "crates/tor-proto/src/crypto/handshake/ntor.rs",
+  "source_commit": "arti-1.2.x",
+  "algorithm": "ntor-curve25519-sha256-1",
+  "note": "These vectors use the same ntor algorithm as Arti: Curve25519 DH + HKDF-SHA256. Keys use RFC 7748 clamping. server_identity is 32 bytes (go-tor convention). The server_response field is server_y_public||auth (64 bytes).",
+  "vectors": [
+    {
+      "comment": "ntor end-to-end with clamped repeated-byte keys",
+      "node_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "server_identity": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "server_b_private": "b8bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb7b",
+      "server_b_public": "6b0b616d718e53691236d3be3ce6d44f9d28836426d81305d131f488206f8d2b",
+      "client_x_private": "c8cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc4c",
+      "client_x_public": "e8980c4ea5ebf8fb6c281098b75cdd32862922a638778251979b6d322ed7e02e",
+      "server_y_private": "d8dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd5d",
+      "server_y_public": "b2599e860bbe532e4955cca4dbd20d3b7f6805d81bb505ddbe69276a170c4d74",
+      "auth": "cc91d4ba8078235c55daa4cfdc3c20c467120e763199aa425bcf96104d7bf05f",
+      "key_material": "2296ec90e4853d0aa9c68a72c7b692cb23d63fa231537be0253bd7331c8eb343f217edaa3a1e002e2cedc22a15a9bae3adf406e427d1592cf60b9f6ee980574c0632b4ab9fc9809b",
+      "handshake_data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa6b0b616d718e53691236d3be3ce6d44f9d28836426d81305d131f488206f8d2be8980c4ea5ebf8fb6c281098b75cdd32862922a638778251979b6d322ed7e02e",
+      "server_response": "b2599e860bbe532e4955cca4dbd20d3b7f6805d81bb505ddbe69276a170c4d74cc91d4ba8078235c55daa4cfdc3c20c467120e763199aa425bcf96104d7bf05f"
+    }
+  ]
+}

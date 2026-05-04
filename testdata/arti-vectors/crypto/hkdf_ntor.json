@@ -1,0 +1,32 @@
+{
+  "description": "HKDF-SHA256 test vectors for ntor key derivation, compatible with Arti",
+  "source": "tor-spec.txt §5.1.4, RFC 5869, Arti tor-proto ntor handshake",
+  "source_repo": "https://gitlab.torproject.org/tpo/core/arti",
+  "source_path": "crates/tor-proto/src/crypto/handshake/ntor.rs",
+  "source_commit": "arti-1.2.x",
+  "algorithm": "HKDF-SHA256 (RFC 5869) with nil salt",
+  "note": "Arti uses the hkdf crate from RustCrypto. These vectors match the ntor key derivation info strings from tor-spec.txt §5.1.4.",
+  "vectors": [
+    {
+      "comment": "HKDF key_extract: sequential IKM",
+      "ikm": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "info": "ntor-curve25519-sha256-1:key_extract",
+      "length": 72,
+      "output": "705b120066bd1a87596e49a304ff1faa0ea1fd4e68d84df50d70266a18f47e06bebceb101d96462ae449bfd1069bebb86522c80ae01eb754e8c927dcae4fd2804d8c193ed9fa7f6c"
+    },
+    {
+      "comment": "HKDF verify: sequential IKM",
+      "ikm": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "info": "ntor-curve25519-sha256-1:verify",
+      "length": 72,
+      "output": "60552dc74941192843fbface0cb38396f3a85120337a7d46d24efa7617a94c9bf3ac313ea1c332da4f89005b04dc70b667067fe22983579dc0c4990bd07e197ea536d795217b06a1"
+    },
+    {
+      "comment": "HKDF key_extract: repeated-0x42 IKM",
+      "ikm": "4242424242424242424242424242424242424242424242424242424242424242",
+      "info": "ntor-curve25519-sha256-1:key_extract",
+      "length": 72,
+      "output": "d985dcbb17caabbc621cc84075ed0479d69f62be96c2ffb215f8f773f7de3c20866e1a80da69417fd4a773b9b48e9cdf2c6108d938a23430d6ee1bbb8ca30a5b23588ff4e59fe743"
+    }
+  ]
+}

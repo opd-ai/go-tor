@@ -1,0 +1,39 @@
+{
+  "description": "Variable-length cell encoding test vectors, compatible with C Tor wire format",
+  "source": "tor-spec.txt §3 (Cell Packet Format)",
+  "source_repo": "https://gitlab.torproject.org/tpo/core/tor",
+  "source_commit": "tor-0.4.8.x",
+  "note": "Variable cells: CircID(4)||CMD(1)||LENGTH(2)||PAYLOAD(LENGTH). Commands >= 128 and VERSIONS (7) are variable-length. VERSIONS cells have CircID=0 per spec.",
+  "vectors": [
+    {
+      "comment": "VERSIONS cell: CircID=0, payload=[0x00,0x04] (version 4 only)",
+      "circ_id": 0,
+      "command": 7,
+      "command_name": "VERSIONS",
+      "payload": "0004",
+      "payload_len": 2,
+      "total_encoded_len": 9,
+      "encoded": "000000000700020004"
+    },
+    {
+      "comment": "CERTS cell: CircID=0, empty payload",
+      "circ_id": 0,
+      "command": 129,
+      "command_name": "CERTS",
+      "payload": "",
+      "payload_len": 0,
+      "total_encoded_len": 7,
+      "encoded": "00000000810000"
+    },
+    {
+      "comment": "VPADDING cell: CircID=0, 4-byte zero payload",
+      "circ_id": 0,
+      "command": 128,
+      "command_name": "VPADDING",
+      "payload": "00000000",
+      "payload_len": 4,
+      "total_encoded_len": 11,
+      "encoded": "0000000080000400000000"
+    }
+  ]
+}
