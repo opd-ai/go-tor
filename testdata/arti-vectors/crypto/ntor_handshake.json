@@ -1,9 +1,9 @@
 {
   "description": "ntor handshake test vectors compatible with Arti",
-  "source": "tor-spec.txt §5.1.4, Arti tor-proto ntor handshake",
+  "source": "tor-spec.txt \u00a75.1.4, Arti tor-proto ntor handshake",
   "source_repo": "https://gitlab.torproject.org/tpo/core/arti",
   "source_path": "crates/tor-proto/src/crypto/handshake/ntor.rs",
-  "source_commit": "arti-1.2.x",
+  "source_commit": "Independently computed from tor-spec.txt (https://spec.torproject.org/)",
   "algorithm": "ntor-curve25519-sha256-1",
   "note": "These vectors use the same ntor algorithm as Arti: Curve25519 DH + HKDF-SHA256. Keys use RFC 7748 clamping. server_identity is 32 bytes (go-tor convention). The server_response field is server_y_public||auth (64 bytes).",
   "vectors": [

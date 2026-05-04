@@ -343,7 +343,7 @@ func runNtorVectors(t *testing.T, path string) {
 					gotServerResp, wantServerResponse)
 			}
 
-			// Test server-side key material via NtorServerHandshakeWithKeys
+			// Test server-side response and key material via ntorServerHandshakeWithKeys
 			var handshakeData []byte
 			if len(wantHandshake) == 84 {
 				handshakeData = wantHandshake
@@ -353,11 +353,15 @@ func runNtorVectors(t *testing.T, path string) {
 				copy(handshakeData[20:52], serverBPublic)
 				copy(handshakeData[52:84], clientXPublic)
 			}
-			_, serverKeyMat, err := NtorServerHandshakeWithKeys(
+			gotServerResp, serverKeyMat, err := ntorServerHandshakeWithKeys(
 				handshakeData, serverBPrivate, serverIdentity, serverYPrivate,
 			)
 			if err != nil {
-				t.Fatalf("NtorServerHandshakeWithKeys: %v", err)
+				t.Fatalf("ntorServerHandshakeWithKeys: %v", err)
+			}
+			if !ConstantTimeCompare(gotServerResp, wantServerResponse) {
+				t.Errorf("server response mismatch:\n  got  %x\n  want %x",
+					gotServerResp, wantServerResponse)
 			}
 			if !ConstantTimeCompare(serverKeyMat, wantKeyMaterial) {
 				t.Errorf("server key_material mismatch:\n  got  %x\n  want %x",

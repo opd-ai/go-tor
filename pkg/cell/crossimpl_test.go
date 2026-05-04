@@ -49,12 +49,14 @@ func decodeCellHex(t *testing.T, s string) []byte {
 type fixedCellVectorFile struct {
 	Description string `json:"description"`
 	Vectors     []struct {
-		Comment         string `json:"comment"`
-		CircID          uint32 `json:"circ_id"`
-		Command         byte   `json:"command"`
-		CommandName     string `json:"command_name"`
-		TotalEncodedLen int    `json:"total_encoded_len"`
-		Encoded         string `json:"encoded"`
+		Comment          string `json:"comment"`
+		CircID           uint32 `json:"circ_id"`
+		Command          byte   `json:"command"`
+		CommandName      string `json:"command_name"`
+		PayloadPrefix    string `json:"payload_prefix"`
+		PayloadPrefixLen int    `json:"payload_prefix_len"`
+		TotalEncodedLen  int    `json:"total_encoded_len"`
+		Encoded          string `json:"encoded"`
 	} `json:"vectors"`
 }
 
@@ -95,6 +97,21 @@ func runFixedCellVectors(t *testing.T, path string) {
 				t.Errorf("payload length = %d, want %d", len(decoded.Payload), PayloadLen)
 			}
 
+			// Verify the payload prefix bytes from the vector match the decoded payload
+			if vec.PayloadPrefix != "" {
+				wantPrefix := decodeCellHex(t, vec.PayloadPrefix)
+				if len(wantPrefix) != vec.PayloadPrefixLen {
+					t.Fatalf("payload_prefix hex length %d != payload_prefix_len %d",
+						len(wantPrefix), vec.PayloadPrefixLen)
+				}
+				if !bytes.Equal(decoded.Payload[:vec.PayloadPrefixLen], wantPrefix) {
+					t.Errorf("payload prefix mismatch (first %d bytes):\n  got  %x\n  want %x",
+						vec.PayloadPrefixLen,
+						decoded.Payload[:vec.PayloadPrefixLen],
+						wantPrefix)
+				}
+			}
+
 			// Re-encode and verify the wire bytes match
 			var buf bytes.Buffer
 			if err := decoded.Encode(&buf); err != nil {
@@ -124,6 +141,7 @@ type variableCellVectorFile struct {
 		CircID          uint32 `json:"circ_id"`
 		Command         byte   `json:"command"`
 		CommandName     string `json:"command_name"`
+		Payload         string `json:"payload"`
 		PayloadLen      int    `json:"payload_len"`
 		TotalEncodedLen int    `json:"total_encoded_len"`
 		Encoded         string `json:"encoded"`
@@ -165,6 +183,12 @@ func runVariableCellVectors(t *testing.T, path string) {
 			}
 			if len(decoded.Payload) != vec.PayloadLen {
 				t.Errorf("payload length = %d, want %d", len(decoded.Payload), vec.PayloadLen)
+			}
+
+			// Verify the exact payload bytes from the vector
+			wantPayload := decodeCellHex(t, vec.Payload)
+			if !bytes.Equal(decoded.Payload, wantPayload) {
+				t.Errorf("payload bytes mismatch:\n  got  %x\n  want %x", decoded.Payload, wantPayload)
 			}
 
 			// Re-encode and verify the wire bytes match

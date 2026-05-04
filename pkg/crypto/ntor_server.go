@@ -30,19 +30,18 @@ func NtorServerHandshake(clientHandshake, serverNtorKey, serverIdentity []byte) 
 	return ntorServerHandshakeCore(clientHandshake, serverNtorKey, serverIdentity, nil)
 }
 
-// NtorServerHandshakeWithKeys performs the server side of the ntor handshake
+// ntorServerHandshakeWithKeys performs the server side of the ntor handshake
 // using a caller-supplied ephemeral private key. This enables deterministic
-// testing against known test vectors; it must not be used in production code
-// where the ephemeral key must be random.
+// testing against known test vectors.
 //
 // Parameters:
 //   - clientHandshake: The client's handshake data (84 bytes)
 //   - serverNtorKey: The server's long-term private key (32 bytes)
 //   - serverIdentity: The server's identity key (32 bytes)
-//   - ephemeralPrivate: Caller-provided ephemeral private key (32 bytes); if nil a fresh key is generated
+//   - ephemeralPrivate: Caller-provided ephemeral private key (must be exactly 32 bytes)
 //
-// Implements tor-spec.txt section 5.1.4 (deterministic variant for testing)
-func NtorServerHandshakeWithKeys(clientHandshake, serverNtorKey, serverIdentity, ephemeralPrivate []byte) (response, keyMaterial []byte, err error) {
+// Implements tor-spec.txt section 5.1.4 (deterministic variant for testing only)
+func ntorServerHandshakeWithKeys(clientHandshake, serverNtorKey, serverIdentity, ephemeralPrivate []byte) (response, keyMaterial []byte, err error) {
 	return ntorServerHandshakeCore(clientHandshake, serverNtorKey, serverIdentity, ephemeralPrivate)
 }
 
@@ -67,7 +66,10 @@ func ntorServerHandshakeCore(clientHandshake, serverNtorKey, serverIdentity, eph
 
 	// Use caller-supplied ephemeral key if provided, otherwise generate a fresh one.
 	var serverEphemeral *NtorKeyPair
-	if len(ephemeralPrivate) == 32 {
+	if ephemeralPrivate != nil {
+		if len(ephemeralPrivate) != 32 {
+			return nil, nil, fmt.Errorf("ephemeralPrivate must be exactly 32 bytes, got %d", len(ephemeralPrivate))
+		}
 		serverEphemeral = &NtorKeyPair{}
 		copy(serverEphemeral.Private[:], ephemeralPrivate)
 		curve25519.ScalarBaseMult(&serverEphemeral.Public, &serverEphemeral.Private)

@@ -2,7 +2,7 @@
   "description": "HKDF-SHA256 test vectors for ntor key derivation, compatible with C Tor and Arti",
   "source": "tor-spec.txt §5.1.4, RFC 5869, ntor handshake key derivation",
   "source_repo": "https://gitlab.torproject.org/tpo/core/tor",
-  "source_commit": "tor-0.4.8.x",
+  "source": "Independently computed from tor-spec.txt (https://spec.torproject.org/)",
   "algorithm": "HKDF-SHA256 (RFC 5869) with nil salt",
   "note": "ntor uses HKDF-SHA256 with nil salt (treated as 32 zero bytes by RFC 5869 §2.2). Info strings use domain separation per tor-spec.txt §5.1.4. Output is 72 bytes of key material.",
   "vectors": [

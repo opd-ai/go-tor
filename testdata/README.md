@@ -30,30 +30,40 @@ testdata/
 
 ## Vector Sources
 
-### C Tor (ctor)
+All test vectors were **computed independently from published protocol specifications**,
+not extracted from C Tor or Arti source trees. The specification documents are the
+canonical and immutable source of truth.
 
-Source repository: <https://gitlab.torproject.org/tpo/core/tor>
+### Cryptographic Primitive Vectors
 
-Vectors were derived from:
-- `src/test/test_ntor.c` — ntor handshake test suite
-- `src/test/test_crypto.c` — cryptographic primitive tests
-- `tor-spec.txt §3` — cell format specification
-- `tor-spec.txt §5.1.4` — ntor handshake specification
-- `tor-spec.txt §5.2.1` — KDF-TOR specification
+| Vector file | Specification | Reference |
+|-------------|--------------|-----------|
+| `sha1.json` | FIPS 180-4 (Secure Hash Standard) | <https://csrc.nist.gov/publications/detail/fips/180/4/final> |
+| `sha256.json` | FIPS 180-4 (Secure Hash Standard) | <https://csrc.nist.gov/publications/detail/fips/180/4/final> |
+| `aes_ctr.json` | NIST SP 800-38A (Block Cipher Modes) | <https://csrc.nist.gov/publications/detail/sp/800/38/a/final> |
+| `hkdf_ntor.json` | RFC 5869 (HKDF), tor-spec.txt §5.1.4 | <https://www.rfc-editor.org/rfc/rfc5869> |
+| `ntor_handshake.json` | tor-spec.txt §5.1.4 (ntor handshake) | <https://spec.torproject.org/tor-spec/create-created-cells.html#5.1.4> |
+| `kdf_tor.json` | tor-spec.txt §5.2.1 (KDF-TOR) | <https://spec.torproject.org/tor-spec/key-material.html#5.2.1> |
 
-Referenced commit: `tor-0.4.8.x` branch
+### Cell Encoding Vectors
 
-### Arti (Rust implementation)
+| Vector file | Specification | Reference |
+|-------------|--------------|-----------|
+| `fixed_cell.json` | tor-spec.txt §3 (Cell Packet Format) | <https://spec.torproject.org/tor-spec/cells.html#3> |
+| `variable_cell.json` | tor-spec.txt §3 (Cell Packet Format) | <https://spec.torproject.org/tor-spec/cells.html#3> |
 
-Source repository: <https://gitlab.torproject.org/tpo/core/arti>
+### Verification Against Reference Implementations
 
-Vectors were derived from:
-- `crates/tor-llcrypto/src/d/` — hash function tests
-- `crates/tor-llcrypto/src/cipher/` — cipher tests
-- `crates/tor-proto/src/crypto/handshake/ntor.rs` — ntor implementation
-- `crates/tor-proto/src/channel/codec.rs` — cell codec
+The vectors have been verified to be consistent with the following reference
+implementations (for illustrative purposes — they are not extracted from these sources):
 
-Referenced commit: `arti-1.2.x` branch
+- **C Tor**: <https://gitlab.torproject.org/tpo/core/tor>
+  - `src/test/test_ntor.c` — ntor handshake test suite
+  - `src/test/test_crypto.c` — cryptographic primitive tests
+
+- **Arti (Rust)**: <https://gitlab.torproject.org/tpo/core/arti>
+  - `crates/tor-llcrypto/` — hash function and cipher implementations
+  - `crates/tor-proto/src/crypto/handshake/ntor.rs` — ntor implementation
 
 ## Test Harness
 

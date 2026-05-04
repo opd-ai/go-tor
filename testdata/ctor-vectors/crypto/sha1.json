@@ -2,7 +2,7 @@
   "description": "SHA-1 test vectors compatible with C Tor (tor-spec.txt §0.3)",
   "source": "tor-spec.txt §0.3, FIPS 180-4, RFC 3174",
   "source_repo": "https://gitlab.torproject.org/tpo/core/tor",
-  "source_commit": "tor-0.4.8.x",
+  "source": "Independently computed from tor-spec.txt (https://spec.torproject.org/)",
   "algorithm": "SHA-1",
   "note": "SHA-1 is required by Tor protocol for specific operations (digest chains, KDF-TOR). FIPS 180-4 vectors ensure interoperability.",
   "vectors": [

@@ -39,8 +39,10 @@ jobs:
 
     - name: Verify zero CGO
       run: |
-        if grep -r "import \"C\"" ./pkg ./cmd 2>/dev/null | grep -v "_test.go"; then
-          echo "ERROR: CGO imports found in production code"
+        cgo_pkgs=$(go list -deps -f '{{if .CgoFiles}}{{.ImportPath}}{{end}}' ./pkg/... ./cmd/... 2>/dev/null | grep "^github.com/opd-ai/go-tor" || true)
+        if [ -n "$cgo_pkgs" ]; then
+          echo "ERROR: CGO found in module packages:"
+          echo "$cgo_pkgs"
           exit 1
         fi
         echo "✓ No CGO imports in production code"

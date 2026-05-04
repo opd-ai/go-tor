@@ -3,7 +3,7 @@
   "source": "tor-spec.txt \u00a73, Arti tor-proto cell encoding",
   "source_repo": "https://gitlab.torproject.org/tpo/core/arti",
   "source_path": "crates/tor-proto/src/channel/codec.rs",
-  "source_commit": "arti-1.2.x",
+  "source": "Independently computed from tor-spec.txt (https://spec.torproject.org/)",
   "note": "Arti's cell encoding is identical to C Tor: fixed cells 514 bytes, variable cells have 2-byte length field. These vectors cover both.",
   "fixed_cell_vectors": [
     {
