@@ -64,7 +64,7 @@ func TestCheckCircuitBuild_Empty(t *testing.T) {
 func TestCheckCircuitBuild_Fail(t *testing.T) {
 	threshold := perfbaseline.Threshold{
 		CircuitBuildP95:   500 * time.Millisecond,
-		MemoryRSSMB:       50,
+		MemoryAllocMB:     50,
 		ConcurrentStreams: 100,
 	}
 	b := perfbaseline.NewWithThresholds(threshold)
@@ -78,19 +78,37 @@ func TestCheckCircuitBuild_Fail(t *testing.T) {
 }
 
 func TestCheckMemory_Pass(t *testing.T) {
-	b := perfbaseline.New()
-	// Current Go process should be well under 50 MB in tests.
+	// Use an intentionally high threshold (500 MB) so this always passes
+	// regardless of test environment heap size.
+	b := perfbaseline.NewWithThresholds(perfbaseline.Threshold{
+		CircuitBuildP95: 5 * time.Second,
+		MemoryAllocMB:   500,
+	})
 	if err := b.CheckMemory(); err != nil {
-		t.Logf("memory check failed (may be fine in large test run): %v", err)
+		t.Errorf("unexpected memory check failure with 500 MB threshold: %v", err)
+	}
+}
+
+func TestCheckMemory_Fail(t *testing.T) {
+	// Use a 0.001 MB (1 KB) threshold so any real process will exceed it.
+	b := perfbaseline.NewWithThresholds(perfbaseline.Threshold{
+		CircuitBuildP95: 5 * time.Second,
+		MemoryAllocMB:   0.001,
+	})
+	if err := b.CheckMemory(); err == nil {
+		t.Error("expected memory check to fail with 0.001 MB threshold")
 	}
 }
 
 func TestCheck_Combined(t *testing.T) {
-	b := perfbaseline.New()
+	// Use a high memory threshold so Check always passes on circuit_build alone.
+	b := perfbaseline.NewWithThresholds(perfbaseline.Threshold{
+		CircuitBuildP95: 5 * time.Second,
+		MemoryAllocMB:   500,
+	})
 	b.RecordDuration("circuit_build", 100*time.Millisecond)
 	if err := b.Check(); err != nil {
-		// Memory might legitimately exceed 50MB in a full test run.
-		t.Logf("Check: %v (may be acceptable in full test run)", err)
+		t.Errorf("unexpected Check failure: %v", err)
 	}
 }
 
@@ -211,8 +229,8 @@ func TestReadmeThresholds(t *testing.T) {
 	if th.CircuitBuildP95 != 5*time.Second {
 		t.Errorf("CircuitBuildP95: got %v, want 5s (README)", th.CircuitBuildP95)
 	}
-	if th.MemoryRSSMB != 50 {
-		t.Errorf("MemoryRSSMB: got %v, want 50 (README)", th.MemoryRSSMB)
+	if th.MemoryAllocMB != 50 {
+		t.Errorf("MemoryAllocMB: got %v, want 50 (README)", th.MemoryAllocMB)
 	}
 	if th.ConcurrentStreams < 100 {
 		t.Errorf("ConcurrentStreams: got %d, want >= 100 (README)", th.ConcurrentStreams)

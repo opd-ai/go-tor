@@ -196,7 +196,16 @@ func (l *Listener) Enqueue(conn net.Conn) {
 
 // Accept waits for and returns the next enqueued connection.
 // Returns ErrListenerClosed when the listener has been closed.
+// A closed listener always returns ErrListenerClosed, even if connections
+// were previously enqueued.
 func (l *Listener) Accept() (net.Conn, error) {
+	// Check the closed channel first (non-blocking) to give priority to
+	// the closed state, matching the behaviour of a real net.Listener.
+	select {
+	case <-l.closed:
+		return nil, ErrListenerClosed
+	default:
+	}
 	select {
 	case conn, ok := <-l.conns:
 		if !ok {
@@ -217,24 +226,14 @@ func (l *Listener) Close() error {
 // Addr returns the listener's network address.
 func (l *Listener) Addr() net.Addr { return l.addr }
 
-// Pipe creates a pair of connected Conn objects whose reads and writes
-// are synchronised through in-memory pipes. Writes to one end can be
-// read from the other, mirroring the behaviour of net.Pipe.
-func Pipe() (client, server *Conn) {
-	cToS := &bytes.Buffer{}
-	sToC := &bytes.Buffer{}
-
-	client = &Conn{
-		ReadBuf:    sToC,
-		WriteBuf:   cToS,
-		localAddr:  NewAddr("tcp", "127.0.0.1:1"),
-		remoteAddr: NewAddr("tcp", "127.0.0.1:2"),
-	}
-	server = &Conn{
-		ReadBuf:    cToS,
-		WriteBuf:   sToC,
-		localAddr:  NewAddr("tcp", "127.0.0.1:2"),
-		remoteAddr: NewAddr("tcp", "127.0.0.1:1"),
-	}
-	return client, server
+// Pipe creates a pair of connected net.Conn objects using [net.Pipe].
+// Writes to one end can be read from the other, mirroring the behaviour of
+// net.Pipe. Both ends are safe for concurrent use from multiple goroutines.
+//
+// Note: unlike [NewConn], the returned connections are synchronous (there is
+// no internal buffering). A Write blocks until the corresponding Read is called
+// from the other end. Tests must read and write in separate goroutines to avoid
+// deadlock.
+func Pipe() (client, server net.Conn) {
+	return net.Pipe()
 }

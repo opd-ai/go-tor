@@ -96,6 +96,8 @@ func New(t *testing.T) *Harness {
 }
 
 // Check runs fn as a sub-test named after req and records the outcome.
+// If fn calls t.Skip, the requirement is recorded as [StatusSkip] rather than
+// [StatusPass] or [StatusFail].
 //
 //	h.Check("tor-spec §0.2", "fixed-size cells are 514 bytes", func(t *testing.T) {
 //	    // assertion
@@ -105,13 +107,20 @@ func (h *Harness) Check(spec, description string, fn CheckFunc) {
 	req := Requirement{Spec: spec, Description: description}
 	name := fmt.Sprintf("%s/%s", sanitise(spec), sanitise(description))
 
+	var skipped bool
 	passed := h.t.Run(name, func(t *testing.T) {
 		t.Helper()
+		// Use defer to capture t.Skipped() even when fn calls t.Skip(),
+		// which triggers runtime.Goexit() and prevents code after fn(t) from running.
+		defer func() { skipped = t.Skipped() }()
 		fn(t)
 	})
 
 	status := StatusPass
-	if !passed {
+	switch {
+	case skipped:
+		status = StatusSkip
+	case !passed:
 		status = StatusFail
 	}
 	h.results = append(h.results, result{Requirement: req, Status: status})

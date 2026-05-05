@@ -4,10 +4,10 @@
 // It implements threshold-based assertions against the performance targets
 // stated in the project README:
 //
-//   - Circuit build time: < 5s at the 95th percentile
-//   - Memory usage: < 50 MB RSS in steady state
-//   - Binary size: < 15 MB static binary
-//   - Concurrent streams: ≥ 100 on typical hardware
+//   - Circuit build time: < 5s at the 95th percentile (validated by [Baseline.CheckCircuitBuild])
+//   - Memory heap allocation: < 50 MB (validated by [Baseline.CheckMemory])
+//   - Binary size: < 15 MB static binary (informational; not validated at runtime)
+//   - Concurrent streams: ≥ 100 on typical hardware (informational; not validated at runtime)
 //
 // # Usage
 //
@@ -42,17 +42,22 @@ import (
 // Thresholds contains the project's stated performance targets.
 var Thresholds = Threshold{
 	CircuitBuildP95:   5 * time.Second,
-	MemoryRSSMB:       50,
+	MemoryAllocMB:     50,
 	ConcurrentStreams: 100,
 }
 
 // Threshold holds performance targets against which measurements are compared.
 type Threshold struct {
 	// CircuitBuildP95 is the maximum acceptable 95th-percentile circuit build time.
+	// Validated by [Baseline.CheckCircuitBuild].
 	CircuitBuildP95 time.Duration
-	// MemoryRSSMB is the maximum acceptable RSS memory usage in megabytes.
-	MemoryRSSMB float64
+	// MemoryAllocMB is the maximum acceptable Go heap allocation in megabytes,
+	// as reported by runtime.MemStats.Alloc. Validated by [Baseline.CheckMemory].
+	// Note: this measures heap allocations, not OS-level RSS.
+	MemoryAllocMB float64
 	// ConcurrentStreams is the minimum acceptable concurrent stream count.
+	// This is an informational target from the project README and is NOT
+	// validated by [Baseline.Check]; use it for documentation and manual checks.
 	ConcurrentStreams int
 }
 
@@ -142,14 +147,19 @@ func (b *Baseline) CheckCircuitBuild() error {
 	return nil
 }
 
-// CheckMemory validates current Go runtime memory against the RSS threshold.
+// CheckMemory validates the current Go runtime heap allocation against the
+// MemoryAllocMB threshold. It reads runtime.MemStats.Alloc (in-use heap bytes)
+// and returns an error if the value exceeds the configured threshold.
+//
+// Note: this measures heap allocations reported by the Go runtime, not OS-level
+// RSS. RSS includes code, stack, and shared memory that are not reflected here.
 func (b *Baseline) CheckMemory() error {
 	var ms runtime.MemStats
 	runtime.ReadMemStats(&ms)
 	allocMB := float64(ms.Alloc) / (1024 * 1024)
-	if allocMB > b.thresholds.MemoryRSSMB {
-		return fmt.Errorf("memory alloc %.1f MB exceeds threshold %.1f MB",
-			allocMB, b.thresholds.MemoryRSSMB)
+	if allocMB > b.thresholds.MemoryAllocMB {
+		return fmt.Errorf("heap alloc %.1f MB exceeds threshold %.1f MB",
+			allocMB, b.thresholds.MemoryAllocMB)
 	}
 	return nil
 }

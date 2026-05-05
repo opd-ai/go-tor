@@ -105,18 +105,12 @@ func TestCreateHiddenServiceWithConfig_NilConfig(t *testing.T) {
 
 // TestClientClose_NoBine ensures Close works without a bine client.
 func TestClientClose_NoBine(t *testing.T) {
-	// A client with only a nil bineClient (goTorClient also nil → panic guard).
-	// We test the code path where bineClient is nil and goTorClient is nil.
+	// A Client with both goTorClient and bineClient nil should not panic
+	// and should return nil (no error to report).
 	c := &Client{}
-	// Close with both fields nil should not panic; goTorClient.Close() would
-	// panic on a nil pointer, so we only exercise the bineClient nil branch.
-	// The implementation skips c.bineClient when it is nil – confirm no panic.
-	defer func() {
-		if r := recover(); r != nil {
-			t.Logf("Close panicked (acceptable with nil goTorClient): %v", r)
-		}
-	}()
-	_ = c.Close()
+	if err := c.Close(); err != nil {
+		t.Errorf("Close with nil fields returned unexpected error: %v", err)
+	}
 }
 
 // TestOptionsStruct_Fields ensures all public fields of Options are accessible.

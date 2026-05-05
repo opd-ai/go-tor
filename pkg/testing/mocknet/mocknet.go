@@ -53,7 +53,7 @@ type RelayConfig struct {
 	Flags []string
 	// Bandwidth is the relay's bandwidth weight (KB/s).
 	Bandwidth int
-	// Address is the relay's IP:ORport; defaults to "127.0.0.1:<random>".
+	// Address is the relay's IP:ORport; defaults to "127.0.0.1:9001".
 	Address string
 }
 

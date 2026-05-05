@@ -99,7 +99,20 @@ func TestStatus_String(t *testing.T) {
 	}
 }
 
-// ExampleHarness shows how to write spec compliance tests using the harness.
+// TestHarness_SkipInCheckFunc verifies that calling t.Skip() inside a CheckFunc
+// records the result as StatusSkip, not StatusPass or StatusFail.
+func TestHarness_SkipInCheckFunc(t *testing.T) {
+	h := compliance.New(t)
+	h.Check("tor-spec §2", "TLS cert requirement", func(t *testing.T) {
+		t.Skip("skipping: requires live TLS connection")
+	})
+	pass, fail, skip := h.Summary()
+	if pass != 0 || fail != 0 || skip != 1 {
+		t.Errorf("Summary: pass=%d fail=%d skip=%d; want 0/0/1", pass, fail, skip)
+	}
+}
+
+// TestExampleHarness shows how to write spec compliance tests using the harness.
 func TestExampleHarness(t *testing.T) {
 	h := compliance.New(t)
 

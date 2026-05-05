@@ -244,44 +244,76 @@ func TestListener_AcceptMultiple(t *testing.T) {
 
 func TestPipe_ReadWrite(t *testing.T) {
 	client, server := netmock.Pipe()
+	defer client.Close()
+	defer server.Close()
 
-	// Write from client, read on server.
 	data := []byte("ping")
+	readDone := make(chan string, 1)
+	go func() {
+		buf := make([]byte, 4)
+		if _, err := io.ReadFull(server, buf); err != nil {
+			readDone <- ""
+			return
+		}
+		readDone <- string(buf)
+	}()
+
 	if _, err := client.Write(data); err != nil {
 		t.Fatalf("client Write: %v", err)
 	}
-	buf := make([]byte, 4)
-	n, err := server.Read(buf)
-	if err != nil && err != io.EOF {
-		t.Fatalf("server Read: %v", err)
-	}
-	if string(buf[:n]) != "ping" {
-		t.Errorf("server Read: got %q, want ping", string(buf[:n]))
+	if got := <-readDone; got != "ping" {
+		t.Errorf("server Read: got %q, want ping", got)
 	}
 }
 
 func TestPipe_BidirectionalFlow(t *testing.T) {
 	client, server := netmock.Pipe()
+	defer client.Close()
+	defer server.Close()
 
 	// Client → Server
-	_, _ = client.Write([]byte("request"))
-	buf := make([]byte, 7)
-	n, _ := server.Read(buf)
-	if string(buf[:n]) != "request" {
-		t.Errorf("c→s: got %q", string(buf[:n]))
+	{
+		readDone := make(chan string, 1)
+		go func() {
+			buf := make([]byte, 7)
+			if _, err := io.ReadFull(server, buf); err != nil {
+				readDone <- ""
+				return
+			}
+			readDone <- string(buf)
+		}()
+		if _, err := client.Write([]byte("request")); err != nil {
+			t.Fatalf("c→s write: %v", err)
+		}
+		if got := <-readDone; got != "request" {
+			t.Errorf("c→s: got %q", got)
+		}
 	}
 
 	// Server → Client
-	_, _ = server.Write([]byte("response"))
-	buf2 := make([]byte, 8)
-	n2, _ := client.Read(buf2)
-	if string(buf2[:n2]) != "response" {
-		t.Errorf("s→c: got %q", string(buf2[:n2]))
+	{
+		readDone := make(chan string, 1)
+		go func() {
+			buf := make([]byte, 8)
+			if _, err := io.ReadFull(client, buf); err != nil {
+				readDone <- ""
+				return
+			}
+			readDone <- string(buf)
+		}()
+		if _, err := server.Write([]byte("response")); err != nil {
+			t.Fatalf("s→c write: %v", err)
+		}
+		if got := <-readDone; got != "response" {
+			t.Errorf("s→c: got %q", got)
+		}
 	}
 }
 
 func TestPipe_ImplementsNetConn(t *testing.T) {
 	client, server := netmock.Pipe()
+	defer client.Close()
+	defer server.Close()
 	var _ net.Conn = client
 	var _ net.Conn = server
 }
