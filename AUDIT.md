@@ -2424,8 +2424,19 @@ When planning or reviewing test work, always refer to the “Current Coverage An
   - Fuzzing revealed that `NewAESCTRCipher` panicked on invalid IV instead of returning error
   - Fixed `NewAESCTRCipher` to validate IV length and return error instead of panic (security hardening)
   - Updated `iv_nonce_test.go` and `aes_edge_cases_test.go` to expect error instead of panic
-- [ ] Create comprehensive mocking for network operations [4h]
-- [ ] Develop specification compliance test harness [8h]
+- [x] Create comprehensive mocking for network operations [4h] ✅ **COMPLETED**
+  - Created `pkg/testing/netmock/` package with reusable mock types
+  - `Addr` – implements net.Addr with configurable Network/String
+  - `Conn` – implements net.Conn with ReadBuf/WriteBuf, injectable errors (ReadErr/WriteErr/CloseErr), concurrency-safe
+  - `Listener` – implements net.Listener with Enqueue mechanism and graceful Close
+  - `Pipe()` – creates a pair of connected mock Conns for bidirectional testing
+  - 23 test functions covering all methods, concurrent use, and error paths
+- [x] Develop specification compliance test harness [8h] ✅ **COMPLETED**
+  - Created `pkg/testing/compliance/` package with a reusable harness
+  - `Harness` type with `Check()` (run sub-test), `Skip()`, `Report()`, `Summary()` methods
+  - `Requirement` struct (Spec + Description) and `Status` type (Pass/Fail/Skip)
+  - Harness groups results by spec section and reports aggregate pass/fail/skip counts
+  - Test file with 7 test functions including example showing tor-spec §0.2 and rend-spec-v3 §6 checks
 - [ ] Add integration test environment with mock Tor network [16h]
 - [ ] Create performance regression test baseline [4h]
 
