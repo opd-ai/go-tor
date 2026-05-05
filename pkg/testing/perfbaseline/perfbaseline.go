@@ -41,9 +41,9 @@ import (
 
 // Thresholds contains the project's stated performance targets.
 var Thresholds = Threshold{
-	CircuitBuildP95:    5 * time.Second,
-	MemoryRSSMB:        50,
-	ConcurrentStreams:  100,
+	CircuitBuildP95:   5 * time.Second,
+	MemoryRSSMB:       50,
+	ConcurrentStreams: 100,
 }
 
 // Threshold holds performance targets against which measurements are compared.
@@ -65,16 +65,16 @@ type Measurement struct {
 
 // Snapshot is a serialisable performance snapshot.
 type Snapshot struct {
-	CreatedAt    time.Time      `json:"created_at"`
-	Measurements []Measurement  `json:"measurements"`
-	MemStats     MemStats       `json:"mem_stats"`
+	CreatedAt    time.Time     `json:"created_at"`
+	Measurements []Measurement `json:"measurements"`
+	MemStats     MemStats      `json:"mem_stats"`
 }
 
 // MemStats captures memory usage metrics.
 type MemStats struct {
-	AllocMB     float64 `json:"alloc_mb"`
-	SysMB       float64 `json:"sys_mb"`
-	NumGoroutine int    `json:"num_goroutine"`
+	AllocMB      float64 `json:"alloc_mb"`
+	SysMB        float64 `json:"sys_mb"`
+	NumGoroutine int     `json:"num_goroutine"`
 }
 
 // Baseline collects performance measurements and validates them against

@@ -229,13 +229,17 @@ func (d *Directory) Stop() error {
 
 func randomHex(n int) string {
 	b := make([]byte, n)
-	_, _ = rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		panic(fmt.Sprintf("mocknet: failed to read random bytes: %v", err))
+	}
 	return fmt.Sprintf("%X", b)
 }
 
 func randomBase64(n int) string {
 	b := make([]byte, n)
-	_, _ = rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		panic(fmt.Sprintf("mocknet: failed to read random bytes: %v", err))
+	}
 	return base64.StdEncoding.EncodeToString(b)
 }
 

@@ -150,7 +150,10 @@ func (c *Conn) LocalAddr() net.Addr { return c.localAddr }
 // RemoteAddr returns the remote network address.
 func (c *Conn) RemoteAddr() net.Addr { return c.remoteAddr }
 
-// SetDeadline is a no-op for the mock connection.
+// SetDeadline stores the deadline for informational purposes only.
+// Deadline enforcement (timing out blocked Read/Write calls) is not
+// implemented in this mock. This is intentional: the mock uses in-memory
+// buffers that do not block, so deadlines are not meaningful.
 func (c *Conn) SetDeadline(t time.Time) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()

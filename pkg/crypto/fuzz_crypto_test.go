@@ -221,8 +221,8 @@ func FuzzEd25519Verify(f *testing.F) {
 	sig := make([]byte, 64)
 	f.Add(pubKey, []byte("message"), sig)
 	f.Add([]byte{}, []byte{}, []byte{})
-	f.Add(make([]byte, 31), []byte("msg"), make([]byte, 64))  // Wrong pubkey length
-	f.Add(make([]byte, 32), []byte("msg"), make([]byte, 63))  // Wrong sig length
+	f.Add(make([]byte, 31), []byte("msg"), make([]byte, 64)) // Wrong pubkey length
+	f.Add(make([]byte, 32), []byte("msg"), make([]byte, 63)) // Wrong sig length
 
 	f.Fuzz(func(t *testing.T, publicKey, message, signature []byte) {
 		defer func() {

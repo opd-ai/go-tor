@@ -148,7 +148,8 @@ func TestSaveLoadSnapshot(t *testing.T) {
 }
 
 func TestLoadSnapshot_Missing(t *testing.T) {
-	_, err := perfbaseline.LoadSnapshot("/tmp/nonexistent-baseline-12345.json")
+	missing := filepath.Join(t.TempDir(), "nonexistent-baseline.json")
+	_, err := perfbaseline.LoadSnapshot(missing)
 	if err == nil {
 		t.Error("expected error for missing file")
 	}

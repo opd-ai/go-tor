@@ -27,10 +27,10 @@ func FuzzParseAddress(f *testing.F) {
 	f.Add("short.onion")
 	f.Add("example.com")
 	f.Add("http://2gzyxa5ihm7nsggfxnu52rck2vv4rvmdlkiu3zzui5du4xyclen53wid.onion")
-	f.Add(string(make([]byte, 256)))  // Very long string
-	f.Add("!@#$%^&*.onion")          // Special characters
-	f.Add("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.onion") // Wrong length base32
-	f.Add("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.onion") // 55 chars base32 (wrong)
+	f.Add(string(make([]byte, 256)))                                         // Very long string
+	f.Add("!@#$%^&*.onion")                                                  // Special characters
+	f.Add("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.onion")   // Wrong length base32
+	f.Add("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.onion")   // 55 chars base32 (wrong)
 	f.Add("a2gzyxa5ihm7nsggfxnu52rck2vv4rvmdlkiu3zzui5du4xyclen53wid.onion") // 1 char too long
 
 	f.Fuzz(func(t *testing.T, addr string) {
