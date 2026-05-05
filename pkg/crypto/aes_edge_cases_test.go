@@ -6,15 +6,15 @@ import (
 	"testing"
 )
 
-// TestNewAESCTRCipher_InvalidIVLength tests that cipher.NewCTR panics with invalid IV length
-// This documents expected behavior from Go's crypto/cipher package
+// TestNewAESCTRCipher_InvalidIVLength tests that NewAESCTRCipher returns an error with invalid IV length.
+// Previously cipher.NewCTR would panic; now NewAESCTRCipher validates the IV and returns an error.
 func TestNewAESCTRCipher_InvalidIVLength(t *testing.T) {
 	key := make([]byte, 16)
 
 	tests := []struct {
-		name   string
-		ivLen  int
-		panics bool
+		name      string
+		ivLen     int
+		wantError bool
 	}{
 		{"valid IV (16 bytes)", 16, false},
 		{"short IV (8 bytes)", 8, true},
@@ -26,22 +26,16 @@ func TestNewAESCTRCipher_InvalidIVLength(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			iv := make([]byte, tt.ivLen)
 
-			defer func() {
-				r := recover()
-				if tt.panics && r == nil {
-					t.Error("Expected panic with invalid IV length, got none")
+			c, err := NewAESCTRCipher(key, iv)
+			if tt.wantError {
+				if err == nil {
+					t.Error("Expected error with invalid IV length, got none")
 				}
-				if !tt.panics && r != nil {
-					t.Errorf("Unexpected panic with valid IV: %v", r)
-				}
-			}()
-
-			cipher, err := NewAESCTRCipher(key, iv)
-			if !tt.panics {
+			} else {
 				if err != nil {
 					t.Fatalf("NewAESCTRCipher failed with valid IV: %v", err)
 				}
-				if cipher == nil {
+				if c == nil {
 					t.Error("NewAESCTRCipher returned nil cipher")
 				}
 			}

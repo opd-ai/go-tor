@@ -109,6 +109,10 @@ func NewAESCTRCipher(key, iv []byte) (*AESCTRCipher, error) {
 		return nil, fmt.Errorf("failed to create AES cipher: %w", err)
 	}
 
+	if len(iv) != aes.BlockSize {
+		return nil, fmt.Errorf("invalid IV size: %d, expected %d", len(iv), aes.BlockSize)
+	}
+
 	stream := cipher.NewCTR(block, iv)
 	return &AESCTRCipher{
 		stream: stream,

@@ -149,9 +149,9 @@ func TestIVSize_Validation(t *testing.T) {
 	key := make([]byte, 16)
 
 	tests := []struct {
-		name        string
-		ivLen       int
-		shouldPanic bool
+		name      string
+		ivLen     int
+		wantError bool
 	}{
 		{"valid 16-byte IV", 16, false},
 		{"invalid 8-byte IV", 8, true},
@@ -165,19 +165,12 @@ func TestIVSize_Validation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			iv := make([]byte, tt.ivLen)
 
-			defer func() {
-				r := recover()
-				if tt.shouldPanic && r == nil {
-					t.Error("Expected panic with invalid IV length, got none")
-				}
-				if !tt.shouldPanic && r != nil {
-					t.Errorf("Unexpected panic with valid IV: %v", r)
-				}
-			}()
-
 			_, err := NewAESCTRCipher(key, iv)
-			if err != nil && !tt.shouldPanic {
-				t.Fatalf("NewAESCTRCipher failed with valid IV: %v", err)
+			if tt.wantError && err == nil {
+				t.Error("Expected error with invalid IV length, got none")
+			}
+			if !tt.wantError && err != nil {
+				t.Errorf("Unexpected error with valid IV: %v", err)
 			}
 		})
 	}
