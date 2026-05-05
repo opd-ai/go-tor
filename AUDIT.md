@@ -2403,13 +2403,27 @@ When planning or reviewing test work, always refer to the “Current Coverage An
 - [x] Helper HTTP client scenarios [pkg/helpers] [unit] [2h] ✅ **COMPLETED**
 
 #### Low (P3) - Nice to Have
-- [ ] Bine integration scenarios [pkg/bine] [integration] [4h]
+- [x] Bine integration scenarios [pkg/bine] [integration] [4h] ✅ **COMPLETED**
+  - Created `pkg/bine/integration_test.go` with 12 test functions
+  - TestOptionsDefaults_Integration, TestConnectNilOptions_Integration, TestConnectCustomPorts_Integration
+  - TestConnectCancelledContext_Integration, TestCreateHiddenService_NoBine
+  - TestCreateHiddenServiceWithConfig_NoBine, TestCreateHiddenServiceWithConfig_NilConfig
+  - TestClientClose_NoBine, TestOptionsStruct_Fields, TestHiddenServiceConfig_Fields
+  - TestAPISignatures_Integration, TestHTTPClientConstruction, TestConnectWithOptions_Integration
 - [x] Profiling endpoint coverage [pkg/profiling] [unit] [2h] ✅ **COMPLETED**
 - [x] Benchmark accuracy validation [pkg/benchmark] [unit] [2h] ✅ **COMPLETED**
 
 ### 4.3 Test Infrastructure Improvements
 
-- [ ] Add property-based testing framework (go-fuzz or similar) [8h]
+- [x] Add property-based testing framework (go-fuzz or similar) [8h] ✅ **COMPLETED**
+  - Added Go built-in fuzzing (Go 1.18+ style) to security-critical packages
+  - Created `pkg/crypto/fuzz_crypto_test.go` with 9 fuzz functions: FuzzSHA1Hash, FuzzSHA256Hash,
+    FuzzNewAESCTRCipher, FuzzDecryptAES256CTR, FuzzEncryptAES256CTR, FuzzEncryptDecryptRoundtrip,
+    FuzzParseRSAPublicKey, FuzzConstantTimeCompare, FuzzEd25519Verify, FuzzDeriveKey
+  - Created `pkg/onion/fuzz_onion_test.go` with FuzzParseAddress, FuzzIsOnionAddress, FuzzAddressRoundtrip
+  - Fuzzing revealed that `NewAESCTRCipher` panicked on invalid IV instead of returning error
+  - Fixed `NewAESCTRCipher` to validate IV length and return error instead of panic (security hardening)
+  - Updated `iv_nonce_test.go` and `aes_edge_cases_test.go` to expect error instead of panic
 - [ ] Create comprehensive mocking for network operations [4h]
 - [ ] Develop specification compliance test harness [8h]
 - [ ] Add integration test environment with mock Tor network [16h]
