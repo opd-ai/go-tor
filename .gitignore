@@ -90,3 +90,15 @@ examples/intro-point-management/intro-point-management
 examples/client-auth-integration/client-auth-integration
 examples/stream-backpressure/stream-backpressure
 examples/bridge-config/bridge-config
+examples/bridgedb-demo/bridgedb-demo
+examples/obfs4-demo/obfs4-demo
+
+# Root-level plugin/manager binaries
+pt-manager
+
+# Analysis and diff report artifacts
+pre-cleanup.json
+post-cleanup.json
+*-baseline.json
+*-post.json
+diff-report*.json
