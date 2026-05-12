@@ -74,7 +74,7 @@ jobs:
         echo "total_benchmarks=$TOTAL" >> $GITHUB_OUTPUT
 
     - name: Upload benchmark results
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
       with:
         name: benchmark-results
         path: |
@@ -151,7 +151,7 @@ jobs:
         echo "\`\`\`" >> critical-benchmarks.md
 
     - name: Upload critical path benchmarks
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
       with:
         name: critical-benchmarks
         path: critical-benchmarks.md
@@ -214,7 +214,7 @@ jobs:
         fi
 
     - name: Upload memory profile
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
       with:
         name: memory-profile
         path: memory-profile.md
