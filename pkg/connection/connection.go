@@ -6,7 +6,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/rsa"
-	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -143,19 +142,21 @@ func createTorTLSConfigWithPinning(expectedIdentity []byte, expectedFingerprint 
 	return cfg
 }
 
-// verifyRelayIdentityPinning verifies the relay's certificate matches expected identity
-// This implements certificate pinning to prevent MITM attacks at the TLS layer.
+// verifyRelayIdentityPinning verifies the relay's certificate contains valid key material.
+// This implements a basic TLS-layer sanity check on the certificate's public key.
 //
-// Per tor-spec.txt §4.1, relay identity verification involves:
-// 1. Verifying the TLS certificate contains the relay's public key
-// 2. Comparing the certificate fingerprint against the directory consensus
-// 3. Verifying link protocol CERTS cells for additional identity confirmation
+// Per tor-spec.txt §4.1, complete relay identity verification requires:
+// 1. Verifying link protocol CERTS cells for identity confirmation
+// 2. Matching relay fingerprints from the directory consensus
 //
-// This function performs step 1-2 at the TLS level as defense in depth.
-// Complete verification also requires link protocol CERTS cell verification (pkg/protocol/protocol.go).
-func verifyRelayIdentityPinning(rawCerts [][]byte, expectedIdentity []byte, expectedFingerprint string) error {
-	if len(expectedIdentity) == 0 && expectedFingerprint == "" {
-		// No pinning configured - skip validation
+// NOTE: expectedFingerprint carries a relay identity fingerprint (e.g. SHA-1 of the RSA
+// identity key from the directory consensus). It is semantically unrelated to a SHA-256
+// fingerprint of the raw TLS certificate DER, so fingerprint comparison is intentionally
+// NOT performed here. Identity fingerprint validation is deferred to the link-protocol
+// CERTS layer (see pkg/protocol/protocol.go receiveCERTS), where its semantics are correct.
+func verifyRelayIdentityPinning(rawCerts [][]byte, expectedIdentity []byte, _ string) error {
+	if len(expectedIdentity) == 0 {
+		// No identity pinning configured - skip validation
 		return nil
 	}
 
@@ -169,57 +170,25 @@ func verifyRelayIdentityPinning(rawCerts [][]byte, expectedIdentity []byte, expe
 		return fmt.Errorf("failed to parse certificate for pinning: %w", err)
 	}
 
-	// If fingerprint is provided, verify it matches
-	if expectedFingerprint != "" {
-		// Compute SHA-256 fingerprint of the DER-encoded certificate
-		certDER := rawCerts[0]
-		actualFingerprint := sha256.Sum256(certDER)
-		actualFingerprintHex := fmt.Sprintf("%x", actualFingerprint[:])
-
-		// Compare against expected fingerprint
-		// Note: Tor typically uses SHA-1 fingerprints of identity keys, but TLS-level pinning
-		// uses SHA-256 of the certificate itself for stronger security
-		if actualFingerprintHex != expectedFingerprint {
-			return fmt.Errorf("certificate fingerprint mismatch: expected %s, got %s",
-				expectedFingerprint, actualFingerprintHex)
-		}
+	// Verify the certificate's public key contains valid key material
+	if cert.PublicKey == nil {
+		return fmt.Errorf("certificate contains no public key")
 	}
 
-	// If identity is provided, verify the certificate's public key matches
-	if len(expectedIdentity) > 0 {
-		// Extract public key from certificate
-		if cert.PublicKey == nil {
-			return fmt.Errorf("certificate contains no public key")
+	// Basic check to ensure the certificate at least contains some key material.
+	// Full identity verification happens via CERTS cell verification in the link
+	// protocol layer (see pkg/protocol/protocol.go receiveCERTS).
+	switch pubKey := cert.PublicKey.(type) {
+	case *rsa.PublicKey:
+		if pubKey.N == nil || pubKey.E == 0 {
+			return fmt.Errorf("certificate RSA public key is malformed")
 		}
-
-		// Attempt to use the public key to verify it matches expected identity
-		// Note: The actual identity verification happens in link protocol via CERTS cells
-		// This is a basic check to ensure the certificate at least contains some key material
-		switch pubKey := cert.PublicKey.(type) {
-		case *rsa.PublicKey:
-			if pubKey == nil {
-				return fmt.Errorf("certificate RSA public key is nil")
-			}
-			// For RSA keys, verify the key has the expected bit length (typically 1024 or 2048)
-			// This is a basic check; full verification happens in link protocol
-			if pubKey.N == nil || pubKey.E == 0 {
-				return fmt.Errorf("certificate RSA public key is malformed")
-			}
-		case *ecdsa.PublicKey:
-			if pubKey == nil {
-				return fmt.Errorf("certificate ECDSA public key is nil")
-			}
-			// For ECDSA keys, verify the key has valid curve and coordinates
-			if pubKey.X == nil || pubKey.Y == nil || pubKey.Curve == nil {
-				return fmt.Errorf("certificate ECDSA public key is malformed")
-			}
-		default:
-			return fmt.Errorf("unsupported public key type: %T", cert.PublicKey)
+	case *ecdsa.PublicKey:
+		if pubKey.X == nil || pubKey.Y == nil || pubKey.Curve == nil {
+			return fmt.Errorf("certificate ECDSA public key is malformed")
 		}
-
-		// Per tor-spec.txt §4.2, full identity verification happens via CERTS cell verification
-		// in the link protocol layer (see pkg/protocol/protocol.go receiveCERTS)
-		// This TLS-level check provides defense in depth
+	default:
+		return fmt.Errorf("unsupported public key type: %T", cert.PublicKey)
 	}
 
 	return nil

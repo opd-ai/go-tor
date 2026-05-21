@@ -463,14 +463,11 @@ func (c *CERTSCell) ValidateSignatures() error {
 			// Type 4: Ed25519 signing key certificate
 			// Per cert-spec.txt, this must be signed by the relay's long-term Ed25519 identity key.
 			// The identity key is contained in the type-7 (Ed25519Identity) certificate.
+			// Absence of a type-7 cert is a hard error: accepting a self-signed type-4 cert would
+			// break the identity binding required by the spec.
 			identityCert := c.FindCertificate(CertTypeEd25519Identity)
 			if identityCert == nil || identityCert.Ed25519Cert == nil {
-				// If no type-7 is available, fall back to verifying as self-signed
-				// This may occur in some protocol variations
-				if err := cert.Ed25519Cert.VerifySignature(cert.Ed25519Cert.CertifiedKey); err != nil {
-					return fmt.Errorf("type 4 (Ed25519 signing key) signature verification failed: %w", err)
-				}
-				break
+				return fmt.Errorf("type 7 (Ed25519 identity) certificate is required to verify type 4 (Ed25519 signing key) but was not found")
 			}
 
 			// Extract the Ed25519 identity key from the type-7 certificate

@@ -492,6 +492,10 @@ func (c *Circuit) UpdateDigest(direction Direction, cellData []byte) error {
 // Note: This is a public API but is primarily used for testing. For production relay cell verification,
 // use verifyRelayCellDigest which properly integrates with circuit state updates.
 func (c *Circuit) VerifyDigest(direction Direction, cellData []byte, receivedDigest [4]byte) error {
+	if len(cellData) < 11 {
+		return fmt.Errorf("relay cell too short for digest verification: %d < 11", len(cellData))
+	}
+
 	c.mu.RLock()
 	var digest hash.Hash
 	if direction == DirectionForward {
@@ -499,27 +503,27 @@ func (c *Circuit) VerifyDigest(direction Direction, cellData []byte, receivedDig
 	} else {
 		digest = c.backwardDigest
 	}
-	c.mu.RUnlock()
 
 	if digest == nil {
+		c.mu.RUnlock()
 		return fmt.Errorf("digest not initialized for direction %d", direction)
+	}
+
+	// Clone the hash state while holding the read lock to prevent races with UpdateDigest
+	hashClone, err := crypto.CloneHash(digest)
+	c.mu.RUnlock()
+
+	if err != nil {
+		return fmt.Errorf("failed to clone hash state for verification: %w", err)
 	}
 
 	// Create a copy with digest zeroed for verification
 	cellCopy := make([]byte, len(cellData))
 	copy(cellCopy, cellData)
-	if len(cellCopy) >= 9 {
-		cellCopy[5] = 0
-		cellCopy[6] = 0
-		cellCopy[7] = 0
-		cellCopy[8] = 0
-	}
-
-	// Clone the hash state to compute the expected digest without modifying the running digest
-	hashClone, err := crypto.CloneHash(digest)
-	if err != nil {
-		return fmt.Errorf("failed to clone hash state for verification: %w", err)
-	}
+	cellCopy[5] = 0
+	cellCopy[6] = 0
+	cellCopy[7] = 0
+	cellCopy[8] = 0
 
 	// Write the cell to the cloned hash state
 	if _, err := hashClone.Write(cellCopy); err != nil {
@@ -712,14 +716,12 @@ func (c *Circuit) verifyRelayCellDigest(payload []byte) (int, error) {
 		// Clone the hash state to compute the expected digest without modifying the running digest
 		hashClone, err := crypto.CloneHash(hop.BackwardDigest)
 		if err != nil {
-			// If we can't clone the hash, skip this hop
-			continue
+			return -1, fmt.Errorf("failed to clone hash state for hop %d: %w", hopIdx, err)
 		}
 
 		// Write the cell to the cloned hash state
 		if _, err := hashClone.Write(cellCopy); err != nil {
-			// If we can't update the hash, skip this hop
-			continue
+			return -1, fmt.Errorf("failed to update hash for hop %d: %w", hopIdx, err)
 		}
 
 		// Get the digest from the cloned state
