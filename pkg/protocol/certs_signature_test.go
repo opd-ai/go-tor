@@ -373,24 +373,24 @@ func TestValidateSignatures_Integration(t *testing.T) {
 	// Build type-7 (Ed25519Identity) certificate in wire format
 	// CertifiedKey = identity public key; signed by identity private key
 	identityCertData := make([]byte, 0, 256)
-	identityCertData = append(identityCertData, 1)                // Version
-	identityCertData = append(identityCertData, 7)                // CertType (Ed25519 identity)
+	identityCertData = append(identityCertData, 1) // Version
+	identityCertData = append(identityCertData, 7) // CertType (Ed25519 identity)
 	identityCertData = append(identityCertData, expBytes...)
-	identityCertData = append(identityCertData, 1)                // CertKeyType
+	identityCertData = append(identityCertData, 1)                 // CertKeyType
 	identityCertData = append(identityCertData, identityPubKey...) // CertifiedKey (32 bytes)
-	identityCertData = append(identityCertData, 0)                // No extensions
+	identityCertData = append(identityCertData, 0)                 // No extensions
 	identitySignature := ed25519.Sign(identityPrivKey, identityCertData)
 	identityCertData = append(identityCertData, identitySignature...)
 
 	// Build type-4 (Ed25519Signing) certificate in wire format
 	// CertifiedKey = signing public key; signed by identity private key
 	certData := make([]byte, 0, 256)
-	certData = append(certData, 1)               // Version
-	certData = append(certData, 4)               // CertType (signing key)
+	certData = append(certData, 1) // Version
+	certData = append(certData, 4) // CertType (signing key)
 	certData = append(certData, expBytes...)
-	certData = append(certData, 1)               // CertKeyType
+	certData = append(certData, 1)                // CertKeyType
 	certData = append(certData, signingPubKey...) // CertifiedKey (32 bytes)
-	certData = append(certData, 0)               // No extensions
+	certData = append(certData, 0)                // No extensions
 	signature := ed25519.Sign(identityPrivKey, certData)
 	certData = append(certData, signature...)
 

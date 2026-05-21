@@ -328,9 +328,9 @@ func GenerateNtorKeyPair() (*NtorKeyPair, error) {
 //
 // ⚠️ SECURITY WARNING: The second return value is the ephemeral private key (x),
 // NOT the final shared secret. It must be:
-//   1. Passed to NtorProcessResponse() when the server response arrives
-//   2. Kept confidential and never used as key material directly
-//   3. Zeroed after use via security.SecureZeroMemory()
+//  1. Passed to NtorProcessResponse() when the server response arrives
+//  2. Kept confidential and never used as key material directly
+//  3. Zeroed after use via security.SecureZeroMemory()
 //
 // Parameters:
 //   - identityKey: The relay's Ed25519 identity key (32 bytes)
@@ -342,12 +342,13 @@ func GenerateNtorKeyPair() (*NtorKeyPair, error) {
 //   - err: Error if handshake generation fails
 //
 // Usage:
-//   handshakeData, ephemeralPrivate, err := NtorClientHandshake(relay.Identity, relay.NtorKey)
-//   if err != nil { /* handle error */ }
-//   defer security.SecureZeroMemory(ephemeralPrivate)
-//   // Send handshakeData to relay...
-//   // When server response arrives:
-//   keyMaterial, err := NtorProcessResponse(serverResponse, ephemeralPrivate, relay.NtorKey, relay.Identity)
+//
+//	handshakeData, ephemeralPrivate, err := NtorClientHandshake(relay.Identity, relay.NtorKey)
+//	if err != nil { /* handle error */ }
+//	defer security.SecureZeroMemory(ephemeralPrivate)
+//	// Send handshakeData to relay...
+//	// When server response arrives:
+//	keyMaterial, err := NtorProcessResponse(serverResponse, ephemeralPrivate, relay.NtorKey, relay.Identity)
 //
 // Implements tor-spec.txt section 5.1.4
 func NtorClientHandshake(identityKey, ntorOnionKey []byte) (handshakeData, ephemeralPrivate []byte, err error) {
@@ -387,9 +388,9 @@ func NtorClientHandshake(identityKey, ntorOnionKey []byte) (handshakeData, ephem
 //
 // ⚠️ SECURITY CRITICAL: This function must receive the correct ephemeral private key
 // from NtorClientHandshake. The caller MUST:
-//   1. Pass the ephemeralPrivate value returned from NtorClientHandshake
-//   2. Zero the clientPrivate parameter after this function returns using security.SecureZeroMemory()
-//   3. Verify that the server's response is valid before using the returned key material
+//  1. Pass the ephemeralPrivate value returned from NtorClientHandshake
+//  2. Zero the clientPrivate parameter after this function returns using security.SecureZeroMemory()
+//  3. Verify that the server's response is valid before using the returned key material
 //
 // Parameters:
 //   - response: The server's response from CREATED2/EXTENDED2 cell (must be 64 bytes: Y || AUTH)

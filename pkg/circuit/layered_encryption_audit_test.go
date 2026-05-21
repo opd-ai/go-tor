@@ -162,73 +162,73 @@ func TestLayeredEncryptionAudit(t *testing.T) {
 }
 
 // TestRelayCellDigestVerification provides comprehensive digest verification tests
-	func TestRelayCellDigestVerification(t *testing.T) {
-		t.Run("VerifyRelayCellDigestRecognition", func(t *testing.T) {
-			// Test that verifyRelayCellDigest correctly identifies which hop sent the cell
-			hops := []*Hop{
-				createTestHopWithDigest(t),
-				createTestHopWithDigest(t),
-				createTestHopWithDigest(t),
-			}
-			circuit := &Circuit{Hops: hops}
+func TestRelayCellDigestVerification(t *testing.T) {
+	t.Run("VerifyRelayCellDigestRecognition", func(t *testing.T) {
+		// Test that verifyRelayCellDigest correctly identifies which hop sent the cell
+		hops := []*Hop{
+			createTestHopWithDigest(t),
+			createTestHopWithDigest(t),
+			createTestHopWithDigest(t),
+		}
+		circuit := &Circuit{Hops: hops}
 
-			// Initialize each hop with a different digest state to differentiate them
-			// In the real protocol, this happens during circuit creation with different key material
-			for i, hop := range hops {
-				initBytes := []byte{byte(i), byte(i + 1), byte(i + 2), byte(i + 3)}
-				hop.BackwardDigest.Write(initBytes)
-			}
+		// Initialize each hop with a different digest state to differentiate them
+		// In the real protocol, this happens during circuit creation with different key material
+		for i, hop := range hops {
+			initBytes := []byte{byte(i), byte(i + 1), byte(i + 2), byte(i + 3)}
+			hop.BackwardDigest.Write(initBytes)
+		}
 
-			// Create a relay cell payload
-			payload := make([]byte, 509)
-			payload[0] = 3 // RelayCommand: RELAY_DATA
-			// bytes 1-2: Recognized = 0 (must be 0 for recognized cell)
-			binary.BigEndian.PutUint16(payload[1:3], 0)
-			// bytes 3-4: StreamID
-			binary.BigEndian.PutUint16(payload[3:5], 1)
-			// bytes 5-8: Digest (will be computed)
-			// bytes 9-10: Length
-			binary.BigEndian.PutUint16(payload[9:11], 10)
-			// Data
-			copy(payload[11:], []byte("test data"))
+		// Create a relay cell payload
+		payload := make([]byte, 509)
+		payload[0] = 3 // RelayCommand: RELAY_DATA
+		// bytes 1-2: Recognized = 0 (must be 0 for recognized cell)
+		binary.BigEndian.PutUint16(payload[1:3], 0)
+		// bytes 3-4: StreamID
+		binary.BigEndian.PutUint16(payload[3:5], 1)
+		// bytes 5-8: Digest (will be computed)
+		// bytes 9-10: Length
+		binary.BigEndian.PutUint16(payload[9:11], 10)
+		// Data
+		copy(payload[11:], []byte("test data"))
 
-			// Compute digest for hop 1 (middle hop)
-			// Per tor-spec.txt §6.1, the digest in a cell is computed as H(prev + cell)
-			// where H(prev) is the running digest state BEFORE processing this cell.
-			targetHop := hops[1]
-			cellCopy := make([]byte, len(payload))
-			copy(cellCopy, payload)
-			cellCopy[5] = 0
-			cellCopy[6] = 0
-			cellCopy[7] = 0
-			cellCopy[8] = 0
+		// Compute digest for hop 1 (middle hop)
+		// Per tor-spec.txt §6.1, the digest in a cell is computed as H(prev + cell)
+		// where H(prev) is the running digest state BEFORE processing this cell.
+		targetHop := hops[1]
+		cellCopy := make([]byte, len(payload))
+		copy(cellCopy, payload)
+		cellCopy[5] = 0
+		cellCopy[6] = 0
+		cellCopy[7] = 0
+		cellCopy[8] = 0
 
-			// Clone the hop's backward digest WITHOUT modifying it yet
-			// This represents the state BEFORE receiving the cell
-			hashClone, err := crypto.CloneHash(targetHop.BackwardDigest)
-			if err != nil {
-				t.Fatalf("Failed to clone hash: %v", err)
-			}
+		// Clone the hop's backward digest WITHOUT modifying it yet
+		// This represents the state BEFORE receiving the cell
+		hashClone, err := crypto.CloneHash(targetHop.BackwardDigest)
+		if err != nil {
+			t.Fatalf("Failed to clone hash: %v", err)
+		}
 
-			// Write the cell to the cloned hash to compute H(prev + cell)
-			hashClone.Write(cellCopy)
-			digestSum := hashClone.Sum(nil)
+		// Write the cell to the cloned hash to compute H(prev + cell)
+		hashClone.Write(cellCopy)
+		digestSum := hashClone.Sum(nil)
 
-			// Set digest in payload
-			payload[5] = digestSum[0]
-			payload[6] = digestSum[1]
-			payload[7] = digestSum[2]
-			payload[8] = digestSum[3]
+		// Set digest in payload
+		payload[5] = digestSum[0]
+		payload[6] = digestSum[1]
+		payload[7] = digestSum[2]
+		payload[8] = digestSum[3]
 
-			// Verify cell is recognized by hop 1
-			hopIdx, err := circuit.verifyRelayCellDigest(payload)
-			if err != nil {
-				t.Fatalf("verifyRelayCellDigest failed: %v", err)
-			}
-			if hopIdx != 1 {
-				t.Errorf("Wrong hop recognized cell: got %d, want 1", hopIdx)
-			}
-		})
+		// Verify cell is recognized by hop 1
+		hopIdx, err := circuit.verifyRelayCellDigest(payload)
+		if err != nil {
+			t.Fatalf("verifyRelayCellDigest failed: %v", err)
+		}
+		if hopIdx != 1 {
+			t.Errorf("Wrong hop recognized cell: got %d, want 1", hopIdx)
+		}
+	})
 
 	t.Run("UnrecognizedCellHandling", func(t *testing.T) {
 		// Test that cells with invalid digest are not recognized

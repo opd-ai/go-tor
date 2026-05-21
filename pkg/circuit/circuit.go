@@ -484,9 +484,6 @@ func (c *Circuit) UpdateDigest(direction Direction, cellData []byte) error {
 }
 
 // VerifyDigest verifies the digest of an incoming relay cell (CRYPTO-001)
-// This prevents cell injection and replay attacks per tor-spec.txt §6.1.
-// Returns error if digest verification fails.
-// VerifyDigest verifies the digest of a relay cell
 // Per tor-spec.txt §6.1, the digest is computed over the cell with the digest field zeroed.
 // This function must clone the hash state to verify without modifying it.
 // Note: This is a public API but is primarily used for testing. For production relay cell verification,
@@ -674,8 +671,7 @@ func (c *Circuit) updateHopDigests(direction Direction, payload []byte) error {
 	return nil
 }
 
-// verifyRelayCellDigest verifies the digest of an incoming relay cell
-// verifyRelayCellDigest verifies the relay cell digest and returns the hop index that recognizes it
+// verifyRelayCellDigest verifies the relay cell digest and returns the hop index that recognizes it.
 // Per tor-spec.txt §6.1, relay cell digest is computed over the cell payload with the digest field zeroed,
 // and each hop maintains a running hash of all cells it processes.
 // Returns the hop index that recognized the cell, or -1 if unrecognized
