@@ -461,10 +461,27 @@ func (c *CERTSCell) ValidateSignatures() error {
 		switch cert.CertType {
 		case CertTypeEd25519Signing:
 			// Type 4: Ed25519 signing key certificate
-			// This is typically signed by the identity key (certified key itself for self-signed)
-			// For initial handshake, we verify it's self-signed
-			if err := cert.Ed25519Cert.VerifySignature(cert.Ed25519Cert.CertifiedKey); err != nil {
-				return fmt.Errorf("type 4 (Ed25519 signing key) signature verification failed: %w", err)
+			// Per cert-spec.txt, this must be signed by the relay's long-term Ed25519 identity key.
+			// The identity key is contained in the type-7 (Ed25519Identity) certificate.
+			identityCert := c.FindCertificate(CertTypeEd25519Identity)
+			if identityCert == nil || identityCert.Ed25519Cert == nil {
+				// If no type-7 is available, fall back to verifying as self-signed
+				// This may occur in some protocol variations
+				if err := cert.Ed25519Cert.VerifySignature(cert.Ed25519Cert.CertifiedKey); err != nil {
+					return fmt.Errorf("type 4 (Ed25519 signing key) signature verification failed: %w", err)
+				}
+				break
+			}
+
+			// Extract the Ed25519 identity key from the type-7 certificate
+			identityKey := identityCert.Ed25519Cert.CertifiedKey
+			if len(identityKey) != 32 {
+				return fmt.Errorf("type 7 (Ed25519 identity) certified key has invalid length: %d", len(identityKey))
+			}
+
+			// Verify type-4 signature against the identity key
+			if err := cert.Ed25519Cert.VerifySignature(identityKey); err != nil {
+				return fmt.Errorf("type 4 (Ed25519 signing key) signature verification failed against identity key: %w", err)
 			}
 
 		case CertTypeEd25519TLSLink:
