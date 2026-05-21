@@ -172,6 +172,13 @@ func TestRelayCellDigestVerification(t *testing.T) {
 		}
 		circuit := &Circuit{Hops: hops}
 
+		// Initialize each hop with a different digest state to differentiate them
+		// In the real protocol, this happens during circuit creation with different key material
+		for i, hop := range hops {
+			initBytes := []byte{byte(i), byte(i + 1), byte(i + 2), byte(i + 3)}
+			hop.BackwardDigest.Write(initBytes)
+		}
+
 		// Create a relay cell payload
 		payload := make([]byte, 509)
 		payload[0] = 3 // RelayCommand: RELAY_DATA
@@ -186,6 +193,8 @@ func TestRelayCellDigestVerification(t *testing.T) {
 		copy(payload[11:], []byte("test data"))
 
 		// Compute digest for hop 1 (middle hop)
+		// Per tor-spec.txt §6.1, the digest in a cell is computed as H(prev + cell)
+		// where H(prev) is the running digest state BEFORE processing this cell.
 		targetHop := hops[1]
 		cellCopy := make([]byte, len(payload))
 		copy(cellCopy, payload)
@@ -194,9 +203,16 @@ func TestRelayCellDigestVerification(t *testing.T) {
 		cellCopy[7] = 0
 		cellCopy[8] = 0
 
-		// Update hop's backward digest
-		targetHop.BackwardDigest.Write(cellCopy)
-		digestSum := targetHop.BackwardDigest.Sum(nil)
+		// Clone the hop's backward digest WITHOUT modifying it yet
+		// This represents the state BEFORE receiving the cell
+		hashClone, err := crypto.CloneHash(targetHop.BackwardDigest)
+		if err != nil {
+			t.Fatalf("Failed to clone hash: %v", err)
+		}
+
+		// Write the cell to the cloned hash to compute H(prev + cell)
+		hashClone.Write(cellCopy)
+		digestSum := hashClone.Sum(nil)
 
 		// Set digest in payload
 		payload[5] = digestSum[0]
@@ -307,8 +323,13 @@ func TestRelayCellDigestVerification(t *testing.T) {
 		cellCopy[7] = 0
 		cellCopy[8] = 0
 
-		// Get digest without updating state
-		digestSum := hop.BackwardDigest.Sum(nil)
+		// Clone the digest and write the cell to compute H(prev + cell)
+		hashClone, err := crypto.CloneHash(hop.BackwardDigest)
+		if err != nil {
+			t.Fatalf("Failed to clone hash: %v", err)
+		}
+		hashClone.Write(cellCopy)
+		digestSum := hashClone.Sum(nil)
 		payload[5] = digestSum[0]
 		payload[6] = digestSum[1]
 		payload[7] = digestSum[2]

@@ -529,13 +529,15 @@ func (s *Server) handleConnection(ctx context.Context, conn net.Conn) {
 	// If circuit pool is available, request a circuit (isolated or not)
 	var circ *circuit.Circuit
 	if circuitPool != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		// AUDIT-HIGH-5: Use the parent context with timeout instead of creating a detached context
+		// This ensures that server shutdown properly cancels in-flight circuit acquisitions
+		timeoutCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 
 		var err error
 		// Use isolated circuit if isolation key is present, otherwise get any circuit
 		if isolationKey != nil {
-			circ, err = circuitPool.GetWithIsolation(ctx, isolationKey)
+			circ, err = circuitPool.GetWithIsolation(timeoutCtx, isolationKey)
 			if err != nil {
 				s.logger.Error("Failed to get isolated circuit", "error", err, "isolation_key", isolationKey)
 				s.sendReply(conn, replyGeneralFailure, nil)
@@ -563,7 +565,7 @@ func (s *Server) handleConnection(ctx context.Context, conn net.Conn) {
 				"target", targetAddr)
 		} else {
 			// No isolation - get any available circuit from the pool
-			circ, err = circuitPool.Get(ctx)
+			circ, err = circuitPool.Get(timeoutCtx)
 			if err != nil {
 				s.logger.Error("Failed to get circuit from pool", "error", err)
 				s.sendReply(conn, replyGeneralFailure, nil)

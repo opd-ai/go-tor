@@ -171,18 +171,30 @@ func TestEd25519CertificateVerifySignature_InvalidKeyLength(t *testing.T) {
 
 // TestValidateSignatures tests the CERTSCell signature validation
 func TestValidateSignatures(t *testing.T) {
-	// Generate keypair for signing
-	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	// Generate identity keypair (type 7) and signing keypair (type 4)
+	identityPubKey, identityPrivKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
-		t.Fatalf("Failed to generate Ed25519 keypair: %v", err)
+		t.Fatalf("Failed to generate Ed25519 identity keypair: %v", err)
 	}
 
-	// Create a self-signed Ed25519 signing key certificate (type 4)
-	signingKeyCert := createSignedEd25519Cert(t, 4, publicKey, privateKey, publicKey)
+	signingPubKey, _, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate Ed25519 signing keypair: %v", err)
+	}
 
-	// Create CERTS cell with the signing key certificate
+	// Create type-7 (Ed25519Identity) cert – CertifiedKey is the identity public key
+	identityCert := createSignedEd25519Cert(t, 7, identityPubKey, identityPrivKey, identityPubKey)
+
+	// Create type-4 (Ed25519Signing) cert signed by the identity private key
+	signingKeyCert := createSignedEd25519Cert(t, 4, signingPubKey, identityPrivKey, identityPubKey)
+
+	// Create CERTS cell with both type-7 and type-4 certificates
 	certsCell := &CERTSCell{
 		Certificates: []*Certificate{
+			{
+				CertType:    CertTypeEd25519Identity,
+				Ed25519Cert: identityCert,
+			},
 			{
 				CertType:    CertTypeEd25519Signing,
 				Ed25519Cert: signingKeyCert,
@@ -193,16 +205,21 @@ func TestValidateSignatures(t *testing.T) {
 	// Validate signatures
 	err = certsCell.ValidateSignatures()
 	if err != nil {
-		t.Errorf("Signature validation failed for valid self-signed cert: %v", err)
+		t.Errorf("Signature validation failed for valid cert chain: %v", err)
 	}
 }
 
 // TestValidateSignatures_WithTLSLink tests signature validation with signing key and TLS link
 func TestValidateSignatures_WithTLSLink(t *testing.T) {
-	// Generate keypairs
+	// Generate keypairs: identity (type 7), signing (type 4), link (type 5)
+	identityPubKey, identityPrivKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate Ed25519 identity keypair: %v", err)
+	}
+
 	signingPubKey, signingPrivKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
-		t.Fatalf("Failed to generate signing keypair: %v", err)
+		t.Fatalf("Failed to generate Ed25519 signing keypair: %v", err)
 	}
 
 	linkPubKey, _, err := ed25519.GenerateKey(rand.Reader)
@@ -210,15 +227,22 @@ func TestValidateSignatures_WithTLSLink(t *testing.T) {
 		t.Fatalf("Failed to generate link keypair: %v", err)
 	}
 
-	// Create self-signed signing key cert (type 4)
-	signingKeyCert := createSignedEd25519Cert(t, 4, signingPubKey, signingPrivKey, signingPubKey)
+	// Create type-7 (Ed25519Identity) cert
+	identityCert := createSignedEd25519Cert(t, 7, identityPubKey, identityPrivKey, identityPubKey)
 
-	// Create TLS link cert (type 5) signed by signing key
+	// Create type-4 (Ed25519Signing) cert signed by the identity private key
+	signingKeyCert := createSignedEd25519Cert(t, 4, signingPubKey, identityPrivKey, identityPubKey)
+
+	// Create type-5 (Ed25519TLSLink) cert signed by signing key
 	tlsLinkCert := createSignedEd25519Cert(t, 5, linkPubKey, signingPrivKey, signingPubKey)
 
 	// Create CERTS cell
 	certsCell := &CERTSCell{
 		Certificates: []*Certificate{
+			{
+				CertType:    CertTypeEd25519Identity,
+				Ed25519Cert: identityCert,
+			},
 			{
 				CertType:    CertTypeEd25519Signing,
 				Ed25519Cert: signingKeyCert,
@@ -331,35 +355,58 @@ func createSignedEd25519Cert(t *testing.T, certType uint8, certifiedKey, private
 
 // TestValidateSignatures_Integration tests full CERTS cell parsing and validation
 func TestValidateSignatures_Integration(t *testing.T) {
-	// Generate keypair
-	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	// Generate identity keypair (type 7) and signing keypair (type 4)
+	identityPubKey, identityPrivKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
-		t.Fatalf("Failed to generate keypair: %v", err)
+		t.Fatalf("Failed to generate identity keypair: %v", err)
 	}
 
-	// Build a complete Ed25519 certificate in wire format
-	certData := make([]byte, 0, 256)
-	certData = append(certData, 1) // Version
-	certData = append(certData, 4) // CertType (signing key)
+	signingPubKey, _, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate signing keypair: %v", err)
+	}
 
 	expirationHours := uint32(time.Now().Add(365*24*time.Hour).Unix() / 3600)
 	expBytes := make([]byte, 4)
 	binary.BigEndian.PutUint32(expBytes, expirationHours)
+
+	// Build type-7 (Ed25519Identity) certificate in wire format
+	// CertifiedKey = identity public key; signed by identity private key
+	identityCertData := make([]byte, 0, 256)
+	identityCertData = append(identityCertData, 1) // Version
+	identityCertData = append(identityCertData, 7) // CertType (Ed25519 identity)
+	identityCertData = append(identityCertData, expBytes...)
+	identityCertData = append(identityCertData, 1)                 // CertKeyType
+	identityCertData = append(identityCertData, identityPubKey...) // CertifiedKey (32 bytes)
+	identityCertData = append(identityCertData, 0)                 // No extensions
+	identitySignature := ed25519.Sign(identityPrivKey, identityCertData)
+	identityCertData = append(identityCertData, identitySignature...)
+
+	// Build type-4 (Ed25519Signing) certificate in wire format
+	// CertifiedKey = signing public key; signed by identity private key
+	certData := make([]byte, 0, 256)
+	certData = append(certData, 1) // Version
+	certData = append(certData, 4) // CertType (signing key)
 	certData = append(certData, expBytes...)
-
-	certData = append(certData, 1)            // CertKeyType
-	certData = append(certData, publicKey...) // CertifiedKey (32 bytes)
-	certData = append(certData, 0)            // No extensions
-
-	// Sign the certificate data
-	signature := ed25519.Sign(privateKey, certData)
+	certData = append(certData, 1)                // CertKeyType
+	certData = append(certData, signingPubKey...) // CertifiedKey (32 bytes)
+	certData = append(certData, 0)                // No extensions
+	signature := ed25519.Sign(identityPrivKey, certData)
 	certData = append(certData, signature...)
 
-	// Build CERTS cell payload
-	payload := make([]byte, 0, 256)
-	payload = append(payload, 1)                            // Number of certificates
-	payload = append(payload, byte(CertTypeEd25519Signing)) // Cert type
+	// Build CERTS cell payload with both type-7 and type-4 certs
+	payload := make([]byte, 0, 512)
+	payload = append(payload, 2) // Number of certificates
 
+	// Append type-7 cert
+	payload = append(payload, byte(CertTypeEd25519Identity))
+	id7Len := make([]byte, 2)
+	binary.BigEndian.PutUint16(id7Len, uint16(len(identityCertData)))
+	payload = append(payload, id7Len...)
+	payload = append(payload, identityCertData...)
+
+	// Append type-4 cert
+	payload = append(payload, byte(CertTypeEd25519Signing))
 	certLen := make([]byte, 2)
 	binary.BigEndian.PutUint16(certLen, uint16(len(certData)))
 	payload = append(payload, certLen...)

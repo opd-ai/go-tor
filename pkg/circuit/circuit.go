@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/opd-ai/go-tor/pkg/cell"
+	"github.com/opd-ai/go-tor/pkg/crypto"
 )
 
 // State represents the current state of a circuit
@@ -483,13 +484,16 @@ func (c *Circuit) UpdateDigest(direction Direction, cellData []byte) error {
 }
 
 // VerifyDigest verifies the digest of an incoming relay cell (CRYPTO-001)
-// This prevents cell injection and replay attacks per tor-spec.txt §6.1.
-// Returns error if digest verification fails.
+// Per tor-spec.txt §6.1, the digest is computed over the cell with the digest field zeroed.
+// This function must clone the hash state to verify without modifying it.
+// Note: This is a public API but is primarily used for testing. For production relay cell verification,
+// use verifyRelayCellDigest which properly integrates with circuit state updates.
 func (c *Circuit) VerifyDigest(direction Direction, cellData []byte, receivedDigest [4]byte) error {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	if len(cellData) < 11 {
+		return fmt.Errorf("relay cell too short for digest verification: %d < 11", len(cellData))
+	}
 
-	// Select appropriate digest
+	c.mu.RLock()
 	var digest hash.Hash
 	if direction == DirectionForward {
 		digest = c.forwardDigest
@@ -498,13 +502,33 @@ func (c *Circuit) VerifyDigest(direction Direction, cellData []byte, receivedDig
 	}
 
 	if digest == nil {
+		c.mu.RUnlock()
 		return fmt.Errorf("digest not initialized for direction %d", direction)
 	}
 
-	// Compute expected digest (first 4 bytes of SHA-1)
-	// Note: We're checking the state BEFORE updating, so we compute what the
-	// digest should be for this cell given the current state
-	expectedSum := digest.Sum(nil)
+	// Clone the hash state while holding the read lock to prevent races with UpdateDigest
+	hashClone, err := crypto.CloneHash(digest)
+	c.mu.RUnlock()
+
+	if err != nil {
+		return fmt.Errorf("failed to clone hash state for verification: %w", err)
+	}
+
+	// Create a copy with digest zeroed for verification
+	cellCopy := make([]byte, len(cellData))
+	copy(cellCopy, cellData)
+	cellCopy[5] = 0
+	cellCopy[6] = 0
+	cellCopy[7] = 0
+	cellCopy[8] = 0
+
+	// Write the cell to the cloned hash state
+	if _, err := hashClone.Write(cellCopy); err != nil {
+		return fmt.Errorf("failed to update hash for verification: %w", err)
+	}
+
+	// Compute expected digest (first 4 bytes of hash)
+	expectedSum := hashClone.Sum(nil)
 	expected := [4]byte{expectedSum[0], expectedSum[1], expectedSum[2], expectedSum[3]}
 
 	// Constant-time comparison to prevent timing attacks
@@ -566,8 +590,9 @@ func (c *Circuit) encryptForward(payload []byte) []byte {
 	encrypted := make([]byte, len(payload))
 	copy(encrypted, payload)
 
-	// Encrypt with each hop's cipher in forward order (guard -> middle -> exit)
-	// Each hop will decrypt one layer, like peeling an onion
+	// Encrypt with each hop's cipher in reverse order (exit -> middle -> guard)
+	// We apply layers from innermost (exit) to outermost (guard) so the guard's layer
+	// is the outermost and will be decrypted first by the guard when it receives the cell
 	for i := len(hops) - 1; i >= 0; i-- {
 		hop := hops[i]
 		if hop.ForwardCipher != nil {
@@ -646,7 +671,9 @@ func (c *Circuit) updateHopDigests(direction Direction, payload []byte) error {
 	return nil
 }
 
-// verifyRelayCellDigest verifies the digest of an incoming relay cell
+// verifyRelayCellDigest verifies the relay cell digest and returns the hop index that recognizes it.
+// Per tor-spec.txt §6.1, relay cell digest is computed over the cell payload with the digest field zeroed,
+// and each hop maintains a running hash of all cells it processes.
 // Returns the hop index that recognized the cell, or -1 if unrecognized
 func (c *Circuit) verifyRelayCellDigest(payload []byte) (int, error) {
 	c.mu.RLock()
@@ -663,10 +690,18 @@ func (c *Circuit) verifyRelayCellDigest(payload []byte) (int, error) {
 
 	// Check if this cell is recognized by any hop
 	// A cell is "recognized" if:
-	// 1. The digest matches the hop's running backward digest
+	// 1. The digest matches the expected post-cell digest (after writing the cell to the hash)
 	// 2. The "recognized" field is zero (bytes 1-2)
 
 	recognized := binary.BigEndian.Uint16(payload[1:3])
+
+	// Create a copy with digest zeroed for digest computation
+	cellCopy := make([]byte, len(payload))
+	copy(cellCopy, payload)
+	cellCopy[5] = 0
+	cellCopy[6] = 0
+	cellCopy[7] = 0
+	cellCopy[8] = 0
 
 	// Try each hop to see which one recognizes this cell
 	for hopIdx, hop := range hops {
@@ -674,23 +709,26 @@ func (c *Circuit) verifyRelayCellDigest(payload []byte) (int, error) {
 			continue
 		}
 
-		// Compute expected digest for this hop
-		// Create a copy with digest zeroed
-		cellCopy := make([]byte, len(payload))
-		copy(cellCopy, payload)
-		cellCopy[5] = 0
-		cellCopy[6] = 0
-		cellCopy[7] = 0
-		cellCopy[8] = 0
+		// Clone the hash state to compute the expected digest without modifying the running digest
+		hashClone, err := crypto.CloneHash(hop.BackwardDigest)
+		if err != nil {
+			return -1, fmt.Errorf("failed to clone hash state for hop %d: %w", hopIdx, err)
+		}
 
-		// Get the current digest state (without modifying it)
-		expectedSum := hop.BackwardDigest.Sum(nil)
+		// Write the cell to the cloned hash state
+		if _, err := hashClone.Write(cellCopy); err != nil {
+			return -1, fmt.Errorf("failed to update hash for hop %d: %w", hopIdx, err)
+		}
+
+		// Get the digest from the cloned state
+		expectedSum := hashClone.Sum(nil)
 		expected := [4]byte{expectedSum[0], expectedSum[1], expectedSum[2], expectedSum[3]}
 
 		// Check if digest matches AND recognized field is zero
+		// Use constant-time comparison to prevent timing attacks
 		if subtle.ConstantTimeCompare(expected[:], cellDigest[:]) == 1 && recognized == 0 {
 			// This hop recognizes the cell
-			// Now update the digest with this cell
+			// Now update the real (non-cloned) digest with this cell
 			if _, err := hop.BackwardDigest.Write(cellCopy); err != nil {
 				return -1, fmt.Errorf("failed to update backward digest: %w", err)
 			}
