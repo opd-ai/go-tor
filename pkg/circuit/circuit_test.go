@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/opd-ai/go-tor/pkg/cell"
+	"github.com/opd-ai/go-tor/pkg/crypto"
 )
 
 func TestStateString(t *testing.T) {
@@ -539,12 +540,25 @@ func TestVerifyDigest(t *testing.T) {
 	cellData := make([]byte, 20)
 	cellData[0] = 1 // Command
 
-	// Get the current digest state BEFORE updating (this is the verification flow)
-	currentSum := c.forwardDigest.Sum(nil)
-	receivedDigest := [4]byte{currentSum[0], currentSum[1], currentSum[2], currentSum[3]}
+	// Zero out the digest field
+	cellCopy := make([]byte, len(cellData))
+	copy(cellCopy, cellData)
+	cellCopy[5] = 0
+	cellCopy[6] = 0
+	cellCopy[7] = 0
+	cellCopy[8] = 0
+
+	// Clone current digest state and write the cell to compute H(prev + cell)
+	hashClone, err := crypto.CloneHash(c.forwardDigest)
+	if err != nil {
+		t.Fatalf("Failed to clone hash: %v", err)
+	}
+	hashClone.Write(cellCopy)
+	digestSum := hashClone.Sum(nil)
+	receivedDigest := [4]byte{digestSum[0], digestSum[1], digestSum[2], digestSum[3]}
 
 	// Verify should pass with matching digest
-	err := c.VerifyDigest(DirectionForward, cellData, receivedDigest)
+	err = c.VerifyDigest(DirectionForward, cellData, receivedDigest)
 	if err != nil {
 		t.Errorf("VerifyDigest failed: %v", err)
 	}
