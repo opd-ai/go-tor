@@ -270,16 +270,20 @@ func (c *Client) fetchFromAuthority(ctx context.Context, authorityURL string) ([
 	}
 
 	// SPEC-003: Validate consensus metadata
+	// Per tor-spec.txt §5, consensus validation is critical for security.
+	// Invalid timestamps, insufficient authority signatures, or other validation failures
+	// indicate a potential attack and must result in rejection of the consensus.
 	if err := ValidateConsensusMetadata(metadata); err != nil {
-		c.logger.Warn("Consensus metadata validation failed", "error", err)
-		// Log warning but don't fail the fetch - this allows gradual rollout
-		// In production, this should be a hard error for security
-	} else {
-		c.logger.Info("Consensus metadata validated",
-			"signatures", metadata.SignatureCount,
-			"valid_after", metadata.ValidAfter,
-			"valid_until", metadata.ValidUntil)
+		c.logger.Error("Consensus metadata validation failed", "error", err)
+		// Return error - invalid consensus must be rejected
+		// This prevents use of expired, insufficient, or tampered consensus documents
+		return nil, fmt.Errorf("consensus validation failed: %w", err)
 	}
+
+	c.logger.Info("Consensus metadata validated",
+		"signatures", metadata.SignatureCount,
+		"valid_after", metadata.ValidAfter,
+		"valid_until", metadata.ValidUntil)
 
 	return relays, nil
 }

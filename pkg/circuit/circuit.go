@@ -589,8 +589,9 @@ func (c *Circuit) encryptForward(payload []byte) []byte {
 	encrypted := make([]byte, len(payload))
 	copy(encrypted, payload)
 
-	// Encrypt with each hop's cipher in forward order (guard -> middle -> exit)
-	// Each hop will decrypt one layer, like peeling an onion
+	// Encrypt with each hop's cipher in reverse order (exit -> middle -> guard)
+	// We apply layers from innermost (exit) to outermost (guard) so the guard's layer
+	// is the outermost and will be decrypted first by the guard when it receives the cell
 	for i := len(hops) - 1; i >= 0; i-- {
 		hop := hops[i]
 		if hop.ForwardCipher != nil {
