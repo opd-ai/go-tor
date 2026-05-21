@@ -322,7 +322,13 @@ func GenerateNtorKeyPair() (*NtorKeyPair, error) {
 }
 
 // NtorClientHandshake performs the client side of the ntor handshake
-// Returns the handshake data to send to the relay and the shared secret
+// Returns the handshake data to send to the relay and the ephemeral private key.
+//
+// ⚠️ SECURITY WARNING: The second return value is the ephemeral private key (x),
+// NOT the final shared secret. It must be:
+//   1. Passed to NtorProcessResponse() when the server response arrives
+//   2. Kept confidential and never used as key material directly
+//   3. Zeroed after use via security.SecureZeroMemory()
 //
 // Parameters:
 //   - identityKey: The relay's Ed25519 identity key (32 bytes)
@@ -330,10 +336,19 @@ func GenerateNtorKeyPair() (*NtorKeyPair, error) {
 //
 // Returns:
 //   - handshakeData: The data to send in CREATE2/EXTEND2 cell
-//   - sharedSecret: The derived shared secret for KDF
+//   - ephemeralPrivate: The client's ephemeral private key (x) for NtorProcessResponse
+//   - err: Error if handshake generation fails
+//
+// Usage:
+//   handshakeData, ephemeralPrivate, err := NtorClientHandshake(relay.Identity, relay.NtorKey)
+//   if err != nil { /* handle error */ }
+//   defer security.SecureZeroMemory(ephemeralPrivate)
+//   // Send handshakeData to relay...
+//   // When server response arrives:
+//   keyMaterial, err := NtorProcessResponse(serverResponse, ephemeralPrivate, relay.NtorKey, relay.Identity)
 //
 // Implements tor-spec.txt section 5.1.4
-func NtorClientHandshake(identityKey, ntorOnionKey []byte) (handshakeData, sharedSecret []byte, err error) {
+func NtorClientHandshake(identityKey, ntorOnionKey []byte) (handshakeData, ephemeralPrivate []byte, err error) {
 	if len(identityKey) != 32 {
 		return nil, nil, fmt.Errorf("invalid identity key length: %d", len(identityKey))
 	}
@@ -356,31 +371,33 @@ func NtorClientHandshake(identityKey, ntorOnionKey []byte) (handshakeData, share
 	copy(handshakeData[20:52], ntorOnionKey)        // KEYID
 	copy(handshakeData[52:84], ephemeral.Public[:]) // CLIENT_PK
 
-	// Note: The complete ntor handshake requires processing the server's response
-	// to compute the actual shared secret. For now, we return a placeholder.
-	// A full implementation would:
-	// 1. Receive server's Y and auth from CREATED2/EXTENDED2
-	// 2. Compute shared secrets: EXP(Y,x) and EXP(B,x)
-	// 3. Derive key material using HKDF-SHA256
-	// 4. Verify auth MAC
+	// Return the ephemeral private key (x) for use in NtorProcessResponse
+	// This is NOT the final shared secret - it will be used to compute the shared secret
+	// after the server's response is received.
+	ephemeralPrivate = make([]byte, 32)
+	copy(ephemeralPrivate, ephemeral.Private[:])
 
-	// Placeholder shared secret (will be replaced when processing server response)
-	sharedSecret = make([]byte, 32)
-	copy(sharedSecret, ephemeral.Private[:])
-
-	return handshakeData, sharedSecret, nil
+	return handshakeData, ephemeralPrivate, nil
 }
 
 // NtorProcessResponse processes the server's response to complete the ntor handshake
+// and computes the final shared secret for circuit key derivation.
+//
+// ⚠️ SECURITY CRITICAL: This function must receive the correct ephemeral private key
+// from NtorClientHandshake. The caller MUST:
+//   1. Pass the ephemeralPrivate value returned from NtorClientHandshake
+//   2. Zero the clientPrivate parameter after this function returns using security.SecureZeroMemory()
+//   3. Verify that the server's response is valid before using the returned key material
 //
 // Parameters:
-//   - response: The server's response from CREATED2/EXTENDED2 (HLEN bytes of handshake data)
-//   - clientPrivate: The client's ephemeral private key from the initial handshake
+//   - response: The server's response from CREATED2/EXTENDED2 cell (must be 64 bytes: Y || AUTH)
+//   - clientPrivate: The client's ephemeral private key (x) from NtorClientHandshake (32 bytes)
 //   - serverNtorKey: The relay's ntor onion key (32 bytes)
 //   - serverIdentity: The relay's identity key (32 bytes)
 //
 // Returns:
-//   - sharedSecret: The verified shared secret for key derivation
+//   - keyMaterial: 72 bytes of key material (Df || Db || Kf || Kb) for circuit use
+//   - err: Error if response is invalid or server authentication fails
 //
 // Implements tor-spec.txt section 5.1.4
 func NtorProcessResponse(response, clientPrivate, serverNtorKey, serverIdentity []byte) ([]byte, error) {
