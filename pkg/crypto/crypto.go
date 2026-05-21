@@ -18,8 +18,10 @@ import (
 	"crypto/sha1" // #nosec G505 - SHA1 required by Tor protocol specification (tor-spec.txt)
 	"crypto/sha256"
 	"crypto/x509"
+	"encoding"
 	"encoding/pem"
 	"fmt"
+	"hash"
 	"io"
 	"sync"
 
@@ -489,6 +491,49 @@ func constantTimeCompare(a, b []byte) bool {
 // ConstantTimeCompare is the exported version of constantTimeCompare
 func ConstantTimeCompare(a, b []byte) bool {
 	return constantTimeCompare(a, b)
+}
+
+// CloneHash clones a hash.Hash by marshaling and unmarshaling its state
+// This is used for non-destructive digest verification in relay cells
+// Per tor-spec.txt §6.1, relay cell digest verification requires checking
+// the hash state before and after updating with the cell
+func CloneHash(h hash.Hash) (hash.Hash, error) {
+	// Use binary marshaling interface that SHA-1 and SHA-256 support
+	marshaler, ok := h.(encoding.BinaryMarshaler)
+	if !ok {
+		return nil, fmt.Errorf("hash does not support binary marshaling: %T", h)
+	}
+
+	// Get the current state
+	state, err := marshaler.MarshalBinary()
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal hash state: %w", err)
+	}
+
+	// Create a new hash of the same size
+	// We determine this by checking the hash's output size
+	hashSize := h.Size()
+	var newHash hash.Hash
+	switch hashSize {
+	case 20: // SHA-1
+		newHash = sha1.New()
+	case 32: // SHA-256
+		newHash = sha256.New()
+	default:
+		return nil, fmt.Errorf("unsupported hash size: %d", hashSize)
+	}
+
+	// Restore the state to the new hash
+	unmarshaler, ok := newHash.(encoding.BinaryUnmarshaler)
+	if !ok {
+		return nil, fmt.Errorf("new hash does not support binary unmarshaling: %T", newHash)
+	}
+
+	if err := unmarshaler.UnmarshalBinary(state); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal hash state: %w", err)
+	}
+
+	return newHash, nil
 }
 
 // Ed25519Verify verifies an Ed25519 signature
