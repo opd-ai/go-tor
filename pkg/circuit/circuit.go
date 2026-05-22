@@ -1253,17 +1253,21 @@ func (c *Circuit) DeliverRelayCell(cellData *cell.Cell) error {
 	c.deliverTimer.Reset(100 * time.Millisecond)
 	select {
 	case c.relayReceiveChan <- relayCell:
-		// Stop the timer as we've already delivered
-		if !c.deliverTimer.Stop() {
-			// Drain the timer channel if it fired
-			select {
-			case <-c.deliverTimer.C:
-			default:
-			}
-		}
+		stopAndDrainTimer(c.deliverTimer)
 		return nil
 	case <-c.deliverTimer.C:
 		return fmt.Errorf("relay receive channel full or blocked")
+	}
+}
+
+// stopAndDrainTimer stops a timer and drains its channel if it has already fired
+func stopAndDrainTimer(t *time.Timer) {
+	if !t.Stop() {
+		// Timer already fired, drain the channel
+		select {
+		case <-t.C:
+		default:
+		}
 	}
 }
 
