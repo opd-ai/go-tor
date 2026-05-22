@@ -67,6 +67,7 @@ type Connection struct {
 	expectedIdentity    []byte // Expected relay Ed25519 identity key (32 bytes) - for CERTS validation
 	expectedFingerprint string // Expected relay RSA fingerprint - for CERTS validation
 	requireCERTS        bool   // If true, fail handshake on CERTS validation failure
+	readyCh             chan struct{} // AUDIT-MED-3 FIX: Channel closed when connection reaches StateOpen
 }
 
 // Config holds connection configuration
@@ -269,6 +270,7 @@ func New(cfg *Config, log *logger.Logger) *Connection {
 		expectedIdentity:    cfg.ExpectedIdentity,
 		expectedFingerprint: cfg.ExpectedFingerprint,
 		requireCERTS:        cfg.RequireCERTS,
+		readyCh:             make(chan struct{}), // AUDIT-MED-3 FIX: Channel for ready signaling
 	}
 }
 
@@ -434,6 +436,12 @@ func (c *Connection) Address() string {
 func (c *Connection) setState(state State) {
 	c.stateMu.Lock()
 	defer c.stateMu.Unlock()
+	
+	// AUDIT-MED-3 FIX: Close ready channel when transitioning to StateOpen
+	if state == StateOpen && c.state != StateOpen {
+		close(c.readyCh)
+	}
+	
 	c.state = state
 }
 
@@ -500,4 +508,10 @@ func (c *Connection) ExpectedFingerprint() string {
 // If false, CERTS validation errors are logged as warnings (backward compatible).
 func (c *Connection) RequireCERTS() bool {
 	return c.requireCERTS
+}
+
+// Ready returns a channel that is closed when the connection reaches StateOpen.
+// AUDIT-MED-3 FIX: Allows waiting for connection readiness without timing guesses.
+func (c *Connection) Ready() <-chan struct{} {
+	return c.readyCh
 }

@@ -204,15 +204,16 @@ func (b *Builder) connectToRelay(ctx context.Context, address string, relay *dir
 		return nil, fmt.Errorf("failed to connect: %w", err)
 	}
 
-	// Wait for connection to be ready
+	// AUDIT-MED-3 FIX: Wait for connection to be ready using Ready() channel
+	// instead of a fixed 100ms timeout
 	select {
 	case <-ctx.Done():
 		if err := conn.Close(); err != nil {
 			b.logger.Error("Failed to close connection on context cancellation", "function", "connectToRelay", "error", err)
 		}
 		return nil, ctx.Err()
-	case <-time.After(100 * time.Millisecond):
-		// Connection established
+	case <-conn.Ready():
+		// Connection is now ready (StateOpen reached)
 	}
 
 	return conn, nil

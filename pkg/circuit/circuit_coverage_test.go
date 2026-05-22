@@ -363,7 +363,9 @@ func TestCircuitStreamOperations(t *testing.T) {
 	c.SetState(StateOpen)
 
 	// Test OpenStream - requires connection
-	err := c.OpenStream(1, "example.com", 80)
+	// AUDIT-MED-2 FIX: OpenStream now requires context parameter
+	ctx := context.Background()
+	err := c.OpenStream(ctx, 1, "example.com", 80)
 	if err == nil {
 		t.Error("OpenStream should return error when conn is nil")
 	}
