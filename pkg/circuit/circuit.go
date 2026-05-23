@@ -75,7 +75,8 @@ type Circuit struct {
 	// SECURITY-001: Replay protection per tor-spec.txt
 	replayProtection *cell.ReplayProtection // Replay protection for cells
 	// AUDIT-MED-4 FIX: Reusable timer to avoid GC pressure from time.After
-	deliverTimer *time.Timer // Timer for relay cell delivery timeout
+	deliverTimer   *time.Timer // Timer for relay cell delivery timeout
+	deliverTimerMu sync.Mutex
 }
 
 // Hop represents a single hop in a circuit (one relay)
@@ -115,6 +116,9 @@ func (h *Hop) SetCryptoState(forwardCipher, backwardCipher cipher.Stream, forwar
 // NewCircuit creates a new circuit with the given ID
 func NewCircuit(id uint32) *Circuit {
 	now := time.Now()
+	deliverTimer := time.NewTimer(deliverRelayCellTimeout)
+	stopAndDrainTimer(deliverTimer)
+
 	return &Circuit{
 		ID:               id,
 		State:            StateBuilding,
@@ -135,7 +139,7 @@ func NewCircuit(id uint32) *Circuit {
 		sendmeReceived:   0,                              // No DATA cells received yet
 		sendmeSent:       0,                              // No SENDME cells sent yet
 		replayProtection: cell.NewReplayProtection(),     // SECURITY-001: Initialize replay protection
-		deliverTimer:     time.NewTimer(100 * time.Millisecond), // AUDIT-MED-4 FIX: Reusable timer
+		deliverTimer:     deliverTimer,                   // AUDIT-MED-4 FIX: Reusable timer
 	}
 }
 
@@ -217,6 +221,10 @@ func (c *Circuit) Close() {
 		close(c.relayReceiveChan)
 		c.relayReceiveChan = nil
 	}
+
+	c.deliverTimerMu.Lock()
+	defer c.deliverTimerMu.Unlock()
+	stopAndDrainTimer(c.deliverTimer)
 }
 
 // Manager manages a collection of circuits
@@ -1250,7 +1258,10 @@ func (c *Circuit) DeliverRelayCell(cellData *cell.Cell) error {
 
 	// Deliver to receive channel (non-blocking with timeout)
 	// AUDIT-MED-4 FIX: Use reusable timer instead of time.After to avoid GC pressure
-	c.deliverTimer.Reset(100 * time.Millisecond)
+	c.deliverTimerMu.Lock()
+	defer c.deliverTimerMu.Unlock()
+	stopAndDrainTimer(c.deliverTimer)
+	c.deliverTimer.Reset(deliverRelayCellTimeout)
 	select {
 	case c.relayReceiveChan <- relayCell:
 		stopAndDrainTimer(c.deliverTimer)
@@ -1259,6 +1270,8 @@ func (c *Circuit) DeliverRelayCell(cellData *cell.Cell) error {
 		return fmt.Errorf("relay receive channel full or blocked")
 	}
 }
+
+const deliverRelayCellTimeout = 100 * time.Millisecond
 
 // stopAndDrainTimer stops a timer and drains its channel if it has already fired
 func stopAndDrainTimer(t *time.Timer) {

@@ -177,6 +177,11 @@ func (b *Builder) BuildCircuit(ctx context.Context, p *path.Path, timeout time.D
 // certificate for a different relay's identity.
 func (b *Builder) connectToRelay(ctx context.Context, address string, relay *directory.Relay) (*connection.Connection, error) {
 	cfg := connection.DefaultConfig(address)
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline && cfg.Timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, cfg.Timeout)
+		defer cancel()
+	}
 
 	// AUDIT-004: Enhanced certificate pinning with relay identity from consensus
 	if relay != nil {
@@ -213,7 +218,9 @@ func (b *Builder) connectToRelay(ctx context.Context, address string, relay *dir
 		}
 		return nil, ctx.Err()
 	case <-conn.Ready():
-		// Connection is now ready (StateOpen reached)
+		if !conn.IsOpen() {
+			return nil, fmt.Errorf("connection did not reach open state: %s", conn.GetState())
+		}
 	}
 
 	return conn, nil

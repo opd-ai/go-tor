@@ -61,13 +61,14 @@ type Connection struct {
 	stateMu             sync.RWMutex
 	closeCh             chan struct{}
 	closeOnce           sync.Once
+	readyOnce           sync.Once
 	sendMu              sync.Mutex
 	recvMu              sync.Mutex
 	logger              *logger.Logger
-	expectedIdentity    []byte // Expected relay Ed25519 identity key (32 bytes) - for CERTS validation
-	expectedFingerprint string // Expected relay RSA fingerprint - for CERTS validation
-	requireCERTS        bool   // If true, fail handshake on CERTS validation failure
-	readyCh             chan struct{} // AUDIT-MED-3 FIX: Channel closed when connection reaches StateOpen
+	expectedIdentity    []byte        // Expected relay Ed25519 identity key (32 bytes) - for CERTS validation
+	expectedFingerprint string        // Expected relay RSA fingerprint - for CERTS validation
+	requireCERTS        bool          // If true, fail handshake on CERTS validation failure
+	readyCh             chan struct{} // AUDIT-MED-3 FIX: Channel closed when the connection reaches a terminal state
 }
 
 // Config holds connection configuration
@@ -270,7 +271,7 @@ func New(cfg *Config, log *logger.Logger) *Connection {
 		expectedIdentity:    cfg.ExpectedIdentity,
 		expectedFingerprint: cfg.ExpectedFingerprint,
 		requireCERTS:        cfg.RequireCERTS,
-		readyCh:             make(chan struct{}), // AUDIT-MED-3 FIX: Channel for ready signaling
+		readyCh:             make(chan struct{}), // AUDIT-MED-3 FIX: Channel for readiness/terminal-state signaling
 	}
 }
 
@@ -436,12 +437,15 @@ func (c *Connection) Address() string {
 func (c *Connection) setState(state State) {
 	c.stateMu.Lock()
 	defer c.stateMu.Unlock()
-	
-	// AUDIT-MED-3 FIX: Close ready channel when transitioning to StateOpen
-	if state == StateOpen && c.state != StateOpen {
-		close(c.readyCh)
+
+	// AUDIT-MED-3 FIX: Close ready channel when reaching a terminal state so
+	// waiters are not blocked forever on failed or closed connections.
+	if state == StateOpen || state == StateClosed || state == StateFailed {
+		c.readyOnce.Do(func() {
+			close(c.readyCh)
+		})
 	}
-	
+
 	c.state = state
 }
 
@@ -510,8 +514,9 @@ func (c *Connection) RequireCERTS() bool {
 	return c.requireCERTS
 }
 
-// Ready returns a channel that is closed when the connection reaches StateOpen.
-// AUDIT-MED-3 FIX: Allows waiting for connection readiness without timing guesses.
+// Ready returns a channel that is closed when the connection reaches a terminal
+// state. Callers should check IsOpen or GetState after it closes to distinguish
+// a usable connection from a failed or closed one.
 func (c *Connection) Ready() <-chan struct{} {
 	return c.readyCh
 }
