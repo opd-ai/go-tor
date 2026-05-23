@@ -10,6 +10,47 @@ import (
 	"github.com/opd-ai/go-tor/pkg/crypto"
 )
 
+func newRecognizedRelayDeliveryCell(t *testing.T, c *Circuit, streamID uint16, data []byte) *cell.Cell {
+	t.Helper()
+
+	if len(c.Hops) == 0 || c.Hops[0].BackwardDigest == nil {
+		t.Fatal("circuit must have a hop with a backward digest")
+	}
+
+	relayCell, err := cell.NewRelayCell(streamID, cell.RelayData, data)
+	if err != nil {
+		t.Fatalf("NewRelayCell() error = %v", err)
+	}
+
+	payload, err := relayCell.Encode()
+	if err != nil {
+		t.Fatalf("Encode() error = %v", err)
+	}
+
+	hashClone, err := crypto.CloneHash(c.Hops[0].BackwardDigest)
+	if err != nil {
+		t.Fatalf("CloneHash() error = %v", err)
+	}
+
+	cellCopy := make([]byte, len(payload))
+	copy(cellCopy, payload)
+	cellCopy[5] = 0
+	cellCopy[6] = 0
+	cellCopy[7] = 0
+	cellCopy[8] = 0
+
+	if _, err := hashClone.Write(cellCopy); err != nil {
+		t.Fatalf("hash write error = %v", err)
+	}
+	copy(payload[5:9], hashClone.Sum(nil)[:4])
+
+	return &cell.Cell{
+		CircID:  c.ID,
+		Command: cell.CmdRelay,
+		Payload: payload,
+	}
+}
+
 func TestStateString(t *testing.T) {
 	tests := []struct {
 		state    State
@@ -117,6 +158,85 @@ func TestCircuitAge(t *testing.T) {
 	}
 	if age > 1*time.Second {
 		t.Errorf("Age() = %v, want < 1s", age)
+	}
+}
+
+func TestCircuitDeliverRelayCellDoesNotSpuriouslyTimeoutAfterIdle(t *testing.T) {
+	c := NewCircuit(1)
+	c.SetState(StateOpen)
+	hop := createTestHopWithDigest(t)
+	hop.BackwardCipher = nil
+	hop.ForwardCipher = nil
+	c.Hops = []*Hop{hop}
+	c.replayProtection = nil
+	c.relayReceiveChan = make(chan *cell.RelayCell)
+
+	time.Sleep(deliverRelayCellTimeout + 20*time.Millisecond)
+
+	receivedCh := make(chan *cell.RelayCell, 1)
+	go func() {
+		time.Sleep(10 * time.Millisecond)
+		select {
+		case relay := <-c.relayReceiveChan:
+			receivedCh <- relay
+		case <-time.After(200 * time.Millisecond):
+		}
+	}()
+
+	if err := c.DeliverRelayCell(newRecognizedRelayDeliveryCell(t, c, 1, []byte("first"))); err != nil {
+		t.Fatalf("DeliverRelayCell() error = %v", err)
+	}
+
+	select {
+	case relay := <-receivedCh:
+		if relay == nil {
+			t.Fatal("expected delivered relay cell")
+		}
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("timed out waiting for relay cell delivery")
+	}
+}
+
+func TestCircuitDeliverRelayCellTimeoutDrainOnReuse(t *testing.T) {
+	c := NewCircuit(1)
+	c.SetState(StateOpen)
+	hop := createTestHopWithDigest(t)
+	hop.BackwardCipher = nil
+	hop.ForwardCipher = nil
+	c.Hops = []*Hop{hop}
+	c.replayProtection = nil
+	c.relayReceiveChan = make(chan *cell.RelayCell)
+
+	start := time.Now()
+	err := c.DeliverRelayCell(newRecognizedRelayDeliveryCell(t, c, 1, []byte("timeout")))
+	if err == nil {
+		t.Fatal("expected timeout error")
+	}
+	if elapsed := time.Since(start); elapsed < deliverRelayCellTimeout {
+		t.Fatalf("timeout returned too early: %v", elapsed)
+	}
+
+	receivedCh := make(chan *cell.RelayCell, 1)
+	go func() {
+		time.Sleep(10 * time.Millisecond)
+		select {
+		case relay := <-c.relayReceiveChan:
+			receivedCh <- relay
+		case <-time.After(200 * time.Millisecond):
+		}
+	}()
+
+	if err := c.DeliverRelayCell(newRecognizedRelayDeliveryCell(t, c, 1, []byte("second"))); err != nil {
+		t.Fatalf("DeliverRelayCell() after timeout error = %v", err)
+	}
+
+	select {
+	case relay := <-receivedCh:
+		if relay == nil {
+			t.Fatal("expected delivered relay cell")
+		}
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("timed out waiting for relay cell after timer reuse")
 	}
 }
 

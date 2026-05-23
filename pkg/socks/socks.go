@@ -626,7 +626,8 @@ func (s *Server) handleConnection(ctx context.Context, conn net.Conn) {
 	strm.SetState(stream.StateConnecting)
 
 	// Open the stream on the circuit (sends RELAY_BEGIN and waits for RELAY_CONNECTED)
-	if err := circ.OpenStream(strm.ID, hostStr, port); err != nil {
+	// AUDIT-MED-2 FIX: Pass ctx to respect connection-scoped context
+	if err := circ.OpenStream(ctx, strm.ID, hostStr, port); err != nil {
 		s.logger.Error("Failed to open stream", "stream_id", strm.ID, "error", err)
 		s.sendReply(conn, replyHostUnreachable, nil)
 		return

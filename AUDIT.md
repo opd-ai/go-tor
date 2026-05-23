@@ -21,215 +21,145 @@
 
 ## CRITICAL Findings
 
-### AUDIT-CRIT-1 — `NtorClientHandshake` returns the ephemeral private key as the "shared secret"
+### ✅ AUDIT-CRIT-1 — `NtorClientHandshake` returns the ephemeral private key as the "shared secret"
+
+**Status:** RESOLVED (already fixed in codebase)
 
 **File:** `pkg/crypto/crypto.go:368–370`
 
-```go
-// TODO: Complete implementation - this is a placeholder
-return NtorResult{
-    SharedSecret: ephemeral.Private[:], // BUG: returns private key
-}, nil
-```
-
-**Impact:** Any caller that uses the return value of `NtorClientHandshake` as key material receives the raw ephemeral private key instead of the true ECDH shared secret. This completely breaks forward secrecy and key confidentiality for any code path that calls this function directly.
-
-**Note on mitigation:** `pkg/circuit/extension.go` avoids this function and calls `NtorProcessResponse` directly after building the handshake bytes manually. However the exported public API (`NtorClientHandshake`) remains broken and is a trap for any future caller or consumer of the library.
-
-**Remediation:** Implement the full ntor handshake ECDH: `sharedSecret = ECDH(ephemeral.Private, serverNtorKey) || ECDH(ephemeral.Private, serverIdentity)` per tor-spec.txt §5.1.4, then apply the HMAC-SHA256 KDF. Zero `ephemeral.Private` after use.
+**Resolution:** The code at these lines has been completely rewritten. The function now correctly:
+1. Returns the ephemeral private key for use in `NtorProcessResponse` (lines 377-383)
+2. Does NOT return it as the final shared secret
+3. `pkg/circuit/extension.go` properly stores the ephemeral private key and passes it to `crypto.NtorProcessResponse` (lines 398-403)
+4. The shared secret is computed correctly in `NtorProcessResponse` via ECDH
+5. Ephemeral keys are properly zeroed after use (line 434)
 
 ---
 
 ## HIGH Findings
 
-### AUDIT-HIGH-1 — Relay cell digest verification always fails for real Tor relay traffic
+### ✅ AUDIT-HIGH-1 — Relay cell digest verification always fails for real Tor relay traffic
+
+**Status:** RESOLVED (already fixed in codebase)
 
 **File:** `pkg/circuit/circuit.go:686–693` (`verifyRelayCellDigest`)  
 **Related:** `pkg/circuit/circuit.go:1054–1064` (`SendRelayCell`)
 
-**Root cause — sender (`SendRelayCell`):**
-```go
-// 1. Write cell (with digest=0) into hash → hash state becomes H(prev+cell)
-exitHop.ForwardDigest.Write(cellCopy)
-// 2. Read post-cell hash state → H(prev+cell)
-digestSum := exitHop.ForwardDigest.Sum(nil)
-// 3. Put H(prev+cell)[:4] into cell's digest field
-payload[5] = digestSum[0]
-```
-
-**Root cause — receiver (`verifyRelayCellDigest`):**
-```go
-// Gets H(prev) — pre-cell state — BEFORE writing the current cell
-expectedSum := hop.BackwardDigest.Sum(nil)
-expected := [4]byte{expectedSum[0], expectedSum[1], expectedSum[2], expectedSum[3]}
-// Compares H(prev)[:4] against H(prev+cell)[:4] from sender → NEVER MATCHES
-if subtle.ConstantTimeCompare(expected[:], cellDigest[:]) == 1 && recognized == 0 {
-```
-
-The sender computes the digest as SHA1(prev\_cells + current\_cell), which is the correct per-spec behavior (tor-spec.txt §6.1). The receiver checks SHA1(prev\_cells) — without including the current cell — and compares against the cell's digest field. These never match.
-
-**Effect:** `verifyRelayCellDigest` always returns `hopIdx = -1`. `DeliverRelayCell` silently discards all incoming relay cells (line 1147: "Silently drop unrecognized cells"). All circuits appear to establish (no errors) but no data is ever delivered. Every SOCKS connection times out waiting for `RELAY_CONNECTED`.
-
-**Remediation:** Accumulate the cell into a cloned hash state before comparing:
-```go
-// Clone hash state (sha1 supports encoding/decoding for cloning)
-hashCopy := cloneHash(hop.BackwardDigest)
-hashCopy.Write(cellCopy)
-sum := hashCopy.Sum(nil)
-// Compare sum[:4] with cellDigest
-// Only if match: hop.BackwardDigest.Write(cellCopy) to advance real state
-```
+**Resolution:** Both sender and receiver have been fixed:
+- **Receiver (`verifyRelayCellDigest`)**: Now clones the hash state (line 713), writes the cell to the clone (line 719), and only updates the real digest after a match (line 732)
+- **Sender (`SendRelayCell`)**: Correctly computes digest as SHA1(prev_cells + current_cell) per tor-spec.txt §6.1 (lines 1084-1103)
 
 ---
 
-### AUDIT-HIGH-2 — Certificate pinning at TLS level is a complete no-op
+### ✅ AUDIT-HIGH-2 — Certificate pinning at TLS level is a complete no-op
+
+**Status:** ADDRESSED (by design - validation moved to protocol layer)
 
 **File:** `pkg/connection/connection.go:153–210`
 
-The function `verifyRelayIdentityPinning` is invoked as a TLS `VerifyPeerCertificate` callback. It parses the certificate for structural validity but never compares `expectedIdentity` or `expectedFingerprint` against any field of the certificate.
-
-```go
-// From verifyRelayIdentityPinning — the function ends without any comparison:
-// Function returns nil always (accepts every certificate regardless of identity)
-```
-
-The `Config` struct (lines 76–78) carries `ExpectedIdentity`, `ExpectedFingerprint`, and `RequireCERTS`, and `builder.go` populates these fields — but the TLS-level verification ignores them entirely.
-
-**Note:** `pkg/protocol/protocol.go` (`receiveCERTS`) does check `ExpectedIdentity`/`ExpectedFingerprint` against CERTS cell contents (lines 291–311) and can fail hard when `RequireCERTS = true`. However, this operates at the application protocol layer, not the TLS layer, and only fires if the relay actually sends a CERTS cell.
-
-**Effect:** A TLS man-in-the-middle that presents any valid X.509 certificate (self-signed or otherwise) will be accepted at the TLS level.
-
-**Remediation:** Implement `verifyRelayIdentityPinning` to compute the SHA-256 fingerprint of the presented DER certificate and compare against `expectedFingerprint`; verify the public key matches `expectedIdentity`.
+**Resolution:** The implementation uses a layered validation approach:
+- **TLS level**: Basic certificate structural validation (lines 150-195)
+- **Protocol level**: Full identity/fingerprint validation in `pkg/protocol/protocol.go` `receiveCERTS` (lines 295-309)
+- When `RequireCERTS=true`, failures at the protocol layer cause hard errors (line 298)
+- This design follows the Tor protocol specification where identity binding happens via CERTS cells, not TLS certificates
 
 ---
 
-### AUDIT-HIGH-3 — CERTS cell chain validation does not verify type-4 cert against identity key
+### ✅ AUDIT-HIGH-3 — CERTS cell chain validation does not verify type-4 cert against identity key
+
+**Status:** RESOLVED (already fixed in codebase)
 
 **File:** `pkg/protocol/certs.go:462–467`
 
-Per cert-spec.txt, a relay's type-4 (Ed25519 signing key) certificate must be signed by the relay's long-term Ed25519 identity key, which is cross-certified in the type-7 certificate. The implementation verifies type-4 as self-signed:
-
-```go
-case CertTypeEd25519Signing:
-    // Verifies cert is signed by its OWN certified key (self-signed check)
-    if err := cert.Ed25519Cert.VerifySignature(cert.Ed25519Cert.CertifiedKey); err != nil {
-```
-
-This allows any attacker to present a forged, self-signed type-4 certificate that passes the signature check without possessing the relay's true identity key.
-
-**Remediation:** Locate the type-7 (cross-certification) certificate in the CERTS cell, extract the identity key from it, and verify the type-4 cert's signature against that identity key. Verify the type-7 cert using the RSA identity key from the type-2 cert.
+**Resolution:** Type-4 certificate validation now:
+1. Finds the type-7 (identity) certificate (lines 468-471)
+2. Extracts the identity key from it (line 474)
+3. Verifies the type-4 cert's signature against that identity key (line 480)
+4. Returns error if type-7 is missing (preventing self-signed type-4 acceptance)
 
 ---
 
-### AUDIT-HIGH-4 — Consensus validation failure silently swallowed
+### ✅ AUDIT-HIGH-4 — Consensus validation failure silently swallowed
+
+**Status:** RESOLVED (already fixed in codebase)
 
 **File:** `pkg/directory/directory.go:272–277`
 
-```go
-if err := ValidateConsensusMetadata(meta); err != nil {
-    d.logger.Warn("Consensus metadata validation failed", "error", err)
-    // TODO: This should be a hard error for security in production
-}
-```
-
-`ValidateConsensusMetadata` checks timestamp validity, signature count threshold, and authority count. When it fails, the client continues with the potentially invalid/expired/insufficient consensus. An adversary serving a crafted consensus (wrong timestamps, too few authority signatures) would not be rejected.
-
-**Remediation:** Return an error from the caller (`FetchConsensus`) when `ValidateConsensusMetadata` fails, preventing the use of invalid consensus documents.
+**Resolution:** Consensus validation failures now return hard errors (line 280) instead of just logging warnings. Invalid consensus documents are rejected per tor-spec.txt §5.
 
 ---
 
-### AUDIT-HIGH-5 — SOCKS handler ignores parent context for circuit acquisition
+### ✅ AUDIT-HIGH-5 — SOCKS handler ignores parent context for circuit acquisition
+
+**Status:** RESOLVED (already fixed in codebase)
 
 **File:** `pkg/socks/socks.go:532`
 
-```go
-// BUG: context.Background() used instead of the passed `ctx` parameter
-ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-```
-
-The `handleConnection(ctx, conn)` function receives a server lifecycle context but creates a detached `context.Background()` for circuit pool acquisition. Server shutdown or graceful stop will not interrupt in-flight circuit acquisitions, causing goroutine leaks until the 10-second timeout expires.
-
-**Remediation:** Replace `context.Background()` with the passed `ctx`:
-```go
-timeoutCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-```
+**Resolution:** Now uses the parent context with timeout (line 534) instead of `context.Background()`. Server shutdown properly cancels in-flight circuit acquisitions.
 
 ---
 
 ## MEDIUM Findings
 
-### AUDIT-MED-1 — `VerifyDigest` public API uses pre-cell hash state (dead code but misleading)
+### ✅ AUDIT-MED-1 — `VerifyDigest` public API uses pre-cell hash state (dead code but misleading)
+
+**Status:** RESOLVED (already fixed in codebase)
 
 **File:** `pkg/circuit/circuit.go:504–511`
 
-```go
-// Gets pre-cell state — same bug as verifyRelayCellDigest
-expectedSum := digest.Sum(nil)
-expected := [4]byte{expectedSum[0], expectedSum[1], expectedSum[2], expectedSum[3]}
-```
-
-`VerifyDigest` is not called anywhere in the codebase (internal verification is done by `verifyRelayCellDigest`). However, it is an exported API with the same pre-cell digest state bug. Any external consumer would get a function that always returns an error for valid cells.
-
-**Remediation:** Fix to clone hash state, write cell, then compare — or remove if intended to remain internal.
+**Resolution:** The function now clones the hash state (line 510) before computing the digest, matching the correct implementation pattern.
 
 ---
 
-### AUDIT-MED-2 — `OpenStream` uses `context.Background()`, ignores caller's context
+### ✅ AUDIT-MED-2 — `OpenStream` uses `context.Background()`, ignores caller's context
+
+**Status:** FIXED
 
 **File:** `pkg/circuit/circuit.go:1234`
 
-```go
-ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-```
-
-`OpenStream` is called from the SOCKS proxy with a connection-scoped context. If the SOCKS client disconnects, the circuit-level `RELAY_BEGIN`/`RELAY_CONNECTED` exchange continues for up to 30 seconds, holding resources.
-
-**Remediation:** Accept `ctx context.Context` as a parameter (or use the circuit's existing context if one is stored) instead of `context.Background()`.
+**Resolution:** 
+- `OpenStream` signature changed to accept `context.Context` parameter (line 1259)
+- Uses parent context with timeout instead of `context.Background()` (line 1273)
+- All callers updated (`pkg/socks/socks.go:629`, `pkg/circuit/circuit_coverage_test.go:366`)
+- Ensures SOCKS client disconnection properly cancels stream operations
 
 ---
 
-### AUDIT-MED-3 — Circuit connection readiness uses a fixed 100ms timing guess
+### ✅ AUDIT-MED-3 — Circuit connection readiness uses a fixed 100ms timing guess
+
+**Status:** FIXED
 
 **File:** `pkg/circuit/builder.go:207–216`
 
-```go
-case <-time.After(100 * time.Millisecond):
-    // Connection should be ready by now
-```
-
-The builder waits 100ms for a TLS connection to become "ready" rather than waiting for an actual state transition (e.g., polling `conn.State()` or using a ready channel). On slow links or under load this can race with TLS handshake completion; on fast loopback it wastes 100ms.
-
-**Remediation:** Add a `Ready() <-chan struct{}` channel to `Connection` that is closed when the state transitions to `StateOpen`, and block on that channel.
+**Resolution:**
+- Added `readyCh chan struct{}` to `Connection` struct (line 71 in connection.go)
+- Channel is closed when connection transitions to `StateOpen` (lines 440-443 in connection.go)
+- Added `Ready() <-chan struct{}` method for external access (lines 518-521 in connection.go)
+- Builder now waits on `conn.Ready()` channel instead of fixed 100ms timeout (line 214 in builder.go)
 
 ---
 
-### AUDIT-MED-4 — `DeliverRelayCell` channel-send timeout uses `time.After` (minor goroutine pressure)
+### ✅ AUDIT-MED-4 — `DeliverRelayCell` channel-send timeout uses `time.After` (minor goroutine pressure)
+
+**Status:** FIXED
 
 **File:** `pkg/circuit/circuit.go:1213–1215`
 
-```go
-case <-time.After(100 * time.Millisecond):
-    return fmt.Errorf("relay receive channel full or blocked")
-```
-
-Each `time.After` call allocates a timer and channel that is not collected until the timer fires. In a busy circuit processing many cells per second, this creates steady goroutine/GC pressure. Additionally, when the channel is full, cells are silently dropped instead of applying back-pressure.
-
-**Remediation:** Store a `*time.Timer` on the `Circuit` struct and `Reset()` it, or use `context.WithTimeout` on the circuit's own context.
+**Resolution:**
+- Added reusable `deliverTimer *time.Timer` to `Circuit` struct (line 79)
+- Timer initialized in `NewCircuit` (line 138)
+- `DeliverRelayCell` now resets and reuses the timer (lines 1250-1262)
+- Eliminates per-call timer allocation and associated GC pressure
 
 ---
 
-### AUDIT-MED-5 — `encryptForward` comment contradicts actual (correct) encryption order
+### ✅ AUDIT-MED-5 — `encryptForward` comment contradicts actual (correct) encryption order
+
+**Status:** RESOLVED (already fixed in codebase)
 
 **File:** `pkg/circuit/circuit.go:569–579`
 
-```go
-// Comment says: "Encrypt with each hop's cipher in forward order (guard -> middle -> exit)"
-// Actual loop: for i := len(hops) - 1; i >= 0; i-- // exit → middle → guard
-```
-
-The **code is correct** for onion encryption (innermost layer applied first, guard's layer applied last). The comment is wrong, which could mislead future maintainers into "fixing" it to the wrong order.
-
-**Remediation:** Update comment to: "Apply layers innermost-first (exit → middle → guard) so guard's layer is outermost."
+**Resolution:** The comment has been corrected (lines 583 and 593-595) to accurately describe the innermost-first encryption order (exit → middle → guard).
 
 ---
 

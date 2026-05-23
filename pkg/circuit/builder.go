@@ -177,6 +177,13 @@ func (b *Builder) BuildCircuit(ctx context.Context, p *path.Path, timeout time.D
 // certificate for a different relay's identity.
 func (b *Builder) connectToRelay(ctx context.Context, address string, relay *directory.Relay) (*connection.Connection, error) {
 	cfg := connection.DefaultConfig(address)
+	// Apply the connection timeout when callers pass a context without a deadline
+	// so connect and handshake waits stay bounded even outside BuildCircuit.
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline && cfg.Timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, cfg.Timeout)
+		defer cancel()
+	}
 
 	// AUDIT-004: Enhanced certificate pinning with relay identity from consensus
 	if relay != nil {
@@ -204,15 +211,18 @@ func (b *Builder) connectToRelay(ctx context.Context, address string, relay *dir
 		return nil, fmt.Errorf("failed to connect: %w", err)
 	}
 
-	// Wait for connection to be ready
+	// AUDIT-MED-3 FIX: Wait for connection to be ready using Ready() channel
+	// instead of a fixed 100ms timeout
 	select {
 	case <-ctx.Done():
 		if err := conn.Close(); err != nil {
 			b.logger.Error("Failed to close connection on context cancellation", "function", "connectToRelay", "error", err)
 		}
 		return nil, ctx.Err()
-	case <-time.After(100 * time.Millisecond):
-		// Connection established
+	case <-conn.Ready():
+		if !conn.IsOpen() {
+			return nil, fmt.Errorf("connection did not reach open state: %s", conn.GetState())
+		}
 	}
 
 	return conn, nil

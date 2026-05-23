@@ -74,6 +74,9 @@ type Circuit struct {
 	sendmeSent     int // Count of SENDME cells sent
 	// SECURITY-001: Replay protection per tor-spec.txt
 	replayProtection *cell.ReplayProtection // Replay protection for cells
+	// AUDIT-MED-4 FIX: Reusable timer to avoid GC pressure from time.After
+	deliverTimer   *time.Timer // Timer for relay cell delivery timeout
+	deliverTimerMu sync.Mutex
 }
 
 // Hop represents a single hop in a circuit (one relay)
@@ -113,6 +116,9 @@ func (h *Hop) SetCryptoState(forwardCipher, backwardCipher cipher.Stream, forwar
 // NewCircuit creates a new circuit with the given ID
 func NewCircuit(id uint32) *Circuit {
 	now := time.Now()
+	deliverTimer := time.NewTimer(deliverRelayCellTimeout)
+	stopAndDrainTimer(deliverTimer)
+
 	return &Circuit{
 		ID:               id,
 		State:            StateBuilding,
@@ -133,6 +139,7 @@ func NewCircuit(id uint32) *Circuit {
 		sendmeReceived:   0,                              // No DATA cells received yet
 		sendmeSent:       0,                              // No SENDME cells sent yet
 		replayProtection: cell.NewReplayProtection(),     // SECURITY-001: Initialize replay protection
+		deliverTimer:     deliverTimer,                   // AUDIT-MED-4 FIX: Reusable timer
 	}
 }
 
@@ -214,6 +221,10 @@ func (c *Circuit) Close() {
 		close(c.relayReceiveChan)
 		c.relayReceiveChan = nil
 	}
+
+	c.deliverTimerMu.Lock()
+	defer c.deliverTimerMu.Unlock()
+	stopAndDrainTimer(c.deliverTimer)
 }
 
 // Manager manages a collection of circuits
@@ -1246,17 +1257,40 @@ func (c *Circuit) DeliverRelayCell(cellData *cell.Cell) error {
 	c.RecordActivity()
 
 	// Deliver to receive channel (non-blocking with timeout)
+	// AUDIT-MED-4 FIX: Use reusable timer instead of time.After to avoid GC pressure
+	c.deliverTimerMu.Lock()
+	defer c.deliverTimerMu.Unlock()
+	stopAndDrainTimer(c.deliverTimer)
+	c.deliverTimer.Reset(deliverRelayCellTimeout)
 	select {
 	case c.relayReceiveChan <- relayCell:
+		stopAndDrainTimer(c.deliverTimer)
 		return nil
-	case <-time.After(100 * time.Millisecond):
+	case <-c.deliverTimer.C:
 		return fmt.Errorf("relay receive channel full or blocked")
+	}
+}
+
+const deliverRelayCellTimeout = 100 * time.Millisecond
+
+// stopAndDrainTimer stops a timer and drains its channel if it has already
+// fired. When Stop returns false, the timer has either expired or is in the
+// process of delivering on C, so draining prevents a stale signal from causing
+// the next Reset to time out immediately.
+func stopAndDrainTimer(t *time.Timer) {
+	if !t.Stop() {
+		// Timer already fired, drain the channel
+		select {
+		case <-t.C:
+		default:
+		}
 	}
 }
 
 // OpenStream opens a new stream on this circuit
 // This is a convenience method that integrates with the stream manager
-func (c *Circuit) OpenStream(streamID uint16, target string, port uint16) error {
+// AUDIT-MED-2 FIX: Now accepts context parameter to respect caller's cancellation
+func (c *Circuit) OpenStream(ctx context.Context, streamID uint16, target string, port uint16) error {
 	// Send RELAY_BEGIN cell
 	beginPayload := []byte(fmt.Sprintf("%s:%d\x00", target, port))
 	beginCell, err := cell.NewRelayCell(streamID, cell.RelayBegin, beginPayload)
@@ -1268,11 +1302,11 @@ func (c *Circuit) OpenStream(streamID uint16, target string, port uint16) error 
 		return fmt.Errorf("failed to send RELAY_BEGIN: %w", err)
 	}
 
-	// Wait for RELAY_CONNECTED response
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	// Wait for RELAY_CONNECTED response with caller's context and 30s timeout
+	timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	connectedCell, err := c.ReceiveRelayCell(ctx)
+	connectedCell, err := c.ReceiveRelayCell(timeoutCtx)
 	if err != nil {
 		return fmt.Errorf("failed to receive RELAY_CONNECTED: %w", err)
 	}

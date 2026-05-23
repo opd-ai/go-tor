@@ -133,6 +133,59 @@ func TestConnectionAddress(t *testing.T) {
 	}
 }
 
+func TestConnectionReady(t *testing.T) {
+	t.Run("stays open for non-terminal states", func(t *testing.T) {
+		conn := New(DefaultConfig("127.0.0.1:9001"), logger.NewDefault())
+
+		select {
+		case <-conn.Ready():
+			t.Fatal("Ready() closed too early")
+		default:
+		}
+
+		conn.setState(StateHandshaking)
+
+		select {
+		case <-conn.Ready():
+			t.Fatal("Ready() closed during handshaking")
+		default:
+		}
+	})
+
+	t.Run("closes when connection opens", func(t *testing.T) {
+		conn := New(DefaultConfig("127.0.0.1:9001"), logger.NewDefault())
+		conn.setState(StateOpen)
+
+		select {
+		case <-conn.Ready():
+		default:
+			t.Fatal("Ready() should close when connection opens")
+		}
+	})
+
+	t.Run("closes when connection fails", func(t *testing.T) {
+		conn := New(DefaultConfig("127.0.0.1:9001"), logger.NewDefault())
+		conn.setState(StateFailed)
+
+		select {
+		case <-conn.Ready():
+		default:
+			t.Fatal("Ready() should close when connection fails")
+		}
+	})
+
+	t.Run("closes when connection closes before opening", func(t *testing.T) {
+		conn := New(DefaultConfig("127.0.0.1:9001"), logger.NewDefault())
+		conn.setState(StateClosed)
+
+		select {
+		case <-conn.Ready():
+		default:
+			t.Fatal("Ready() should close when connection closes")
+		}
+	})
+}
+
 func TestConnectionClose(t *testing.T) {
 	cfg := DefaultConfig("127.0.0.1:9001")
 	conn := New(cfg, logger.NewDefault())
