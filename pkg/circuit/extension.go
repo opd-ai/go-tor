@@ -7,6 +7,8 @@ import (
 	"crypto/sha1" // #nosec G505 - SHA-1 required by Tor protocol (tor-spec.txt §6.1)
 	"encoding/binary"
 	"fmt"
+	"net"
+	"strconv"
 	"time"
 
 	"github.com/opd-ai/go-tor/pkg/cell"
@@ -126,6 +128,9 @@ func (e *Extension) ExtendCircuit(ctx context.Context, target string, handshakeT
 	// Build EXTEND2 relay cell
 	// EXTEND2 format: NSPEC [LSPECS] HTYPE HLEN HDATA
 	extend2Data := e.buildExtend2Data(target, handshakeType, handshakeData)
+	if extend2Data == nil {
+		return fmt.Errorf("failed to build EXTEND2 data for target: %s", target)
+	}
 
 	// Create RELAY_EXTEND2 cell
 	relayCell := &cell.RelayCell{
@@ -242,20 +247,57 @@ func (e *Extension) buildExtend2Data(target string, handshakeType HandshakeType,
 	// HLEN (2 bytes) - handshake data length
 	// HDATA (variable) - handshake data
 
-	// For simplicity, we'll use a minimal implementation
-	// In production, this would parse the target and create proper link specifiers
-
 	data := make([]byte, 0, 256)
 
-	// NSPEC: 1 link specifier (simplified)
+	// Parse target address to extract IP and port
+	host, portStr, err := net.SplitHostPort(target)
+	if err != nil {
+		// If parsing fails, return error-safe nil
+		// This prevents sending invalid loopback addresses to relays
+		e.logger.Error("Failed to parse target address", "target", target, "error", err)
+		return nil
+	}
+
+	port, err := strconv.Atoi(portStr)
+	if err != nil || port < 0 || port > 65535 {
+		e.logger.Error("Invalid port in target address", "target", target, "port", portStr)
+		return nil
+	}
+
+	// Parse IP address
+	ip := net.ParseIP(host)
+	if ip == nil {
+		// If it's not an IP, it might be a hostname
+		// For now, we return nil and require IP addresses
+		// A future enhancement could add hostname link specifiers (type 3)
+		e.logger.Error("Target must be an IP address, not a hostname", "target", target, "host", host)
+		return nil
+	}
+
+	// NSPEC: 1 link specifier
 	data = append(data, 1)
 
-	// Link specifier type 0 (TLS-over-TCP, IPv4) - simplified
-	// Type (1 byte) | Length (1 byte) | IPv4 (4 bytes) | Port (2 bytes)
-	data = append(data, 0)            // Type
-	data = append(data, 6)            // Length
-	data = append(data, 127, 0, 0, 1) // IPv4 (placeholder)
-	data = append(data, 0, 0)         // Port (placeholder)
+	// Determine if IPv4 or IPv6 and build appropriate link specifier
+	ipv4 := ip.To4()
+	if ipv4 != nil {
+		// Link specifier type 0 (TLS-over-TCP, IPv4)
+		// Type (1 byte) | Length (1 byte) | IPv4 (4 bytes) | Port (2 bytes)
+		data = append(data, 0) // Type: IPv4
+		data = append(data, 6) // Length: 4 (IPv4) + 2 (port)
+		data = append(data, ipv4...)
+		portBytes := make([]byte, 2)
+		binary.BigEndian.PutUint16(portBytes, uint16(port))
+		data = append(data, portBytes...)
+	} else {
+		// Link specifier type 1 (TLS-over-TCP, IPv6)
+		// Type (1 byte) | Length (1 byte) | IPv6 (16 bytes) | Port (2 bytes)
+		data = append(data, 1)  // Type: IPv6
+		data = append(data, 18) // Length: 16 (IPv6) + 2 (port)
+		data = append(data, ip.To16()...)
+		portBytes := make([]byte, 2)
+		binary.BigEndian.PutUint16(portBytes, uint16(port))
+		data = append(data, portBytes...)
+	}
 
 	// HTYPE
 	htypeBytes := make([]byte, 2)
@@ -267,6 +309,7 @@ func (e *Extension) buildExtend2Data(target string, handshakeType HandshakeType,
 	if err != nil {
 		// This should never happen as handshake data is typically small
 		// But handle it gracefully
+		e.logger.Error("Handshake data too large", "length", len(handshakeData))
 		return nil
 	}
 	hlenBytes := make([]byte, 2)

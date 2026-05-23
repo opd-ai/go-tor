@@ -173,7 +173,7 @@ func TestExtendCircuit(t *testing.T) {
 	handshakeData := make([]byte, 84)
 	rand.Read(handshakeData)
 
-	extend2Data := ext.buildExtend2Data("relay.example.com:9001", HandshakeTypeNTor, handshakeData)
+	extend2Data := ext.buildExtend2Data("192.0.2.1:9001", HandshakeTypeNTor, handshakeData)
 
 	if len(extend2Data) < 20 {
 		t.Errorf("EXTEND2 data too short: %d bytes", len(extend2Data))
@@ -230,7 +230,7 @@ func TestBuildExtend2Data(t *testing.T) {
 	ext := NewExtension(circuit, log)
 
 	handshakeData := make([]byte, 32)
-	data := ext.buildExtend2Data("relay.example.com:9001", HandshakeTypeNTor, handshakeData)
+	data := ext.buildExtend2Data("192.0.2.1:9001", HandshakeTypeNTor, handshakeData)
 
 	if len(data) == 0 {
 		t.Error("Expected non-empty EXTEND2 data")
