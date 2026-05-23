@@ -183,8 +183,6 @@ func TestConnectionReady(t *testing.T) {
 		default:
 			t.Fatal("Ready() should close when connection closes")
 		}
-
-		conn.setState(StateOpen)
 	})
 }
 

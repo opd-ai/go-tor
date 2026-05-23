@@ -1273,7 +1273,10 @@ func (c *Circuit) DeliverRelayCell(cellData *cell.Cell) error {
 
 const deliverRelayCellTimeout = 100 * time.Millisecond
 
-// stopAndDrainTimer stops a timer and drains its channel if it has already fired
+// stopAndDrainTimer stops a timer and drains its channel if it has already
+// fired. When Stop returns false, the timer has either expired or is in the
+// process of delivering on C, so draining prevents a stale signal from causing
+// the next Reset to time out immediately.
 func stopAndDrainTimer(t *time.Timer) {
 	if !t.Stop() {
 		// Timer already fired, drain the channel

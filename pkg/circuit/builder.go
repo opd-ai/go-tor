@@ -177,6 +177,8 @@ func (b *Builder) BuildCircuit(ctx context.Context, p *path.Path, timeout time.D
 // certificate for a different relay's identity.
 func (b *Builder) connectToRelay(ctx context.Context, address string, relay *directory.Relay) (*connection.Connection, error) {
 	cfg := connection.DefaultConfig(address)
+	// Apply the connection timeout when callers pass a context without a deadline
+	// so connect and handshake waits stay bounded even outside BuildCircuit.
 	if _, hasDeadline := ctx.Deadline(); !hasDeadline && cfg.Timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, cfg.Timeout)
