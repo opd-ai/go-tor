@@ -77,10 +77,15 @@ func (h *Handshake) PerformHandshake(ctx context.Context) error {
 		return fmt.Errorf("failed to receive VERSIONS: %w", err)
 	}
 
-	// Receive CERTS cell (optional but recommended)
+	// Receive CERTS cell (mandatory for link protocol v3+, per tor-spec.txt §4.2)
 	if err := h.receiveCERTS(ctx); err != nil {
-		// Log warning but don't fail - CERTS authentication is optional for now
-		h.logger.Warn("CERTS cell handling failed", "error", err)
+		// For link protocol v3+, CERTS exchange is mandatory
+		// Also fail if RequireCERTS flag is explicitly set
+		if h.negotiatedVersion >= 3 || h.conn.RequireCERTS() {
+			return fmt.Errorf("CERTS cell handling failed (protocol v%d requires CERTS): %w", h.negotiatedVersion, err)
+		}
+		// For older protocols or non-strict mode, just log a warning
+		h.logger.Warn("CERTS cell handling failed", "error", err, "protocol_version", h.negotiatedVersion)
 	}
 
 	// Send NETINFO cell
