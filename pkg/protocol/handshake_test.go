@@ -69,7 +69,11 @@ func (m *mockTLSRelay) serveHandshake() {
 			if err != nil {
 				return
 			}
-			go m.handleHandshake(conn)
+			if m.handleCellsFn != nil {
+				go m.handleCellsFn(conn)
+			} else {
+				go m.handleHandshake(conn)
+			}
 		}
 	}()
 }
@@ -167,6 +171,94 @@ func (m *mockTLSRelay) handleHandshake(conn net.Conn) {
 	}
 }
 
+// handleHandshakePaddingBeforeCERTS handles handshake while injecting PADDING before CERTS.
+func (m *mockTLSRelay) handleHandshakePaddingBeforeCERTS(conn net.Conn) {
+	defer conn.Close()
+
+	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+
+	versionsCell, err := cell.DecodeCell(conn)
+	if err != nil {
+		m.logger.Debug("Failed to decode VERSIONS cell", "error", err)
+		return
+	}
+	if versionsCell.Command != cell.CmdVersions {
+		m.logger.Debug("Expected VERSIONS command", "got", versionsCell.Command)
+		return
+	}
+
+	responseCell := cell.NewCell(0, cell.CmdVersions)
+	responseCell.Payload = []byte{0x00, 0x04}
+	var encBuf bytes.Buffer
+	if err := responseCell.Encode(&encBuf); err != nil {
+		m.logger.Debug("Failed to encode VERSIONS response", "error", err)
+		return
+	}
+	if _, err := conn.Write(encBuf.Bytes()); err != nil {
+		m.logger.Debug("Failed to write VERSIONS response", "error", err)
+		return
+	}
+
+	paddingCell := cell.NewCell(0, cell.CmdPadding)
+	var paddingBuf bytes.Buffer
+	if err := paddingCell.Encode(&paddingBuf); err != nil {
+		m.logger.Debug("Failed to encode PADDING response", "error", err)
+		return
+	}
+	if _, err := conn.Write(paddingBuf.Bytes()); err != nil {
+		m.logger.Debug("Failed to write PADDING response", "error", err)
+		return
+	}
+
+	certsCell := cell.NewCell(0, cell.CmdCerts)
+	certsCell.Payload = []byte{0}
+	var certsBuf bytes.Buffer
+	if err := certsCell.Encode(&certsBuf); err != nil {
+		m.logger.Debug("Failed to encode CERTS response", "error", err)
+		return
+	}
+	if _, err := conn.Write(certsBuf.Bytes()); err != nil {
+		m.logger.Debug("Failed to write CERTS response", "error", err)
+		return
+	}
+
+	netinfoCell, err := cell.DecodeCell(conn)
+	if err != nil {
+		m.logger.Debug("Failed to decode NETINFO cell", "error", err)
+		return
+	}
+	if netinfoCell.Command != cell.CmdNetinfo {
+		m.logger.Debug("Expected NETINFO command", "got", netinfoCell.Command)
+		return
+	}
+
+	netinfoResponse := cell.NewCell(0, cell.CmdNetinfo)
+	payload := make([]byte, 11)
+	now := uint32(time.Now().Unix())
+	payload[0] = byte(now >> 24)
+	payload[1] = byte(now >> 16)
+	payload[2] = byte(now >> 8)
+	payload[3] = byte(now)
+	payload[4] = 0x04
+	payload[5] = 4
+	payload[6] = 0
+	payload[7] = 0
+	payload[8] = 0
+	payload[9] = 0
+	payload[10] = 0
+	netinfoResponse.Payload = payload
+
+	var netBuf bytes.Buffer
+	if err := netinfoResponse.Encode(&netBuf); err != nil {
+		m.logger.Debug("Failed to encode NETINFO response", "error", err)
+		return
+	}
+	if _, err := conn.Write(netBuf.Bytes()); err != nil {
+		m.logger.Debug("Failed to write NETINFO response", "error", err)
+		return
+	}
+}
+
 // close closes the mock relay
 func (m *mockTLSRelay) close() {
 	m.listener.Close()
@@ -225,6 +317,45 @@ func TestPerformHandshakeSuccess(t *testing.T) {
 	// Verify negotiated version
 	if v := h.NegotiatedVersion(); v != 4 {
 		t.Errorf("NegotiatedVersion() = %d, want 4", v)
+	}
+}
+
+func TestPerformHandshakePaddingBeforeCERTS(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping TLS handshake test in short mode")
+	}
+
+	relay, addr, err := newMockTLSRelay(t)
+	if err != nil {
+		t.Fatalf("Failed to create mock TLS relay: %v", err)
+	}
+	defer relay.close()
+
+	relay.handleCellsFn = relay.handleHandshakePaddingBeforeCERTS
+	relay.serveHandshake()
+	time.Sleep(50 * time.Millisecond)
+
+	cfg := connection.DefaultConfig(addr)
+	cfg.Timeout = 5 * time.Second
+	cfg.TLSConfig = &tls.Config{
+		InsecureSkipVerify: true,
+		MinVersion:         tls.VersionTLS12,
+	}
+
+	log := logger.NewDefault()
+	torConn := connection.New(cfg, log)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := torConn.Connect(ctx, cfg); err != nil {
+		t.Fatalf("Failed to connect to mock relay: %v", err)
+	}
+	defer torConn.Close()
+
+	h := NewHandshake(torConn, log)
+	if err := h.PerformHandshake(ctx); err != nil {
+		t.Fatalf("PerformHandshake with PADDING before CERTS failed: %v", err)
 	}
 }
 

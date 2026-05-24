@@ -77,10 +77,15 @@ func (h *Handshake) PerformHandshake(ctx context.Context) error {
 		return fmt.Errorf("failed to receive VERSIONS: %w", err)
 	}
 
-	// Receive CERTS cell (optional but recommended)
+	// Receive CERTS cell (mandatory for link protocol v3+, per tor-spec.txt §4.2)
 	if err := h.receiveCERTS(ctx); err != nil {
-		// Log warning but don't fail - CERTS authentication is optional for now
-		h.logger.Warn("CERTS cell handling failed", "error", err)
+		// For link protocol v3+, CERTS exchange is mandatory
+		// Also fail if RequireCERTS flag is explicitly set
+		if h.negotiatedVersion >= 3 || h.conn.RequireCERTS() {
+			return fmt.Errorf("CERTS cell handling failed (protocol v%d requires CERTS): %w", h.negotiatedVersion, err)
+		}
+		// For older protocols or non-strict mode, just log a warning
+		h.logger.Warn("CERTS cell handling failed", "error", err, "protocol_version", h.negotiatedVersion)
 	}
 
 	// Send NETINFO cell
@@ -246,18 +251,29 @@ func (h *Handshake) receiveCERTS(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, h.timeout)
 	defer cancel()
 
-	// Use context-aware receive to prevent goroutine leak on timeout
-	receivedCell, err := h.conn.ReceiveCellWithContext(ctx)
-	if err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return fmt.Errorf("timeout waiting for CERTS response")
+	var (
+		receivedCell *cell.Cell
+		err          error
+	)
+	for {
+		// Use context-aware receive to prevent goroutine leak on timeout
+		receivedCell, err = h.conn.ReceiveCellWithContext(ctx)
+		if err != nil {
+			if ctx.Err() == context.DeadlineExceeded {
+				return fmt.Errorf("timeout waiting for CERTS response")
+			}
+			return err
 		}
-		return err
+
+		if receivedCell.Command == cell.CmdPadding {
+			h.logger.Debug("Skipping PADDING cell while waiting for CERTS")
+			continue
+		}
+		break
 	}
 
 	if receivedCell.Command != cell.CmdCerts {
-		h.logger.Debug("Received non-CERTS cell, skipping CERTS validation", "command", receivedCell.Command)
-		return nil
+		return fmt.Errorf("expected CERTS cell, got %s", receivedCell.Command)
 	}
 
 	h.logger.Debug("Received CERTS cell")

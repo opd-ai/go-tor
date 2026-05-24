@@ -44,7 +44,10 @@ func TestEXTEND2CellFormat(t *testing.T) {
 			rand.Read(handshakeData)
 
 			// Build EXTEND2 data
-			extend2Data := ext.buildExtend2Data("127.0.0.1:9001", tt.handshakeType, handshakeData)
+			extend2Data, err := ext.buildExtend2Data("127.0.0.1:9001", tt.handshakeType, handshakeData)
+			if err != nil {
+				t.Fatalf("buildExtend2Data() error = %v", err)
+			}
 
 			if len(extend2Data) == 0 {
 				t.Fatal("EXTEND2 data should not be empty")
@@ -110,7 +113,10 @@ func TestEXTEND2LinkSpecifiers(t *testing.T) {
 	handshakeData := make([]byte, 84)
 	rand.Read(handshakeData)
 
-	extend2Data := ext.buildExtend2Data("127.0.0.1:9001", HandshakeTypeNTor, handshakeData)
+	extend2Data, err := ext.buildExtend2Data("127.0.0.1:9001", HandshakeTypeNTor, handshakeData)
+	if err != nil {
+		t.Fatalf("buildExtend2Data() error = %v", err)
+	}
 
 	// Parse NSPEC
 	if len(extend2Data) < 1 {

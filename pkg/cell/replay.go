@@ -29,12 +29,12 @@ type ReplayProtection struct {
 	// Forward direction (client -> exit)
 	forwardSeq     uint64              // Next expected sequence number
 	forwardWindow  map[uint64]struct{} // Seen sequence numbers in window
-	forwardDigests map[[16]byte]uint64 // Cell digest -> sequence number
+	forwardDigests map[[32]byte]uint64 // Cell digest -> sequence number (full SHA-256, ~2^128 birthday-bound collision resistance)
 
 	// Backward direction (exit -> client)
 	backwardSeq     uint64
 	backwardWindow  map[uint64]struct{}
-	backwardDigests map[[16]byte]uint64
+	backwardDigests map[[32]byte]uint64 // Full SHA-256 digest (~2^128 birthday-bound collision resistance)
 
 	// Configuration
 	windowSize uint64 // Sliding window size
@@ -70,10 +70,10 @@ func NewReplayProtectionWithWindow(windowSize uint64) *ReplayProtection {
 	return &ReplayProtection{
 		forwardSeq:      0,
 		forwardWindow:   make(map[uint64]struct{}),
-		forwardDigests:  make(map[[16]byte]uint64),
+		forwardDigests:  make(map[[32]byte]uint64),
 		backwardSeq:     0,
 		backwardWindow:  make(map[uint64]struct{}),
-		backwardDigests: make(map[[16]byte]uint64),
+		backwardDigests: make(map[[32]byte]uint64),
 		windowSize:      windowSize,
 	}
 }
@@ -82,7 +82,7 @@ func NewReplayProtectionWithWindow(windowSize uint64) *ReplayProtection {
 // Returns an error if the cell appears to be replayed.
 //
 // The function:
-// 1. Computes a truncated SHA-256 digest of the cell data
+// 1. Computes the full SHA-256 digest of the cell data
 // 2. Checks if we've seen this exact digest before
 // 3. Validates the sequence number is within acceptable window
 // 4. Records the cell for future replay detection
@@ -94,10 +94,8 @@ func (r *ReplayProtection) ValidateAndTrack(direction ReplayDirection, seqNum ui
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	// Compute truncated digest (first 16 bytes of SHA-256)
-	fullDigest := sha256.Sum256(cellData)
-	var digest [16]byte
-	copy(digest[:], fullDigest[:16])
+	// Compute full SHA-256 digest (32 bytes for 2^128 collision resistance)
+	digest := sha256.Sum256(cellData)
 
 	if direction == ReplayForward {
 		return r.validateForward(seqNum, digest)
@@ -106,7 +104,7 @@ func (r *ReplayProtection) ValidateAndTrack(direction ReplayDirection, seqNum ui
 }
 
 // validateForward validates and tracks a forward direction cell.
-func (r *ReplayProtection) validateForward(seqNum uint64, digest [16]byte) error {
+func (r *ReplayProtection) validateForward(seqNum uint64, digest [32]byte) error {
 	// Check for duplicate digest
 	if prevSeq, exists := r.forwardDigests[digest]; exists {
 		r.replayAttemptsForward++
@@ -140,7 +138,7 @@ func (r *ReplayProtection) validateForward(seqNum uint64, digest [16]byte) error
 }
 
 // validateBackward validates and tracks a backward direction cell.
-func (r *ReplayProtection) validateBackward(seqNum uint64, digest [16]byte) error {
+func (r *ReplayProtection) validateBackward(seqNum uint64, digest [32]byte) error {
 	// Check for duplicate digest
 	if prevSeq, exists := r.backwardDigests[digest]; exists {
 		r.replayAttemptsBackward++
@@ -197,7 +195,7 @@ func (r *ReplayProtection) validateSequence(seqNum, expectedSeq uint64, window m
 // cleanupWindow removes old entries outside the sliding window.
 func (r *ReplayProtection) cleanupWindow(direction ReplayDirection) {
 	var window map[uint64]struct{}
-	var digests map[[16]byte]uint64
+	var digests map[[32]byte]uint64
 	var expectedSeq uint64
 
 	if direction == ReplayForward {
@@ -272,11 +270,11 @@ func (r *ReplayProtection) Reset() {
 
 	r.forwardSeq = 0
 	r.forwardWindow = make(map[uint64]struct{})
-	r.forwardDigests = make(map[[16]byte]uint64)
+	r.forwardDigests = make(map[[32]byte]uint64)
 
 	r.backwardSeq = 0
 	r.backwardWindow = make(map[uint64]struct{})
-	r.backwardDigests = make(map[[16]byte]uint64)
+	r.backwardDigests = make(map[[32]byte]uint64)
 
 	// Keep statistics for debugging purposes
 }
@@ -312,10 +310,8 @@ func (r *ReplayProtection) ValidateAndTrackAuto(direction ReplayDirection, cellD
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	// Compute truncated digest (first 16 bytes of SHA-256)
-	fullDigest := sha256.Sum256(cellData)
-	var digest [16]byte
-	copy(digest[:], fullDigest[:16])
+	// Compute full SHA-256 digest (32 bytes for 2^128 collision resistance)
+	digest := sha256.Sum256(cellData)
 
 	// Get next sequence number atomically with validation
 	var seqNum uint64
@@ -339,7 +335,7 @@ func (r *ReplayProtection) ValidateAndTrackAuto(direction ReplayDirection, cellD
 }
 
 // validateForwardLocked validates and tracks a forward cell (must hold lock).
-func (r *ReplayProtection) validateForwardLocked(seqNum uint64, digest [16]byte) error {
+func (r *ReplayProtection) validateForwardLocked(seqNum uint64, digest [32]byte) error {
 	// Check for duplicate digest
 	if prevSeq, exists := r.forwardDigests[digest]; exists {
 		r.replayAttemptsForward++
@@ -368,7 +364,7 @@ func (r *ReplayProtection) validateForwardLocked(seqNum uint64, digest [16]byte)
 }
 
 // validateBackwardLocked validates and tracks a backward cell (must hold lock).
-func (r *ReplayProtection) validateBackwardLocked(seqNum uint64, digest [16]byte) error {
+func (r *ReplayProtection) validateBackwardLocked(seqNum uint64, digest [32]byte) error {
 	// Check for duplicate digest
 	if prevSeq, exists := r.backwardDigests[digest]; exists {
 		r.replayAttemptsBackward++

@@ -7,6 +7,8 @@ import (
 	"crypto/sha1" // #nosec G505 - SHA-1 required by Tor protocol (tor-spec.txt §6.1)
 	"encoding/binary"
 	"fmt"
+	"net"
+	"strconv"
 	"time"
 
 	"github.com/opd-ai/go-tor/pkg/cell"
@@ -125,7 +127,10 @@ func (e *Extension) ExtendCircuit(ctx context.Context, target string, handshakeT
 
 	// Build EXTEND2 relay cell
 	// EXTEND2 format: NSPEC [LSPECS] HTYPE HLEN HDATA
-	extend2Data := e.buildExtend2Data(target, handshakeType, handshakeData)
+	extend2Data, err := e.buildExtend2Data(target, handshakeType, handshakeData)
+	if err != nil {
+		return fmt.Errorf("failed to build EXTEND2 data for target %q: %w", target, err)
+	}
 
 	// Create RELAY_EXTEND2 cell
 	relayCell := &cell.RelayCell{
@@ -234,7 +239,7 @@ func (e *Extension) generateHandshakeData(handshakeType HandshakeType) ([]byte, 
 }
 
 // buildExtend2Data builds the EXTEND2 relay cell data
-func (e *Extension) buildExtend2Data(target string, handshakeType HandshakeType, handshakeData []byte) []byte {
+func (e *Extension) buildExtend2Data(target string, handshakeType HandshakeType, handshakeData []byte) ([]byte, error) {
 	// EXTEND2 format (simplified):
 	// NSPEC (1 byte) - number of link specifiers
 	// Link specifiers (variable)
@@ -242,20 +247,49 @@ func (e *Extension) buildExtend2Data(target string, handshakeType HandshakeType,
 	// HLEN (2 bytes) - handshake data length
 	// HDATA (variable) - handshake data
 
-	// For simplicity, we'll use a minimal implementation
-	// In production, this would parse the target and create proper link specifiers
-
 	data := make([]byte, 0, 256)
 
-	// NSPEC: 1 link specifier (simplified)
+	// Parse target address to extract IP and port
+	host, portStr, err := net.SplitHostPort(target)
+	if err != nil {
+		return nil, fmt.Errorf("invalid target address: %w", err)
+	}
+
+	port, err := strconv.Atoi(portStr)
+	if err != nil || port < 0 || port > 65535 {
+		return nil, fmt.Errorf("invalid port %q in target address", portStr)
+	}
+
+	// Parse IP address
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return nil, fmt.Errorf("target must be an IP address (hostnames require DNS resolution which is not supported in EXTEND2), got %q", host)
+	}
+
+	// NSPEC: 1 link specifier
 	data = append(data, 1)
 
-	// Link specifier type 0 (TLS-over-TCP, IPv4) - simplified
-	// Type (1 byte) | Length (1 byte) | IPv4 (4 bytes) | Port (2 bytes)
-	data = append(data, 0)            // Type
-	data = append(data, 6)            // Length
-	data = append(data, 127, 0, 0, 1) // IPv4 (placeholder)
-	data = append(data, 0, 0)         // Port (placeholder)
+	// Determine if IPv4 or IPv6 and build appropriate link specifier
+	ipv4 := ip.To4()
+	if ipv4 != nil {
+		// Link specifier type 0 (TLS-over-TCP, IPv4)
+		// Type (1 byte) | Length (1 byte) | IPv4 (4 bytes) | Port (2 bytes)
+		data = append(data, 0) // Type: IPv4
+		data = append(data, 6) // Length: 4 (IPv4) + 2 (port)
+		data = append(data, ipv4...)
+		portBytes := make([]byte, 2)
+		binary.BigEndian.PutUint16(portBytes, uint16(port))
+		data = append(data, portBytes...)
+	} else {
+		// Link specifier type 1 (TLS-over-TCP, IPv6)
+		// Type (1 byte) | Length (1 byte) | IPv6 (16 bytes) | Port (2 bytes)
+		data = append(data, 1)  // Type: IPv6
+		data = append(data, 18) // Length: 16 (IPv6) + 2 (port)
+		data = append(data, ip.To16()...)
+		portBytes := make([]byte, 2)
+		binary.BigEndian.PutUint16(portBytes, uint16(port))
+		data = append(data, portBytes...)
+	}
 
 	// HTYPE
 	htypeBytes := make([]byte, 2)
@@ -265,9 +299,7 @@ func (e *Extension) buildExtend2Data(target string, handshakeType HandshakeType,
 	// HLEN - safely convert handshake data length
 	hlen, err := security.SafeLenToUint16(handshakeData)
 	if err != nil {
-		// This should never happen as handshake data is typically small
-		// But handle it gracefully
-		return nil
+		return nil, fmt.Errorf("handshake data too large: %w", err)
 	}
 	hlenBytes := make([]byte, 2)
 	binary.BigEndian.PutUint16(hlenBytes, hlen)
@@ -276,7 +308,7 @@ func (e *Extension) buildExtend2Data(target string, handshakeType HandshakeType,
 	// HDATA
 	data = append(data, handshakeData...)
 
-	return data
+	return data, nil
 }
 
 // SetTargetRelay sets the target relay descriptor for key extraction (SPEC-001)
