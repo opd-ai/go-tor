@@ -3,7 +3,7 @@ package protocol
 import (
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha256"
+	"crypto/sha1" // #nosec G505 - SHA-1 required by Tor spec for RSA fingerprints
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/binary"
@@ -40,13 +40,13 @@ func TestValidateRelayIdentity_RSA_Success(t *testing.T) {
 		t.Fatalf("Failed to parse certificate: %v", err)
 	}
 
-	// Calculate expected fingerprint
+	// Calculate expected fingerprint using SHA-1 (per dir-spec.txt)
 	derBytes, err := x509.MarshalPKIXPublicKey(&rsaKey.PublicKey)
 	if err != nil {
 		t.Fatalf("Failed to marshal public key: %v", err)
 	}
-	fingerprint := sha256.Sum256(derBytes)
-	expectedFingerprint := fmt.Sprintf("%X", fingerprint[:20])
+	fingerprint := sha1.Sum(derBytes) // #nosec G401 - SHA-1 required by Tor spec
+	expectedFingerprint := fmt.Sprintf("%X", fingerprint[:])
 
 	// Create CERTSCell with RSA identity cert
 	certs := &CERTSCell{
@@ -366,8 +366,8 @@ func TestValidateRelayIdentity_BothRSAAndEd25519(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to marshal public key: %v", err)
 	}
-	fingerprint := sha256.Sum256(derBytes)
-	expectedFingerprint := fmt.Sprintf("%X", fingerprint[:20])
+	fingerprint := sha1.Sum(derBytes) // #nosec G401 - SHA-1 required by Tor spec
+	expectedFingerprint := fmt.Sprintf("%X", fingerprint[:])
 
 	// Create Ed25519 identity
 	expectedIdentity := make([]byte, 32)
