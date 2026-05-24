@@ -6,12 +6,12 @@
 
 ## Phase 1: Critical Security Fixes (Must Complete First)
 
-### Step 1.1: Fix NtorClientHandshake Documentation
-- [ ] Update `pkg/crypto/crypto.go` NtorClientHandshake GoDoc with explicit warning
-- [ ] Add deprecation notice or error return until fully implemented
-- [ ] Add cross-reference to NtorProcessResponse in documentation
-- [ ] Add example usage showing proper two-phase workflow
-- [ ] Run tests: `go test ./pkg/crypto/...`
+### Step 1.1: Fix NtorClientHandshake Documentation (Resolved)
+- [x] Update `pkg/crypto/crypto.go` NtorClientHandshake GoDoc with explicit warning
+- [x] Add deprecation notice or error return until fully implemented
+- [x] Add cross-reference to NtorProcessResponse in documentation
+- [x] Add example usage showing proper two-phase workflow
+- [x] Run tests: `go test ./pkg/crypto/...`
 
 ### Step 1.2: Fix VerifyDigest Implementation
 - [ ] Analyze Tor spec §6.1 digest calculation requirements
@@ -136,10 +136,10 @@ A step is complete when:
 
 ## Progress Tracking
 
-**Phase 1**: 0/4 steps complete  
+**Phase 1**: 1/4 steps complete  
 **Phase 2**: 0/4 steps complete  
 **Phase 3**: 0/2 steps complete  
 **Phase 4**: 0/3 steps complete  
-**Overall**: 0/13 steps complete (0%)
+**Overall**: 1/13 steps complete (8%)
 
-**Current Focus**: Phase 1, Step 1.1 (Fix NtorClientHandshake Documentation)
+**Current Focus**: Phase 1, Step 1.2 (Fix VerifyDigest Implementation)

@@ -41,10 +41,7 @@ func TestValidateRelayIdentity_RSA_Success(t *testing.T) {
 	}
 
 	// Calculate expected fingerprint using SHA-1 (per dir-spec.txt)
-	derBytes, err := x509.MarshalPKIXPublicKey(&rsaKey.PublicKey)
-	if err != nil {
-		t.Fatalf("Failed to marshal public key: %v", err)
-	}
+	derBytes := x509.MarshalPKCS1PublicKey(&rsaKey.PublicKey)
 	fingerprint := sha1.Sum(derBytes) // #nosec G401 - SHA-1 required by Tor spec
 	expectedFingerprint := fmt.Sprintf("%X", fingerprint[:])
 
@@ -362,10 +359,7 @@ func TestValidateRelayIdentity_BothRSAAndEd25519(t *testing.T) {
 	}
 
 	// Calculate RSA fingerprint
-	derBytes, err := x509.MarshalPKIXPublicKey(&rsaKey.PublicKey)
-	if err != nil {
-		t.Fatalf("Failed to marshal public key: %v", err)
-	}
+	derBytes := x509.MarshalPKCS1PublicKey(&rsaKey.PublicKey)
 	fingerprint := sha1.Sum(derBytes) // #nosec G401 - SHA-1 required by Tor spec
 	expectedFingerprint := fmt.Sprintf("%X", fingerprint[:])
 

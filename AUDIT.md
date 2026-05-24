@@ -4,7 +4,7 @@
 **Source**: GAPS.md analysis  
 **Status**: IN PROGRESS
 
-This document tracks critical security vulnerabilities and missing implementations that must be fixed before the code can be considered production-ready (even for educational/research use).
+This document tracks critical security vulnerabilities and missing implementations for this experimental project. Even with these findings addressed, go-tor remains experimental and is not production-ready.
 
 ## Critical Findings (UNSAFE)
 
