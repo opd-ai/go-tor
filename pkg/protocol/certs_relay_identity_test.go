@@ -43,7 +43,7 @@ func TestValidateRelayIdentity_RSA_Success(t *testing.T) {
 	// Calculate expected fingerprint using SHA-1 (per dir-spec.txt)
 	derBytes := x509.MarshalPKCS1PublicKey(&rsaKey.PublicKey)
 	fingerprint := sha1.Sum(derBytes) // #nosec G401 - SHA-1 required by Tor spec
-	expectedFingerprint := fmt.Sprintf("%X", fingerprint[:])
+	expectedFingerprint := fmt.Sprintf("%X", fingerprint[:20])
 
 	// Create CERTSCell with RSA identity cert
 	certs := &CERTSCell{
@@ -361,7 +361,7 @@ func TestValidateRelayIdentity_BothRSAAndEd25519(t *testing.T) {
 	// Calculate RSA fingerprint
 	derBytes := x509.MarshalPKCS1PublicKey(&rsaKey.PublicKey)
 	fingerprint := sha1.Sum(derBytes) // #nosec G401 - SHA-1 required by Tor spec
-	expectedFingerprint := fmt.Sprintf("%X", fingerprint[:])
+	expectedFingerprint := fmt.Sprintf("%X", fingerprint[:20])
 
 	// Create Ed25519 identity
 	expectedIdentity := make([]byte, 32)

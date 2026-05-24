@@ -302,7 +302,7 @@ func (c *CERTSCell) ValidateRelayIdentity(expectedRSAFingerprint string, expecte
 			return fmt.Errorf("RSA identity cert does not contain RSA public key")
 		}
 
-		// Calculate fingerprint (SHA-1 of PKCS#1 DER-encoded RSA public key)
+		// Calculate fingerprint (SHA-1 hash of RSA public key in PKCS#1 DER encoding)
 		derBytes := x509.MarshalPKCS1PublicKey(rsaPubKey)
 
 		// For Tor, we use SHA-1 of the DER encoding per dir-spec.txt

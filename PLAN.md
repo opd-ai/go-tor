@@ -41,12 +41,12 @@
 ## Phase 2: High Priority Fixes (Protocol Correctness)
 
 ### Step 2.1: Fix RSA Fingerprint Algorithm
-- [ ] Change `pkg/protocol/certs.go` ValidateRelayIdentity to use SHA-1
-- [ ] Remove SHA-256 truncation (incorrect per dir-spec.txt)
-- [ ] Update GoDoc to document SHA-1 usage
-- [ ] Add test vectors from real consensus documents
-- [ ] Verify relay selection works with correct fingerprints
-- [ ] Run tests: `go test ./pkg/protocol/...`
+- [x] Change `pkg/protocol/certs.go` ValidateRelayIdentity to use SHA-1
+- [x] Remove SHA-256 truncation (incorrect per dir-spec.txt)
+- [x] Update GoDoc to document SHA-1 usage
+- [x] Add test vectors from real consensus documents
+- [x] Verify relay selection works with correct fingerprints
+- [x] Run tests: `go test ./pkg/protocol/...`
 
 ### Step 2.2: Populate Relay Descriptor Keys
 - [ ] Parse IdentityKey from relay descriptors in `pkg/directory/directory.go`
@@ -137,9 +137,9 @@ A step is complete when:
 ## Progress Tracking
 
 **Phase 1**: 1/4 steps complete  
-**Phase 2**: 0/4 steps complete  
+**Phase 2**: 1/4 steps complete  
 **Phase 3**: 0/2 steps complete  
 **Phase 4**: 0/3 steps complete  
-**Overall**: 1/13 steps complete (8%)
+**Overall**: 2/13 steps complete (15%)
 
 **Current Focus**: Phase 1, Step 1.2 (Fix VerifyDigest Implementation)

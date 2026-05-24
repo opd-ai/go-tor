@@ -88,7 +88,7 @@ The GAPS.md analysis is outdated - this issue was already fixed.
 **Status**: ✅ FIXED
 **Issue**: Uses SHA-256 truncated to 20 bytes instead of SHA-1 for RSA fingerprints.  
 **Resolution**: Fixed RSA fingerprint algorithm to use SHA-1:
-1. ✅ Changed certs.go line 312 from SHA-256 to SHA-1 of DER-encoded RSA public key
+1. ✅ Changed certs.go line 312 from SHA-256 over SPKI (PKIX) encoding to SHA-1 over PKCS#1 DER-encoded RSA public key
 2. ✅ Updated to use all 20 bytes of SHA-1 hash (not truncation)
 3. ✅ Added #nosec G401 comment documenting Tor spec requirement
 4. ✅ Updated GoDoc comment to reflect SHA-1 usage per dir-spec.txt
