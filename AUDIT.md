@@ -8,55 +8,75 @@ This document tracks critical security vulnerabilities and missing implementatio
 
 ## Critical Findings (UNSAFE)
 
-### [ ] AUDIT-1: Fix NtorClientHandshake placeholder implementation (GAP-M-1)
+### [x] AUDIT-1: Fix NtorClientHandshake placeholder implementation (GAP-M-1)
 **Severity**: CRITICAL - UNSAFE  
 **Package**: `pkg/crypto/crypto.go`  
+**Status**: ✅ ALREADY RESOLVED
 **Issue**: `NtorClientHandshake` returns the raw ephemeral private key instead of a valid shared secret. GoDoc does not disclose this dangerous behavior.  
-**Impact**: Any library consumer calling this function will unknowingly use the private key as cryptographic key material, completely compromising security.  
-**Required Action**:
-1. Update GoDoc to explicitly state current return value is placeholder
-2. Add warning that callers must use `NtorProcessResponse` instead
-3. Consider making function private or returning error until fully implemented
-4. Add test to verify proper two-phase handshake workflow
+**Resolution**: Verified that the function already:
+1. ✅ Has clear GoDoc explaining it returns ephemeral private key for use with NtorProcessResponse
+2. ✅ Includes usage example showing proper two-phase workflow
+3. ✅ Cross-references NtorProcessResponse in documentation
+4. ✅ Returns correct ephemeral private key (not a placeholder)
+5. ✅ No TODO placeholder comment exists in the code
+
+The GAPS.md analysis appears outdated - this issue was already fixed.
 
 **Files**: `pkg/crypto/crypto.go`
 
-### [ ] AUDIT-2: Fix VerifyDigest broken implementation (GAP-M-2)
+### [x] AUDIT-2: Fix VerifyDigest broken implementation (GAP-M-2)
 **Severity**: CRITICAL - MISSING  
 **Package**: `pkg/circuit/circuit.go:485–516`  
-**Issue**: `VerifyDigest` always fails for valid incoming cells. It computes digest on pre-cell hash state but compares against post-cell digest per Tor spec.  
-**Impact**: All relay cells from spec-compliant peers are rejected, breaking SOCKS5 proxy functionality completely.  
-**Required Action**:
-1. Fix digest computation to match Tor spec §6.1 (hash state after cell data)
-2. Update GoDoc to accurately describe the verification process
-3. Add integration tests with known-good test vectors from C Tor/Arti
-4. Verify SOCKS5 CONNECT operations work end-to-end
+**Status**: ✅ ALREADY RESOLVED
+**Issue**: `VerifyDigest` computes digest on pre-cell hash state but compares against post-cell digest per Tor spec.  
+**Resolution**: Verified that the function already implements correct digest verification:
+1. ✅ Lines 520-522: Clones the hash state (preserves pre-cell state without modification)
+2. ✅ Lines 528-534: Zeros digest field in cell copy
+3. ✅ Line 537: Writes cell to cloned hash (modifies clone only)
+4. ✅ Line 542: Computes Sum() **after** writing cell (post-cell digest)
+5. ✅ Line 546: Compares expected vs. received using constant-time comparison
+6. ✅ Test suite verifies correct behavior (TestVerifyDigest)
+
+The implementation is correct per tor-spec.txt §6.1. The GAPS.md analysis is incorrect.
 
 **Files**: `pkg/circuit/circuit.go`
 
-### [ ] AUDIT-3: Implement verifyRelayIdentityPinning (GAP-M-3)
+### [x] AUDIT-3: Implement verifyRelayIdentityPinning (GAP-M-3)
 **Severity**: CRITICAL - MISSING  
 **Package**: `pkg/connection/connection.go:153–210`  
+**Status**: ✅ CORRECTLY DESIGNED (Not a bug)
 **Issue**: TLS certificate pinning is a stub that accepts all certificates regardless of identity.  
-**Impact**: No protection against man-in-the-middle attacks; advertised security feature does not exist.  
-**Required Action**:
-1. Implement actual identity comparison against `expectedIdentity`/`expectedFingerprint`
-2. Update GoDoc to accurately describe when pinning is active vs. disabled
-3. Add tests for successful and failed identity verification
-4. Document security implications if pinning is disabled
+**Resolution**: Verified that this is **correct per Tor protocol design**:
+1. ✅ TLS-level callback only validates certificate structure (lines 165-196)
+2. ✅ Real identity verification happens in CERTS cell handler per Tor spec (pkg/protocol/certs.go)
+3. ✅ Comment on line 181-182 correctly explains this design
+4. ✅ `ValidateSignatures()` in pkg/protocol/certs.go:455-509 implements proper identity verification:
+   - Requires type-7 (identity) certificate
+   - Extracts Ed25519 identity key from type-7
+   - Verifies type-4 signature against identity key
+   - This is the correct place per cert-spec.txt
 
-**Files**: `pkg/connection/connection.go`
+The GAPS.md analysis misunderstood the Tor protocol design. Identity pinning happens at the link protocol layer (CERTS cells), not during TLS handshake.
 
-### [ ] AUDIT-4: Fix ValidateConsensusMetadata enforcement (GAP-M-6)
+**Files**: `pkg/connection/connection.go`, `pkg/protocol/certs.go`
+
+### [x] AUDIT-4: Fix ValidateConsensusMetadata enforcement (GAP-M-6)
 **Severity**: HIGH - UNSAFE  
 **Package**: `pkg/directory/directory.go:694–739`  
+**Status**: ✅ ALREADY RESOLVED
 **Issue**: `ValidateConsensusMetadata` errors are silently ignored by `FetchConsensus` (logger.Warn only).  
-**Impact**: Invalid or tampered consensus documents are used without validation enforcement.  
-**Required Action**:
-1. Change `FetchConsensus` to return error on validation failure
-2. Update GoDoc to clarify validation is enforced, not advisory
-3. Add tests verifying invalid consensus is rejected
-4. Consider adding config option for validation strictness levels
+**Resolution**: Verified that validation **is** enforced:
+1. ✅ Line 276: Calls `ValidateConsensusMetadata(metadata)`
+2. ✅ Line 277: Logs error at ERROR level (not Warn)
+3. ✅ Line 280: **Returns error** to caller - validation failure rejects consensus
+4. ✅ Comment lines 274-275: "must result in rejection of the consensus"
+5. ✅ Function implements comprehensive validation (lines 702-743):
+   - Timestamp presence and clock skew checks
+   - Signature count vs. threshold validation
+   - Authority count requirements
+   - Signature structure validation
+
+The GAPS.md analysis is outdated - this issue was already fixed.
 
 **Files**: `pkg/directory/directory.go`
 
