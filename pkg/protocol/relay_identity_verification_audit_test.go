@@ -5,7 +5,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha256"
+	"crypto/sha1" // #nosec G505 - SHA-1 required by Tor spec for RSA fingerprints
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/binary"
@@ -99,11 +99,8 @@ func testValidRSAFingerprintMatch(t *testing.T) {
 	}
 
 	// Calculate expected fingerprint
-	derBytes, err := x509.MarshalPKIXPublicKey(&rsaKey.PublicKey)
-	if err != nil {
-		t.Fatalf("Failed to marshal public key: %v", err)
-	}
-	fingerprint := sha256.Sum256(derBytes)
+	derBytes := x509.MarshalPKCS1PublicKey(&rsaKey.PublicKey)
+	fingerprint := sha1.Sum(derBytes) // #nosec G401 - SHA-1 required by Tor spec
 	fingerprintHex := fmt.Sprintf("%X", fingerprint[:20])
 
 	// Create CERTS cell
@@ -258,11 +255,8 @@ func testRSAFingerprintCaseSensitivity(t *testing.T) {
 	}
 
 	// Calculate expected fingerprint
-	derBytes, err := x509.MarshalPKIXPublicKey(&rsaKey.PublicKey)
-	if err != nil {
-		t.Fatalf("Failed to marshal public key: %v", err)
-	}
-	fingerprint := sha256.Sum256(derBytes)
+	derBytes := x509.MarshalPKCS1PublicKey(&rsaKey.PublicKey)
+	fingerprint := sha1.Sum(derBytes) // #nosec G401 - SHA-1 required by Tor spec
 	fingerprintHex := fmt.Sprintf("%X", fingerprint[:20])
 
 	cert := &Certificate{
@@ -517,11 +511,8 @@ func testBothRSAAndEd25519Valid(t *testing.T) {
 		t.Fatalf("Failed to parse RSA certificate: %v", err)
 	}
 
-	rsaDerBytes, err := x509.MarshalPKIXPublicKey(&rsaKey.PublicKey)
-	if err != nil {
-		t.Fatalf("Failed to marshal RSA public key: %v", err)
-	}
-	rsaFingerprint := sha256.Sum256(rsaDerBytes)
+	rsaDerBytes := x509.MarshalPKCS1PublicKey(&rsaKey.PublicKey)
+	rsaFingerprint := sha1.Sum(rsaDerBytes) // #nosec G401
 	rsaFingerprintHex := fmt.Sprintf("%X", rsaFingerprint[:20])
 
 	// Generate Ed25519 key
@@ -570,11 +561,8 @@ func testRSAValidEd25519Invalid(t *testing.T) {
 		t.Fatalf("Failed to parse RSA certificate: %v", err)
 	}
 
-	rsaDerBytes, err := x509.MarshalPKIXPublicKey(&rsaKey.PublicKey)
-	if err != nil {
-		t.Fatalf("Failed to marshal RSA public key: %v", err)
-	}
-	rsaFingerprint := sha256.Sum256(rsaDerBytes)
+	rsaDerBytes := x509.MarshalPKCS1PublicKey(&rsaKey.PublicKey)
+	rsaFingerprint := sha1.Sum(rsaDerBytes) // #nosec G401
 	rsaFingerprintHex := fmt.Sprintf("%X", rsaFingerprint[:20])
 
 	// Generate two different Ed25519 keys
@@ -717,15 +705,15 @@ func testFingerprintCollisionResistance(t *testing.T) {
 	}
 
 	// Calculate fingerprints
-	derBytes1, _ := x509.MarshalPKIXPublicKey(&rsaKey1.PublicKey)
-	derBytes2, _ := x509.MarshalPKIXPublicKey(&rsaKey2.PublicKey)
+	derBytes1 := x509.MarshalPKCS1PublicKey(&rsaKey1.PublicKey)
+	derBytes2 := x509.MarshalPKCS1PublicKey(&rsaKey2.PublicKey)
 
-	fingerprint1 := sha256.Sum256(derBytes1)
-	fingerprint2 := sha256.Sum256(derBytes2)
+	fingerprint1 := sha1.Sum(derBytes1) // #nosec G401
+	fingerprint2 := sha1.Sum(derBytes2) // #nosec G401
 
-	// Verify fingerprints are different (collision resistant)
+	// Verify fingerprints are different for different RSA public keys.
 	if string(fingerprint1[:]) == string(fingerprint2[:]) {
-		t.Error("SHA-256 collision detected (extremely unlikely!)")
+		t.Error("SHA-1 digest collision detected for distinct RSA public keys")
 	}
 
 	fingerprintHex1 := fmt.Sprintf("%X", fingerprint1[:20])
@@ -1191,8 +1179,8 @@ func TestRelayIdentityIntegration(t *testing.T) {
 
 	rsaCertDER, _ := x509.CreateCertificate(rand.Reader, template, template, &rsaKey.PublicKey, rsaKey)
 
-	rsaDerBytes, _ := x509.MarshalPKIXPublicKey(&rsaKey.PublicKey)
-	rsaFingerprint := sha256.Sum256(rsaDerBytes)
+	rsaDerBytes := x509.MarshalPKCS1PublicKey(&rsaKey.PublicKey)
+	rsaFingerprint := sha1.Sum(rsaDerBytes) // #nosec G401
 	rsaFingerprintHex := fmt.Sprintf("%X", rsaFingerprint[:20])
 
 	ed25519Pub, _, _ := ed25519.GenerateKey(rand.Reader)

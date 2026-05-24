@@ -4,7 +4,7 @@ package protocol
 import (
 	"crypto/ed25519"
 	"crypto/rsa"
-	"crypto/sha256"
+	"crypto/sha1" // #nosec G505 - SHA-1 required by Tor spec for RSA fingerprints
 	"crypto/x509"
 	"encoding/binary"
 	"fmt"
@@ -302,15 +302,13 @@ func (c *CERTSCell) ValidateRelayIdentity(expectedRSAFingerprint string, expecte
 			return fmt.Errorf("RSA identity cert does not contain RSA public key")
 		}
 
-		// Calculate fingerprint (SHA-1 of DER-encoded RSA public key)
-		derBytes, err := x509.MarshalPKIXPublicKey(rsaPubKey)
-		if err != nil {
-			return fmt.Errorf("failed to encode RSA public key: %w", err)
-		}
+		// Calculate fingerprint (SHA-1 hash of RSA public key in PKCS#1 DER encoding)
+		derBytes := x509.MarshalPKCS1PublicKey(rsaPubKey)
 
-		// For Tor, we use SHA-256 of the DER encoding
-		fingerprint := sha256.Sum256(derBytes)
-		fingerprintHex := fmt.Sprintf("%X", fingerprint[:20]) // Use first 20 bytes for compatibility
+		// For Tor, we use SHA-1 of the DER encoding per dir-spec.txt
+		// The relay fingerprint is the SHA-1 hash of the DER-encoded RSA public key
+		fingerprint := sha1.Sum(derBytes)                   // #nosec G401 - SHA-1 required by Tor spec for RSA fingerprints
+		fingerprintHex := fmt.Sprintf("%X", fingerprint[:]) // All 20 bytes of SHA-1
 
 		if fingerprintHex != expectedRSAFingerprint {
 			return fmt.Errorf("RSA identity mismatch: expected %s, got %s", expectedRSAFingerprint, fingerprintHex)
