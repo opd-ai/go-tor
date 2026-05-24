@@ -263,7 +263,7 @@ func TestBuildExtend2DataTargetParsing(t *testing.T) {
 	}{
 		{name: "ipv4_success", target: "192.0.2.1:9001", wantErr: false},
 		{name: "ipv6_success", target: "[2001:db8::1]:9001", wantErr: false},
-		{name: "hostname_failure", target: "example.com:9001", wantErr: true},
+		{name: "hostname_error", target: "example.com:9001", wantErr: true},
 		{name: "missing_port_failure", target: "192.0.2.1", wantErr: true},
 		{name: "invalid_port_failure", target: "192.0.2.1:notaport", wantErr: true},
 	}

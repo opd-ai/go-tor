@@ -29,12 +29,12 @@ type ReplayProtection struct {
 	// Forward direction (client -> exit)
 	forwardSeq     uint64              // Next expected sequence number
 	forwardWindow  map[uint64]struct{} // Seen sequence numbers in window
-	forwardDigests map[[32]byte]uint64 // Cell digest -> sequence number (full SHA-256)
+	forwardDigests map[[32]byte]uint64 // Cell digest -> sequence number (full SHA-256, ~2^128 birthday-bound collision resistance)
 
 	// Backward direction (exit -> client)
 	backwardSeq     uint64
 	backwardWindow  map[uint64]struct{}
-	backwardDigests map[[32]byte]uint64 // Full SHA-256 digest for maximum collision resistance
+	backwardDigests map[[32]byte]uint64 // Full SHA-256 digest (~2^128 birthday-bound collision resistance)
 
 	// Configuration
 	windowSize uint64 // Sliding window size

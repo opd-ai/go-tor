@@ -263,7 +263,7 @@ func (e *Extension) buildExtend2Data(target string, handshakeType HandshakeType,
 	// Parse IP address
 	ip := net.ParseIP(host)
 	if ip == nil {
-		return nil, fmt.Errorf("target must be an IP address, got hostname %q", host)
+		return nil, fmt.Errorf("target must be an IP address (hostnames require DNS resolution which is not supported in EXTEND2), got %q", host)
 	}
 
 	// NSPEC: 1 link specifier
