@@ -173,7 +173,10 @@ func TestExtendCircuit(t *testing.T) {
 	handshakeData := make([]byte, 84)
 	rand.Read(handshakeData)
 
-	extend2Data := ext.buildExtend2Data("192.0.2.1:9001", HandshakeTypeNTor, handshakeData)
+	extend2Data, err := ext.buildExtend2Data("192.0.2.1:9001", HandshakeTypeNTor, handshakeData)
+	if err != nil {
+		t.Fatalf("buildExtend2Data returned error: %v", err)
+	}
 
 	if len(extend2Data) < 20 {
 		t.Errorf("EXTEND2 data too short: %d bytes", len(extend2Data))
@@ -230,7 +233,10 @@ func TestBuildExtend2Data(t *testing.T) {
 	ext := NewExtension(circuit, log)
 
 	handshakeData := make([]byte, 32)
-	data := ext.buildExtend2Data("192.0.2.1:9001", HandshakeTypeNTor, handshakeData)
+	data, err := ext.buildExtend2Data("192.0.2.1:9001", HandshakeTypeNTor, handshakeData)
+	if err != nil {
+		t.Fatalf("buildExtend2Data returned error: %v", err)
+	}
 
 	if len(data) == 0 {
 		t.Error("Expected non-empty EXTEND2 data")
@@ -239,6 +245,45 @@ func TestBuildExtend2Data(t *testing.T) {
 	// Check NSPEC
 	if data[0] != 1 {
 		t.Errorf("Expected NSPEC=1, got %d", data[0])
+	}
+}
+
+func TestBuildExtend2DataTargetParsing(t *testing.T) {
+	log := logger.NewDefault()
+	circuit := NewCircuit(1)
+	ext := NewExtension(circuit, log)
+
+	handshakeData := make([]byte, 32)
+	rand.Read(handshakeData)
+
+	tests := []struct {
+		name    string
+		target  string
+		wantErr bool
+	}{
+		{name: "ipv4_success", target: "192.0.2.1:9001", wantErr: false},
+		{name: "ipv6_success", target: "[2001:db8::1]:9001", wantErr: false},
+		{name: "hostname_failure", target: "example.com:9001", wantErr: true},
+		{name: "missing_port_failure", target: "192.0.2.1", wantErr: true},
+		{name: "invalid_port_failure", target: "192.0.2.1:notaport", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data, err := ext.buildExtend2Data(tt.target, HandshakeTypeNTor, handshakeData)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("buildExtend2Data(%q) expected error, got nil", tt.target)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("buildExtend2Data(%q) unexpected error: %v", tt.target, err)
+			}
+			if len(data) == 0 {
+				t.Fatalf("buildExtend2Data(%q) returned empty data", tt.target)
+			}
+		})
 	}
 }
 
@@ -620,7 +665,10 @@ func TestBuildExtend2DataStructure(t *testing.T) {
 	rand.Read(handshakeData)
 
 	// Build EXTEND2 data
-	extend2Data := ext.buildExtend2Data("192.0.2.1:9001", HandshakeTypeNTor, handshakeData)
+	extend2Data, err := ext.buildExtend2Data("192.0.2.1:9001", HandshakeTypeNTor, handshakeData)
+	if err != nil {
+		t.Fatalf("buildExtend2Data returned error: %v", err)
+	}
 
 	// Verify structure
 	if len(extend2Data) < 1 {

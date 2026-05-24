@@ -127,9 +127,9 @@ func (e *Extension) ExtendCircuit(ctx context.Context, target string, handshakeT
 
 	// Build EXTEND2 relay cell
 	// EXTEND2 format: NSPEC [LSPECS] HTYPE HLEN HDATA
-	extend2Data := e.buildExtend2Data(target, handshakeType, handshakeData)
-	if extend2Data == nil {
-		return fmt.Errorf("failed to build EXTEND2 data for target: %s", target)
+	extend2Data, err := e.buildExtend2Data(target, handshakeType, handshakeData)
+	if err != nil {
+		return fmt.Errorf("failed to build EXTEND2 data for target %q: %w", target, err)
 	}
 
 	// Create RELAY_EXTEND2 cell
@@ -239,7 +239,7 @@ func (e *Extension) generateHandshakeData(handshakeType HandshakeType) ([]byte, 
 }
 
 // buildExtend2Data builds the EXTEND2 relay cell data
-func (e *Extension) buildExtend2Data(target string, handshakeType HandshakeType, handshakeData []byte) []byte {
+func (e *Extension) buildExtend2Data(target string, handshakeType HandshakeType, handshakeData []byte) ([]byte, error) {
 	// EXTEND2 format (simplified):
 	// NSPEC (1 byte) - number of link specifiers
 	// Link specifiers (variable)
@@ -252,26 +252,18 @@ func (e *Extension) buildExtend2Data(target string, handshakeType HandshakeType,
 	// Parse target address to extract IP and port
 	host, portStr, err := net.SplitHostPort(target)
 	if err != nil {
-		// If parsing fails, return error-safe nil
-		// This prevents sending invalid loopback addresses to relays
-		e.logger.Error("Failed to parse target address", "target", target, "error", err)
-		return nil
+		return nil, fmt.Errorf("invalid target address: %w", err)
 	}
 
 	port, err := strconv.Atoi(portStr)
 	if err != nil || port < 0 || port > 65535 {
-		e.logger.Error("Invalid port in target address", "target", target, "port", portStr)
-		return nil
+		return nil, fmt.Errorf("invalid port %q in target address", portStr)
 	}
 
 	// Parse IP address
 	ip := net.ParseIP(host)
 	if ip == nil {
-		// If it's not an IP, it might be a hostname
-		// For now, we return nil and require IP addresses
-		// A future enhancement could add hostname link specifiers (type 3)
-		e.logger.Error("Target must be an IP address, not a hostname", "target", target, "host", host)
-		return nil
+		return nil, fmt.Errorf("target must be an IP address, got hostname %q", host)
 	}
 
 	// NSPEC: 1 link specifier
@@ -307,10 +299,7 @@ func (e *Extension) buildExtend2Data(target string, handshakeType HandshakeType,
 	// HLEN - safely convert handshake data length
 	hlen, err := security.SafeLenToUint16(handshakeData)
 	if err != nil {
-		// This should never happen as handshake data is typically small
-		// But handle it gracefully
-		e.logger.Error("Handshake data too large", "length", len(handshakeData))
-		return nil
+		return nil, fmt.Errorf("handshake data too large: %w", err)
 	}
 	hlenBytes := make([]byte, 2)
 	binary.BigEndian.PutUint16(hlenBytes, hlen)
@@ -319,7 +308,7 @@ func (e *Extension) buildExtend2Data(target string, handshakeType HandshakeType,
 	// HDATA
 	data = append(data, handshakeData...)
 
-	return data
+	return data, nil
 }
 
 // SetTargetRelay sets the target relay descriptor for key extraction (SPEC-001)

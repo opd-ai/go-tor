@@ -82,7 +82,7 @@ func NewReplayProtectionWithWindow(windowSize uint64) *ReplayProtection {
 // Returns an error if the cell appears to be replayed.
 //
 // The function:
-// 1. Computes a truncated SHA-256 digest of the cell data
+// 1. Computes the full SHA-256 digest of the cell data
 // 2. Checks if we've seen this exact digest before
 // 3. Validates the sequence number is within acceptable window
 // 4. Records the cell for future replay detection
