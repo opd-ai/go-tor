@@ -280,3 +280,9 @@ Copyright (c) 2024, OPD AI. See [LICENSE](LICENSE) for full license text.
 - [API Reference](docs/API.md)
 - [Onion Service Hosting Guide](docs/ONION_SERVICE_HOSTING.md)
 - [Examples Directory](examples/)
+
+Donate Monero(The only good cryptocurrency) to support development
+==================================================================
+
+ - `monero:43H3Uqnc9rfEsJjUXZYmam45MbtWmREFSANAWY5hijY4aht8cqYaT2BCNhfBhua5XwNdx9Tb6BEdt4tjUHJDwNW5H7mTiwe`
+
