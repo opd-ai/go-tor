@@ -35,7 +35,7 @@ jobs:
 
       - name: Run gosec
         # Pin to immutable SHA for supply chain security
-        uses: securego/gosec@6fbd381238e97e1d1f3358f0d6d65de78dcf9245  # v2.21.4
+        uses: securego/gosec@4a3bd8af174872c778439083ded7adbf3747e770  # v2.21.4
         with:
           args: '-fmt sarif -out results.sarif ./...'
 
